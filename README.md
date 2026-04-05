@@ -1,13 +1,14 @@
 # mcp-google-multi
 
-A local MCP (Model Context Protocol) server that gives Claude Code access to Gmail, Google Drive, and Google Calendar across multiple Google accounts simultaneously.
+A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (and any MCP client) access to **Gmail**, **Google Drive**, and **Google Calendar** across multiple Google accounts simultaneously.
 
 ## Features
 
-- **Multi-account** — manage 3 Google accounts (`ic`, `personal`, `fatoura`) from a single server
-- **37 tools** — Gmail (21), Drive (15), Calendar (11)
-- **Auto-refresh** — OAuth tokens refresh transparently and persist to disk
-- **Stdio transport** — Claude Code spawns it as a local subprocess, no hosting needed
+- **Multi-account** -- manage any number of Google accounts from a single server
+- **47 tools** -- Gmail (21), Drive (15), Calendar (11)
+- **Config-driven** -- accounts defined in `.env`, no code changes needed
+- **Auto-refresh** -- OAuth tokens refresh transparently and persist to disk
+- **Stdio transport** -- runs as a local subprocess, no hosting needed
 
 ## Tools
 
@@ -73,34 +74,46 @@ A local MCP (Model Context Protocol) server that gives Claude Code access to Gma
 | `calendar_get_freebusy` | Check free/busy times for calendars |
 | `calendar_create_calendar` | Create a new calendar |
 
-Every tool accepts an `account` parameter: `"ic"`, `"personal"`, or `"fatoura"`.
+Every tool accepts an `account` parameter matching one of your configured aliases.
 
 ## Prerequisites
 
 - Node.js 18+
-- A GCP project with **Gmail API**, **Google Drive API**, and **Google Calendar API** enabled
+- A Google Cloud project with **Gmail API**, **Google Drive API**, and **Google Calendar API** enabled
 - An OAuth 2.0 Client ID (Desktop app type)
 
 ## Setup
 
-### 1. GCP Credentials
+### 1. Google Cloud Credentials
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com)
 2. Create or select a project
-3. Enable: **Gmail API**, **Google Drive API**, **Google Calendar API**
-4. Go to APIs & Services > Credentials > Create Credentials > OAuth 2.0 Client ID
+3. Enable these APIs:
+   - [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
+   - [Google Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
+   - [Google Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
+4. Go to **APIs & Services > Credentials > Create Credentials > OAuth 2.0 Client ID**
 5. Application type: **Desktop app**
 6. Add authorized redirect URI: `http://localhost:4242/oauth2callback`
-7. Copy the `client_id` and `client_secret`
+7. Copy the **Client ID** and **Client Secret**
 
 ### 2. Install & Configure
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/bakissation/mcp-google-multi.git
 cd mcp-google-multi
 npm install
 cp .env.example .env
-# Edit .env with your client_id and client_secret
+```
+
+Edit `.env`:
+
+```env
+GOOGLE_CLIENT_ID=your_client_id_here
+GOOGLE_CLIENT_SECRET=your_client_secret_here
+
+# Define your accounts as alias:email pairs (comma-separated)
+GOOGLE_ACCOUNTS=work:you@company.com,personal:you@gmail.com
 ```
 
 ### 3. Build
@@ -111,19 +124,47 @@ npm run build
 
 ### 4. Authenticate Accounts
 
+Run the auth flow for each account alias you defined:
+
 ```bash
-npm run auth:ic         # opens browser → log in as baki@ideacrafters.com
-npm run auth:personal   # opens browser → log in as abdelbaki.berkati@gmail.com
-npm run auth:fatoura    # opens browser → log in as baki@fatoura.app
+npm run auth -- work       # opens browser -> log in with you@company.com
+npm run auth -- personal   # opens browser -> log in with you@gmail.com
 ```
 
-Each saves a token to `tokens/<alias>/token.json`. Tokens auto-refresh — you should only need to do this once per account.
+Each saves a token to `tokens/<alias>/token.json`. Tokens auto-refresh -- you should only need to do this once per account.
 
 ### 5. Register in Claude Code
 
 ```bash
-claude mcp add google-multi -s user -- node /path/to/mcp-google-multi/dist/index.js
+claude mcp add google-multi -s user -- node /absolute/path/to/mcp-google-multi/dist/index.js
 ```
+
+Or add it manually to your Claude Code MCP config:
+
+```json
+{
+  "mcpServers": {
+    "google-multi": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-google-multi/dist/index.js"]
+    }
+  }
+}
+```
+
+## Adding / Removing Accounts
+
+Edit the `GOOGLE_ACCOUNTS` variable in `.env`, rebuild, and authenticate the new account:
+
+```bash
+# Add a new account
+# .env: GOOGLE_ACCOUNTS=work:you@company.com,personal:you@gmail.com,freelance:you@freelance.com
+
+npm run build
+npm run auth -- freelance
+```
+
+No code changes required.
 
 ## Project Structure
 
@@ -131,9 +172,9 @@ claude mcp add google-multi -s user -- node /path/to/mcp-google-multi/dist/index
 mcp-google-multi/
 ├── src/
 │   ├── index.ts          # Entry point: MCP server or auth CLI
-│   ├── accounts.ts       # Account registry (aliases, emails, token paths)
+│   ├── accounts.ts       # Account config parser (reads from .env)
 │   ├── auth.ts           # OAuth flow with local HTTP callback
-│   ├── client.ts         # OAuth2Client factory with auto-refresh persistence
+│   ├── client.ts         # OAuth2Client factory with auto-refresh
 │   ├── types.ts          # Shared TypeScript types
 │   └── tools/
 │       ├── gmail.ts      # 21 Gmail tools
@@ -141,28 +182,36 @@ mcp-google-multi/
 │       └── calendar.ts   # 11 Calendar tools
 ├── tokens/               # OAuth tokens per account (gitignored)
 ├── dist/                 # Compiled output (gitignored)
-├── .env                  # Google OAuth credentials (gitignored)
+├── .env                  # Your credentials (gitignored)
 ├── .env.example          # Template for .env
 ├── package.json
-└── tsconfig.json
+├── tsconfig.json
+└── LICENSE
 ```
 
 ## OAuth Scopes
 
-- `gmail.modify` — read, label, trash, delete emails
-- `gmail.send` — send emails
-- `drive` — full Drive access (read, upload, share, delete)
-- `calendar` — full calendar access
+| Scope | Access |
+|-------|--------|
+| `gmail.modify` | Read, label, trash, delete emails |
+| `gmail.send` | Send emails |
+| `drive` | Full Drive access (read, upload, share, delete) |
+| `calendar` | Full calendar access |
 
-## Adding / Changing Accounts
+## Troubleshooting
 
-Edit `src/accounts.ts` to add or modify account aliases, then rebuild and re-auth:
+**"GOOGLE_ACCOUNTS is not set"** -- Make sure your `.env` file exists in the project root and has the `GOOGLE_ACCOUNTS` variable set.
 
-```bash
-npm run build
-node dist/index.js auth --account <new-alias>
-```
+**"No token file found for account X"** -- Run `npm run auth -- <alias>` to authenticate that account.
+
+**"Port 4242 is already in use"** -- Another process is using port 4242. Close it and retry the auth flow.
+
+**Token refresh errors** -- Delete the token file at `tokens/<alias>/token.json` and re-authenticate.
+
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request.
 
 ## License
 
-Private
+[MIT](LICENSE)

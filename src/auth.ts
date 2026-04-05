@@ -6,7 +6,6 @@ import path from 'node:path';
 import open from 'open';
 import destroyer from 'server-destroy';
 import { ACCOUNTS, ACCOUNT_CONFIG } from './accounts.js';
-import type { Account } from './accounts.js';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.modify',
@@ -23,7 +22,7 @@ export async function runAuthFlow(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const alias = args[accountIdx + 1] as Account;
+  const alias = args[accountIdx + 1];
   if (!ACCOUNTS.includes(alias)) {
     console.error(`Unknown account "${alias}". Valid aliases: ${ACCOUNTS.join(', ')}`);
     process.exit(1);

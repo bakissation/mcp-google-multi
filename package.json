@@ -1,14 +1,23 @@
 {
   "name": "mcp-google-multi",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "description": "MCP server for Gmail, Google Drive, and Google Calendar with multi-account support",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "google",
+    "gmail",
+    "google-drive",
+    "google-calendar",
+    "claude",
+    "claude-code"
+  ],
   "scripts": {
     "build": "tsc && chmod +x dist/index.js",
     "watch": "tsc --watch",
-    "auth:ic": "node dist/index.js auth --account ic",
-    "auth:personal": "node dist/index.js auth --account personal",
-    "auth:fatoura": "node dist/index.js auth --account fatoura"
+    "auth": "node dist/index.js auth --account"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

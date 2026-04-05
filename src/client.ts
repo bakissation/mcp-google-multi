@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import fs from 'node:fs/promises';
-import type { Account } from './accounts.js';
 import { ACCOUNT_CONFIG } from './accounts.js';
+import type { Account } from './accounts.js';
 import type { TokenData } from './types.js';
 
 export async function getClient(account: Account) {

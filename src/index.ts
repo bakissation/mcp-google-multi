@@ -1,10 +1,5 @@
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-
-// Load .env from the project root (not CWD) so it works when spawned by Claude Code
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+// accounts.ts handles dotenv loading (must happen before any other imports that read env)
+import './accounts.js';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
