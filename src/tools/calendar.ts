@@ -387,10 +387,10 @@ export function registerCalendarTools(server: McpServer): void {
       description: 'Check free/busy times for one or more calendars within a time window. Returns only busy blocks, not event details.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        calendarIds: z.array(z.string()).describe('Calendar IDs to check, e.g. ["primary", "jad@buildingo.com"]'),
+        calendarIds: z.array(z.string()).describe('Calendar IDs to check, e.g. ["primary", "user@example.com"]'),
         timeMin: z.string().describe('ISO 8601 start of window'),
         timeMax: z.string().describe('ISO 8601 end of window'),
-        timeZone: z.string().optional().describe('Timezone (default: Africa/Algiers)'),
+        timeZone: z.string().optional().describe('Timezone (default: UTC)'),
       },
     },
     async ({ account, calendarIds, timeMin, timeMax, timeZone }) => {
@@ -401,7 +401,7 @@ export function registerCalendarTools(server: McpServer): void {
           requestBody: {
             timeMin,
             timeMax,
-            timeZone: timeZone ?? 'Africa/Algiers',
+            timeZone: timeZone ?? 'UTC',
             items: calendarIds.map((id: string) => ({ id })),
           },
         });
@@ -423,7 +423,7 @@ export function registerCalendarTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias'),
         summary: z.string().describe('Calendar name'),
         description: z.string().optional().describe('Calendar description'),
-        timeZone: z.string().optional().describe('Timezone (default: Africa/Algiers)'),
+        timeZone: z.string().optional().describe('Timezone (default: UTC)'),
       },
     },
     async ({ account, summary, description, timeZone }) => {
@@ -434,7 +434,7 @@ export function registerCalendarTools(server: McpServer): void {
           requestBody: {
             summary,
             description,
-            timeZone: timeZone ?? 'Africa/Algiers',
+            timeZone: timeZone ?? 'UTC',
           },
         });
         return {
