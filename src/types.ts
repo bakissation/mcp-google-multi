@@ -15,6 +15,12 @@ export interface GmailMessageHeader {
   snippet: string;
 }
 
+export interface GmailAttachment {
+  filename: string;
+  attachmentId: string;
+  mimeType: string;
+}
+
 export interface GmailMessageFull {
   id: string;
   threadId: string;
@@ -24,7 +30,7 @@ export interface GmailMessageFull {
   cc: string;
   date: string;
   body: string;
-  attachments: string[];
+  attachments: GmailAttachment[];
 }
 
 export interface DriveFile {

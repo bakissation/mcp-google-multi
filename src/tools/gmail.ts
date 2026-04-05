@@ -4,7 +4,9 @@ import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import type { GmailMessageHeader, GmailMessageFull } from '../types.js';
+import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../types.js';
+import * as path from 'path';
+import * as fs from 'fs';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -48,17 +50,21 @@ function decodeBody(
   return '';
 }
 
-function getAttachmentNames(payload: any): string[] {
-  const names: string[] = [];
+function getAttachments(payload: any): GmailAttachment[] {
+  const attachments: GmailAttachment[] = [];
   if (payload.filename && payload.body?.attachmentId) {
-    names.push(payload.filename);
+    attachments.push({
+      filename: payload.filename,
+      attachmentId: payload.body.attachmentId,
+      mimeType: payload.mimeType ?? 'application/octet-stream',
+    });
   }
   if (payload.parts) {
     for (const part of payload.parts) {
-      names.push(...getAttachmentNames(part));
+      attachments.push(...getAttachments(part));
     }
   }
-  return names;
+  return attachments;
 }
 
 function parseMessage(msg: any): GmailMessageFull {
@@ -72,7 +78,7 @@ function parseMessage(msg: any): GmailMessageFull {
     cc: getHeader(headers, 'Cc'),
     date: getHeader(headers, 'Date'),
     body: decodeBody(msg.payload),
-    attachments: getAttachmentNames(msg.payload),
+    attachments: getAttachments(msg.payload),
   };
 }
 
@@ -254,7 +260,47 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // 9.5 gmail_create_draft
+  // 9.5 gmail_download_attachment
+  server.registerTool(
+    'gmail_download_attachment',
+    {
+      description: 'Download an email attachment to local disk. Use gmail_read first to get the attachmentId.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        messageId: z.string().describe('The Gmail message ID'),
+        attachmentId: z.string().describe('The attachment ID from gmail_read response'),
+        filename: z.string().describe('Filename to save as (e.g. report.xlsx)'),
+        savePath: z.string().describe('Absolute directory path to save into, e.g. /home/user/Downloads'),
+      },
+    },
+    async ({ account, messageId, attachmentId, filename, savePath }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+
+        const res = await gmail.users.messages.attachments.get({
+          userId: 'me',
+          messageId,
+          id: attachmentId,
+        });
+
+        const data = res.data.data;
+        if (!data) throw new Error('No attachment data returned');
+
+        const buffer = Buffer.from(data, 'base64url');
+        const fullPath = path.join(savePath, filename);
+        await fs.promises.writeFile(fullPath, buffer);
+
+        return {
+          content: [{ type: 'text' as const, text: `Saved to ${fullPath} (${buffer.length} bytes)` }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // 9.6 gmail_create_draft
   server.registerTool(
     'gmail_create_draft',
     {
