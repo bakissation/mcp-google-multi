@@ -14,11 +14,13 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.4.0",
     "googleapis": "^144.0.0",
+    "mime-types": "^3.0.2",
     "open": "^10.0.0",
     "server-destroy": "^1.0.1",
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@types/mime-types": "^3.0.1",
     "@types/node": "^22.0.0",
     "@types/server-destroy": "^1.0.3",
     "typescript": "^5.8.0"

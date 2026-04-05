@@ -5,28 +5,73 @@ A local MCP (Model Context Protocol) server that gives Claude Code access to Gma
 ## Features
 
 - **Multi-account** — manage 3 Google accounts (`ic`, `personal`, `fatoura`) from a single server
-- **14 tools** — Gmail (search, read, send, draft), Drive (search, read, list), Calendar (list, get, create, update, delete)
+- **37 tools** — Gmail (21), Drive (15), Calendar (11)
 - **Auto-refresh** — OAuth tokens refresh transparently and persist to disk
 - **Stdio transport** — Claude Code spawns it as a local subprocess, no hosting needed
 
 ## Tools
 
-| Service | Tool | Description |
-|---------|------|-------------|
-| Gmail | `gmail_search` | Search messages with Gmail query syntax |
-| Gmail | `gmail_read` | Read a full message by ID |
-| Gmail | `gmail_read_thread` | Read all messages in a thread |
-| Gmail | `gmail_send` | Send an email |
-| Gmail | `gmail_create_draft` | Create a draft |
-| Drive | `drive_search` | Search files with Drive query syntax |
-| Drive | `drive_read` | Read file content (exports Workspace docs as text) |
-| Drive | `drive_list` | List files in a folder or root |
-| Calendar | `calendar_list_calendars` | List all calendars |
-| Calendar | `calendar_list_events` | List/search events with time range |
-| Calendar | `calendar_get_event` | Get a single event by ID |
-| Calendar | `calendar_create_event` | Create an event |
-| Calendar | `calendar_update_event` | Update an event |
-| Calendar | `calendar_delete_event` | Delete an event |
+### Gmail (21 tools)
+
+| Tool | Description |
+|------|-------------|
+| `gmail_search` | Search messages with Gmail query syntax |
+| `gmail_read` | Read a full message by ID |
+| `gmail_read_thread` | Read all messages in a thread |
+| `gmail_send` | Send an email |
+| `gmail_download_attachment` | Download an email attachment to local disk |
+| `gmail_create_draft` | Create a draft |
+| `gmail_modify_labels` | Add/remove labels on a message (star, archive, mark read, etc.) |
+| `gmail_trash` | Move a message to Trash (recoverable) |
+| `gmail_delete` | Permanently delete a message (irreversible) |
+| `gmail_batch_modify` | Bulk add/remove labels across up to 1000 messages |
+| `gmail_batch_delete` | Permanently delete multiple messages (irreversible) |
+| `gmail_list_drafts` | List all drafts |
+| `gmail_get_draft` | Read a specific draft |
+| `gmail_send_draft` | Send an existing draft |
+| `gmail_list_labels` | List all labels (system + custom) |
+| `gmail_create_label` | Create a custom label |
+| `gmail_delete_label` | Delete a label |
+| `gmail_get_profile` | Get account email, message count, history ID |
+| `gmail_list_history` | Get mailbox changes since a history ID |
+| `gmail_get_vacation` | Read vacation responder settings |
+| `gmail_set_vacation` | Enable/disable vacation responder |
+
+### Google Drive (15 tools)
+
+| Tool | Description |
+|------|-------------|
+| `drive_search` | Search files with Drive query syntax |
+| `drive_read` | Read file content (exports Workspace docs as text) |
+| `drive_list` | List files in a folder or root |
+| `drive_upload` | Upload a local file to Drive |
+| `drive_download` | Download a binary file to local disk |
+| `drive_export` | Export Google Docs/Sheets/Slides to PDF, DOCX, XLSX, Markdown, etc. |
+| `drive_create_folder` | Create a new folder |
+| `drive_update` | Rename, move, or replace file content |
+| `drive_delete` | Permanently delete a file (irreversible) |
+| `drive_trash` | Move a file to trash (recoverable) |
+| `drive_copy` | Duplicate a file |
+| `drive_share` | Share with user/group/domain/anyone |
+| `drive_list_permissions` | List who has access to a file |
+| `drive_remove_permission` | Revoke access |
+| `drive_get_about` | Storage quota and account info |
+
+### Google Calendar (11 tools)
+
+| Tool | Description |
+|------|-------------|
+| `calendar_list_calendars` | List all calendars |
+| `calendar_list_events` | List/search events with time range |
+| `calendar_get_event` | Get a single event by ID |
+| `calendar_create_event` | Create an event |
+| `calendar_update_event` | Update an event |
+| `calendar_delete_event` | Delete an event |
+| `calendar_quick_add` | Create event from natural language (e.g. "Lunch Thursday 1pm") |
+| `calendar_move_event` | Move an event between calendars |
+| `calendar_list_instances` | List occurrences of a recurring event |
+| `calendar_get_freebusy` | Check free/busy times for calendars |
+| `calendar_create_calendar` | Create a new calendar |
 
 Every tool accepts an `account` parameter: `"ic"`, `"personal"`, or `"fatoura"`.
 
@@ -91,9 +136,9 @@ mcp-google-multi/
 │   ├── client.ts         # OAuth2Client factory with auto-refresh persistence
 │   ├── types.ts          # Shared TypeScript types
 │   └── tools/
-│       ├── gmail.ts      # 5 Gmail tools
-│       ├── drive.ts      # 3 Drive tools
-│       └── calendar.ts   # 6 Calendar tools
+│       ├── gmail.ts      # 21 Gmail tools
+│       ├── drive.ts      # 15 Drive tools
+│       └── calendar.ts   # 11 Calendar tools
 ├── tokens/               # OAuth tokens per account (gitignored)
 ├── dist/                 # Compiled output (gitignored)
 ├── .env                  # Google OAuth credentials (gitignored)
@@ -104,9 +149,9 @@ mcp-google-multi/
 
 ## OAuth Scopes
 
-- `gmail.modify` — read, send, draft emails
+- `gmail.modify` — read, label, trash, delete emails
 - `gmail.send` — send emails
-- `drive` — read Drive files
+- `drive` — full Drive access (read, upload, share, delete)
 - `calendar` — full calendar access
 
 ## Adding / Changing Accounts

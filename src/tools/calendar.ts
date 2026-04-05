@@ -277,6 +277,174 @@ export function registerCalendarTools(server: McpServer): void {
       }
     },
   );
+
+  // --- New tools below ---
+
+  // calendar_quick_add
+  server.registerTool(
+    'calendar_quick_add',
+    {
+      description: 'Create a calendar event from a natural language string. Google parses date, time, title, and guests automatically.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        calendarId: z.string().default('primary').optional()
+          .describe('Calendar ID (default: primary)'),
+        text: z.string().describe('Natural language event, e.g. "Lunch with Farouk Thursday 1pm at Le Boulanger"'),
+        sendNotifications: z.boolean().optional().describe('Send notifications to attendees (default: false)'),
+      },
+    },
+    async ({ account, calendarId, text, sendNotifications }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const cal = google.calendar({ version: 'v3', auth });
+        const res = await cal.events.quickAdd({
+          calendarId: calendarId ?? 'primary',
+          text,
+          sendNotifications: sendNotifications ?? false,
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(formatEvent(res.data), null, 2) }],
+        };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
+
+  // calendar_move_event
+  server.registerTool(
+    'calendar_move_event',
+    {
+      description: 'Move an event from one calendar to another',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        calendarId: z.string().describe('Source calendar ID'),
+        eventId: z.string().describe('Event ID to move'),
+        destinationCalendarId: z.string().describe('Destination calendar ID'),
+        sendNotifications: z.boolean().optional().describe('Send notifications (default: false)'),
+      },
+    },
+    async ({ account, calendarId, eventId, destinationCalendarId, sendNotifications }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const cal = google.calendar({ version: 'v3', auth });
+        const res = await cal.events.move({
+          calendarId,
+          eventId,
+          destination: destinationCalendarId,
+          sendNotifications: sendNotifications ?? false,
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(formatEvent(res.data), null, 2) }],
+        };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
+
+  // calendar_list_instances
+  server.registerTool(
+    'calendar_list_instances',
+    {
+      description: 'List all occurrences of a recurring calendar event',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        calendarId: z.string().default('primary').optional()
+          .describe('Calendar ID (default: primary)'),
+        eventId: z.string().describe('ID of the recurring event series'),
+        timeMin: z.string().optional().describe('ISO 8601 — filter instances after this time'),
+        timeMax: z.string().optional().describe('ISO 8601 — filter instances before this time'),
+        maxResults: z.number().min(1).max(250).default(25).optional()
+          .describe('Max instances to return (default: 25)'),
+      },
+    },
+    async ({ account, calendarId, eventId, timeMin, timeMax, maxResults }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const cal = google.calendar({ version: 'v3', auth });
+        const res = await cal.events.instances({
+          calendarId: calendarId ?? 'primary',
+          eventId,
+          timeMin,
+          timeMax,
+          maxResults: maxResults ?? 25,
+        });
+        const events = (res.data.items ?? []).map(formatEvent);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(events, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
+
+  // calendar_get_freebusy
+  server.registerTool(
+    'calendar_get_freebusy',
+    {
+      description: 'Check free/busy times for one or more calendars within a time window. Returns only busy blocks, not event details.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        calendarIds: z.array(z.string()).describe('Calendar IDs to check, e.g. ["primary", "jad@buildingo.com"]'),
+        timeMin: z.string().describe('ISO 8601 start of window'),
+        timeMax: z.string().describe('ISO 8601 end of window'),
+        timeZone: z.string().optional().describe('Timezone (default: Africa/Algiers)'),
+      },
+    },
+    async ({ account, calendarIds, timeMin, timeMax, timeZone }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const cal = google.calendar({ version: 'v3', auth });
+        const res = await cal.freebusy.query({
+          requestBody: {
+            timeMin,
+            timeMax,
+            timeZone: timeZone ?? 'Africa/Algiers',
+            items: calendarIds.map((id: string) => ({ id })),
+          },
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data.calendars, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
+
+  // calendar_create_calendar
+  server.registerTool(
+    'calendar_create_calendar',
+    {
+      description: 'Create a new calendar under the account',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        summary: z.string().describe('Calendar name'),
+        description: z.string().optional().describe('Calendar description'),
+        timeZone: z.string().optional().describe('Timezone (default: Africa/Algiers)'),
+      },
+    },
+    async ({ account, summary, description, timeZone }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const cal = google.calendar({ version: 'v3', auth });
+        const res = await cal.calendars.insert({
+          requestBody: {
+            summary,
+            description,
+            timeZone: timeZone ?? 'Africa/Algiers',
+          },
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
 }
 
 function formatEvent(event: any) {

@@ -362,6 +362,436 @@ export function registerGmailTools(server: McpServer): void {
       }
     },
   );
+
+  // --- New tools below ---
+
+  // gmail_modify_labels
+  server.registerTool(
+    'gmail_modify_labels',
+    {
+      description: 'Add or remove labels on a Gmail message. Use system label IDs like STARRED, UNREAD, INBOX, TRASH, or custom label IDs from gmail_list_labels.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        messageId: z.string().describe('Gmail message ID'),
+        addLabelIds: z.array(z.string()).optional().describe('Label IDs to add'),
+        removeLabelIds: z.array(z.string()).optional().describe('Label IDs to remove'),
+      },
+    },
+    async ({ account, messageId, addLabelIds, removeLabelIds }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.messages.modify({
+          userId: 'me',
+          id: messageId,
+          requestBody: {
+            addLabelIds: addLabelIds ?? [],
+            removeLabelIds: removeLabelIds ?? [],
+          },
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_trash
+  server.registerTool(
+    'gmail_trash',
+    {
+      description: 'Move a Gmail message to Trash (recoverable)',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        messageId: z.string().describe('Gmail message ID'),
+      },
+    },
+    async ({ account, messageId }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.messages.trash({ userId: 'me', id: messageId });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_delete
+  server.registerTool(
+    'gmail_delete',
+    {
+      description: 'Permanently and irreversibly delete a Gmail message. No recovery possible.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        messageId: z.string().describe('Gmail message ID'),
+      },
+    },
+    async ({ account, messageId }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        await gmail.users.messages.delete({ userId: 'me', id: messageId });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, messageId }, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_batch_modify
+  server.registerTool(
+    'gmail_batch_modify',
+    {
+      description: 'Add/remove labels across up to 1000 Gmail messages at once. Useful for bulk archiving, marking as read, etc.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        messageIds: z.array(z.string()).describe('Message IDs (up to 1000)'),
+        addLabelIds: z.array(z.string()).optional().describe('Label IDs to add'),
+        removeLabelIds: z.array(z.string()).optional().describe('Label IDs to remove'),
+      },
+    },
+    async ({ account, messageIds, addLabelIds, removeLabelIds }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        await gmail.users.messages.batchModify({
+          userId: 'me',
+          requestBody: {
+            ids: messageIds,
+            addLabelIds: addLabelIds ?? [],
+            removeLabelIds: removeLabelIds ?? [],
+          },
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ modified: messageIds.length }, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_batch_delete
+  server.registerTool(
+    'gmail_batch_delete',
+    {
+      description: 'Permanently delete multiple Gmail messages. Irreversible.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        messageIds: z.array(z.string()).describe('Message IDs (up to 1000)'),
+      },
+    },
+    async ({ account, messageIds }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        await gmail.users.messages.batchDelete({
+          userId: 'me',
+          requestBody: { ids: messageIds },
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ deleted: messageIds.length }, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_list_drafts
+  server.registerTool(
+    'gmail_list_drafts',
+    {
+      description: 'List all drafts in a Gmail mailbox',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        maxResults: z.number().min(1).max(100).default(20).optional()
+          .describe('Max results to return (default: 20)'),
+        query: z.string().optional().describe('Gmail search syntax to filter drafts'),
+      },
+    },
+    async ({ account, maxResults, query }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.drafts.list({
+          userId: 'me',
+          maxResults: maxResults ?? 20,
+          q: query,
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data.drafts ?? [], null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_get_draft
+  server.registerTool(
+    'gmail_get_draft',
+    {
+      description: 'Read the full content of a specific Gmail draft',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        draftId: z.string().describe('Draft ID'),
+      },
+    },
+    async ({ account, draftId }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.drafts.get({
+          userId: 'me',
+          id: draftId,
+          format: 'full',
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_send_draft
+  server.registerTool(
+    'gmail_send_draft',
+    {
+      description: 'Send an existing Gmail draft by its draft ID',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        draftId: z.string().describe('Draft ID to send'),
+      },
+    },
+    async ({ account, draftId }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.drafts.send({
+          userId: 'me',
+          requestBody: { id: draftId },
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_list_labels
+  server.registerTool(
+    'gmail_list_labels',
+    {
+      description: 'List all Gmail labels (system and user-defined). Use to get label IDs for gmail_modify_labels.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+      },
+    },
+    async ({ account }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.labels.list({ userId: 'me' });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data.labels ?? [], null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_create_label
+  server.registerTool(
+    'gmail_create_label',
+    {
+      description: 'Create a new custom Gmail label',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        name: z.string().describe('Label name, e.g. "Ideacrafters/ComptaLegal"'),
+        messageListVisibility: z.enum(['show', 'hide']).optional()
+          .describe('Whether messages with this label show in message list (default: show)'),
+        labelListVisibility: z.enum(['labelShow', 'labelShowIfUnread', 'labelHide']).optional()
+          .describe('Whether the label appears in the label list (default: labelShow)'),
+      },
+    },
+    async ({ account, name, messageListVisibility, labelListVisibility }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.labels.create({
+          userId: 'me',
+          requestBody: {
+            name,
+            messageListVisibility: messageListVisibility ?? 'show',
+            labelListVisibility: labelListVisibility ?? 'labelShow',
+          },
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_delete_label
+  server.registerTool(
+    'gmail_delete_label',
+    {
+      description: 'Permanently delete a Gmail label and remove it from all messages',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        labelId: z.string().describe('Label ID to delete'),
+      },
+    },
+    async ({ account, labelId }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        await gmail.users.labels.delete({ userId: 'me', id: labelId });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, labelId }, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_get_profile
+  server.registerTool(
+    'gmail_get_profile',
+    {
+      description: 'Get Gmail account profile: email address, total messages, total threads, and current history ID',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+      },
+    },
+    async ({ account }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.getProfile({ userId: 'me' });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_list_history
+  server.registerTool(
+    'gmail_list_history',
+    {
+      description: 'Get all mailbox changes since a given historyId. Useful for detecting new emails since last check.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        startHistoryId: z.string().describe('History ID from a previous gmail_get_profile or gmail_read response'),
+        maxResults: z.number().min(1).max(500).default(100).optional()
+          .describe('Max results to return (default: 100)'),
+        historyTypes: z.array(z.enum(['messageAdded', 'messageDeleted', 'labelAdded', 'labelRemoved'])).optional()
+          .describe('Filter by history event types'),
+      },
+    },
+    async ({ account, startHistoryId, maxResults, historyTypes }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.history.list({
+          userId: 'me',
+          startHistoryId,
+          maxResults: maxResults ?? 100,
+          historyTypes: historyTypes as any,
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_get_vacation
+  server.registerTool(
+    'gmail_get_vacation',
+    {
+      description: 'Read current Gmail vacation responder settings',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+      },
+    },
+    async ({ account }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.settings.getVacation({ userId: 'me' });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
+
+  // gmail_set_vacation
+  server.registerTool(
+    'gmail_set_vacation',
+    {
+      description: 'Enable or disable Gmail vacation responder with a custom message',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        enableAutoReply: z.boolean().describe('Whether to enable the vacation responder'),
+        responseSubject: z.string().optional().describe('Subject line for auto-reply'),
+        responseBodyPlainText: z.string().optional().describe('Plain text body for auto-reply'),
+        startTime: z.string().optional().describe('Start time as Unix timestamp in ms'),
+        endTime: z.string().optional().describe('End time as Unix timestamp in ms'),
+        restrictToContacts: z.boolean().optional().describe('Only reply to contacts (default: false)'),
+        restrictToDomain: z.boolean().optional().describe('Only reply to same domain (default: false)'),
+      },
+    },
+    async ({ account, enableAutoReply, responseSubject, responseBodyPlainText, startTime, endTime, restrictToContacts, restrictToDomain }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = google.gmail({ version: 'v1', auth });
+        const res = await gmail.users.settings.updateVacation({
+          userId: 'me',
+          requestBody: {
+            enableAutoReply,
+            responseSubject,
+            responseBodyPlainText,
+            startTime,
+            endTime,
+            restrictToContacts: restrictToContacts ?? false,
+            restrictToDomain: restrictToDomain ?? false,
+          },
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGmailError(error, account as Account);
+      }
+    },
+  );
 }
 
 function handleGmailError(error: any, account: Account) {
