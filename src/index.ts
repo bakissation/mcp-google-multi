@@ -6,6 +6,9 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { registerGmailTools } from './tools/gmail.js';
 import { registerDriveTools } from './tools/drive.js';
 import { registerCalendarTools } from './tools/calendar.js';
+import { registerSheetsTools } from './tools/sheets.js';
+import { registerDocsTools } from './tools/docs.js';
+import { registerContactsTools } from './tools/contacts.js';
 
 async function main() {
   // Route: auth CLI or MCP server
@@ -24,6 +27,9 @@ async function main() {
   registerGmailTools(server);
   registerDriveTools(server);
   registerCalendarTools(server);
+  registerSheetsTools(server);
+  registerDocsTools(server);
+  registerContactsTools(server);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

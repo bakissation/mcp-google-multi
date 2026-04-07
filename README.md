@@ -1,11 +1,11 @@
 # mcp-google-multi
 
-A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (and any MCP client) access to **Gmail**, **Google Drive**, and **Google Calendar** across multiple Google accounts simultaneously.
+A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (and any MCP client) access to **Gmail**, **Google Drive**, **Google Calendar**, **Google Sheets**, **Google Docs**, and **Google Contacts** across multiple Google accounts simultaneously.
 
 ## Features
 
 - **Multi-account** -- manage any number of Google accounts from a single server
-- **47 tools** -- Gmail (21), Drive (15), Calendar (11)
+- **73 tools** -- Gmail (21), Drive (15), Calendar (11), Sheets (9), Docs (8), Contacts (9)
 - **Config-driven** -- accounts defined in `.env`, no code changes needed
 - **Auto-refresh** -- OAuth tokens refresh transparently and persist to disk
 - **Stdio transport** -- runs as a local subprocess, no hosting needed
@@ -74,6 +74,47 @@ A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (an
 | `calendar_get_freebusy` | Check free/busy times for calendars |
 | `calendar_create_calendar` | Create a new calendar |
 
+### Google Sheets (9 tools)
+
+| Tool | Description |
+|------|-------------|
+| `sheets_create` | Create a new spreadsheet |
+| `sheets_get` | Get spreadsheet metadata (title, sheets/tabs, named ranges) |
+| `sheets_read_range` | Read cell values from a range (A1 notation) |
+| `sheets_write_range` | Write values to a range |
+| `sheets_append_rows` | Append rows after existing data |
+| `sheets_clear_range` | Clear values from a range (keeps formatting) |
+| `sheets_batch_read` | Read multiple ranges at once |
+| `sheets_batch_write` | Write to multiple ranges at once |
+| `sheets_add_sheet` | Add a new tab/sheet to a spreadsheet |
+
+### Google Docs (8 tools)
+
+| Tool | Description |
+|------|-------------|
+| `docs_create` | Create a new document |
+| `docs_get` | Get document metadata (title, revision, named ranges) |
+| `docs_read` | Read document content as plain text |
+| `docs_insert_text` | Insert text at a position or at the end |
+| `docs_replace_text` | Find and replace all occurrences |
+| `docs_delete_range` | Delete content in an index range |
+| `docs_update_style` | Update text formatting (bold, italic, font, size) |
+| `docs_insert_table` | Insert a table at a position |
+
+### Google Contacts (9 tools)
+
+| Tool | Description |
+|------|-------------|
+| `contacts_search` | Search contacts by name, email, phone, or organization |
+| `contacts_get` | Get a single contact by resource name |
+| `contacts_list` | List all contacts (paginated) |
+| `contacts_create` | Create a new contact |
+| `contacts_update` | Update an existing contact |
+| `contacts_delete` | Delete a contact |
+| `contacts_groups_list` | List all contact groups (labels) |
+| `contacts_group_members` | List members of a contact group |
+| `contacts_group_create` | Create a new contact group |
+
 Every tool accepts an `account` parameter matching one of your configured aliases.
 
 ## Prerequisites
@@ -92,6 +133,9 @@ Every tool accepts an `account` parameter matching one of your configured aliase
    - [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
    - [Google Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
    - [Google Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
+   - [Google Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com)
+   - [Google Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com)
+   - [People API](https://console.cloud.google.com/apis/library/people.googleapis.com)
 4. Go to **APIs & Services > Credentials > Create Credentials > OAuth 2.0 Client ID**
 5. Application type: **Desktop app**
 6. Add authorized redirect URI: `http://localhost:4242/oauth2callback`
@@ -179,7 +223,10 @@ mcp-google-multi/
 │   └── tools/
 │       ├── gmail.ts      # 21 Gmail tools
 │       ├── drive.ts      # 15 Drive tools
-│       └── calendar.ts   # 11 Calendar tools
+│       ├── calendar.ts   # 11 Calendar tools
+│       ├── sheets.ts     # 9 Sheets tools
+│       ├── docs.ts       # 8 Docs tools
+│       └── contacts.ts   # 9 Contacts tools
 ├── tokens/               # OAuth tokens per account (gitignored)
 ├── dist/                 # Compiled output (gitignored)
 ├── .env                  # Your credentials (gitignored)
@@ -197,6 +244,9 @@ mcp-google-multi/
 | `gmail.send` | Send emails |
 | `drive` | Full Drive access (read, upload, share, delete) |
 | `calendar` | Full calendar access |
+| `spreadsheets` | Read/write Google Sheets |
+| `documents` | Read/write Google Docs |
+| `contacts` | Read/write Google Contacts |
 
 ## Troubleshooting
 
