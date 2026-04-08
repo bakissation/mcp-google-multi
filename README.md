@@ -1,11 +1,11 @@
 # mcp-google-multi
 
-A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (and any MCP client) access to **Gmail**, **Google Drive**, **Google Calendar**, **Google Sheets**, **Google Docs**, and **Google Contacts** across multiple Google accounts simultaneously.
+A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (and any MCP client) access to **Gmail**, **Google Drive**, **Google Calendar**, **Google Sheets**, **Google Docs**, **Google Contacts**, and **Google Search Console** across multiple Google accounts simultaneously.
 
 ## Features
 
 - **Multi-account** -- manage any number of Google accounts from a single server
-- **73 tools** -- Gmail (21), Drive (15), Calendar (11), Sheets (9), Docs (8), Contacts (9)
+- **83 tools** -- Gmail (21), Drive (15), Calendar (11), Sheets (9), Docs (8), Contacts (9), Search Console (10)
 - **Config-driven** -- accounts defined in `.env`, no code changes needed
 - **Auto-refresh** -- OAuth tokens refresh transparently and persist to disk
 - **Stdio transport** -- runs as a local subprocess, no hosting needed
@@ -115,6 +115,21 @@ A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (an
 | `contacts_group_members` | List members of a contact group |
 | `contacts_group_create` | Create a new contact group |
 
+### Google Search Console (10 tools)
+
+| Tool | Description |
+|------|-------------|
+| `searchconsole_sites_list` | List all Search Console properties |
+| `searchconsole_sites_get` | Get details for a specific property |
+| `searchconsole_sites_add` | Add a property to Search Console |
+| `searchconsole_sites_delete` | Remove a property |
+| `searchconsole_sitemaps_list` | List submitted sitemaps |
+| `searchconsole_sitemaps_get` | Get sitemap details (status, errors, indexed count) |
+| `searchconsole_sitemaps_submit` | Submit a sitemap |
+| `searchconsole_sitemaps_delete` | Delete a submitted sitemap |
+| `searchconsole_searchanalytics_query` | Query search analytics (clicks, impressions, CTR, position) with filtering |
+| `searchconsole_url_inspect` | Inspect a URL (indexing status, crawl info, rich results, mobile usability) |
+
 Every tool accepts an `account` parameter matching one of your configured aliases.
 
 ## Prerequisites
@@ -136,6 +151,7 @@ Every tool accepts an `account` parameter matching one of your configured aliase
    - [Google Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com)
    - [Google Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com)
    - [People API](https://console.cloud.google.com/apis/library/people.googleapis.com)
+   - [Search Console API](https://console.cloud.google.com/apis/library/searchconsole.googleapis.com)
 4. Go to **APIs & Services > Credentials > Create Credentials > OAuth 2.0 Client ID**
 5. Application type: **Desktop app**
 6. Add authorized redirect URI: `http://localhost:4242/oauth2callback`
@@ -226,7 +242,8 @@ mcp-google-multi/
 │       ├── calendar.ts   # 11 Calendar tools
 │       ├── sheets.ts     # 9 Sheets tools
 │       ├── docs.ts       # 8 Docs tools
-│       └── contacts.ts   # 9 Contacts tools
+│       ├── contacts.ts   # 9 Contacts tools
+│       └── searchconsole.ts # 10 Search Console tools
 ├── tokens/               # OAuth tokens per account (gitignored)
 ├── dist/                 # Compiled output (gitignored)
 ├── .env                  # Your credentials (gitignored)
@@ -247,6 +264,7 @@ mcp-google-multi/
 | `spreadsheets` | Read/write Google Sheets |
 | `documents` | Read/write Google Docs |
 | `contacts` | Read/write Google Contacts |
+| `webmasters` | Google Search Console (sites, sitemaps, analytics, URL inspection) |
 
 ## Troubleshooting
 
