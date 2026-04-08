@@ -262,6 +262,12 @@ mcp-google-multi/
 
 Contributions are welcome! Please open an issue or submit a pull request.
 
+## Author
+
+**Abdelbaki Berkati** — [berkati.xyz](https://berkati.xyz) · [@bakissation](https://github.com/bakissation)
+
+[Read the case study →](https://berkati.xyz/case-studies/mcp-google-multi/)
+
 ## License
 
 [MIT](LICENSE)
