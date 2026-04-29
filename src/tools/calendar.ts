@@ -205,8 +205,8 @@ export function registerCalendarTools(server: McpServer): void {
         const auth = await getClient(account as Account);
         const cal = google.calendar({ version: 'v3', auth });
 
-        // Fetch existing event first to merge
-        const existing = await cal.events.get({
+        // Fetch the event first so a 404 surfaces before we attempt the patch.
+        await cal.events.get({
           calendarId: calendarId ?? 'primary',
           eventId,
         });

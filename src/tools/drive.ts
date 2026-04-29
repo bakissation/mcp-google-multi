@@ -267,7 +267,8 @@ export function registerDriveTools(server: McpServer): void {
         const auth = await getClient(account as Account);
         const drive = google.drive({ version: 'v3', auth });
 
-        const dest = path.join(savePath, filename);
+        // Strip path components so callers can't escape savePath via "../".
+        const dest = path.join(savePath, path.basename(filename));
         const res = await drive.files.get(
           { fileId, alt: 'media' },
           { responseType: 'stream' },
@@ -308,7 +309,8 @@ export function registerDriveTools(server: McpServer): void {
         const auth = await getClient(account as Account);
         const drive = google.drive({ version: 'v3', auth });
 
-        const dest = path.join(savePath, filename);
+        // Strip path components so callers can't escape savePath via "../".
+        const dest = path.join(savePath, path.basename(filename));
         const res = await drive.files.export(
           { fileId, mimeType: exportMime },
           { responseType: 'stream' },

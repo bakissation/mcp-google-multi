@@ -4,6 +4,7 @@ import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
+import { encodeAddressHeader, encodeHeaderValue, normalizeBodyLineEndings } from './gmail-mime.js';
 import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../types.js';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -221,21 +222,22 @@ export function registerGmailTools(server: McpServer): void {
         const config = (await import('../accounts.js')).ACCOUNT_CONFIG[account as Account];
 
         const headers = [
-          `From: ${config.email}`,
-          `To: ${to}`,
-          `Subject: ${subject}`,
+          `From: ${encodeAddressHeader(config.email)}`,
+          `To: ${encodeAddressHeader(to)}`,
+          `Subject: ${encodeHeaderValue(subject)}`,
           'MIME-Version: 1.0',
           'Content-Type: text/plain; charset="UTF-8"',
+          'Content-Transfer-Encoding: 8bit',
         ];
 
-        if (cc) headers.push(`Cc: ${cc}`);
+        if (cc) headers.push(`Cc: ${encodeAddressHeader(cc)}`);
         if (replyToMessageId) {
           headers.push(`In-Reply-To: ${replyToMessageId}`);
           headers.push(`References: ${replyToMessageId}`);
         }
 
-        const rawMessage = [...headers, '', body].join('\r\n');
-        const encoded = Buffer.from(rawMessage).toString('base64url');
+        const rawMessage = [...headers, '', normalizeBodyLineEndings(body)].join('\r\n');
+        const encoded = Buffer.from(rawMessage, 'utf-8').toString('base64url');
 
         const sendParams: any = {
           userId: 'me',
@@ -288,7 +290,8 @@ export function registerGmailTools(server: McpServer): void {
         if (!data) throw new Error('No attachment data returned');
 
         const buffer = Buffer.from(data, 'base64url');
-        const fullPath = path.join(savePath, filename);
+        // Strip path components so callers can't escape savePath via "../".
+        const fullPath = path.join(savePath, path.basename(filename));
         await fs.promises.writeFile(fullPath, buffer);
 
         return {
@@ -322,17 +325,18 @@ export function registerGmailTools(server: McpServer): void {
         const config = (await import('../accounts.js')).ACCOUNT_CONFIG[account as Account];
 
         const headers = [
-          `From: ${config.email}`,
-          `To: ${to}`,
-          `Subject: ${subject}`,
+          `From: ${encodeAddressHeader(config.email)}`,
+          `To: ${encodeAddressHeader(to)}`,
+          `Subject: ${encodeHeaderValue(subject)}`,
           'MIME-Version: 1.0',
           'Content-Type: text/plain; charset="UTF-8"',
+          'Content-Transfer-Encoding: 8bit',
         ];
 
-        if (cc) headers.push(`Cc: ${cc}`);
+        if (cc) headers.push(`Cc: ${encodeAddressHeader(cc)}`);
 
-        const rawMessage = [...headers, '', body].join('\r\n');
-        const encoded = Buffer.from(rawMessage).toString('base64url');
+        const rawMessage = [...headers, '', normalizeBodyLineEndings(body)].join('\r\n');
+        const encoded = Buffer.from(rawMessage, 'utf-8').toString('base64url');
 
         const draftParams: any = {
           userId: 'me',

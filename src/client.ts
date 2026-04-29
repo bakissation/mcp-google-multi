@@ -33,17 +33,17 @@ export async function getClient(account: Account) {
 
   oauth2Client.setCredentials(tokenData);
 
-  // Persist refreshed tokens back to disk
+  // 0o600: tokens grant full account access; keep them user-only.
   oauth2Client.on('tokens', async (tokens) => {
     try {
       const existing = JSON.parse(
         await fs.readFile(config.tokenPath, 'utf-8'),
       );
       const merged = { ...existing, ...tokens };
-      await fs.writeFile(config.tokenPath, JSON.stringify(merged, null, 2));
+      await fs.writeFile(config.tokenPath, JSON.stringify(merged, null, 2), { mode: 0o600 });
     } catch {
       // If we can't read the existing file, just write the new tokens
-      await fs.writeFile(config.tokenPath, JSON.stringify(tokens, null, 2));
+      await fs.writeFile(config.tokenPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
     }
   });
 
