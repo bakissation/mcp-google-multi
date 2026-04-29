@@ -17,6 +17,56 @@ function getHeader(
   return headers?.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? '';
 }
 
+// RFC 2047 encoded-word (`=?utf-8?B?...?=`) for non-ASCII header text.
+// Splits long values into multiple <=75-char encoded-words separated by CRLF SPACE
+// (header folding) so the resulting header lines stay under the 76-char line limit.
+function encodeHeaderValue(value: string): string {
+  if (value === '' || /^[\x00-\x7F]*$/.test(value)) return value;
+  const prefix = '=?utf-8?B?';
+  const suffix = '?=';
+  const maxInner = 75 - prefix.length - suffix.length;
+  // base64 encodes 3 input bytes into 4 output chars (always padded to a
+  // multiple of 4). Round maxInner DOWN to a multiple of 4 first, then
+  // divide by 4 and multiply by 3 — anything else can overshoot maxInner.
+  const bytesPerChunk = Math.floor(maxInner / 4) * 3;
+  const buf = Buffer.from(value, 'utf-8');
+  const chunks: string[] = [];
+  for (let i = 0; i < buf.length; i += bytesPerChunk) {
+    chunks.push(`${prefix}${buf.subarray(i, i + bytesPerChunk).toString('base64')}${suffix}`);
+  }
+  return chunks.join('\r\n ');
+}
+
+// Encode an address-list header (To/Cc/Bcc/From). RFC 2047 encoded-words may
+// only appear in display names, never in the addr-spec (`local@domain`) or
+// around the angle brackets. So parse each comma-separated address and only
+// encode the display name when present.
+function encodeAddressHeader(value: string): string {
+  if (value === '') return '';
+  return value.split(',').map((part) => {
+    const trimmed = part.trim();
+    if (trimmed === '') return '';
+    const m = trimmed.match(/^(.*?)<([^>]+)>$/);
+    if (m) {
+      const rawName = m[1].trim().replace(/^"(.*)"$/, '$1').trim();
+      const addr = m[2].trim();
+      if (rawName === '') return `<${addr}>`;
+      return `${encodeHeaderValue(rawName)} <${addr}>`;
+    }
+    // No angle brackets — bare addr-spec. Per RFC 5321 the local part is
+    // ASCII unless SMTPUTF8 is in play, which Gmail negotiates for us; we
+    // pass it through unchanged.
+    return trimmed;
+  }).filter(Boolean).join(', ');
+}
+
+// RFC 5322 §2.3: "CR and LF MUST only occur together as CRLF; they MUST NOT
+// appear independently in the body." Normalize any bare \n (or bare \r) to
+// CRLF so the body is spec-conformant regardless of how the caller composed it.
+function normalizeBodyLineEndings(body: string): string {
+  return body.replace(/\r\n|\r|\n/g, '\r\n');
+}
+
 function decodeBody(
   payload: any,
 ): string {
@@ -221,21 +271,22 @@ export function registerGmailTools(server: McpServer): void {
         const config = (await import('../accounts.js')).ACCOUNT_CONFIG[account as Account];
 
         const headers = [
-          `From: ${config.email}`,
-          `To: ${to}`,
-          `Subject: ${subject}`,
+          `From: ${encodeAddressHeader(config.email)}`,
+          `To: ${encodeAddressHeader(to)}`,
+          `Subject: ${encodeHeaderValue(subject)}`,
           'MIME-Version: 1.0',
           'Content-Type: text/plain; charset="UTF-8"',
+          'Content-Transfer-Encoding: 8bit',
         ];
 
-        if (cc) headers.push(`Cc: ${cc}`);
+        if (cc) headers.push(`Cc: ${encodeAddressHeader(cc)}`);
         if (replyToMessageId) {
           headers.push(`In-Reply-To: ${replyToMessageId}`);
           headers.push(`References: ${replyToMessageId}`);
         }
 
-        const rawMessage = [...headers, '', body].join('\r\n');
-        const encoded = Buffer.from(rawMessage).toString('base64url');
+        const rawMessage = [...headers, '', normalizeBodyLineEndings(body)].join('\r\n');
+        const encoded = Buffer.from(rawMessage, 'utf-8').toString('base64url');
 
         const sendParams: any = {
           userId: 'me',
@@ -322,17 +373,18 @@ export function registerGmailTools(server: McpServer): void {
         const config = (await import('../accounts.js')).ACCOUNT_CONFIG[account as Account];
 
         const headers = [
-          `From: ${config.email}`,
-          `To: ${to}`,
-          `Subject: ${subject}`,
+          `From: ${encodeAddressHeader(config.email)}`,
+          `To: ${encodeAddressHeader(to)}`,
+          `Subject: ${encodeHeaderValue(subject)}`,
           'MIME-Version: 1.0',
           'Content-Type: text/plain; charset="UTF-8"',
+          'Content-Transfer-Encoding: 8bit',
         ];
 
-        if (cc) headers.push(`Cc: ${cc}`);
+        if (cc) headers.push(`Cc: ${encodeAddressHeader(cc)}`);
 
-        const rawMessage = [...headers, '', body].join('\r\n');
-        const encoded = Buffer.from(rawMessage).toString('base64url');
+        const rawMessage = [...headers, '', normalizeBodyLineEndings(body)].join('\r\n');
+        const encoded = Buffer.from(rawMessage, 'utf-8').toString('base64url');
 
         const draftParams: any = {
           userId: 'me',
