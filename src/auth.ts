@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import http from 'node:http';
 import { URL } from 'node:url';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import open from 'open';
@@ -40,11 +41,15 @@ export async function runAuthFlow(args: string[]): Promise<void> {
     'http://localhost:4242/oauth2callback',
   );
 
+  // CSRF protection for the OAuth callback (RFC 6749 §10.12).
+  const expectedState = randomBytes(32).toString('hex');
+
   const authorizeUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
     scope: SCOPES,
     login_hint: config.email,
+    state: expectedState,
   });
 
   console.log(`Authenticating account "${alias}" (${config.email})...`);
@@ -75,13 +80,23 @@ export async function runAuthFlow(args: string[]): Promise<void> {
               return;
             }
 
+            const returnedState = qs.get('state');
+            if (returnedState !== expectedState) {
+              res.writeHead(400, { 'Content-Type': 'text/plain' });
+              res.end('State mismatch — possible CSRF attempt. Aborting.');
+              (server as any).destroy();
+              reject(new Error('OAuth state token mismatch'));
+              return;
+            }
+
             const { tokens } = await oauth2Client.getToken(code);
 
-            // Ensure directory exists
             await fs.mkdir(path.dirname(config.tokenPath), { recursive: true });
+            // 0o600: tokens grant full account access; keep them user-only.
             await fs.writeFile(
               config.tokenPath,
               JSON.stringify(tokens, null, 2),
+              { mode: 0o600 },
             );
 
             res.writeHead(200, { 'Content-Type': 'text/html' });

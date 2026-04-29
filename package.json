@@ -20,21 +20,29 @@
   "scripts": {
     "build": "tsc && chmod +x dist/index.js",
     "watch": "tsc --watch",
-    "auth": "node dist/index.js auth --account"
+    "auth": "node dist/index.js auth --account",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.4.0",
-    "googleapis": "^144.0.0",
+    "googleapis": "^171.4.0",
     "mime-types": "^3.0.2",
-    "open": "^10.0.0",
+    "open": "^11.0.0",
     "server-destroy": "^1.0.1",
-    "zod": "^3.25.0"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/mime-types": "^3.0.1",
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.6.0",
     "@types/server-destroy": "^1.0.3",
-    "typescript": "^5.8.0"
+    "eslint": "^10.2.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.1",
+    "vitest": "^4.1.5"
   }
 }
