@@ -4,6 +4,7 @@ import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
+import { handleGoogleApiError } from './_errors.js';
 import { encodeAddressHeader, encodeHeaderValue, normalizeBodyLineEndings } from './gmail-mime.js';
 import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../types.js';
 import * as path from 'path';
@@ -21,25 +22,20 @@ function getHeader(
 function decodeBody(
   payload: any,
 ): string {
-  // Try direct body
   if (payload.body?.data) {
     return Buffer.from(payload.body.data, 'base64url').toString('utf-8');
   }
-
-  // Recurse into parts — prefer text/plain
   if (payload.parts) {
     for (const part of payload.parts) {
       if (part.mimeType === 'text/plain' && part.body?.data) {
         return Buffer.from(part.body.data, 'base64url').toString('utf-8');
       }
     }
-    // Fallback to text/html
     for (const part of payload.parts) {
       if (part.mimeType === 'text/html' && part.body?.data) {
         return Buffer.from(part.body.data, 'base64url').toString('utf-8');
       }
     }
-    // Recurse into nested multipart
     for (const part of payload.parts) {
       if (part.parts) {
         const result = decodeBody(part);
@@ -84,7 +80,6 @@ function parseMessage(msg: any): GmailMessageFull {
 }
 
 export function registerGmailTools(server: McpServer): void {
-  // 9.1 gmail_search
   server.registerTool(
     'gmail_search',
     {
@@ -135,8 +130,6 @@ export function registerGmailTools(server: McpServer): void {
       }
     },
   );
-
-  // 9.2 gmail_read
   server.registerTool(
     'gmail_read',
     {
@@ -166,8 +159,6 @@ export function registerGmailTools(server: McpServer): void {
       }
     },
   );
-
-  // 9.3 gmail_read_thread
   server.registerTool(
     'gmail_read_thread',
     {
@@ -197,8 +188,6 @@ export function registerGmailTools(server: McpServer): void {
       }
     },
   );
-
-  // 9.4 gmail_send
   server.registerTool(
     'gmail_send',
     {
@@ -261,8 +250,6 @@ export function registerGmailTools(server: McpServer): void {
       }
     },
   );
-
-  // 9.5 gmail_download_attachment
   server.registerTool(
     'gmail_download_attachment',
     {
@@ -302,8 +289,6 @@ export function registerGmailTools(server: McpServer): void {
       }
     },
   );
-
-  // 9.6 gmail_create_draft
   server.registerTool(
     'gmail_create_draft',
     {
@@ -367,9 +352,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // --- New tools below ---
-
-  // gmail_modify_labels
   server.registerTool(
     'gmail_modify_labels',
     {
@@ -402,7 +384,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_trash
   server.registerTool(
     'gmail_trash',
     {
@@ -426,7 +407,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_delete
   server.registerTool(
     'gmail_delete',
     {
@@ -450,7 +430,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_batch_modify
   server.registerTool(
     'gmail_batch_modify',
     {
@@ -483,7 +462,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_batch_delete
   server.registerTool(
     'gmail_batch_delete',
     {
@@ -510,7 +488,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_list_drafts
   server.registerTool(
     'gmail_list_drafts',
     {
@@ -540,7 +517,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_get_draft
   server.registerTool(
     'gmail_get_draft',
     {
@@ -568,7 +544,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_send_draft
   server.registerTool(
     'gmail_send_draft',
     {
@@ -595,7 +570,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_list_labels
   server.registerTool(
     'gmail_list_labels',
     {
@@ -618,7 +592,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_create_label
   server.registerTool(
     'gmail_create_label',
     {
@@ -653,7 +626,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_delete_label
   server.registerTool(
     'gmail_delete_label',
     {
@@ -677,7 +649,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_get_profile
   server.registerTool(
     'gmail_get_profile',
     {
@@ -700,7 +671,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_list_history
   server.registerTool(
     'gmail_list_history',
     {
@@ -733,7 +703,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_get_vacation
   server.registerTool(
     'gmail_get_vacation',
     {
@@ -756,7 +725,6 @@ export function registerGmailTools(server: McpServer): void {
     },
   );
 
-  // gmail_set_vacation
   server.registerTool(
     'gmail_set_vacation',
     {
@@ -799,30 +767,5 @@ export function registerGmailTools(server: McpServer): void {
 }
 
 function handleGmailError(error: any, account: Account) {
-  if (error.code === 401) {
-    return {
-      content: [{
-        type: 'text' as const,
-        text: `Authentication error for account "${account}". Run: node dist/index.js auth --account ${account}`,
-      }],
-      isError: true,
-    };
-  }
-  if (error.code === 429) {
-    const retryAfter = error.response?.headers?.['retry-after'] ?? 'unknown';
-    return {
-      content: [{
-        type: 'text' as const,
-        text: JSON.stringify({ error: 'rate_limited', retryAfter }),
-      }],
-      isError: true,
-    };
-  }
-  return {
-    content: [{
-      type: 'text' as const,
-      text: JSON.stringify({ error: error.message ?? String(error), code: error.code }),
-    }],
-    isError: true,
-  };
+  return handleGoogleApiError(error, account);
 }
