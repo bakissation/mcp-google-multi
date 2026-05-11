@@ -8,7 +8,16 @@ import open from 'open';
 import destroyer from 'server-destroy';
 import { ACCOUNTS, ACCOUNT_CONFIG } from './accounts.js';
 
-const SCOPES = [
+// ─── Scope tiers ────────────────────────────────────────────────────────
+//
+// BASE: always granted. Existing v3 surface + Tasks + Meet (added in v4.0.0).
+// OPTIONAL: per-account opt-in via env GOOGLE_OPTIONAL_SCOPES="forms,chat".
+// ADMIN: per-account opt-in via env GOOGLE_ADMIN_ACCOUNTS="alias1,alias2".
+//
+// Personal Gmail accounts will 403 on admin scopes — never grant by default.
+// ────────────────────────────────────────────────────────────────────────
+
+export const BASE_SCOPES = [
   'https://www.googleapis.com/auth/gmail.modify',
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/drive',
@@ -17,7 +26,70 @@ const SCOPES = [
   'https://www.googleapis.com/auth/documents',
   'https://www.googleapis.com/auth/contacts',
   'https://www.googleapis.com/auth/webmasters',
+  'https://www.googleapis.com/auth/tasks',
+  'https://www.googleapis.com/auth/meetings.space.readonly',
 ];
+
+export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
+  forms: [
+    'https://www.googleapis.com/auth/forms.body',
+    'https://www.googleapis.com/auth/forms.responses.readonly',
+  ],
+  chat: [
+    'https://www.googleapis.com/auth/chat.spaces',
+    'https://www.googleapis.com/auth/chat.messages',
+    'https://www.googleapis.com/auth/chat.messages.create',
+  ],
+};
+
+export const ADMIN_SCOPES = [
+  'https://www.googleapis.com/auth/admin.reports.audit.readonly',
+  'https://www.googleapis.com/auth/apps.alerts',
+  'https://www.googleapis.com/auth/admin.directory.user',
+  'https://www.googleapis.com/auth/admin.directory.group.readonly',
+  'https://www.googleapis.com/auth/admin.directory.group.member.readonly',
+];
+
+/** Parse comma-separated env value into a deduplicated string array. */
+function parseCsvEnv(name: string): string[] {
+  return (process.env[name]?.trim() ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+/** Bundle keys enabled via GOOGLE_OPTIONAL_SCOPES (e.g. ["forms","chat"]). */
+export function getOptionalBundles(): string[] {
+  return parseCsvEnv('GOOGLE_OPTIONAL_SCOPES').filter(b => b in OPTIONAL_SCOPE_BUNDLES);
+}
+
+/** Account aliases granted ADMIN_SCOPES via GOOGLE_ADMIN_ACCOUNTS. */
+export function getAdminAccounts(): string[] {
+  return parseCsvEnv('GOOGLE_ADMIN_ACCOUNTS');
+}
+
+/**
+ * Compose the scope list for a single account at consent time.
+ * Resolves env flags: GOOGLE_OPTIONAL_SCOPES (global) and GOOGLE_ADMIN_ACCOUNTS (per-account allowlist).
+ */
+export function resolveScopesForAccount(alias: string): string[] {
+  const scopes = [...BASE_SCOPES];
+
+  for (const bundle of getOptionalBundles()) {
+    scopes.push(...OPTIONAL_SCOPE_BUNDLES[bundle]);
+  }
+
+  if (getAdminAccounts().includes(alias)) {
+    scopes.push(...ADMIN_SCOPES);
+  }
+
+  return Array.from(new Set(scopes));
+}
+
+/** True if admin writes are explicitly enabled. Default refuses to prevent accidents on small orgs. */
+export function adminWritesEnabled(): boolean {
+  return process.env.GOOGLE_ALLOW_ADMIN_WRITES === 'true';
+}
 
 export async function runAuthFlow(args: string[]): Promise<void> {
   const accountIdx = args.indexOf('--account');
@@ -34,6 +106,7 @@ export async function runAuthFlow(args: string[]): Promise<void> {
   }
 
   const config = ACCOUNT_CONFIG[alias];
+  const scopes = resolveScopesForAccount(alias);
 
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -47,12 +120,16 @@ export async function runAuthFlow(args: string[]): Promise<void> {
   const authorizeUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
-    scope: SCOPES,
+    scope: scopes,
     login_hint: config.email,
     state: expectedState,
   });
 
   console.log(`Authenticating account "${alias}" (${config.email})...`);
+  console.log(`Requesting ${scopes.length} scopes.`);
+  if (getAdminAccounts().includes(alias)) {
+    console.log('  ⚠ Admin scopes included — this account will be granted Workspace admin access.');
+  }
   console.log(`Opening browser for authorization...`);
 
   return new Promise((resolve, reject) => {
@@ -115,7 +192,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
           reject(e);
         }
       })
-      .listen(4242, () => {
+      // Bind to loopback only — never expose the OAuth callback to the local network.
+      .listen(4242, '127.0.0.1', () => {
         open(authorizeUrl, { wait: false }).then((cp) => cp.unref());
       });
 

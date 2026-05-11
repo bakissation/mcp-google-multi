@@ -4,6 +4,7 @@ import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
+import { handleGoogleApiError } from './_errors.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -300,39 +301,5 @@ export function registerSearchConsoleTools(server: McpServer): void {
 }
 
 function handleSearchConsoleError(error: any, account: Account) {
-  if (error.code === 401) {
-    return {
-      content: [{
-        type: 'text' as const,
-        text: `Authentication error for account "${account}". The "webmasters" scope may be missing. Re-run: node dist/index.js auth --account ${account}`,
-      }],
-      isError: true,
-    };
-  }
-  if (error.code === 403) {
-    return {
-      content: [{
-        type: 'text' as const,
-        text: `Permission denied for account "${account}". Ensure the account has access to this Search Console property and the "webmasters" OAuth scope is granted.`,
-      }],
-      isError: true,
-    };
-  }
-  if (error.code === 429) {
-    const retryAfter = error.response?.headers?.['retry-after'] ?? 'unknown';
-    return {
-      content: [{
-        type: 'text' as const,
-        text: JSON.stringify({ error: 'rate_limited', retryAfter }),
-      }],
-      isError: true,
-    };
-  }
-  return {
-    content: [{
-      type: 'text' as const,
-      text: JSON.stringify({ error: error.message ?? String(error), code: error.code }),
-    }],
-    isError: true,
-  };
+  return handleGoogleApiError(error, account);
 }

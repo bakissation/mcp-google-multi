@@ -4,11 +4,11 @@ import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
+import { handleGoogleApiError } from './_errors.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
 export function registerCalendarTools(server: McpServer): void {
-  // calendar_list_calendars
   server.registerTool(
     'calendar_list_calendars',
     {
@@ -41,7 +41,6 @@ export function registerCalendarTools(server: McpServer): void {
     },
   );
 
-  // calendar_list_events
   server.registerTool(
     'calendar_list_events',
     {
@@ -74,8 +73,6 @@ export function registerCalendarTools(server: McpServer): void {
         if (query) params.q = query;
         if (timeMin) params.timeMin = timeMin;
         if (timeMax) params.timeMax = timeMax;
-
-        // Default to upcoming events if no time range specified
         if (!timeMin && !timeMax) {
           params.timeMin = new Date().toISOString();
         }
@@ -92,7 +89,6 @@ export function registerCalendarTools(server: McpServer): void {
     },
   );
 
-  // calendar_get_event
   server.registerTool(
     'calendar_get_event',
     {
@@ -123,7 +119,6 @@ export function registerCalendarTools(server: McpServer): void {
     },
   );
 
-  // calendar_create_event
   server.registerTool(
     'calendar_create_event',
     {
@@ -181,7 +176,6 @@ export function registerCalendarTools(server: McpServer): void {
     },
   );
 
-  // calendar_update_event
   server.registerTool(
     'calendar_update_event',
     {
@@ -247,7 +241,6 @@ export function registerCalendarTools(server: McpServer): void {
     },
   );
 
-  // calendar_delete_event
   server.registerTool(
     'calendar_delete_event',
     {
@@ -278,9 +271,6 @@ export function registerCalendarTools(server: McpServer): void {
     },
   );
 
-  // --- New tools below ---
-
-  // calendar_quick_add
   server.registerTool(
     'calendar_quick_add',
     {
@@ -311,7 +301,6 @@ export function registerCalendarTools(server: McpServer): void {
     },
   );
 
-  // calendar_move_event
   server.registerTool(
     'calendar_move_event',
     {
@@ -343,7 +332,6 @@ export function registerCalendarTools(server: McpServer): void {
     },
   );
 
-  // calendar_list_instances
   server.registerTool(
     'calendar_list_instances',
     {
@@ -380,7 +368,6 @@ export function registerCalendarTools(server: McpServer): void {
     },
   );
 
-  // calendar_get_freebusy
   server.registerTool(
     'calendar_get_freebusy',
     {
@@ -414,7 +401,6 @@ export function registerCalendarTools(server: McpServer): void {
     },
   );
 
-  // calendar_create_calendar
   server.registerTool(
     'calendar_create_calendar',
     {
@@ -468,30 +454,5 @@ function formatEvent(event: any) {
 }
 
 function handleCalendarError(error: any, account: Account) {
-  if (error.code === 401) {
-    return {
-      content: [{
-        type: 'text' as const,
-        text: `Authentication error for account "${account}". Run: node dist/index.js auth --account ${account}`,
-      }],
-      isError: true,
-    };
-  }
-  if (error.code === 429) {
-    const retryAfter = error.response?.headers?.['retry-after'] ?? 'unknown';
-    return {
-      content: [{
-        type: 'text' as const,
-        text: JSON.stringify({ error: 'rate_limited', retryAfter }),
-      }],
-      isError: true,
-    };
-  }
-  return {
-    content: [{
-      type: 'text' as const,
-      text: JSON.stringify({ error: error.message ?? String(error), code: error.code }),
-    }],
-    isError: true,
-  };
+  return handleGoogleApiError(error, account);
 }

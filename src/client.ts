@@ -42,7 +42,6 @@ export async function getClient(account: Account) {
       const merged = { ...existing, ...tokens };
       await fs.writeFile(config.tokenPath, JSON.stringify(merged, null, 2), { mode: 0o600 });
     } catch {
-      // If we can't read the existing file, just write the new tokens
       await fs.writeFile(config.tokenPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
     }
   });

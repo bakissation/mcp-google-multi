@@ -4,6 +4,7 @@ import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
+import { handleGoogleApiError } from './_errors.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -37,7 +38,6 @@ function formatContact(person: any) {
 }
 
 export function registerContactsTools(server: McpServer): void {
-  // contacts_search
   server.registerTool(
     'contacts_search',
     {
@@ -76,7 +76,6 @@ export function registerContactsTools(server: McpServer): void {
     },
   );
 
-  // contacts_get
   server.registerTool(
     'contacts_get',
     {
@@ -103,7 +102,6 @@ export function registerContactsTools(server: McpServer): void {
     },
   );
 
-  // contacts_list
   server.registerTool(
     'contacts_list',
     {
@@ -147,7 +145,6 @@ export function registerContactsTools(server: McpServer): void {
     },
   );
 
-  // contacts_create
   server.registerTool(
     'contacts_create',
     {
@@ -200,7 +197,6 @@ export function registerContactsTools(server: McpServer): void {
     },
   );
 
-  // contacts_update
   server.registerTool(
     'contacts_update',
     {
@@ -282,7 +278,6 @@ export function registerContactsTools(server: McpServer): void {
     },
   );
 
-  // contacts_delete
   server.registerTool(
     'contacts_delete',
     {
@@ -308,7 +303,6 @@ export function registerContactsTools(server: McpServer): void {
     },
   );
 
-  // contacts_groups_list
   server.registerTool(
     'contacts_groups_list',
     {
@@ -342,7 +336,6 @@ export function registerContactsTools(server: McpServer): void {
     },
   );
 
-  // contacts_group_members
   server.registerTool(
     'contacts_group_members',
     {
@@ -358,8 +351,6 @@ export function registerContactsTools(server: McpServer): void {
       try {
         const auth = await getClient(account as Account);
         const people = google.people({ version: 'v1', auth });
-
-        // Get group with member resource names
         const groupRes = await people.contactGroups.get({
           resourceName: groupResourceName,
           maxMembers: maxMembers ?? 100,
@@ -374,8 +365,6 @@ export function registerContactsTools(server: McpServer): void {
             }, null, 2) }],
           };
         }
-
-        // Batch get the actual contact details
         const membersRes = await people.people.getBatchGet({
           resourceNames: memberResourceNames,
           personFields: PERSON_FIELDS,
@@ -397,7 +386,6 @@ export function registerContactsTools(server: McpServer): void {
     },
   );
 
-  // contacts_group_create
   server.registerTool(
     'contacts_group_create',
     {
@@ -431,30 +419,5 @@ export function registerContactsTools(server: McpServer): void {
 }
 
 function handleContactsError(error: any, account: Account) {
-  if (error.code === 401) {
-    return {
-      content: [{
-        type: 'text' as const,
-        text: `Authentication error for account "${account}". Run: node dist/index.js auth --account ${account}`,
-      }],
-      isError: true,
-    };
-  }
-  if (error.code === 429) {
-    const retryAfter = error.response?.headers?.['retry-after'] ?? 'unknown';
-    return {
-      content: [{
-        type: 'text' as const,
-        text: JSON.stringify({ error: 'rate_limited', retryAfter }),
-      }],
-      isError: true,
-    };
-  }
-  return {
-    content: [{
-      type: 'text' as const,
-      text: JSON.stringify({ error: error.message ?? String(error), code: error.code }),
-    }],
-    isError: true,
-  };
+  return handleGoogleApiError(error, account);
 }

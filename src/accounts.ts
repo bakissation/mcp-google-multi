@@ -2,10 +2,8 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-// Resolve paths relative to the project root (parent of src/ or dist/)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load .env from the project root (not CWD) so it works when spawned by Claude Code
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 const tokenDir = path.resolve(__dirname, '..', 'tokens');
 
@@ -48,6 +46,14 @@ function parseAccounts(): { aliases: [string, ...string[]]; configs: Record<stri
     if (!alias || !email) {
       throw new Error(
         `Invalid account entry "${trimmed}". Both alias and email are required.`,
+      );
+    }
+
+    // Restrict alias to a safe charset so it can't escape `tokenDir` via path traversal
+    // (e.g. "../../etc/passwd:foo@bar.com" in .env).
+    if (!/^[a-zA-Z0-9_-]+$/.test(alias)) {
+      throw new Error(
+        `Invalid alias "${alias}". Allowed characters: letters, digits, underscore, hyphen.`,
       );
     }
 
