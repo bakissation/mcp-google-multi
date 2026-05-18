@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] — 2026-05-18
+
+### Added
+
+- `gmail_send` and `gmail_create_draft` accept an optional `htmlBody` field. When set, the message is built as `multipart/alternative` with both plain-text fallback and HTML parts so HTML-capable clients render the rich version. Closes the parity gap with workspace-mcp's HTML sends — plain-text-only sends were rendering as "wall of left-aligned text" in Gmail.
+- `buildMultipartAlternative(plainBody, htmlBody)` helper in `gmail-mime.ts` with full RFC 2046 boundary handling. Covered by 7 new unit tests.
+
+### Notes
+
+- Existing callers passing only `body` (plain text) keep their prior behavior — no migration needed.
+- No new OAuth scopes, no re-auth required.
+
 ## [4.0.0] — 2026-05-11
 
 > **Breaking — re-authenticate every account after upgrading.** The base OAuth scope set grew (Tasks + Meet added); existing tokens lack the new scopes and Tasks/Meet tools will 403 until you re-run `npm run auth -- <alias>` for each account.

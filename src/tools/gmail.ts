@@ -5,7 +5,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
-import { encodeAddressHeader, encodeHeaderValue, normalizeBodyLineEndings } from './gmail-mime.js';
+import { buildMultipartAlternative, encodeAddressHeader, encodeHeaderValue, normalizeBodyLineEndings } from './gmail-mime.js';
 import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../types.js';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -196,7 +196,9 @@ export function registerGmailTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias'),
         to: z.string().describe('Recipient(s), comma-separated'),
         subject: z.string().describe('Email subject'),
-        body: z.string().describe('Plain text body'),
+        body: z.string().describe('Plain text body (always required; also used as fallback when htmlBody is set)'),
+        htmlBody: z.string().optional()
+          .describe('Optional HTML body. When set, sends multipart/alternative so HTML-capable clients render the rich version. Use bare tags only: <p>, <a>, <br>, <strong>, <em>, <ul><li>.'),
         cc: z.string().optional().describe('CC recipients, comma-separated'),
         replyToMessageId: z.string().optional()
           .describe('Message ID to reply to (sets In-Reply-To and References headers)'),
@@ -204,7 +206,7 @@ export function registerGmailTools(server: McpServer): void {
           .describe('Thread ID to send the message in'),
       },
     },
-    async ({ account, to, subject, body, cc, replyToMessageId, replyToThreadId }) => {
+    async ({ account, to, subject, body, htmlBody, cc, replyToMessageId, replyToThreadId }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -215,9 +217,18 @@ export function registerGmailTools(server: McpServer): void {
           `To: ${encodeAddressHeader(to)}`,
           `Subject: ${encodeHeaderValue(subject)}`,
           'MIME-Version: 1.0',
-          'Content-Type: text/plain; charset="UTF-8"',
-          'Content-Transfer-Encoding: 8bit',
         ];
+
+        let bodyText: string;
+        if (htmlBody) {
+          const { contentType, body: mp } = buildMultipartAlternative(body, htmlBody);
+          headers.push(`Content-Type: ${contentType}`);
+          bodyText = mp;
+        } else {
+          headers.push('Content-Type: text/plain; charset="UTF-8"');
+          headers.push('Content-Transfer-Encoding: 8bit');
+          bodyText = normalizeBodyLineEndings(body);
+        }
 
         if (cc) headers.push(`Cc: ${encodeAddressHeader(cc)}`);
         if (replyToMessageId) {
@@ -225,7 +236,7 @@ export function registerGmailTools(server: McpServer): void {
           headers.push(`References: ${replyToMessageId}`);
         }
 
-        const rawMessage = [...headers, '', normalizeBodyLineEndings(body)].join('\r\n');
+        const rawMessage = [...headers, '', bodyText].join('\r\n');
         const encoded = Buffer.from(rawMessage, 'utf-8').toString('base64url');
 
         const sendParams: any = {
@@ -297,13 +308,15 @@ export function registerGmailTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias'),
         to: z.string().describe('Recipient(s), comma-separated'),
         subject: z.string().describe('Email subject'),
-        body: z.string().describe('Plain text body'),
+        body: z.string().describe('Plain text body (always required; also used as fallback when htmlBody is set)'),
+        htmlBody: z.string().optional()
+          .describe('Optional HTML body. When set, drafts as multipart/alternative so HTML-capable clients render the rich version. Use bare tags only: <p>, <a>, <br>, <strong>, <em>, <ul><li>.'),
         cc: z.string().optional().describe('CC recipients, comma-separated'),
         replyToThreadId: z.string().optional()
           .describe('Thread ID to associate the draft with'),
       },
     },
-    async ({ account, to, subject, body, cc, replyToThreadId }) => {
+    async ({ account, to, subject, body, htmlBody, cc, replyToThreadId }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -314,13 +327,22 @@ export function registerGmailTools(server: McpServer): void {
           `To: ${encodeAddressHeader(to)}`,
           `Subject: ${encodeHeaderValue(subject)}`,
           'MIME-Version: 1.0',
-          'Content-Type: text/plain; charset="UTF-8"',
-          'Content-Transfer-Encoding: 8bit',
         ];
+
+        let bodyText: string;
+        if (htmlBody) {
+          const { contentType, body: mp } = buildMultipartAlternative(body, htmlBody);
+          headers.push(`Content-Type: ${contentType}`);
+          bodyText = mp;
+        } else {
+          headers.push('Content-Type: text/plain; charset="UTF-8"');
+          headers.push('Content-Transfer-Encoding: 8bit');
+          bodyText = normalizeBodyLineEndings(body);
+        }
 
         if (cc) headers.push(`Cc: ${encodeAddressHeader(cc)}`);
 
-        const rawMessage = [...headers, '', normalizeBodyLineEndings(body)].join('\r\n');
+        const rawMessage = [...headers, '', bodyText].join('\r\n');
         const encoded = Buffer.from(rawMessage, 'utf-8').toString('base64url');
 
         const draftParams: any = {

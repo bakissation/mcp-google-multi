@@ -61,3 +61,45 @@ export function encodeAddressHeader(value: string): string {
 export function normalizeBodyLineEndings(body: string): string {
   return body.replace(/\r\n|\r|\n/g, '\r\n');
 }
+
+/**
+ * RFC 2046 §5.1.1 boundary token: 1-70 chars from a restricted set, no trailing space.
+ * Hex output from randomBytes only emits [0-9a-f], all of which are bcharsnospace.
+ */
+function generateMimeBoundary(): string {
+  // 32 hex chars + 16-char prefix = 48 chars, well under the 70-char limit.
+  const rand = Array.from({ length: 16 }, () =>
+    Math.floor(Math.random() * 16).toString(16),
+  ).join('');
+  return `=_gm_${rand}${Date.now().toString(36)}`;
+}
+
+/**
+ * Build a multipart/alternative body so HTML-capable clients render the rich
+ * version and plain clients fall back. Returns the header value AND the body.
+ * Caller composes the full message: headers (including this Content-Type) + CRLF + body.
+ */
+export function buildMultipartAlternative(
+  plainBody: string,
+  htmlBody: string,
+): { contentType: string; body: string } {
+  const boundary = generateMimeBoundary();
+  const parts = [
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    normalizeBodyLineEndings(plainBody),
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    normalizeBodyLineEndings(htmlBody),
+    `--${boundary}--`,
+    '',
+  ];
+  return {
+    contentType: `multipart/alternative; boundary="${boundary}"`,
+    body: parts.join('\r\n'),
+  };
+}
