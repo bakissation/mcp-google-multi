@@ -379,9 +379,15 @@ export function registerDriveTools(server: McpServer): void {
         newParentFolderId: z.string().optional().describe('Move to this folder'),
         localPath: z.string().optional().describe('Replace file content with this local file'),
         mimeType: z.string().optional().describe('MIME type of the replacement file (required if localPath is provided)'),
+        convertTo: z.enum([
+          'application/vnd.google-apps.document',
+          'application/vnd.google-apps.spreadsheet',
+          'application/vnd.google-apps.presentation',
+          'application/vnd.google-apps.drawing',
+        ]).optional().describe('When replacing content via localPath, convert the new content into this native Google Workspace type on import (e.g. replace a Google Doc body from a local .docx). Source must be an importable format.'),
       },
     },
-    async ({ account, fileId, newName, newParentFolderId, localPath: localPathArg, mimeType: mimeTypeArg }) => {
+    async ({ account, fileId, newName, newParentFolderId, localPath: localPathArg, mimeType: mimeTypeArg, convertTo }) => {
       try {
         const auth = await getClient(account as Account);
         const drive = google.drive({ version: 'v3', auth });
@@ -407,6 +413,7 @@ export function registerDriveTools(server: McpServer): void {
             mimeType: mimeTypeArg ?? (mime.lookup(localPathArg) || 'application/octet-stream'),
             body: fs.createReadStream(localPathArg),
           };
+          if (convertTo) requestBody.mimeType = convertTo;
         }
 
         const res = await drive.files.update(params);
