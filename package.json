@@ -4,6 +4,28 @@
   "description": "MCP server for Gmail, Google Drive, Calendar, Sheets, Docs, and Contacts with multi-account support",
   "type": "module",
   "license": "MIT",
+  "bin": {
+    "mcp-google-multi": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bakissation/mcp-google-multi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bakissation/mcp-google-multi/issues"
+  },
+  "homepage": "https://github.com/bakissation/mcp-google-multi#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -19,6 +41,7 @@
   ],
   "scripts": {
     "build": "tsc && chmod +x dist/index.js",
+    "prepublishOnly": "npm run build",
     "watch": "tsc --watch",
     "auth": "node dist/index.js auth --account",
     "lint": "eslint .",
