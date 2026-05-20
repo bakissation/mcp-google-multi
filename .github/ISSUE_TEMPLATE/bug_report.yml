@@ -1,0 +1,64 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! **Do not paste OAuth tokens, client secrets, authorization codes, or `.env` contents.** For security vulnerabilities, use private reporting instead — see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `node -p "require('./package.json').version"` (or the release tag).
+      placeholder: "4.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Which tool / service?
+      options:
+        - Gmail
+        - Drive
+        - Calendar
+        - Sheets
+        - Docs
+        - Contacts
+        - Search Console
+        - Tasks
+        - Meet
+        - Forms (optional bundle)
+        - Chat (optional bundle)
+        - Admin (admin bundle)
+        - Alert Center (optional bundle)
+        - Auth / setup
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: account-type
+    attributes:
+      label: Account type
+      description: Workspace or personal @gmail.com? (Some tools, e.g. Chat/Admin, are Workspace-only.)
+      placeholder: "Workspace / personal"
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact tool call / inputs (with secrets redacted).
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error output
+      description: Relevant stderr or error payload. Redact any tokens or emails you don't want public.
+      render: shell
