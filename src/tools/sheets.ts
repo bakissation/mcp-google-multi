@@ -5,6 +5,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { stringToArray } from './_coerce.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -16,7 +17,7 @@ export function registerSheetsTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         title: z.string().describe('Spreadsheet title'),
-        sheetTitles: z.array(z.string()).optional()
+        sheetTitles: z.unknown().pipe(stringToArray).optional()
           .describe('Optional tab/sheet names (default: one sheet named "Sheet1")'),
       },
     },
@@ -233,7 +234,7 @@ export function registerSheetsTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         spreadsheetId: z.string().describe('Spreadsheet ID'),
-        ranges: z.array(z.string()).describe('Array of A1 notation ranges'),
+        ranges: z.unknown().pipe(stringToArray).describe('Array of A1 notation ranges'),
         valueRenderOption: z.enum(['FORMATTED_VALUE', 'UNFORMATTED_VALUE', 'FORMULA'])
           .default('FORMATTED_VALUE').optional()
           .describe('How to render values. Default: FORMATTED_VALUE'),
@@ -662,7 +663,7 @@ export function registerSheetsTools(server: McpServer): void {
         index: z.number().min(0).optional().describe('Where in the rule order to insert (0 = highest priority)'),
         booleanRule: z.object({
           conditionType: z.string().describe(BOOLEAN_CONDITION_TYPE_DESC),
-          conditionValues: z.array(z.string()).optional().describe('Values for the condition (e.g. ["100"] for NUMBER_GREATER, or ["=A1>10"] for CUSTOM_FORMULA)'),
+          conditionValues: z.unknown().pipe(stringToArray).optional().describe('Values for the condition (e.g. ["100"] for NUMBER_GREATER, or ["=A1>10"] for CUSTOM_FORMULA)'),
           format: z.object({
             backgroundColor: rgbColorSchema.optional(),
             textFormat: z.object({
@@ -782,9 +783,9 @@ export function registerSheetsTools(server: McpServer): void {
         sortSpecs: z.array(sortSpecSchema).optional(),
         filterSpecs: z.array(z.object({
           columnIndex: z.number().min(0),
-          hiddenValues: z.array(z.string()).optional().describe('Values to hide in this column'),
+          hiddenValues: z.unknown().pipe(stringToArray).optional().describe('Values to hide in this column'),
           conditionType: z.string().optional().describe(BOOLEAN_CONDITION_TYPE_DESC),
-          conditionValues: z.array(z.string()).optional(),
+          conditionValues: z.unknown().pipe(stringToArray).optional(),
         })).optional(),
       },
     },
@@ -1031,7 +1032,7 @@ export function registerSheetsTools(server: McpServer): void {
         spreadsheetId: z.string().describe('Spreadsheet ID'),
         range: gridRangeSchema,
         conditionType: z.string().describe(BOOLEAN_CONDITION_TYPE_DESC),
-        conditionValues: z.array(z.string()).optional().describe('Values per condition type (list items for ONE_OF_LIST, range A1 for ONE_OF_RANGE, etc.)'),
+        conditionValues: z.unknown().pipe(stringToArray).optional().describe('Values per condition type (list items for ONE_OF_LIST, range A1 for ONE_OF_RANGE, etc.)'),
         inputMessage: z.string().optional().describe('Tooltip shown when cell is selected'),
         strict: z.boolean().optional().describe('Reject invalid input (default: false = warning only)'),
         showCustomUi: z.boolean().optional().describe('Show dropdown UI for list-type validations'),
@@ -1135,7 +1136,7 @@ export function registerSheetsTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         spreadsheetId: z.string().describe('Spreadsheet ID'),
-        ranges: z.array(z.string()).describe('Array of A1 notation ranges'),
+        ranges: z.unknown().pipe(stringToArray).describe('Array of A1 notation ranges'),
       },
     },
     async ({ account, spreadsheetId, ranges }) => {
@@ -1166,7 +1167,7 @@ export function registerSheetsTools(server: McpServer): void {
         spreadsheetId: z.string().describe('Spreadsheet ID'),
         requests: z.array(z.record(z.string(), z.any())).describe('Array of Request objects. Each object has exactly one key (the request type) like {repeatCell: {...}}, {addChart: {...}}, {updateBanding: {...}}, etc.'),
         includeSpreadsheetInResponse: z.boolean().optional(),
-        responseRanges: z.array(z.string()).optional(),
+        responseRanges: z.unknown().pipe(stringToArray).optional(),
         responseIncludeGridData: z.boolean().optional(),
       },
     },

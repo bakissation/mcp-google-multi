@@ -5,6 +5,8 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { stringToArray } from './_coerce.js';
+import { createLogger } from '../logger.js';
 import { encodeAddressHeader, encodeHeaderValue, normalizeBodyLineEndings } from './gmail-mime.js';
 import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../types.js';
 import * as path from 'path';
@@ -92,6 +94,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, query, maxResults }) => {
+      const logger = createLogger({ tool: 'gmail_search', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -122,10 +126,12 @@ export function registerGmailTools(server: McpServer): void {
           });
         }
 
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -140,6 +146,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, messageId }) => {
+      const logger = createLogger({ tool: 'gmail_read', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -151,10 +159,12 @@ export function registerGmailTools(server: McpServer): void {
         });
 
         const result = parseMessage(res.data);
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -169,6 +179,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, threadId }) => {
+      const logger = createLogger({ tool: 'gmail_read_thread', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -180,10 +192,12 @@ export function registerGmailTools(server: McpServer): void {
         });
 
         const messages = (res.data.messages ?? []).map(parseMessage);
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(messages, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -205,6 +219,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, to, subject, body, cc, replyToMessageId, replyToThreadId }) => {
+      const logger = createLogger({ tool: 'gmail_send', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -239,6 +255,7 @@ export function registerGmailTools(server: McpServer): void {
 
         const res = await gmail.users.messages.send(sendParams);
 
+        logger.info('success', Date.now() - start);
         return {
           content: [{
             type: 'text' as const,
@@ -246,6 +263,7 @@ export function registerGmailTools(server: McpServer): void {
           }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -263,6 +281,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, messageId, attachmentId, filename, savePath }) => {
+      const logger = createLogger({ tool: 'gmail_download_attachment', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -281,10 +301,12 @@ export function registerGmailTools(server: McpServer): void {
         const fullPath = path.join(savePath, path.basename(filename));
         await fs.promises.writeFile(fullPath, buffer);
 
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: `Saved to ${fullPath} (${buffer.length} bytes)` }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -304,6 +326,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, to, subject, body, cc, replyToThreadId }) => {
+      const logger = createLogger({ tool: 'gmail_create_draft', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -336,6 +360,7 @@ export function registerGmailTools(server: McpServer): void {
 
         const res = await gmail.users.drafts.create(draftParams);
 
+        logger.info('success', Date.now() - start);
         return {
           content: [{
             type: 'text' as const,
@@ -347,6 +372,7 @@ export function registerGmailTools(server: McpServer): void {
           }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -359,11 +385,13 @@ export function registerGmailTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         messageId: z.string().describe('Gmail message ID'),
-        addLabelIds: z.array(z.string()).optional().describe('Label IDs to add'),
-        removeLabelIds: z.array(z.string()).optional().describe('Label IDs to remove'),
+        addLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to add'),
+        removeLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to remove'),
       },
     },
     async ({ account, messageId, addLabelIds, removeLabelIds }) => {
+      const logger = createLogger({ tool: 'gmail_modify_labels', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -375,10 +403,12 @@ export function registerGmailTools(server: McpServer): void {
             removeLabelIds: removeLabelIds ?? [],
           },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -394,14 +424,18 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, messageId }) => {
+      const logger = createLogger({ tool: 'gmail_trash', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
         const res = await gmail.users.messages.trash({ userId: 'me', id: messageId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -417,14 +451,18 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, messageId }) => {
+      const logger = createLogger({ tool: 'gmail_delete', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
         await gmail.users.messages.delete({ userId: 'me', id: messageId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, messageId }, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -436,12 +474,14 @@ export function registerGmailTools(server: McpServer): void {
       description: 'Add/remove labels across up to 1000 Gmail messages at once. Useful for bulk archiving, marking as read, etc.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageIds: z.array(z.string()).describe('Message IDs (up to 1000)'),
-        addLabelIds: z.array(z.string()).optional().describe('Label IDs to add'),
-        removeLabelIds: z.array(z.string()).optional().describe('Label IDs to remove'),
+        messageIds: z.unknown().pipe(stringToArray).describe('Message IDs (up to 1000)'),
+        addLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to add'),
+        removeLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to remove'),
       },
     },
     async ({ account, messageIds, addLabelIds, removeLabelIds }) => {
+      const logger = createLogger({ tool: 'gmail_batch_modify', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -453,10 +493,12 @@ export function registerGmailTools(server: McpServer): void {
             removeLabelIds: removeLabelIds ?? [],
           },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ modified: messageIds.length }, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -468,10 +510,12 @@ export function registerGmailTools(server: McpServer): void {
       description: 'Permanently delete multiple Gmail messages. Irreversible.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageIds: z.array(z.string()).describe('Message IDs (up to 1000)'),
+        messageIds: z.unknown().pipe(stringToArray).describe('Message IDs (up to 1000)'),
       },
     },
     async ({ account, messageIds }) => {
+      const logger = createLogger({ tool: 'gmail_batch_delete', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -479,10 +523,12 @@ export function registerGmailTools(server: McpServer): void {
           userId: 'me',
           requestBody: { ids: messageIds },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: messageIds.length }, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -500,6 +546,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, maxResults, query }) => {
+      const logger = createLogger({ tool: 'gmail_list_drafts', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -508,10 +556,12 @@ export function registerGmailTools(server: McpServer): void {
           maxResults: maxResults ?? 20,
           q: query,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data.drafts ?? [], null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -527,6 +577,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, draftId }) => {
+      const logger = createLogger({ tool: 'gmail_get_draft', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -535,10 +587,12 @@ export function registerGmailTools(server: McpServer): void {
           id: draftId,
           format: 'full',
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -554,6 +608,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, draftId }) => {
+      const logger = createLogger({ tool: 'gmail_send_draft', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -561,10 +617,12 @@ export function registerGmailTools(server: McpServer): void {
           userId: 'me',
           requestBody: { id: draftId },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -579,14 +637,18 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account }) => {
+      const logger = createLogger({ tool: 'gmail_list_labels', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
         const res = await gmail.users.labels.list({ userId: 'me' });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data.labels ?? [], null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -606,6 +668,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, name, messageListVisibility, labelListVisibility }) => {
+      const logger = createLogger({ tool: 'gmail_create_label', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -617,10 +681,12 @@ export function registerGmailTools(server: McpServer): void {
             labelListVisibility: labelListVisibility ?? 'labelShow',
           },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -636,14 +702,18 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, labelId }) => {
+      const logger = createLogger({ tool: 'gmail_delete_label', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
         await gmail.users.labels.delete({ userId: 'me', id: labelId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, labelId }, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -658,14 +728,18 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account }) => {
+      const logger = createLogger({ tool: 'gmail_get_profile', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
         const res = await gmail.users.getProfile({ userId: 'me' });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -685,6 +759,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, startHistoryId, maxResults, historyTypes }) => {
+      const logger = createLogger({ tool: 'gmail_list_history', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -694,10 +770,12 @@ export function registerGmailTools(server: McpServer): void {
           maxResults: maxResults ?? 100,
           historyTypes: historyTypes as any,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -712,14 +790,18 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account }) => {
+      const logger = createLogger({ tool: 'gmail_get_vacation', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
         const res = await gmail.users.settings.getVacation({ userId: 'me' });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
@@ -741,6 +823,8 @@ export function registerGmailTools(server: McpServer): void {
       },
     },
     async ({ account, enableAutoReply, responseSubject, responseBodyPlainText, startTime, endTime, restrictToContacts, restrictToDomain }) => {
+      const logger = createLogger({ tool: 'gmail_set_vacation', service: 'gmail', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -756,10 +840,12 @@ export function registerGmailTools(server: McpServer): void {
             restrictToDomain: restrictToDomain ?? false,
           },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        logger.error(error, Date.now() - start);
         return handleGmailError(error, account as Account);
       }
     },
