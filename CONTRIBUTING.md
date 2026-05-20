@@ -56,16 +56,18 @@ The full spec lives in [`CLAUDE.md`](./CLAUDE.md). The essentials:
 
 ## Commits & versioning
 
-- Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `chore:`, etc.
-- Semver is manual in `package.json`. New tools / optional bundles / scopes = minor; bug fixes = patch; new `BASE_SCOPES` (forces re-auth) = major.
-- Update `CHANGELOG.md` and the relevant README tables in the same PR.
+Versioning and releases are **fully automated** by [semantic-release](https://semantic-release.gitbook.io/) from your commit messages — **do not bump `package.json` or edit a changelog by hand.** Just write good [Conventional Commits](https://www.conventionalcommits.org/):
+
+- `fix:` → patch, `feat:` → minor, `feat!:` / `BREAKING CHANGE:` → major. `docs:`/`chore:`/`refactor:` don't trigger a release.
+- On merge, a release is cut automatically per channel: **`dev` → `x.y.z-alpha.n`**, **`staging` → `x.y.z-beta.n`**, **`main` → `x.y.z`** (stable). Release notes are generated into [GitHub Releases](https://github.com/bakissation/mcp-google-multi/releases).
+- Still update the relevant **README** tables in your PR when you add/change a tool. (`package.json` `version` is a managed placeholder — the git tag / GitHub Release is the source of truth.)
 
 ## PR checklist
 
 - [ ] Targets `dev`
 - [ ] `typecheck`, `lint`, `test`, `build` all pass
 - [ ] Conventional commit messages
-- [ ] README + `CHANGELOG.md` updated; version bumped if warranted
+- [ ] README tables updated (no manual version bump / changelog — automated from your commits)
 - [ ] No secrets, tokens, or `.env` committed
 
 ## Security

@@ -92,14 +92,14 @@ To convert an upload into a native Workspace file, set the **resource** (`reques
 - It lives in the `alertcenter` key of `OPTIONAL_SCOPE_BUNDLES`, and `registerAlertCenterTools` (in `admin.ts`) registers behind `optional.has('alertcenter')` — never behind `getAdminAccounts()`. Keep these decoupled so a missing/ungrantable `apps.alerts` can never block the working Admin SDK tools.
 - Until service-account + domain-wide-delegation auth exists, the `alertcenter` bundle is declared-but-non-functional under user OAuth. `handleAlertCenterError` surfaces this — keep the hint.
 
-## Versioning
+## Versioning & releases (automated)
 
-- Manual semver in `package.json`.
-- Release commit message format: `chore(release): X.Y.Z` (lowercase, matches existing history).
-- Tag: `vX.Y.Z`.
-- New OAuth scopes in `BASE_SCOPES` = major version bump (tokens become incomplete, requires re-auth).
-- New tools / new optional bundles / new admin scopes = minor version bump.
-- Bug fixes = patch.
+Releases are cut by **semantic-release** on every push to a release branch — do NOT bump `package.json`, write a changelog, or tag by hand.
+
+- Channels: `dev` → `x.y.z-alpha.n`, `staging` → `x.y.z-beta.n`, `main` → `x.y.z` (stable). Config in `.releaserc.json`; workflow in `.github/workflows/release.yml`.
+- Version is computed from Conventional Commits: `fix:` = patch, `feat:` = minor, `feat!:`/`BREAKING CHANGE:` = major. **A new `BASE_SCOPES` scope is breaking** (tokens become incomplete, forces re-auth) — mark it `feat!:` so it bumps major.
+- **Tags + GitHub Releases only** — no commit-back (`@semantic-release/git`/`@semantic-release/npm` are intentionally NOT used) so nothing fights branch protection; `GITHUB_TOKEN` suffices.
+- `package.json` `version` is a placeholder (`0.0.0-semantically-released`). The git tag / GitHub Release is the source of truth. `CHANGELOG.md` is frozen at v4.2.0; newer notes live in Releases.
 
 ## Testing
 

@@ -2,6 +2,8 @@
 
 All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **This file is frozen at v4.2.0.** From v4.3.0 onward, releases are cut automatically by semantic-release from Conventional Commits and published as [GitHub Releases](https://github.com/bakissation/mcp-google-multi/releases) (`dev` → alpha, `staging` → beta, `main` → stable). See the Releases page for current notes.
+
 ## [4.2.0] — 2026-05-20
 
 ### Added
