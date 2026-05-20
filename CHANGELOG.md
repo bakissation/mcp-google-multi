@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] — 2026-05-20
+
+> **Re-authenticate accounts listed in `GOOGLE_ADMIN_ACCOUNTS`.** The admin scope set shrank — `apps.alerts` is no longer requested by the admin bundle. Re-run `npm run auth -- <alias>` so the token drops it cleanly.
+
+### Fixed
+
+- **Admin consent no longer blocked by Alert Center.** `apps.alerts` was hardcoded into the user-OAuth admin bundle (`ADMIN_SCOPES`), but Google does not grant that scope through the interactive user-consent flow — it requires a service account with domain-wide delegation. Any account in `GOOGLE_ADMIN_ACCOUNTS` therefore failed the *entire* admin consent with `Error 400: invalid_scope` / "Some requested scopes cannot be shown", taking the working Admin SDK Directory + Reports tools down with it.
+
+### Changed
+
+- `apps.alerts` moved out of `ADMIN_SCOPES` into a new `alertcenter` key in `OPTIONAL_SCOPE_BUNDLES`.
+- The two Alert Center tools (`alertcenter_alerts_list`, `alertcenter_alert_get`) now register via `registerAlertCenterTools` behind `GOOGLE_OPTIONAL_SCOPES=alertcenter`, decoupled from the admin bundle. The admin bundle is now 6 tools (Reports + Directory); Alert Center is its own 2-tool optional bundle.
+- Added `handleAlertCenterError` with a hint explaining the service-account / domain-wide-delegation requirement.
+
+### Known limitation
+
+- The `alertcenter` bundle is declared-but-non-functional under user OAuth: enabling it requests the scope and registers the tools, but the Alert Center API rejects user-consent tokens. Full support needs a service-account + domain-wide-delegation auth path (tracked in the linked issue).
+
 ## [4.0.0] — 2026-05-11
 
 > **Breaking — re-authenticate every account after upgrading.** The base OAuth scope set grew (Tasks + Meet added); existing tokens lack the new scopes and Tasks/Meet tools will 403 until you re-run `npm run auth -- <alias>` for each account.

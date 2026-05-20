@@ -16,7 +16,7 @@ import { registerTasksTools } from './tools/tasks.js';
 import { registerMeetTools } from './tools/meet.js';
 import { registerFormsTools } from './tools/forms.js';
 import { registerChatTools } from './tools/chat.js';
-import { registerAdminTools } from './tools/admin.js';
+import { registerAdminTools, registerAlertCenterTools } from './tools/admin.js';
 import { getOptionalBundles, getAdminAccounts } from './auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -46,6 +46,7 @@ async function main() {
   const optional = new Set(getOptionalBundles());
   if (optional.has('forms')) registerFormsTools(server);
   if (optional.has('chat')) registerChatTools(server);
+  if (optional.has('alertcenter')) registerAlertCenterTools(server);
   if (getAdminAccounts().length > 0) registerAdminTools(server);
 
   const transport = new StdioServerTransport();
