@@ -46,7 +46,7 @@ A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (an
 | `drive_search` | Search files with Drive query syntax (shared drives included) |
 | `drive_read` | Read file content (exports Workspace docs as text) |
 | `drive_list` | List files in a folder or root |
-| `drive_upload` | Upload a local file to Drive |
+| `drive_upload` | Upload a local file to Drive (optional `convertTo` imports it as a native Google Doc/Sheet/Slides) |
 | `drive_download` | Download a binary file to local disk |
 | `drive_export` | Export Google Docs/Sheets/Slides to PDF, DOCX, XLSX, Markdown, etc. |
 | `drive_create_folder` | Create a new folder |

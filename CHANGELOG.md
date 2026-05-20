@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] — 2026-05-20
+
+### Added
+
+- `drive_upload` gains an optional `convertTo` parameter. When set to a `application/vnd.google-apps.*` type, Drive converts the upload on import — so you can upload Markdown/HTML/DOCX/TXT and get a native, editable Google Doc/Sheet/Slides/Drawing instead of a stored raw file. Backward compatible: omitting `convertTo` keeps the previous store-as-is behaviour. (#6)
+
 ## [4.1.0] — 2026-05-20
 
 > **Re-authenticate accounts listed in `GOOGLE_ADMIN_ACCOUNTS`.** The admin scope set shrank — `apps.alerts` is no longer requested by the admin bundle. Re-run `npm run auth -- <alias>` so the token drops it cleanly.

@@ -62,6 +62,10 @@ server.registerTool(
 
 Every Drive API call that takes a `fileId` must pass `supportsAllDrives: true`. List operations also need `includeItemsFromAllDrives: true`. Forgetting these silently breaks shared-drive content. Existing tools already have them — preserve when refactoring.
 
+## Drive-specific: import conversion
+
+To convert an upload into a native Workspace file, set the **resource** (`requestBody`) `mimeType` to a `application/vnd.google-apps.*` type while the `media` carries the importable source type. The media mimeType is the source; the resource mimeType is the target. `drive_upload`'s `convertTo` param does exactly this. Drive v3 has no separate `convert` flag (the v2 one is deprecated). `drive_export` is the reverse direction only.
+
 ## Sheets/Docs: fields masks
 
 `spreadsheets.batchUpdate` Request types like `RepeatCell` and `updateParagraphStyle` require explicit `fields` masks. Compute the mask from supplied input keys; never use wildcards. The helpers `buildCellFormat` (in `sheets.ts`), `buildParagraphStyle`, and `buildDocumentStyle` (in `docs.ts`) are the reference implementations and are unit-tested in `tests/field-mask-helpers.test.ts`. If you add a new format dimension, extend the helper, add a test, and bump the input schema.
