@@ -424,7 +424,9 @@ mcp-google-multi/
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first. In short: **open pull requests against the `dev` branch** — changes are promoted `dev → staging → main`, and `main` is release-only. Run `typecheck`/`lint`/`test`/`build` before submitting, and use Conventional Commits.
+
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). For security issues, **do not open a public issue** — see [SECURITY.md](SECURITY.md).
 
 ## Author
 
