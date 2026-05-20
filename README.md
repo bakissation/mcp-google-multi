@@ -2,6 +2,8 @@
 
 A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (and any MCP client) access to **Gmail**, **Google Drive**, **Google Calendar**, **Google Sheets**, **Google Docs**, **Google Contacts**, **Google Search Console**, **Google Tasks**, **Google Meet**, and optionally **Google Forms**, **Google Chat**, and **Google Workspace Admin** APIs across multiple Google accounts simultaneously.
 
+[![npm](https://img.shields.io/npm/v/mcp-google-multi?label=npm&color=cb3837)](https://www.npmjs.com/package/mcp-google-multi)
+
 ## Features
 
 - **Multi-account** — manage any number of Google accounts from a single server
@@ -249,14 +251,25 @@ Enable with `GOOGLE_OPTIONAL_SCOPES=alertcenter` in `.env`.
 
 ### 2. Install & Configure
 
+**Option A — from npm (no clone):**
+
+```bash
+npm install -g mcp-google-multi    # installs the `mcp-google-multi` CLI
+# …or run on demand without installing: npx mcp-google-multi
+```
+
+Published with channel dist-tags — `@latest` (stable), `@dev` (alpha), `@staging` (beta); e.g. `npm i -g mcp-google-multi@dev` for the latest alpha.
+
+**Option B — from source:**
+
 ```bash
 git clone https://github.com/bakissation/mcp-google-multi.git
 cd mcp-google-multi
-npm install
+npm install && npm run build
 cp .env.example .env
 ```
 
-Edit `.env`:
+Create a `.env` (from source, `.env.example` is the template; from npm, make one in the directory you'll run the server from) with:
 
 ```env
 GOOGLE_CLIENT_ID=your_client_id_here
@@ -305,6 +318,24 @@ Or add it manually to your Claude Code MCP config:
     "google-multi": {
       "command": "node",
       "args": ["/absolute/path/to/mcp-google-multi/dist/index.js"]
+    }
+  }
+}
+```
+
+If you installed from npm, point at the package instead and pass config via `env` (authenticate first with `mcp-google-multi auth --account <alias>`):
+
+```json
+{
+  "mcpServers": {
+    "google-multi": {
+      "command": "npx",
+      "args": ["-y", "mcp-google-multi"],
+      "env": {
+        "GOOGLE_CLIENT_ID": "your_client_id_here",
+        "GOOGLE_CLIENT_SECRET": "your_client_secret_here",
+        "GOOGLE_ACCOUNTS": "work:you@company.com,personal:you@gmail.com"
+      }
     }
   }
 }
