@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import './accounts.js';
 
 import { readFileSync } from 'node:fs';
