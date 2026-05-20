@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, staging, dev]
 
+# Least privilege: CI only checks out code + runs npm. (CodeQL: actions/missing-workflow-permissions)
+permissions:
+  contents: read
+
 jobs:
   ci:
     runs-on: ubuntu-latest
