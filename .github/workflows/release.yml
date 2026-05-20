@@ -4,12 +4,11 @@ on:
   push:
     branches: [main, staging, dev]
 
-# Tags + GitHub Releases only — no commit-back, so nothing fights branch
-# protection. GITHUB_TOKEN is sufficient (it pushes a tag, not a branch commit).
 permissions:
   contents: write
   issues: write
   pull-requests: write
+  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -28,6 +27,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: npm ci
@@ -38,4 +38,6 @@ jobs:
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
         run: npx semantic-release
