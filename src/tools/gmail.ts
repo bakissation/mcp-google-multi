@@ -5,6 +5,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { stringToArray } from './_coerce.js';
 import { createLogger } from '../logger.js';
 import { encodeAddressHeader, encodeHeaderValue, normalizeBodyLineEndings } from './gmail-mime.js';
 import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../types.js';
@@ -384,8 +385,8 @@ export function registerGmailTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         messageId: z.string().describe('Gmail message ID'),
-        addLabelIds: z.array(z.string()).optional().describe('Label IDs to add'),
-        removeLabelIds: z.array(z.string()).optional().describe('Label IDs to remove'),
+        addLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to add'),
+        removeLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to remove'),
       },
     },
     async ({ account, messageId, addLabelIds, removeLabelIds }) => {
@@ -473,9 +474,9 @@ export function registerGmailTools(server: McpServer): void {
       description: 'Add/remove labels across up to 1000 Gmail messages at once. Useful for bulk archiving, marking as read, etc.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageIds: z.array(z.string()).describe('Message IDs (up to 1000)'),
-        addLabelIds: z.array(z.string()).optional().describe('Label IDs to add'),
-        removeLabelIds: z.array(z.string()).optional().describe('Label IDs to remove'),
+        messageIds: z.unknown().pipe(stringToArray).describe('Message IDs (up to 1000)'),
+        addLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to add'),
+        removeLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to remove'),
       },
     },
     async ({ account, messageIds, addLabelIds, removeLabelIds }) => {
@@ -509,7 +510,7 @@ export function registerGmailTools(server: McpServer): void {
       description: 'Permanently delete multiple Gmail messages. Irreversible.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageIds: z.array(z.string()).describe('Message IDs (up to 1000)'),
+        messageIds: z.unknown().pipe(stringToArray).describe('Message IDs (up to 1000)'),
       },
     },
     async ({ account, messageIds }) => {
