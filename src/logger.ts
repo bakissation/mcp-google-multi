@@ -86,7 +86,7 @@ export function createLogger(options: LoggerOptions = {}) {
   }
 
   return {
-    /** Debug — not shown in production unless LOG_LEVEL=debug */
+    /** Debug — not shown in production */
     debug(msg: string, extra: Record<string, unknown> = {}): void {
       writeLog(buildRecord('debug', 'pending', { msg, ...extra }));
     },
