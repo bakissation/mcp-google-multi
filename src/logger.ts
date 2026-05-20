@@ -1,14 +1,11 @@
 /**
- * Structured logger + secret redactor.
+ * Structured logger for MCP tool handlers.
  *
  * All tool handlers must use this logger — never console.log/error.
  * Logs go to stderr (stdio is the MCP channel).
- *
- * Redacts: access_token, refresh_token, client_secret, private_key,
- *          Authorization header, enc_blob.
  */
 
-import { redactor } from './redactor.js';
+import { redactor, safeStringify } from './redactor.js';
 
 // ---------------------------------------------------------------------------
 // Log levels
@@ -44,11 +41,12 @@ function nextCorrelationId(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Core writer — JSON to stderr
+// Core writer — JSON to stderr (redacted, circular-safe)
 // ---------------------------------------------------------------------------
 
 function writeLog(record: LogRecord): void {
-  process.stderr.write(JSON.stringify(record) + '\n');
+  const redactedRecord = redactor(record);
+  process.stderr.write(safeStringify(redactedRecord) + '\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -107,9 +105,10 @@ export function createLogger(options: LoggerOptions = {}) {
 
     /** Error — handler exceptions */
     error(err: unknown, latencyMs?: number, extra: Record<string, unknown> = {}): void {
-      // Pull a sane message out of the error
-      const message = err instanceof Error ? err.message : String(err);
-      const record = buildRecord('error', 'error', { msg: message, ...extra });
+      // Pull a sane message out of the error, redact any secret in it
+      const rawMessage = err instanceof Error ? err.message : String(err);
+      const redactedMessage = String(redactor({ message: rawMessage }).message);
+      const record = buildRecord('error', 'error', { msg: redactedMessage, ...extra });
       if (latencyMs !== undefined) record.latency_ms = latencyMs;
       writeLog(record);
     },
@@ -130,27 +129,4 @@ export function createLogger(options: LoggerOptions = {}) {
       };
     },
   };
-}
-
-// ---------------------------------------------------------------------------
-// Convenience: log with a redacted payload for debugging
-// ---------------------------------------------------------------------------
-
-/**
- * Writes a redacted log record. Useful for tracing payloads that might contain
- * secrets — the redactor strips sensitive fields before output.
- */
-export function logRedacted(
-  level: LogLevel,
-  msg: string,
-  payload: Record<string, unknown> = {},
-): void {
-  process.stderr.write(
-    JSON.stringify({
-      ts: new Date().toISOString(),
-      level,
-      msg,
-      payload: redactor(payload),
-    }) + '\n',
-  );
 }

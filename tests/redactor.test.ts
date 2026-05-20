@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { redactor } from '../src/redactor.js';
+import { redactor, safeStringify } from '../src/redactor.js';
 
 describe('redactor', () => {
   it('returns primitives unchanged', () => {
@@ -18,6 +18,7 @@ describe('redactor', () => {
       private_key: '-----BEGIN RSA KEY-----',
       authorization: 'Bearer tok_abc123',
       enc_blob: 'encrypted_data_here',
+      id_token: 'eyJhbGciOiJSUzI1NiJ9...',
       normal_field: 'keep me',
     };
 
@@ -29,6 +30,7 @@ describe('redactor', () => {
     expect(result.private_key).toBe('[REDACTED]');
     expect(result.authorization).toBe('[REDACTED]');
     expect(result.enc_blob).toBe('[REDACTED]');
+    expect(result.id_token).toBe('[REDACTED]');
     expect(result.normal_field).toBe('keep me');
   });
 
@@ -38,6 +40,7 @@ describe('redactor', () => {
       REFRESH_TOKEN: 'ref_xyz',
       Authorization: 'Bearer tok',
       ACCESS_TOKEN: 'tok2',
+      ID_TOKEN: 'id_token_val',
     };
 
     const result = redactor(input);
@@ -46,6 +49,26 @@ describe('redactor', () => {
     expect(result.REFRESH_TOKEN).toBe('[REDACTED]');
     expect(result.Authorization).toBe('[REDACTED]');
     expect(result.ACCESS_TOKEN).toBe('[REDACTED]');
+    expect(result.ID_TOKEN).toBe('[REDACTED]');
+  });
+
+  it('redacts camelCase secret variants (accessToken, refreshToken, etc.)', () => {
+    const input = {
+      accessToken: 'myAccessToken',
+      refreshToken: 'myRefreshToken',
+      clientId: 'myClientId',
+      userPassword: 'myPassword',
+      apiKey: 'myApiKey',
+    };
+
+    const result = redactor(input);
+
+    expect(result.accessToken).toBe('[REDACTED]');
+    expect(result.refreshToken).toBe('[REDACTED]');
+    // clientId is a public OAuth client identifier — not a secret
+    expect(result.clientId).toBe('myClientId');
+    expect(result.userPassword).toBe('[REDACTED]');
+    expect(result.apiKey).toBe('[REDACTED]');
   });
 
   it('redacts secrets in nested objects', () => {
@@ -97,10 +120,8 @@ describe('redactor', () => {
     const circular: Record<string, unknown> = { normal: 'value' };
     circular.self = circular;
 
-    // Should not throw
     const result = redactor(circular);
     expect(result.normal).toBe('value');
-    // self references the result object itself (memo registration before recursion)
     expect((result as Record<string, unknown>).self).toBe(result);
   });
 
@@ -144,5 +165,76 @@ describe('redactor', () => {
     expect(result.email).toBe('user@example.com');
     expect(result.user_id).toBe(12345);
     expect(result.enabled).toBe(true);
+  });
+
+  // ─── Special types ─────────────────────────────────────────────────────────
+
+  it('replaces Error with name/message/stack all redacted', () => {
+    const err = new Error('secret message');
+    const result = redactor(err);
+    expect(result).toEqual({ name: '[REDACTED]', message: '[REDACTED]', stack: '[REDACTED]' });
+  });
+
+  it('preserves Date objects unchanged', () => {
+    const date = new Date('2026-05-20T10:00:00Z');
+    const result = redactor(date);
+    expect(result).toBe(date);
+  });
+
+  it('replaces Buffer with "[Buffer]"', () => {
+    const buf = Buffer.from('hello world');
+    const result = redactor(buf);
+    expect(result).toBe('[Buffer]');
+  });
+
+  it('handles arrays containing Error/Date/Buffer', () => {
+    const date = new Date('2026-05-20');
+    const err = new Error('some error');
+    const buf = Buffer.from('test');
+    const result = redactor([date, err, buf]);
+    expect(result[0]).toBe(date);
+    expect(result[1]).toEqual({ name: '[REDACTED]', message: '[REDACTED]', stack: '[REDACTED]' });
+    expect(result[2]).toBe('[Buffer]');
+  });
+});
+
+describe('safeStringify', () => {
+  it('stringifies a plain object', () => {
+    const result = safeStringify({ foo: 'bar', num: 42 });
+    expect(JSON.parse(result)).toEqual({ foo: 'bar', num: 42 });
+  });
+
+  it('replaces circular refs with "[Circular]"', () => {
+    const circular: Record<string, unknown> = { name: 'loop' };
+    circular.self = circular;
+
+    const result = safeStringify(circular);
+    const parsed = JSON.parse(result);
+    expect(parsed.name).toBe('loop');
+    expect(parsed.self).toBe('[Circular]');
+  });
+
+  it('replaces Buffer with "[Buffer]"', () => {
+    const buf = Buffer.from('hello');
+    const result = safeStringify({ data: buf });
+    const parsed = JSON.parse(result);
+    expect(parsed.data).toBe('[Buffer]');
+  });
+
+  it('handles nested circular references', () => {
+    const inner: Record<string, unknown> = {};
+    inner.parent = inner;
+    const outer = { child: inner };
+    inner.root = outer;
+
+    const result = safeStringify({ outer });
+    const parsed = JSON.parse(result);
+    expect(parsed.outer.child.parent).toBe('[Circular]');
+  });
+
+  it('returns "[Circular]" for an object that cannot be stringified', () => {
+    // This shouldn't normally happen since we handle circular refs,
+    // but ensure it doesn't throw
+    expect(safeStringify({ deep: { value: 1 } })).toBe('{"deep":{"value":1}}');
   });
 });

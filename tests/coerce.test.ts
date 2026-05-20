@@ -1,20 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import {
-  stringToArray,
-  stringToObject,
-  stringToBoolean,
-  validationError,
-} from '../src/tools/_coerce.js';
+import { stringToArray, stringToObject, stringToBoolean } from '../src/tools/_coerce.js';
 
-// ─── stringToArray ────────────────────────────────────────────────────────────
+// ─── stringToArray ───────────────────────────────────────────────────────────
 // stringToArray is a complete schema: z.union([z.string(), z.array(z.string())]).transform(...)
 // It accepts a raw string or a JSON-encoded string[] (e.g. when Claude Code serialises
 // an array as a string before sending).
 describe('stringToArray', () => {
   it('passes a real string array through unchanged', () => {
-    // Array arrives as a string-encoded JSON array, e.g. '["a","b","c"]' — the transform
-    // correctly parses the JSON back to a string[].
     const schema = z.object({ ids: stringToArray });
     expect(schema.parse({ ids: ['a', 'b', 'c'] })).toEqual({ ids: ['a', 'b', 'c'] });
   });
@@ -39,14 +32,30 @@ describe('stringToArray', () => {
     expect(schema.parse({ ids: 'a,,b,  ,c' })).toEqual({ ids: ['a', 'b', 'c'] });
   });
 
-  it('throws on number input', () => {
+  // Bad JSON parses — number in JSON array fails validation
+  it('throws when JSON parse produces a number (not string[])', () => {
     const schema = z.object({ ids: stringToArray });
-    expect(() => schema.parse({ ids: 42 })).toThrow(z.ZodError);
+    expect(() => schema.parse({ ids: '42' })).toThrow(z.ZodError);
+  });
+
+  it('throws when JSON parse produces an array with non-string elements', () => {
+    const schema = z.object({ ids: stringToArray });
+    expect(() => schema.parse({ ids: '[1, 2, 3]' })).toThrow(z.ZodError);
+  });
+
+  it('throws when JSON parse produces an object (not array)', () => {
+    const schema = z.object({ ids: stringToArray });
+    expect(() => schema.parse({ ids: '{"a":1}' })).toThrow(z.ZodError);
   });
 
   it('throws on null input', () => {
     const schema = z.object({ ids: stringToArray });
     expect(() => schema.parse({ ids: null })).toThrow(z.ZodError);
+  });
+
+  it('throws on non-string/non-array input', () => {
+    const schema = z.object({ ids: stringToArray });
+    expect(() => schema.parse({ ids: { a: 1 } })).toThrow(z.ZodError);
   });
 });
 
@@ -62,6 +71,16 @@ describe('stringToObject', () => {
   it('parses a JSON string object', () => {
     const schema = z.object({ data: stringToObject });
     expect(schema.parse({ data: '{"key": "value", "num": 42}' })).toEqual({ data: { key: 'value', num: 42 } });
+  });
+
+  it('throws when JSON parse produces a non-object (array)', () => {
+    const schema = z.object({ data: stringToObject });
+    expect(() => schema.parse({ data: '[1, 2, 3]' })).toThrow(z.ZodError);
+  });
+
+  it('throws when JSON parse produces a primitive', () => {
+    const schema = z.object({ data: stringToObject });
+    expect(() => schema.parse({ data: '"just a string"' })).toThrow(z.ZodError);
   });
 
   it('throws on a plain string that is not valid JSON', () => {
@@ -95,8 +114,6 @@ describe('stringToObject', () => {
 });
 
 // ─── stringToBoolean ──────────────────────────────────────────────────────────
-// Usage: z.union([z.boolean(), z.string()]).pipe(stringToBoolean)
-//         OR just stringToBoolean alone (handles bool + string → bool)
 describe('stringToBoolean', () => {
   it('passes a real boolean through unchanged', () => {
     const schema = z.object({ flag: stringToBoolean });
@@ -145,19 +162,5 @@ describe('stringToBoolean', () => {
     } catch (e) {
       expect(e.issues[0].message).toContain('validation_error');
     }
-  });
-});
-
-// ─── validationError helper ───────────────────────────────────────────────────
-
-describe('validationError', () => {
-  it('returns a ZodError with the correct structure', () => {
-    const err = validationError('attendees', 'array of strings', 'not-an-array');
-    expect(err).toBeInstanceOf(z.ZodError);
-    expect(err.issues[0].code).toBe('custom');
-    expect(err.issues[0].message).toContain('validation_error');
-    expect(err.issues[0].message).toContain('attendees');
-    expect(err.issues[0].message).toContain('array of strings');
-    expect(err.issues[0].path).toEqual(['attendees']);
   });
 });

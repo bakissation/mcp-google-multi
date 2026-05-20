@@ -375,7 +375,7 @@ export function registerCalendarTools(server: McpServer): void {
       description: 'Check free/busy times for one or more calendars within a time window. Returns only busy blocks, not event details.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        calendarIds: z.unknown().pipe(stringToArray).describe('Calendar IDs to check, e.g. ["primary", "user@example.com"]'),
+        calendarIds: stringToArray.describe('Calendar IDs to check, e.g. ["primary", "user@example.com"]'),
         timeMin: z.string().describe('ISO 8601 start of window'),
         timeMax: z.string().describe('ISO 8601 end of window'),
         timeZone: z.string().optional().describe('Timezone (default: UTC)'),

@@ -3,35 +3,56 @@ import { z } from 'zod';
 /**
  * Shared string-coercion helpers for MCP tool input schemas.
  *
- * Some MCP clients (e.g. Claude Code) send array/object fields as JSON-encoded
+ * Some MCP clients (Claude Code) send array/object fields as JSON-encoded
  * strings, or boolean fields as "true"/"false" string literals.  These helpers
  * coerce those strings into their intended types before the tool handler runs,
  * producing a clear `validation_error` response when coercion is not possible.
  *
- * Each helper is a Zod schema (z.union + z.transform) that accepts both the
- * native type and a string representation, and transforms to the canonical output.
- *
- * Usage — apply via .pipe() on z.unknown() or z.string():
+ * Usage — apply directly as a schema field (no .pipe() needed):
  *
  *   // For array-of-strings fields:
- *   attendees: z.unknown().pipe(stringToArray).optional()
+ *   attendees: stringToArray.optional()
  *
  *   // For object fields:
- *   filters: z.unknown().pipe(stringToObject).optional()
+ *   filters: stringToObject.optional()
  *
  *   // For boolean fields (client may send "true"/"false" strings):
- *   allDay: z.union([z.boolean(), z.string()]).pipe(stringToBoolean).optional()
+ *   allDay: stringToBoolean.optional()
  *
- * Note: the helpers can be used standalone (no .pipe()) since they already accept
- * z.union input (both native and string representations).
+ * Each helper accepts both the native type and a string representation,
+ * and transforms to the canonical output type.
  */
 
 // ─── stringToArray ────────────────────────────────────────────────────────────
-// Coerces: string[] → unchanged, string → JSON-parse-or-comma-split
+// Coerces: string[] → unchanged, string → JSON-parse-or-comma-split → string[]
+// JSON-parsed values are validated: must be an array of strings after parsing.
 const _stringToArrayTransform = z.union([z.string(), z.array(z.string())]).transform((val, ctx) => {
   if (Array.isArray(val)) return val as string[];
   if (typeof val === 'string') {
-    try { return JSON.parse(val) as string[]; } catch (_) { /* not JSON, fall through to comma-split */ }
+    try {
+      const parsed = JSON.parse(val);
+      // Validate that JSON parse produced an array of strings
+      if (!Array.isArray(parsed)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `validation_error: JSON parse produced ${typeof parsed}, expected string[]`,
+        });
+        return z.NEVER;
+      }
+      // Validate all elements are strings
+      for (let i = 0; i < parsed.length; i++) {
+        if (typeof parsed[i] !== 'string') {
+          ctx.addIssue({
+            code: 'custom',
+            message: `validation_error: array element [${i}] is ${typeof parsed[i]}, expected string`,
+          });
+          return z.NEVER;
+        }
+      }
+      return parsed as string[];
+    } catch (_) {
+      // Not JSON — fall through to comma-split
+    }
     return val.split(',').map((s: string) => s.trim()).filter(Boolean);
   }
   ctx.addIssue({
@@ -41,17 +62,32 @@ const _stringToArrayTransform = z.union([z.string(), z.array(z.string())]).trans
   return z.NEVER;
 });
 
+/**
+ * Zod schema that accepts string | string[] and coerces to string[].
+ * Use directly as a field schema — no .pipe() needed.
+ */
 export const stringToArray = _stringToArrayTransform;
 
 // ─── stringToObject ──────────────────────────────────────────────────────────
 // Coerces: plain object → unchanged, JSON string → parsed object
+// JSON-parsed value is validated: must be a plain object (not array/primitives)
 const _stringToObjectTransform = z.union([
   z.record(z.string(), z.any()),
   z.string(),
 ]).transform((val, ctx) => {
-  if (typeof val === 'object' && val !== null) return val as Record<string, unknown>;
+  if (typeof val === 'object' && val !== null && !Array.isArray(val)) return val as Record<string, unknown>;
   if (typeof val === 'string') {
-    try { return JSON.parse(val) as Record<string, unknown>; } catch {
+    try {
+      const parsed = JSON.parse(val);
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `validation_error: JSON parse produced ${Array.isArray(parsed) ? 'array' : typeof parsed}, expected plain object`,
+        });
+        return z.NEVER;
+      }
+      return parsed as Record<string, unknown>;
+    } catch {
       ctx.addIssue({
         code: 'custom',
         message: `validation_error: cannot coerce "${val}" to object`,
@@ -66,6 +102,10 @@ const _stringToObjectTransform = z.union([
   return z.NEVER;
 });
 
+/**
+ * Zod schema that accepts object | JSON string and coerces to Record<string, unknown>.
+ * Use directly as a field schema — no .pipe() needed.
+ */
 export const stringToObject = _stringToObjectTransform;
 
 // ─── stringToBoolean ─────────────────────────────────────────────────────────
@@ -79,19 +119,8 @@ const _stringToBooleanTransform = z.union([z.boolean(), z.string()]).transform((
   return z.NEVER;
 });
 
-export const stringToBoolean = _stringToBooleanTransform;
-
 /**
- * Builds a ZodError with a clear validation_error message for use in transforms.
+ * Zod schema that accepts boolean | string and coerces to boolean.
+ * Use directly as a field schema — no .pipe() needed.
  */
-export function validationError(
-  field: string,
-  expected: string,
-  received: unknown,
-): z.ZodError {
-  return new z.ZodError([{
-    code: 'custom' as const,
-    message: `validation_error: field "${field}" expected ${expected}, received ${typeof received}: ${JSON.stringify(received)}`,
-    path: [field],
-  }]);
-}
+export const stringToBoolean = _stringToBooleanTransform;

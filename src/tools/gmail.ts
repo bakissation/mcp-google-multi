@@ -385,8 +385,8 @@ export function registerGmailTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         messageId: z.string().describe('Gmail message ID'),
-        addLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to add'),
-        removeLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to remove'),
+        addLabelIds: stringToArray.optional().describe('Label IDs to add'),
+        removeLabelIds: stringToArray.optional().describe('Label IDs to remove'),
       },
     },
     async ({ account, messageId, addLabelIds, removeLabelIds }) => {
@@ -474,9 +474,9 @@ export function registerGmailTools(server: McpServer): void {
       description: 'Add/remove labels across up to 1000 Gmail messages at once. Useful for bulk archiving, marking as read, etc.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageIds: z.unknown().pipe(stringToArray).describe('Message IDs (up to 1000)'),
-        addLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to add'),
-        removeLabelIds: z.unknown().pipe(stringToArray).optional().describe('Label IDs to remove'),
+        messageIds: stringToArray.describe('Message IDs (up to 1000)'),
+        addLabelIds: stringToArray.optional().describe('Label IDs to add'),
+        removeLabelIds: stringToArray.optional().describe('Label IDs to remove'),
       },
     },
     async ({ account, messageIds, addLabelIds, removeLabelIds }) => {
@@ -510,7 +510,7 @@ export function registerGmailTools(server: McpServer): void {
       description: 'Permanently delete multiple Gmail messages. Irreversible.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageIds: z.unknown().pipe(stringToArray).describe('Message IDs (up to 1000)'),
+        messageIds: stringToArray.describe('Message IDs (up to 1000)'),
       },
     },
     async ({ account, messageIds }) => {
