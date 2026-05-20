@@ -5,7 +5,7 @@ Conventions for AI assistants modifying this codebase.
 ## Project shape
 
 - Each Google service lives in `src/tools/<service>.ts` and exports `register<Service>Tools(server: McpServer): void`.
-- `src/index.ts` is the entry point. It wires service registrations into the MCP server, conditional on env-driven scope bundles (Forms/Chat opt-in, Admin opt-in per-account).
+- `src/index.ts` is the entry point. It wires service registrations into the MCP server, conditional on env-driven scope bundles (Forms/Chat/Alert Center opt-in, Admin opt-in per-account).
 - `src/auth.ts` owns OAuth flow + scope tier resolution. `BASE_SCOPES` are always granted; `OPTIONAL_SCOPE_BUNDLES` are env-gated; `ADMIN_SCOPES` are per-account-gated. `resolveScopesForAccount(alias)` is the authoritative composer.
 - `src/client.ts` is a thin OAuth2Client factory used by every tool handler.
 - `src/accounts.ts` parses the `GOOGLE_ACCOUNTS` env var.
@@ -81,6 +81,12 @@ Every Drive API call that takes a `fileId` must pass `supportsAllDrives: true`. 
 - Admin tools only register if `GOOGLE_ADMIN_ACCOUNTS` is set.
 - Destructive admin writes (`admin_users_update`) must check `adminWritesEnabled()` (imported from `auth.ts`) and refuse if `GOOGLE_ALLOW_ADMIN_WRITES` is not exactly `'true'`. Do not relax this gate.
 - Admin tools 403 on personal Gmail accounts. The `handleAdminError` helper surfaces this hint clearly — keep it.
+
+## Alert Center is NOT an admin scope
+
+- `apps.alerts` (Alert Center) is **not** in `ADMIN_SCOPES`. Google does not grant it through the interactive user-consent OAuth flow this server uses — it requires a service account with domain-wide delegation. Putting it in the user-OAuth admin bundle made the *entire* admin consent fail with `Error 400: invalid_scope`.
+- It lives in the `alertcenter` key of `OPTIONAL_SCOPE_BUNDLES`, and `registerAlertCenterTools` (in `admin.ts`) registers behind `optional.has('alertcenter')` — never behind `getAdminAccounts()`. Keep these decoupled so a missing/ungrantable `apps.alerts` can never block the working Admin SDK tools.
+- Until service-account + domain-wide-delegation auth exists, the `alertcenter` bundle is declared-but-non-functional under user OAuth. `handleAlertCenterError` surfaces this — keep the hint.
 
 ## Versioning
 
