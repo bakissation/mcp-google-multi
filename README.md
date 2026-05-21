@@ -22,9 +22,9 @@ A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (an
 | `gmail_search` | Search messages with Gmail query syntax |
 | `gmail_read` | Read a full message by ID |
 | `gmail_read_thread` | Read all messages in a thread |
-| `gmail_send` | Send an email |
+| `gmail_send` | Send an email (optional `htmlBody` for multipart/alternative) |
 | `gmail_download_attachment` | Download an email attachment to local disk |
-| `gmail_create_draft` | Create a draft |
+| `gmail_create_draft` | Create a draft (optional `htmlBody` for multipart/alternative) |
 | `gmail_modify_labels` | Add/remove labels on a message (star, archive, mark read, etc.) |
 | `gmail_trash` | Move a message to Trash (recoverable) |
 | `gmail_delete` | Permanently delete a message (irreversible) |
