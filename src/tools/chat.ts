@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { coerceJson } from './_coerce.js';
 import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
@@ -69,7 +70,7 @@ export function registerChatTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias'),
         parent: z.string().describe('Space resource name, format: spaces/{space}'),
         text: z.string().optional().describe('Plain message text'),
-        cardsV2: z.array(z.record(z.string(), z.any())).optional().describe('Optional Card v2 payloads'),
+        cardsV2: coerceJson(z.array(z.record(z.string(), z.any()))).optional().describe('Optional Card v2 payloads'),
         threadKey: z.string().optional().describe('Thread key to group messages'),
         messageReplyOption: z.enum(['MESSAGE_REPLY_OPTION_UNSPECIFIED', 'REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD', 'REPLY_MESSAGE_OR_FAIL']).optional(),
       },

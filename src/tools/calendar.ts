@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { coerceArray, coerceBoolean } from './_coerce.js';
 import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
@@ -134,7 +135,7 @@ export function registerCalendarTools(server: McpServer): void {
           .describe('Comma-separated email addresses of attendees'),
         calendarId: z.string().default('primary').optional()
           .describe('Calendar ID (default: primary)'),
-        allDay: z.boolean().default(false).optional()
+        allDay: coerceBoolean.default(false).optional()
           .describe('If true, start/end are dates (YYYY-MM-DD) not datetimes'),
       },
     },
@@ -280,7 +281,7 @@ export function registerCalendarTools(server: McpServer): void {
         calendarId: z.string().default('primary').optional()
           .describe('Calendar ID (default: primary)'),
         text: z.string().describe('Natural language event, e.g. "Lunch with Farouk Thursday 1pm at Le Boulanger"'),
-        sendNotifications: z.boolean().optional().describe('Send notifications to attendees (default: false)'),
+        sendNotifications: coerceBoolean.optional().describe('Send notifications to attendees (default: false)'),
       },
     },
     async ({ account, calendarId, text, sendNotifications }) => {
@@ -310,7 +311,7 @@ export function registerCalendarTools(server: McpServer): void {
         calendarId: z.string().describe('Source calendar ID'),
         eventId: z.string().describe('Event ID to move'),
         destinationCalendarId: z.string().describe('Destination calendar ID'),
-        sendNotifications: z.boolean().optional().describe('Send notifications (default: false)'),
+        sendNotifications: coerceBoolean.optional().describe('Send notifications (default: false)'),
       },
     },
     async ({ account, calendarId, eventId, destinationCalendarId, sendNotifications }) => {
@@ -374,7 +375,7 @@ export function registerCalendarTools(server: McpServer): void {
       description: 'Check free/busy times for one or more calendars within a time window. Returns only busy blocks, not event details.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        calendarIds: z.array(z.string()).describe('Calendar IDs to check, e.g. ["primary", "user@example.com"]'),
+        calendarIds: coerceArray(z.string()).describe('Calendar IDs to check, e.g. ["primary", "user@example.com"]'),
         timeMin: z.string().describe('ISO 8601 start of window'),
         timeMax: z.string().describe('ISO 8601 end of window'),
         timeZone: z.string().optional().describe('Timezone (default: UTC)'),
