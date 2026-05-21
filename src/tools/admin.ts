@@ -73,65 +73,6 @@ export function registerAdminTools(server: McpServer): void {
     },
   );
 
-  // ─── Alert Center ──────────────────────────────────────────────────────
-
-  server.registerTool(
-    'alertcenter_alerts_list',
-    {
-      description: 'List Workspace security alerts (suspicious login, phishing, leaked password, Drive exfil, etc.)',
-      inputSchema: {
-        account: accountEnum.describe('Google account alias (must be a Workspace admin)'),
-        pageSize: z.number().min(1).max(1000).optional(),
-        pageToken: z.string().optional(),
-        filter: z.string().optional().describe('Filter expression, e.g. "type = \\"Suspicious login\\""'),
-        orderBy: z.string().optional(),
-        customerId: z.string().optional(),
-      },
-    },
-    async ({ account, pageSize, pageToken, filter, orderBy, customerId }) => {
-      try {
-        const auth = await getClient(account as Account);
-        const alertcenter = google.alertcenter({ version: 'v1beta1', auth });
-        const res = await alertcenter.alerts.list({
-          pageSize: pageSize ?? 50,
-          pageToken,
-          filter,
-          orderBy,
-          customerId,
-        });
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
-        };
-      } catch (error: any) {
-        return handleAdminError(error, account as Account);
-      }
-    },
-  );
-
-  server.registerTool(
-    'alertcenter_alert_get',
-    {
-      description: 'Get a single alert by ID',
-      inputSchema: {
-        account: accountEnum.describe('Google account alias (must be a Workspace admin)'),
-        alertId: z.string().describe('Alert ID'),
-        customerId: z.string().optional(),
-      },
-    },
-    async ({ account, alertId, customerId }) => {
-      try {
-        const auth = await getClient(account as Account);
-        const alertcenter = google.alertcenter({ version: 'v1beta1', auth });
-        const res = await alertcenter.alerts.get({ alertId, customerId });
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
-        };
-      } catch (error: any) {
-        return handleAdminError(error, account as Account);
-      }
-    },
-  );
-
   // ─── Directory: users ─────────────────────────────────────────────────
 
   server.registerTool(
@@ -327,6 +268,76 @@ export function registerAdminTools(server: McpServer): void {
   );
 }
 
+/**
+ * Alert Center tools. Gated behind the `alertcenter` optional bundle, NOT the
+ * admin bundle: the apps.alerts scope cannot be granted via this server's
+ * interactive user-consent OAuth flow — it requires a service account with
+ * domain-wide delegation. Registered separately so a missing/ungrantable
+ * apps.alerts scope never blocks the working Admin SDK admin tools.
+ */
+export function registerAlertCenterTools(server: McpServer): void {
+  server.registerTool(
+    'alertcenter_alerts_list',
+    {
+      description: 'List Workspace security alerts (suspicious login, phishing, leaked password, Drive exfil, etc.). Requires the alertcenter bundle + service-account domain-wide delegation.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias (must be a Workspace admin)'),
+        pageSize: z.number().min(1).max(1000).optional(),
+        pageToken: z.string().optional(),
+        filter: z.string().optional().describe('Filter expression, e.g. "type = \\"Suspicious login\\""'),
+        orderBy: z.string().optional(),
+        customerId: z.string().optional(),
+      },
+    },
+    async ({ account, pageSize, pageToken, filter, orderBy, customerId }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const alertcenter = google.alertcenter({ version: 'v1beta1', auth });
+        const res = await alertcenter.alerts.list({
+          pageSize: pageSize ?? 50,
+          pageToken,
+          filter,
+          orderBy,
+          customerId,
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleAlertCenterError(error, account as Account);
+      }
+    },
+  );
+
+  server.registerTool(
+    'alertcenter_alert_get',
+    {
+      description: 'Get a single alert by ID. Requires the alertcenter bundle + service-account domain-wide delegation.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias (must be a Workspace admin)'),
+        alertId: z.string().describe('Alert ID'),
+        customerId: z.string().optional(),
+      },
+    },
+    async ({ account, alertId, customerId }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const alertcenter = google.alertcenter({ version: 'v1beta1', auth });
+        const res = await alertcenter.alerts.get({ alertId, customerId });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleAlertCenterError(error, account as Account);
+      }
+    },
+  );
+}
+
 function handleAdminError(error: any, account: Account) {
   return handleGoogleApiError(error, account, "Admin tools require Workspace super-admin privileges AND the account must be listed in GOOGLE_ADMIN_ACCOUNTS (then re-authenticated). Personal Gmail accounts cannot use these endpoints.");
+}
+
+function handleAlertCenterError(error: any, account: Account) {
+  return handleGoogleApiError(error, account, "Alert Center (apps.alerts) is not grantable via this server's user-consent OAuth flow — it requires a service account with domain-wide delegation. Enabling GOOGLE_OPTIONAL_SCOPES=alertcenter only declares the scope; the API will reject user-OAuth tokens. See README \"Alert Center\".");
 }

@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest a new tool, parameter, or capability
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: service
+    attributes:
+      label: Which service does this touch?
+      options:
+        - Gmail
+        - Drive
+        - Calendar
+        - Sheets
+        - Docs
+        - Contacts
+        - Search Console
+        - Tasks
+        - Meet
+        - Forms
+        - Chat
+        - Admin
+        - Alert Center
+        - New service
+        - Cross-cutting / infra
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+      description: What are you trying to do that you can't today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: New tool, new parameter on an existing tool, etc. Include the Google API method if you know it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

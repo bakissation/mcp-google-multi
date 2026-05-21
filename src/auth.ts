@@ -40,11 +40,17 @@ export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
     'https://www.googleapis.com/auth/chat.messages',
     'https://www.googleapis.com/auth/chat.messages.create',
   ],
+  // Alert Center's apps.alerts scope is NOT grantable through the interactive
+  // user-consent flow this server uses — it requires a service account with
+  // domain-wide delegation. It lives in its own opt-in bundle so it never
+  // blocks the working Admin SDK admin scopes. See README "Alert Center".
+  alertcenter: [
+    'https://www.googleapis.com/auth/apps.alerts',
+  ],
 };
 
 export const ADMIN_SCOPES = [
   'https://www.googleapis.com/auth/admin.reports.audit.readonly',
-  'https://www.googleapis.com/auth/apps.alerts',
   'https://www.googleapis.com/auth/admin.directory.user',
   'https://www.googleapis.com/auth/admin.directory.group.readonly',
   'https://www.googleapis.com/auth/admin.directory.group.member.readonly',

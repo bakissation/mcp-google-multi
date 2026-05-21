@@ -2,11 +2,13 @@
 
 A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (and any MCP client) access to **Gmail**, **Google Drive**, **Google Calendar**, **Google Sheets**, **Google Docs**, **Google Contacts**, **Google Search Console**, **Google Tasks**, **Google Meet**, and optionally **Google Forms**, **Google Chat**, and **Google Workspace Admin** APIs across multiple Google accounts simultaneously.
 
+[![npm](https://img.shields.io/npm/v/mcp-google-multi?label=npm&color=cb3837)](https://www.npmjs.com/package/mcp-google-multi)
+
 ## Features
 
 - **Multi-account** — manage any number of Google accounts from a single server
-- **175 tools** across 12 Google services
-- **Tiered OAuth scopes** — base scopes always granted; Forms/Chat are opt-in; Admin scopes are per-account opt-in with a separate safety flag for destructive writes
+- **175 tools** across 13 Google services
+- **Tiered OAuth scopes** — base scopes always granted; Forms/Chat/Alert Center are opt-in bundles; Admin scopes are per-account opt-in with a separate safety flag for destructive writes
 - **Config-driven accounts** — defined in `.env`, no code changes needed
 - **Auto-refresh** — OAuth tokens refresh transparently and persist to disk
 - **Stdio transport** — runs as a local subprocess, no hosting needed
@@ -46,7 +48,7 @@ A local [MCP](https://modelcontextprotocol.io) server that gives Claude Code (an
 | `drive_search` | Search files with Drive query syntax (shared drives included) |
 | `drive_read` | Read file content (exports Workspace docs as text) |
 | `drive_list` | List files in a folder or root |
-| `drive_upload` | Upload a local file to Drive |
+| `drive_upload` | Upload a local file to Drive (optional `convertTo` imports it as a native Google Doc/Sheet/Slides) |
 | `drive_download` | Download a binary file to local disk |
 | `drive_export` | Export Google Docs/Sheets/Slides to PDF, DOCX, XLSX, Markdown, etc. |
 | `drive_create_folder` | Create a new folder |
@@ -203,19 +205,28 @@ Enable with `GOOGLE_OPTIONAL_SCOPES=chat` in `.env` (combine: `GOOGLE_OPTIONAL_S
 | `chat_messages_create` | Send text or Card v2 |
 | `chat_messages_list` | List messages with filter / orderBy |
 
-### Google Workspace Admin (8 tools, admin bundle) — _new in v4_
+### Google Workspace Admin (6 tools, admin bundle) — _new in v4_
 
 Enable per-account with `GOOGLE_ADMIN_ACCOUNTS=alias1,alias2` in `.env`. Requires the account to be a Workspace super-admin. Personal `@gmail.com` accounts will 403 — never list them here. Destructive writes additionally require `GOOGLE_ALLOW_ADMIN_WRITES=true`.
 
 | Tool | Description |
 |------|-------------|
 | `reports_activities_list` | Workspace audit log (login, drive, gmail, admin, token, etc.) |
-| `alertcenter_alerts_list` / `alertcenter_alert_get` | Security alerts |
 | `admin_users_list` / `admin_users_get` | User directory reads |
 | `admin_users_update` | User edits (gated, see env flag above) |
 | `admin_groups_list` / `admin_group_members_list` | Group + member reads |
 
 Every tool accepts an `account` parameter matching one of your configured aliases.
+
+### Google Alert Center (2 tools, optional bundle) — _new in v4_
+
+Enable with `GOOGLE_OPTIONAL_SCOPES=alertcenter` in `.env`.
+
+| Tool | Description |
+|------|-------------|
+| `alertcenter_alerts_list` / `alertcenter_alert_get` | Security alerts (suspicious login, phishing, leaked password, Drive exfil) |
+
+> **⚠ Requires service-account domain-wide delegation.** Unlike every other bundle, the Alert Center `apps.alerts` scope **cannot** be granted through this server's interactive user-consent OAuth flow — Google rejects it with `Error 400: invalid_scope` / "Some requested scopes cannot be shown". Per [Google's docs](https://developers.google.com/workspace/admin/alertcenter/guides/auth), Alert Center requires a service account with domain-wide delegation. This server is user-OAuth only, so enabling this bundle declares the scope and registers the tools, but the API will reject the resulting tokens until service-account auth is added (see [#4](https://github.com/bakissation/mcp-google-multi/issues/4)). The bundle is kept separate precisely so this limitation never blocks the working admin tools above.
 
 ## Prerequisites
 
@@ -231,8 +242,8 @@ Every tool accepts an `account` parameter matching one of your configured aliase
 2. Create or select a project.
 3. Enable the APIs you intend to use:
    - **Always required:** [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com), [Google Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com), [Google Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com), [Google Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com), [Google Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com), [People API](https://console.cloud.google.com/apis/library/people.googleapis.com), [Search Console API](https://console.cloud.google.com/apis/library/searchconsole.googleapis.com), [Google Tasks API](https://console.cloud.google.com/apis/library/tasks.googleapis.com), [Google Meet API](https://console.cloud.google.com/apis/library/meet.googleapis.com).
-   - **Optional bundles (only if you enable them):** [Google Forms API](https://console.cloud.google.com/apis/library/forms.googleapis.com), [Google Chat API](https://console.cloud.google.com/apis/library/chat.googleapis.com).
-   - **Admin bundle (only if you set `GOOGLE_ADMIN_ACCOUNTS`):** [Admin SDK API](https://console.cloud.google.com/apis/library/admin.googleapis.com), [Alert Center API](https://console.cloud.google.com/apis/library/alertcenter.googleapis.com).
+   - **Optional bundles (only if you enable them):** [Google Forms API](https://console.cloud.google.com/apis/library/forms.googleapis.com), [Google Chat API](https://console.cloud.google.com/apis/library/chat.googleapis.com), [Alert Center API](https://console.cloud.google.com/apis/library/alertcenter.googleapis.com) (the `alertcenter` bundle also needs service-account domain-wide delegation — see the Alert Center section above).
+   - **Admin bundle (only if you set `GOOGLE_ADMIN_ACCOUNTS`):** [Admin SDK API](https://console.cloud.google.com/apis/library/admin.googleapis.com).
 4. Go to **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID**.
 5. Application type: **Desktop app**.
 6. Add authorized redirect URI: `http://localhost:4242/oauth2callback`.
@@ -240,14 +251,25 @@ Every tool accepts an `account` parameter matching one of your configured aliase
 
 ### 2. Install & Configure
 
+**Option A — from npm (no clone):**
+
+```bash
+npm install -g mcp-google-multi    # installs the `mcp-google-multi` CLI
+# …or run on demand without installing: npx mcp-google-multi
+```
+
+Published with channel dist-tags — `@latest` (stable), `@dev` (alpha), `@staging` (beta); e.g. `npm i -g mcp-google-multi@dev` for the latest alpha.
+
+**Option B — from source:**
+
 ```bash
 git clone https://github.com/bakissation/mcp-google-multi.git
 cd mcp-google-multi
-npm install
+npm install && npm run build
 cp .env.example .env
 ```
 
-Edit `.env`:
+Create a `.env` (from source, `.env.example` is the template; from npm, make one in the directory you'll run the server from) with:
 
 ```env
 GOOGLE_CLIENT_ID=your_client_id_here
@@ -256,7 +278,8 @@ GOOGLE_CLIENT_SECRET=your_client_secret_here
 # Define your accounts as alias:email pairs (comma-separated)
 GOOGLE_ACCOUNTS=work:you@company.com,personal:you@gmail.com
 
-# Optional (v4): enable Forms and/or Chat tool bundles
+# Optional (v4): enable Forms, Chat, and/or Alert Center tool bundles
+# (alertcenter additionally requires service-account domain-wide delegation)
 # GOOGLE_OPTIONAL_SCOPES=forms,chat
 
 # Optional (v4): grant Workspace admin scopes to specific accounts
@@ -295,6 +318,24 @@ Or add it manually to your Claude Code MCP config:
     "google-multi": {
       "command": "node",
       "args": ["/absolute/path/to/mcp-google-multi/dist/index.js"]
+    }
+  }
+}
+```
+
+If you installed from npm, point at the package instead and pass config via `env` (authenticate first with `mcp-google-multi auth --account <alias>`):
+
+```json
+{
+  "mcpServers": {
+    "google-multi": {
+      "command": "npx",
+      "args": ["-y", "mcp-google-multi"],
+      "env": {
+        "GOOGLE_CLIENT_ID": "your_client_id_here",
+        "GOOGLE_CLIENT_SECRET": "your_client_secret_here",
+        "GOOGLE_ACCOUNTS": "work:you@company.com,personal:you@gmail.com"
+      }
     }
   }
 }
@@ -347,6 +388,7 @@ No code changes required.
 |------------|--------|
 | `forms` | `forms.body`, `forms.responses.readonly` |
 | `chat` | `chat.spaces`, `chat.messages`, `chat.messages.create` |
+| `alertcenter` | `apps.alerts` — ⚠ requires service-account domain-wide delegation; not grantable via user OAuth (see Alert Center section) |
 
 ### Admin (per-`GOOGLE_ADMIN_ACCOUNTS` env var)
 
@@ -355,7 +397,6 @@ Only granted to accounts explicitly listed. Personal Gmail accounts will 403 on 
 | Scope | Access |
 |-------|--------|
 | `admin.reports.audit.readonly` | Workspace audit log |
-| `apps.alerts` | Alert Center |
 | `admin.directory.user` | Read/write Workspace users (writes also gated by `GOOGLE_ALLOW_ADMIN_WRITES`) |
 | `admin.directory.group.readonly` | Read groups |
 | `admin.directory.group.member.readonly` | Read group members |
@@ -383,7 +424,7 @@ mcp-google-multi/
 │       ├── meet.ts             # Meet (5) — v4
 │       ├── forms.ts            # Forms (4, optional) — v4
 │       ├── chat.ts             # Chat (4, optional) — v4
-│       └── admin.ts            # Admin SDK (8, admin) — v4
+│       └── admin.ts            # Admin SDK (6, admin) + Alert Center (2, alertcenter bundle) — v4
 ├── tests/                # vitest unit tests (gmail-mime, path-safety, field-mask helpers)
 ├── tokens/               # OAuth tokens per account (gitignored)
 ├── dist/                 # Compiled output (gitignored)
@@ -414,7 +455,9 @@ mcp-google-multi/
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first. In short: **open pull requests against the `dev` branch** — changes are promoted `dev → staging → main`, and `main` is release-only. Run `typecheck`/`lint`/`test`/`build` before submitting, and use Conventional Commits.
+
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md). For security issues, **do not open a public issue** — see [SECURITY.md](SECURITY.md).
 
 ## Author
 

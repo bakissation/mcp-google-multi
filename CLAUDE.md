@@ -5,7 +5,7 @@ Conventions for AI assistants modifying this codebase.
 ## Project shape
 
 - Each Google service lives in `src/tools/<service>.ts` and exports `register<Service>Tools(server: McpServer): void`.
-- `src/index.ts` is the entry point. It wires service registrations into the MCP server, conditional on env-driven scope bundles (Forms/Chat opt-in, Admin opt-in per-account).
+- `src/index.ts` is the entry point. It wires service registrations into the MCP server, conditional on env-driven scope bundles (Forms/Chat/Alert Center opt-in, Admin opt-in per-account).
 - `src/auth.ts` owns OAuth flow + scope tier resolution. `BASE_SCOPES` are always granted; `OPTIONAL_SCOPE_BUNDLES` are env-gated; `ADMIN_SCOPES` are per-account-gated. `resolveScopesForAccount(alias)` is the authoritative composer.
 - `src/client.ts` is a thin OAuth2Client factory used by every tool handler.
 - `src/accounts.ts` parses the `GOOGLE_ACCOUNTS` env var.
@@ -62,6 +62,10 @@ server.registerTool(
 
 Every Drive API call that takes a `fileId` must pass `supportsAllDrives: true`. List operations also need `includeItemsFromAllDrives: true`. Forgetting these silently breaks shared-drive content. Existing tools already have them — preserve when refactoring.
 
+## Drive-specific: import conversion
+
+To convert an upload into a native Workspace file, set the **resource** (`requestBody`) `mimeType` to a `application/vnd.google-apps.*` type while the `media` carries the importable source type. The media mimeType is the source; the resource mimeType is the target. `drive_upload`'s `convertTo` param does exactly this. Drive v3 has no separate `convert` flag (the v2 one is deprecated). `drive_export` is the reverse direction only.
+
 ## Sheets/Docs: fields masks
 
 `spreadsheets.batchUpdate` Request types like `RepeatCell` and `updateParagraphStyle` require explicit `fields` masks. Compute the mask from supplied input keys; never use wildcards. The helpers `buildCellFormat` (in `sheets.ts`), `buildParagraphStyle`, and `buildDocumentStyle` (in `docs.ts`) are the reference implementations and are unit-tested in `tests/field-mask-helpers.test.ts`. If you add a new format dimension, extend the helper, add a test, and bump the input schema.
@@ -82,14 +86,20 @@ Every Drive API call that takes a `fileId` must pass `supportsAllDrives: true`. 
 - Destructive admin writes (`admin_users_update`) must check `adminWritesEnabled()` (imported from `auth.ts`) and refuse if `GOOGLE_ALLOW_ADMIN_WRITES` is not exactly `'true'`. Do not relax this gate.
 - Admin tools 403 on personal Gmail accounts. The `handleAdminError` helper surfaces this hint clearly — keep it.
 
-## Versioning
+## Alert Center is NOT an admin scope
 
-- Manual semver in `package.json`.
-- Release commit message format: `chore(release): X.Y.Z` (lowercase, matches existing history).
-- Tag: `vX.Y.Z`.
-- New OAuth scopes in `BASE_SCOPES` = major version bump (tokens become incomplete, requires re-auth).
-- New tools / new optional bundles / new admin scopes = minor version bump.
-- Bug fixes = patch.
+- `apps.alerts` (Alert Center) is **not** in `ADMIN_SCOPES`. Google does not grant it through the interactive user-consent OAuth flow this server uses — it requires a service account with domain-wide delegation. Putting it in the user-OAuth admin bundle made the *entire* admin consent fail with `Error 400: invalid_scope`.
+- It lives in the `alertcenter` key of `OPTIONAL_SCOPE_BUNDLES`, and `registerAlertCenterTools` (in `admin.ts`) registers behind `optional.has('alertcenter')` — never behind `getAdminAccounts()`. Keep these decoupled so a missing/ungrantable `apps.alerts` can never block the working Admin SDK tools.
+- Until service-account + domain-wide-delegation auth exists, the `alertcenter` bundle is declared-but-non-functional under user OAuth. `handleAlertCenterError` surfaces this — keep the hint.
+
+## Versioning & releases (automated)
+
+Releases are cut by **semantic-release** on every push to a release branch — do NOT bump `package.json`, write a changelog, or tag by hand.
+
+- Channels: `dev` → `x.y.z-alpha.n`, `staging` → `x.y.z-beta.n`, `main` → `x.y.z` (stable). Config in `.releaserc.json`; workflow in `.github/workflows/release.yml`.
+- Version is computed from Conventional Commits: `fix:` = patch, `feat:` = minor, `feat!:`/`BREAKING CHANGE:` = major. **A new `BASE_SCOPES` scope is breaking** (tokens become incomplete, forces re-auth) — mark it `feat!:` so it bumps major.
+- **Tags + GitHub Releases only** — no commit-back (`@semantic-release/git`/`@semantic-release/npm` are intentionally NOT used) so nothing fights branch protection; `GITHUB_TOKEN` suffices.
+- `package.json` `version` is a placeholder (`0.0.0-semantically-released`). The git tag / GitHub Release is the source of truth. `CHANGELOG.md` is frozen at v4.2.0; newer notes live in Releases.
 
 ## Testing
 

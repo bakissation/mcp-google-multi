@@ -219,16 +219,22 @@ export function registerDriveTools(server: McpServer): void {
   server.registerTool(
     'drive_upload',
     {
-      description: 'Upload a local file to Google Drive',
+      description: 'Upload a local file to Google Drive. Pass `convertTo` to import it as a native, editable Google Doc/Sheet/Slides/Drawing instead of storing the raw bytes.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         localPath: z.string().describe('Absolute path to file on disk'),
         filename: z.string().describe('Name as it appears in Drive'),
-        mimeType: z.string().optional().describe('MIME type (inferred from extension if omitted)'),
+        mimeType: z.string().optional().describe('Source MIME type of the local file (inferred from extension if omitted). With `convertTo`, this is the format Drive imports from.'),
+        convertTo: z.enum([
+          'application/vnd.google-apps.document',
+          'application/vnd.google-apps.spreadsheet',
+          'application/vnd.google-apps.presentation',
+          'application/vnd.google-apps.drawing',
+        ]).optional().describe('Convert the upload into this native Google Workspace type on import (e.g. upload .md/.html/.docx/.txt with convertTo=...google-apps.document to get a real Google Doc). Source must be an importable format. Omit to store the file as-is.'),
         parentFolderId: z.string().optional().describe('Parent folder ID (defaults to My Drive root)'),
       },
     },
-    async ({ account, localPath, filename, mimeType: mimeTypeArg, parentFolderId }) => {
+    async ({ account, localPath, filename, mimeType: mimeTypeArg, convertTo, parentFolderId }) => {
       try {
         const auth = await getClient(account as Account);
         const drive = google.drive({ version: 'v3', auth });
@@ -240,6 +246,8 @@ export function registerDriveTools(server: McpServer): void {
           requestBody: {
             name: filename,
             parents: parentFolderId ? [parentFolderId] : undefined,
+            // Setting a google-apps target type makes Drive convert the media on import.
+            ...(convertTo ? { mimeType: convertTo } : {}),
           },
           media: {
             mimeType: resolvedMime,
@@ -371,9 +379,15 @@ export function registerDriveTools(server: McpServer): void {
         newParentFolderId: z.string().optional().describe('Move to this folder'),
         localPath: z.string().optional().describe('Replace file content with this local file'),
         mimeType: z.string().optional().describe('MIME type of the replacement file (required if localPath is provided)'),
+        convertTo: z.enum([
+          'application/vnd.google-apps.document',
+          'application/vnd.google-apps.spreadsheet',
+          'application/vnd.google-apps.presentation',
+          'application/vnd.google-apps.drawing',
+        ]).optional().describe('When replacing content via localPath, convert the new content into this native Google Workspace type on import (e.g. replace a Google Doc body from a local .docx). Source must be an importable format.'),
       },
     },
-    async ({ account, fileId, newName, newParentFolderId, localPath: localPathArg, mimeType: mimeTypeArg }) => {
+    async ({ account, fileId, newName, newParentFolderId, localPath: localPathArg, mimeType: mimeTypeArg, convertTo }) => {
       try {
         const auth = await getClient(account as Account);
         const drive = google.drive({ version: 'v3', auth });
@@ -399,6 +413,7 @@ export function registerDriveTools(server: McpServer): void {
             mimeType: mimeTypeArg ?? (mime.lookup(localPathArg) || 'application/octet-stream'),
             body: fs.createReadStream(localPathArg),
           };
+          if (convertTo) requestBody.mimeType = convertTo;
         }
 
         const res = await drive.files.update(params);
