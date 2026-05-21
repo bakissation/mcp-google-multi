@@ -3,6 +3,7 @@ import {
   encodeHeaderValue,
   encodeAddressHeader,
   normalizeBodyLineEndings,
+  buildMultipartAlternative,
 } from '../src/tools/gmail-mime.js';
 
 describe('encodeHeaderValue', () => {
@@ -163,6 +164,57 @@ describe('normalizeBodyLineEndings', () => {
   it('does not double-encode an existing CRLF', () => {
     expect(normalizeBodyLineEndings('a\r\nb')).not.toContain('\r\r');
     expect(normalizeBodyLineEndings('a\r\nb')).not.toContain('\n\n');
+  });
+});
+
+describe('buildMultipartAlternative', () => {
+  it('returns a Content-Type with multipart/alternative and a boundary', () => {
+    const { contentType } = buildMultipartAlternative('plain', '<p>html</p>');
+    expect(contentType).toMatch(/^multipart\/alternative; boundary="[^"]+"$/);
+  });
+
+  it('uses a boundary token that meets RFC 2046 bcharsnospace', () => {
+    const { contentType } = buildMultipartAlternative('p', 'h');
+    const m = contentType.match(/boundary="([^"]+)"/);
+    expect(m).not.toBeNull();
+    expect(m![1]).toMatch(/^[A-Za-z0-9'()+_,\-./:=?]+$/);
+    expect(m![1].length).toBeLessThanOrEqual(70);
+  });
+
+  it('emits boundary delimiters around both parts and a closing delimiter', () => {
+    const { contentType, body } = buildMultipartAlternative('plain body', '<p>html body</p>');
+    const boundary = contentType.match(/boundary="([^"]+)"/)![1];
+    expect(body).toContain(`--${boundary}\r\nContent-Type: text/plain`);
+    expect(body).toContain(`--${boundary}\r\nContent-Type: text/html`);
+    const escaped = boundary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    expect(body.trimEnd()).toMatch(new RegExp(`--${escaped}--$`));
+  });
+
+  it('places plain part before html part (RFC 2046: clients render the last-listed preferred type)', () => {
+    const { body } = buildMultipartAlternative('plain', '<p>html</p>');
+    const plainIdx = body.indexOf('Content-Type: text/plain');
+    const htmlIdx = body.indexOf('Content-Type: text/html');
+    expect(plainIdx).toBeGreaterThan(-1);
+    expect(htmlIdx).toBeGreaterThan(plainIdx);
+  });
+
+  it('normalizes line endings in both parts to CRLF', () => {
+    const { body } = buildMultipartAlternative('p1\np2', '<p>h1</p>\n<p>h2</p>');
+    expect(body).toContain('p1\r\np2');
+    expect(body).toContain('<p>h1</p>\r\n<p>h2</p>');
+    expect(body).not.toMatch(/[^\r]\n/);
+  });
+
+  it('uses 8bit encoding for both parts', () => {
+    const { body } = buildMultipartAlternative('plain', '<p>html</p>');
+    const occurrences = body.match(/Content-Transfer-Encoding: 8bit/g);
+    expect(occurrences).toHaveLength(2);
+  });
+
+  it('produces a unique boundary per call', () => {
+    const a = buildMultipartAlternative('p', 'h').contentType;
+    const b = buildMultipartAlternative('p', 'h').contentType;
+    expect(a).not.toBe(b);
   });
 });
 
