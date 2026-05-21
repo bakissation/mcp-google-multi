@@ -1,0 +1,16 @@
+version: 2
+
+githubApp:
+  enabled: true
+  dependencyOverviewEnabled: true
+  disableCommentsAndCheckRuns: false
+
+issueRules:
+  malware: true
+  installScripts: true
+  shellScriptOverride: true
+  gitDependency: true
+  httpDependency: true
+  telemetry: true
+  troll: true
+  invalidPackageJSON: true
