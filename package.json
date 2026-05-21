@@ -44,6 +44,7 @@
     "prepublishOnly": "npm run build",
     "watch": "tsc --watch",
     "auth": "node dist/index.js auth --account",
+    "migrate-tokens": "node dist/index.js migrate-tokens",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

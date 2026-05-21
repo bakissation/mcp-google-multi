@@ -30,6 +30,12 @@ async function main() {
     return;
   }
 
+  if (process.argv.includes('migrate-tokens')) {
+    const { runMigrateTokens } = await import('./migrate-tokens.js');
+    runMigrateTokens();
+    return;
+  }
+
   // MCP server mode — no console.log (stdio is the MCP channel)
   const server = new McpServer({
     name: 'mcp-google-multi',
