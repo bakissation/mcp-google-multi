@@ -5,11 +5,14 @@ import path from 'node:path';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
-const tokenDir = path.resolve(__dirname, '..', 'tokens');
+const tokenDir = process.env.TOKEN_STORE_PATH
+  ? path.resolve(process.env.TOKEN_STORE_PATH)
+  : path.resolve(__dirname, '..', 'tokens');
 
 export interface AccountConfig {
   email: string;
   tokenPath: string;
+  encPath: string;
 }
 
 /**
@@ -61,6 +64,7 @@ function parseAccounts(): { aliases: [string, ...string[]]; configs: Record<stri
     configs[alias] = {
       email,
       tokenPath: path.join(tokenDir, alias, 'token.json'),
+      encPath: path.join(tokenDir, `${alias}.enc`),
     };
   }
 
