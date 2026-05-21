@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 /**
  * RFC 2047 encoded-word (`=?utf-8?B?...?=`) for non-ASCII header text.
  * Long values are split into multiple <=75-char encoded-words separated
@@ -60,4 +62,43 @@ export function encodeAddressHeader(value: string): string {
  */
 export function normalizeBodyLineEndings(body: string): string {
   return body.replace(/\r\n|\r|\n/g, '\r\n');
+}
+
+/**
+ * RFC 2046 §5.1.1 boundary token: 1-70 chars from a restricted set, no trailing space.
+ * randomBytes hex output is only [0-9a-f], all of which are bcharsnospace.
+ */
+function generateMimeBoundary(): string {
+  // 5-char prefix + 32 hex chars = 37 chars, well under the 70-char limit.
+  return `=_gm_${randomBytes(16).toString('hex')}`;
+}
+
+/**
+ * Build a multipart/alternative body so HTML-capable clients render the rich
+ * version and plain clients fall back. Returns the header value AND the body.
+ * Caller composes the full message: headers (including this Content-Type) + CRLF + body.
+ */
+export function buildMultipartAlternative(
+  plainBody: string,
+  htmlBody: string,
+): { contentType: string; body: string } {
+  const boundary = generateMimeBoundary();
+  const parts = [
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    normalizeBodyLineEndings(plainBody),
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    normalizeBodyLineEndings(htmlBody),
+    `--${boundary}--`,
+    '',
+  ];
+  return {
+    contentType: `multipart/alternative; boundary="${boundary}"`,
+    body: parts.join('\r\n'),
+  };
 }
