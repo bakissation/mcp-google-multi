@@ -5,6 +5,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { createLogger } from '../logger.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -23,6 +24,8 @@ export function registerMeetTools(server: McpServer): void {
       },
     },
     async ({ account, pageSize, pageToken, filter }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'meet', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const meet = google.meet({ version: 'v2', auth });
@@ -31,10 +34,12 @@ export function registerMeetTools(server: McpServer): void {
           pageToken,
           filter,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleMeetError(error, account as Account);
       }
     },
@@ -50,14 +55,18 @@ export function registerMeetTools(server: McpServer): void {
       },
     },
     async ({ account, name }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'meet', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const meet = google.meet({ version: 'v2', auth });
         const res = await meet.conferenceRecords.get({ name });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleMeetError(error, account as Account);
       }
     },
@@ -77,6 +86,8 @@ export function registerMeetTools(server: McpServer): void {
       },
     },
     async ({ account, parent, pageSize, pageToken }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'meet', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const meet = google.meet({ version: 'v2', auth });
@@ -85,10 +96,12 @@ export function registerMeetTools(server: McpServer): void {
           pageSize: pageSize ?? 20,
           pageToken,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleMeetError(error, account as Account);
       }
     },
@@ -108,6 +121,8 @@ export function registerMeetTools(server: McpServer): void {
       },
     },
     async ({ account, parent, pageSize, pageToken }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'meet', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const meet = google.meet({ version: 'v2', auth });
@@ -116,10 +131,12 @@ export function registerMeetTools(server: McpServer): void {
           pageSize: pageSize ?? 20,
           pageToken,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleMeetError(error, account as Account);
       }
     },
@@ -137,6 +154,8 @@ export function registerMeetTools(server: McpServer): void {
       },
     },
     async ({ account, parent, pageSize, pageToken }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'meet', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const meet = google.meet({ version: 'v2', auth });
@@ -145,10 +164,12 @@ export function registerMeetTools(server: McpServer): void {
           pageSize: pageSize ?? 200,
           pageToken,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleMeetError(error, account as Account);
       }
     },

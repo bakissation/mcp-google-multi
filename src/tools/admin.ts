@@ -5,6 +5,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { createLogger } from '../logger.js';
 import { adminWritesEnabled } from '../auth.js';
 
 const accountEnum = z.enum(ACCOUNTS);
@@ -47,6 +48,8 @@ export function registerAdminTools(server: McpServer): void {
       },
     },
     async ({ account, applicationName, userKey, startTime, endTime, eventName, actorIpAddress, filters, orgUnitID, groupIdFilter, customerId, maxResults, pageToken }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'admin', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const reports = google.admin({ version: 'reports_v1', auth });
@@ -68,6 +71,7 @@ export function registerAdminTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleAdminError(error, account as Account);
       }
     },
@@ -92,6 +96,8 @@ export function registerAdminTools(server: McpServer): void {
       },
     },
     async ({ account, customer, domain, query, maxResults, pageToken, orderBy, showDeleted, projection }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'admin', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const directory = google.admin({ version: 'directory_v1', auth });
@@ -105,10 +111,12 @@ export function registerAdminTools(server: McpServer): void {
           showDeleted: showDeleted !== undefined ? (showDeleted ? 'true' : 'false') : undefined,
           projection: projection ?? 'basic',
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleAdminError(error, account as Account);
       }
     },
@@ -125,6 +133,8 @@ export function registerAdminTools(server: McpServer): void {
       },
     },
     async ({ account, userKey, projection }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'admin', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const directory = google.admin({ version: 'directory_v1', auth });
@@ -132,10 +142,12 @@ export function registerAdminTools(server: McpServer): void {
           userKey,
           projection: projection ?? 'basic',
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleAdminError(error, account as Account);
       }
     },
@@ -157,8 +169,11 @@ export function registerAdminTools(server: McpServer): void {
       },
     },
     async ({ account, userKey, givenName, familyName, suspended, password, changePasswordAtNextLogin, orgUnitPath }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'admin', account: account as string });
+      const start = Date.now();
       try {
         if (!adminWritesEnabled()) {
+          logger.info('success', Date.now() - start);
           return {
             content: [{
               type: 'text' as const,
@@ -192,6 +207,7 @@ export function registerAdminTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleAdminError(error, account as Account);
       }
     },
@@ -214,6 +230,8 @@ export function registerAdminTools(server: McpServer): void {
       },
     },
     async ({ account, customer, domain, userKey, query, maxResults, pageToken }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'admin', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const directory = google.admin({ version: 'directory_v1', auth });
@@ -225,10 +243,12 @@ export function registerAdminTools(server: McpServer): void {
           maxResults: maxResults ?? 100,
           pageToken,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleAdminError(error, account as Account);
       }
     },
@@ -248,6 +268,8 @@ export function registerAdminTools(server: McpServer): void {
       },
     },
     async ({ account, groupKey, roles, includeDerivedMembership, maxResults, pageToken }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'admin', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const directory = google.admin({ version: 'directory_v1', auth });
@@ -258,10 +280,12 @@ export function registerAdminTools(server: McpServer): void {
           maxResults: maxResults ?? 100,
           pageToken,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleAdminError(error, account as Account);
       }
     },
@@ -290,6 +314,8 @@ export function registerAlertCenterTools(server: McpServer): void {
       },
     },
     async ({ account, pageSize, pageToken, filter, orderBy, customerId }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'admin', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const alertcenter = google.alertcenter({ version: 'v1beta1', auth });
@@ -300,10 +326,12 @@ export function registerAlertCenterTools(server: McpServer): void {
           orderBy,
           customerId,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleAlertCenterError(error, account as Account);
       }
     },
@@ -320,14 +348,18 @@ export function registerAlertCenterTools(server: McpServer): void {
       },
     },
     async ({ account, alertId, customerId }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'admin', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const alertcenter = google.alertcenter({ version: 'v1beta1', auth });
         const res = await alertcenter.alerts.get({ alertId, customerId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleAlertCenterError(error, account as Account);
       }
     },

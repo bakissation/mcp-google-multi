@@ -5,6 +5,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { createLogger } from '../logger.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -40,12 +41,15 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, title }) => {
+      const logger = createLogger({ tool: 'docs_create', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
         const res = await docs.documents.create({
           requestBody: { title },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             documentId: res.data.documentId,
@@ -53,6 +57,7 @@ export function registerDocsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -76,6 +81,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, includeTabsContent, suggestionsViewMode }) => {
+      const logger = createLogger({ tool: 'docs_create', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -84,6 +91,7 @@ export function registerDocsTools(server: McpServer): void {
           includeTabsContent: includeTabsContent ?? false,
           suggestionsViewMode,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             documentId: res.data.documentId,
@@ -94,6 +102,7 @@ export function registerDocsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -109,11 +118,14 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId }) => {
+      const logger = createLogger({ tool: 'docs_get', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
         const res = await docs.documents.get({ documentId });
         const text = extractPlainText(res.data.body);
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             documentId: res.data.documentId,
@@ -122,6 +134,7 @@ export function registerDocsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -140,6 +153,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, text, index }) => {
+      const logger = createLogger({ tool: 'docs_read', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -155,6 +170,7 @@ export function registerDocsTools(server: McpServer): void {
           documentId,
           requestBody: { requests: [request] },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             documentId: res.data.documentId,
@@ -162,6 +178,7 @@ export function registerDocsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -181,6 +198,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, findText, replaceText, matchCase }) => {
+      const logger = createLogger({ tool: 'docs_replace_text', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -196,6 +215,7 @@ export function registerDocsTools(server: McpServer): void {
           },
         });
         const occurrences = (res.data.replies?.[0] as any)?.replaceAllText?.occurrencesChanged ?? 0;
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             documentId: res.data.documentId,
@@ -203,6 +223,7 @@ export function registerDocsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -220,6 +241,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, startIndex, endIndex }) => {
+      const logger = createLogger({ tool: 'docs_delete_range', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -233,6 +256,7 @@ export function registerDocsTools(server: McpServer): void {
             }],
           },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             documentId: res.data.documentId,
@@ -240,6 +264,7 @@ export function registerDocsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -262,6 +287,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, startIndex, endIndex, bold, italic, underline, fontSize, fontFamily }) => {
+      const logger = createLogger({ tool: 'docs_update_style', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -310,6 +337,7 @@ export function registerDocsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -329,6 +357,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, rows, columns, index }) => {
+      const logger = createLogger({ tool: 'docs_insert_table', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -344,6 +374,7 @@ export function registerDocsTools(server: McpServer): void {
           documentId,
           requestBody: { requests: [request] },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             documentId: res.data.documentId,
@@ -351,6 +382,7 @@ export function registerDocsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -371,6 +403,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, name, startIndex, endIndex }) => {
+      const logger = createLogger({ tool: 'docs_create_named_range', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -386,10 +420,12 @@ export function registerDocsTools(server: McpServer): void {
           },
         });
         const created = (res.data.replies?.[0] as any)?.createNamedRange;
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(created ?? {}, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -407,6 +443,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, namedRangeId, name }) => {
+      const logger = createLogger({ tool: 'docs_create_named_range', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         if (!namedRangeId && !name) {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either namedRangeId or name must be supplied' }) }], isError: true };
@@ -421,10 +459,12 @@ export function registerDocsTools(server: McpServer): void {
           documentId,
           requestBody: { requests: [{ deleteNamedRange: req }] },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -443,6 +483,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, namedRangeId, namedRangeName, text }) => {
+      const logger = createLogger({ tool: 'docs_delete_named_range', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         if (!namedRangeId && !namedRangeName) {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either namedRangeId or namedRangeName must be supplied' }) }], isError: true };
@@ -457,10 +499,12 @@ export function registerDocsTools(server: McpServer): void {
           documentId,
           requestBody: { requests: [{ replaceNamedRangeContent: req }] },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ replaced: true }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -495,6 +539,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, startIndex, endIndex, ...style }) => {
+      const logger = createLogger({ tool: 'docs_update_paragraph_style', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -518,6 +564,7 @@ export function registerDocsTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify({ styled: true, range: { startIndex, endIndex }, applied: built.fields }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -545,6 +592,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, ...style }) => {
+      const logger = createLogger({ tool: 'docs_update_document_style', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -567,6 +616,7 @@ export function registerDocsTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify({ styled: true, applied: built.fields }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -603,6 +653,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, startIndex, endIndex, bulletPreset }) => {
+      const logger = createLogger({ tool: 'docs_create_paragraph_bullets', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -617,10 +669,12 @@ export function registerDocsTools(server: McpServer): void {
             }],
           },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ bulleted: true }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -638,6 +692,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, startIndex, endIndex }) => {
+      const logger = createLogger({ tool: 'docs_delete_paragraph_bullets', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -651,10 +707,12 @@ export function registerDocsTools(server: McpServer): void {
             }],
           },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ unbulleted: true }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -676,6 +734,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, uri, index, width, height }) => {
+      const logger = createLogger({ tool: 'docs_delete_paragraph_bullets', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -691,10 +751,12 @@ export function registerDocsTools(server: McpServer): void {
           documentId,
           requestBody: { requests: [{ insertInlineImage: request }] },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ inserted: true, at: index ?? 'end' }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -713,6 +775,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, index }) => {
+      const logger = createLogger({ tool: 'docs_insert_inline_image', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -723,10 +787,12 @@ export function registerDocsTools(server: McpServer): void {
           documentId,
           requestBody: { requests: [{ insertPageBreak: request }] },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ inserted: true, at: index ?? 'end' }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -744,6 +810,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, index, sectionType }) => {
+      const logger = createLogger({ tool: 'docs_insert_page_break', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -754,10 +822,12 @@ export function registerDocsTools(server: McpServer): void {
           documentId,
           requestBody: { requests: [{ insertSectionBreak: request }] },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ inserted: true, at: index ?? 'end' }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -776,6 +846,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, sectionBreakIndex }) => {
+      const logger = createLogger({ tool: 'docs_insert_section_break', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -786,10 +858,12 @@ export function registerDocsTools(server: McpServer): void {
           requestBody: { requests: [{ createHeader: request }] },
         });
         const reply = (res.data.replies?.[0] as any)?.createHeader;
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(reply ?? {}, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -806,6 +880,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, headerId }) => {
+      const logger = createLogger({ tool: 'docs_create_header', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -813,10 +889,12 @@ export function registerDocsTools(server: McpServer): void {
           documentId,
           requestBody: { requests: [{ deleteHeader: { headerId } }] },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, headerId }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -833,6 +911,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, sectionBreakIndex }) => {
+      const logger = createLogger({ tool: 'docs_delete_header', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -843,10 +923,12 @@ export function registerDocsTools(server: McpServer): void {
           requestBody: { requests: [{ createFooter: request }] },
         });
         const reply = (res.data.replies?.[0] as any)?.createFooter;
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(reply ?? {}, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -863,6 +945,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, footerId }) => {
+      const logger = createLogger({ tool: 'docs_create_footer', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -870,10 +954,12 @@ export function registerDocsTools(server: McpServer): void {
           documentId,
           requestBody: { requests: [{ deleteFooter: { footerId } }] },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, footerId }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -899,6 +985,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, operation, tableStartIndex, rowIndex, columnIndex, insertBelow, insertRight, rowSpan, columnSpan }) => {
+      const logger = createLogger({ tool: 'docs_delete_footer', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -952,6 +1040,7 @@ export function registerDocsTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify({ operation, completed: true }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -972,6 +1061,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, title, parentTabId, index }) => {
+      const logger = createLogger({ tool: 'docs_add_tab', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -983,10 +1074,12 @@ export function registerDocsTools(server: McpServer): void {
           requestBody: { requests: [{ addDocumentTab: { tabProperties } }] },
         });
         const reply = (res.data.replies?.[0] as any)?.addDocumentTab;
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(reply ?? {}, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -1003,6 +1096,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, tabId }) => {
+      const logger = createLogger({ tool: 'docs_add_tab', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -1010,10 +1105,12 @@ export function registerDocsTools(server: McpServer): void {
           documentId,
           requestBody: { requests: [{ deleteTab: { tabId } }] },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, tabId }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -1033,6 +1130,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, tabId, title, index, parentTabId }) => {
+      const logger = createLogger({ tool: 'docs_delete_tab', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -1059,6 +1158,7 @@ export function registerDocsTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify({ updated: true, tabId, applied: fields }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },
@@ -1081,6 +1181,8 @@ export function registerDocsTools(server: McpServer): void {
       },
     },
     async ({ account, documentId, requests, writeControl }) => {
+      const logger = createLogger({ tool: 'docs_batch_update', service: 'docs', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
@@ -1091,6 +1193,7 @@ export function registerDocsTools(server: McpServer): void {
             writeControl,
           },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             documentId: res.data.documentId,
@@ -1098,6 +1201,7 @@ export function registerDocsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleDocsError(error, account as Account);
       }
     },

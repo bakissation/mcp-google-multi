@@ -5,6 +5,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { createLogger } from '../logger.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -22,6 +23,8 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, maxResults, pageToken }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
@@ -29,10 +32,12 @@ export function registerTasksTools(server: McpServer): void {
           maxResults: maxResults ?? 100,
           pageToken,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },
@@ -48,14 +53,18 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, tasklistId }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
         const res = await tasks.tasklists.get({ tasklist: tasklistId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },
@@ -71,16 +80,20 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, title }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
         const res = await tasks.tasklists.insert({
           requestBody: { title },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },
@@ -97,6 +110,8 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, tasklistId, title }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
@@ -104,10 +119,12 @@ export function registerTasksTools(server: McpServer): void {
           tasklist: tasklistId,
           requestBody: { title },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },
@@ -123,14 +140,18 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, tasklistId }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
         await tasks.tasklists.delete({ tasklist: tasklistId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, tasklistId }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },
@@ -159,6 +180,8 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, tasklistId, ...params }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
@@ -166,10 +189,12 @@ export function registerTasksTools(server: McpServer): void {
           tasklist: tasklistId,
           ...params,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },
@@ -186,14 +211,18 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, tasklistId, taskId }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
         const res = await tasks.tasks.get({ tasklist: tasklistId, task: taskId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },
@@ -215,6 +244,8 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, tasklistId, title, notes, due, status, parent, previous }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
@@ -229,10 +260,12 @@ export function registerTasksTools(server: McpServer): void {
           previous,
           requestBody,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },
@@ -253,6 +286,8 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, tasklistId, taskId, title, notes, due, status }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
@@ -275,6 +310,7 @@ export function registerTasksTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },
@@ -291,14 +327,18 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, tasklistId, taskId }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
         await tasks.tasks.delete({ tasklist: tasklistId, task: taskId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, taskId }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },
@@ -318,6 +358,8 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, tasklistId, taskId, parent, previous, destinationTasklist }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
@@ -328,10 +370,12 @@ export function registerTasksTools(server: McpServer): void {
           previous,
           destinationTasklist,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },
@@ -347,14 +391,18 @@ export function registerTasksTools(server: McpServer): void {
       },
     },
     async ({ account, tasklistId }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'tasks', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const tasks = google.tasks({ version: 'v1', auth });
         await tasks.tasks.clear({ tasklist: tasklistId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ cleared: true, tasklistId }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleTasksError(error, account as Account);
       }
     },

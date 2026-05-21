@@ -5,6 +5,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { createLogger } from '../logger.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -50,6 +51,8 @@ export function registerContactsTools(server: McpServer): void {
       },
     },
     async ({ account, query, pageSize }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'contacts', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const people = google.people({ version: 'v1', auth });
@@ -71,6 +74,7 @@ export function registerContactsTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify(contacts, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleContactsError(error, account as Account);
       }
     },
@@ -86,6 +90,8 @@ export function registerContactsTools(server: McpServer): void {
       },
     },
     async ({ account, resourceName }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'contacts', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const people = google.people({ version: 'v1', auth });
@@ -93,10 +99,12 @@ export function registerContactsTools(server: McpServer): void {
           resourceName,
           personFields: PERSON_FIELDS,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(formatContact(res.data), null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleContactsError(error, account as Account);
       }
     },
@@ -121,6 +129,8 @@ export function registerContactsTools(server: McpServer): void {
       },
     },
     async ({ account, pageSize, pageToken, sortOrder }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'contacts', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const people = google.people({ version: 'v1', auth });
@@ -132,6 +142,7 @@ export function registerContactsTools(server: McpServer): void {
           sortOrder: sortOrder ?? 'FIRST_NAME_ASCENDING',
         });
         const contacts = (res.data.connections ?? []).map(formatContact);
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             contacts,
@@ -140,6 +151,7 @@ export function registerContactsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleContactsError(error, account as Account);
       }
     },
@@ -164,6 +176,8 @@ export function registerContactsTools(server: McpServer): void {
       },
     },
     async ({ account, givenName, familyName, email, emailType, phone, phoneType, organization, jobTitle }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'contacts', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const people = google.people({ version: 'v1', auth });
@@ -192,6 +206,7 @@ export function registerContactsTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify(formatContact(res.data), null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleContactsError(error, account as Account);
       }
     },
@@ -217,6 +232,8 @@ export function registerContactsTools(server: McpServer): void {
       },
     },
     async ({ account, resourceName, givenName, familyName, email, emailType, phone, phoneType, organization, jobTitle }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'contacts', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const people = google.people({ version: 'v1', auth });
@@ -273,6 +290,7 @@ export function registerContactsTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify(formatContact(res.data), null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleContactsError(error, account as Account);
       }
     },
@@ -288,16 +306,20 @@ export function registerContactsTools(server: McpServer): void {
       },
     },
     async ({ account, resourceName }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'contacts', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const people = google.people({ version: 'v1', auth });
         await people.people.deleteContact({ resourceName });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             deleted: resourceName,
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleContactsError(error, account as Account);
       }
     },
@@ -314,6 +336,8 @@ export function registerContactsTools(server: McpServer): void {
       },
     },
     async ({ account, pageSize }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'contacts', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const people = google.people({ version: 'v1', auth });
@@ -327,10 +351,12 @@ export function registerContactsTools(server: McpServer): void {
           groupType: g.groupType,
           memberCount: g.memberCount ?? 0,
         }));
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(groups, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleContactsError(error, account as Account);
       }
     },
@@ -348,6 +374,8 @@ export function registerContactsTools(server: McpServer): void {
       },
     },
     async ({ account, groupResourceName, maxMembers }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'contacts', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const people = google.people({ version: 'v1', auth });
@@ -358,6 +386,7 @@ export function registerContactsTools(server: McpServer): void {
 
         const memberResourceNames = groupRes.data.memberResourceNames ?? [];
         if (memberResourceNames.length === 0) {
+          logger.info('success', Date.now() - start);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify({
               group: groupRes.data.name,
@@ -381,6 +410,7 @@ export function registerContactsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleContactsError(error, account as Account);
       }
     },
@@ -396,6 +426,8 @@ export function registerContactsTools(server: McpServer): void {
       },
     },
     async ({ account, name }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'contacts', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const people = google.people({ version: 'v1', auth });
@@ -404,6 +436,7 @@ export function registerContactsTools(server: McpServer): void {
             contactGroup: { name },
           },
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             resourceName: res.data.resourceName,
@@ -412,6 +445,7 @@ export function registerContactsTools(server: McpServer): void {
           }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleContactsError(error, account as Account);
       }
     },

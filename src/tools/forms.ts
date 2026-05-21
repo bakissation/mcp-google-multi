@@ -5,6 +5,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { createLogger } from '../logger.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -19,14 +20,18 @@ export function registerFormsTools(server: McpServer): void {
       },
     },
     async ({ account, formId }) => {
+      const logger = createLogger({ tool: 'forms_get', service: 'forms', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const forms = google.forms({ version: 'v1', auth });
         const res = await forms.forms.get({ formId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleFormsError(error, account as Account);
       }
     },
@@ -45,6 +50,8 @@ export function registerFormsTools(server: McpServer): void {
       },
     },
     async ({ account, formId, pageSize, pageToken, filter }) => {
+      const logger = createLogger({ tool: 'forms_get', service: 'forms', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const forms = google.forms({ version: 'v1', auth });
@@ -54,10 +61,12 @@ export function registerFormsTools(server: McpServer): void {
           pageToken,
           filter,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleFormsError(error, account as Account);
       }
     },
@@ -74,14 +83,18 @@ export function registerFormsTools(server: McpServer): void {
       },
     },
     async ({ account, formId, responseId }) => {
+      const logger = createLogger({ tool: 'forms_responses_list', service: 'forms', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const forms = google.forms({ version: 'v1', auth });
         const res = await forms.forms.responses.get({ formId, responseId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleFormsError(error, account as Account);
       }
     },
@@ -97,14 +110,18 @@ export function registerFormsTools(server: McpServer): void {
       },
     },
     async ({ account, formId }) => {
+      const logger = createLogger({ tool: 'forms_response_get', service: 'forms', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const forms = google.forms({ version: 'v1', auth });
         const res = await forms.forms.watches.list({ formId });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleFormsError(error, account as Account);
       }
     },

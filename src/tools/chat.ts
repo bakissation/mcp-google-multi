@@ -5,6 +5,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { createLogger } from '../logger.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -21,6 +22,8 @@ export function registerChatTools(server: McpServer): void {
       },
     },
     async ({ account, pageSize, pageToken, filter }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'chat', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const chat = google.chat({ version: 'v1', auth });
@@ -29,10 +32,12 @@ export function registerChatTools(server: McpServer): void {
           pageToken,
           filter,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleChatError(error, account as Account);
       }
     },
@@ -48,14 +53,18 @@ export function registerChatTools(server: McpServer): void {
       },
     },
     async ({ account, name }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'chat', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const chat = google.chat({ version: 'v1', auth });
         const res = await chat.spaces.get({ name });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleChatError(error, account as Account);
       }
     },
@@ -75,6 +84,8 @@ export function registerChatTools(server: McpServer): void {
       },
     },
     async ({ account, parent, text, cardsV2, threadKey, messageReplyOption }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'chat', account: account as string });
+      const start = Date.now();
       try {
         if (!text && (!cardsV2 || cardsV2.length === 0)) {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either text or cardsV2 must be provided' }) }], isError: true };
@@ -95,6 +106,7 @@ export function registerChatTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleChatError(error, account as Account);
       }
     },
@@ -114,6 +126,8 @@ export function registerChatTools(server: McpServer): void {
       },
     },
     async ({ account, parent, pageSize, pageToken, filter, orderBy }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'chat', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const chat = google.chat({ version: 'v1', auth });
@@ -124,10 +138,12 @@ export function registerChatTools(server: McpServer): void {
           filter,
           orderBy,
         });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleChatError(error, account as Account);
       }
     },

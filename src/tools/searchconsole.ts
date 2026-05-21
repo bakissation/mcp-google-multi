@@ -5,6 +5,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { createLogger } from '../logger.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -20,14 +21,18 @@ export function registerSearchConsoleTools(server: McpServer): void {
       },
     },
     async ({ account }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'searchconsole', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const wm = google.webmasters({ version: 'v3', auth });
         const res = await wm.sites.list();
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data.siteEntry ?? [], null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleSearchConsoleError(error, account as Account);
       }
     },
@@ -43,14 +48,18 @@ export function registerSearchConsoleTools(server: McpServer): void {
       },
     },
     async ({ account, siteUrl }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'searchconsole', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const wm = google.webmasters({ version: 'v3', auth });
         const res = await wm.sites.get({ siteUrl });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleSearchConsoleError(error, account as Account);
       }
     },
@@ -66,14 +75,18 @@ export function registerSearchConsoleTools(server: McpServer): void {
       },
     },
     async ({ account, siteUrl }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'searchconsole', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const wm = google.webmasters({ version: 'v3', auth });
         await wm.sites.add({ siteUrl });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ success: true, siteUrl }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleSearchConsoleError(error, account as Account);
       }
     },
@@ -89,14 +102,18 @@ export function registerSearchConsoleTools(server: McpServer): void {
       },
     },
     async ({ account, siteUrl }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'searchconsole', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const wm = google.webmasters({ version: 'v3', auth });
         await wm.sites.delete({ siteUrl });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ success: true, deleted: siteUrl }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleSearchConsoleError(error, account as Account);
       }
     },
@@ -114,14 +131,18 @@ export function registerSearchConsoleTools(server: McpServer): void {
       },
     },
     async ({ account, siteUrl }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'searchconsole', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const wm = google.webmasters({ version: 'v3', auth });
         const res = await wm.sitemaps.list({ siteUrl });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data.sitemap ?? [], null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleSearchConsoleError(error, account as Account);
       }
     },
@@ -138,14 +159,18 @@ export function registerSearchConsoleTools(server: McpServer): void {
       },
     },
     async ({ account, siteUrl, feedpath }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'searchconsole', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const wm = google.webmasters({ version: 'v3', auth });
         const res = await wm.sitemaps.get({ siteUrl, feedpath });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleSearchConsoleError(error, account as Account);
       }
     },
@@ -162,14 +187,18 @@ export function registerSearchConsoleTools(server: McpServer): void {
       },
     },
     async ({ account, siteUrl, feedpath }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'searchconsole', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const wm = google.webmasters({ version: 'v3', auth });
         await wm.sitemaps.submit({ siteUrl, feedpath });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ success: true, siteUrl, feedpath }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleSearchConsoleError(error, account as Account);
       }
     },
@@ -186,14 +215,18 @@ export function registerSearchConsoleTools(server: McpServer): void {
       },
     },
     async ({ account, siteUrl, feedpath }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'searchconsole', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const wm = google.webmasters({ version: 'v3', auth });
         await wm.sitemaps.delete({ siteUrl, feedpath });
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ success: true, deleted: feedpath }, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleSearchConsoleError(error, account as Account);
       }
     },
@@ -234,6 +267,8 @@ export function registerSearchConsoleTools(server: McpServer): void {
       },
     },
     async ({ account, siteUrl, startDate, endDate, dimensions, type, dimensionFilterGroups, rowLimit, startRow, aggregationType, dataState }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'searchconsole', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const wm = google.webmasters({ version: 'v3', auth });
@@ -259,6 +294,7 @@ export function registerSearchConsoleTools(server: McpServer): void {
           content: [{ type: 'text' as const, text: JSON.stringify(summary, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleSearchConsoleError(error, account as Account);
       }
     },
@@ -278,6 +314,8 @@ export function registerSearchConsoleTools(server: McpServer): void {
       },
     },
     async ({ account, siteUrl, inspectionUrl, languageCode }) => {
+      const logger = createLogger({ tool: 'unknown', service: 'searchconsole', account: account as string });
+      const start = Date.now();
       try {
         const auth = await getClient(account as Account);
         const searchconsole = google.searchconsole({ version: 'v1', auth });
@@ -290,10 +328,12 @@ export function registerSearchConsoleTools(server: McpServer): void {
           },
         });
 
+        logger.info('success', Date.now() - start);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+      logger.error(error, Date.now() - start);
         return handleSearchConsoleError(error, account as Account);
       }
     },
