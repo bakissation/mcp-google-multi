@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { coerceBoolean } from './_coerce.js';
 import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
@@ -147,10 +148,10 @@ export function registerTasksTools(server: McpServer): void {
         tasklistId: z.string().describe('Tasklist ID'),
         maxResults: z.number().min(1).max(100).optional(),
         pageToken: z.string().optional(),
-        showCompleted: z.boolean().optional().describe('Include completed tasks (default: true)'),
-        showDeleted: z.boolean().optional(),
-        showHidden: z.boolean().optional(),
-        showAssigned: z.boolean().optional(),
+        showCompleted: coerceBoolean.optional().describe('Include completed tasks (default: true)'),
+        showDeleted: coerceBoolean.optional(),
+        showHidden: coerceBoolean.optional(),
+        showAssigned: coerceBoolean.optional(),
         completedMax: z.string().optional().describe('RFC 3339 upper bound on completion date'),
         completedMin: z.string().optional(),
         dueMax: z.string().optional(),

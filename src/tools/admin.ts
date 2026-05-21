@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { coerceBoolean } from './_coerce.js';
 import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
@@ -87,7 +88,7 @@ export function registerAdminTools(server: McpServer): void {
         maxResults: z.number().min(1).max(500).optional(),
         pageToken: z.string().optional(),
         orderBy: z.enum(['email', 'familyName', 'givenName']).optional(),
-        showDeleted: z.boolean().optional(),
+        showDeleted: coerceBoolean.optional(),
         projection: z.enum(['basic', 'custom', 'full']).optional(),
       },
     },
@@ -150,9 +151,9 @@ export function registerAdminTools(server: McpServer): void {
         userKey: z.string().describe('User email or ID'),
         givenName: z.string().optional(),
         familyName: z.string().optional(),
-        suspended: z.boolean().optional(),
+        suspended: coerceBoolean.optional(),
         password: z.string().optional(),
-        changePasswordAtNextLogin: z.boolean().optional(),
+        changePasswordAtNextLogin: coerceBoolean.optional(),
         orgUnitPath: z.string().optional(),
       },
     },
@@ -242,7 +243,7 @@ export function registerAdminTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias (must be a Workspace admin)'),
         groupKey: z.string().describe('Group email or ID'),
         roles: z.string().optional().describe('Comma-separated roles to include (OWNER, MANAGER, MEMBER)'),
-        includeDerivedMembership: z.boolean().optional(),
+        includeDerivedMembership: coerceBoolean.optional(),
         maxResults: z.number().min(1).max(200).optional(),
         pageToken: z.string().optional(),
       },

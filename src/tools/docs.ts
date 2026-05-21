@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { coerceBoolean, coerceJson } from './_coerce.js';
 import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
@@ -65,7 +66,7 @@ export function registerDocsTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         documentId: z.string().describe('Google Docs document ID'),
-        includeTabsContent: z.boolean().optional()
+        includeTabsContent: coerceBoolean.optional()
           .describe('Include full content for every tab (default: false — first tab only)'),
         suggestionsViewMode: z.enum([
           'DEFAULT_FOR_CURRENT_ACCESS',
@@ -176,7 +177,7 @@ export function registerDocsTools(server: McpServer): void {
         documentId: z.string().describe('Google Docs document ID'),
         findText: z.string().describe('Text to search for'),
         replaceText: z.string().describe('Replacement text'),
-        matchCase: z.boolean().default(true).optional()
+        matchCase: coerceBoolean.default(true).optional()
           .describe('Case-sensitive match (default: true)'),
       },
     },
@@ -254,9 +255,9 @@ export function registerDocsTools(server: McpServer): void {
         documentId: z.string().describe('Google Docs document ID'),
         startIndex: z.number().min(1).describe('Start index (inclusive, 1-based)'),
         endIndex: z.number().min(2).describe('End index (exclusive)'),
-        bold: z.boolean().optional().describe('Set bold'),
-        italic: z.boolean().optional().describe('Set italic'),
-        underline: z.boolean().optional().describe('Set underline'),
+        bold: coerceBoolean.optional().describe('Set bold'),
+        italic: coerceBoolean.optional().describe('Set italic'),
+        underline: coerceBoolean.optional().describe('Set underline'),
         fontSize: z.number().min(1).optional().describe('Font size in points'),
         fontFamily: z.string().optional().describe('Font family name (e.g. "Arial", "Times New Roman")'),
       },
@@ -489,9 +490,9 @@ export function registerDocsTools(server: McpServer): void {
         indentEnd: z.number().optional().describe('End indent in points'),
         indentFirstLine: z.number().optional().describe('First-line indent in points'),
         direction: z.enum(['LEFT_TO_RIGHT', 'RIGHT_TO_LEFT']).optional(),
-        keepLinesTogether: z.boolean().optional(),
-        keepWithNext: z.boolean().optional(),
-        avoidWidowAndOrphan: z.boolean().optional(),
+        keepLinesTogether: coerceBoolean.optional(),
+        keepWithNext: coerceBoolean.optional(),
+        avoidWidowAndOrphan: coerceBoolean.optional(),
       },
     },
     async ({ account, documentId, startIndex, endIndex, ...style }) => {
@@ -539,9 +540,9 @@ export function registerDocsTools(server: McpServer): void {
         marginHeader: z.number().optional(),
         marginFooter: z.number().optional(),
         pageNumberStart: z.number().optional(),
-        useFirstPageHeaderFooter: z.boolean().optional(),
-        useEvenPageHeaderFooter: z.boolean().optional(),
-        useCustomHeaderFooterMargins: z.boolean().optional(),
+        useFirstPageHeaderFooter: coerceBoolean.optional(),
+        useEvenPageHeaderFooter: coerceBoolean.optional(),
+        useCustomHeaderFooterMargins: coerceBoolean.optional(),
       },
     },
     async ({ account, documentId, ...style }) => {
@@ -892,8 +893,8 @@ export function registerDocsTools(server: McpServer): void {
         tableStartIndex: z.number().min(1).describe('Start index of the table in the document'),
         rowIndex: z.number().min(0).describe('Target row (0-based)'),
         columnIndex: z.number().min(0).describe('Target column (0-based)'),
-        insertBelow: z.boolean().optional().describe('insertRow only: insert below the target row (default: false)'),
-        insertRight: z.boolean().optional().describe('insertColumn only: insert right of the target column (default: false)'),
+        insertBelow: coerceBoolean.optional().describe('insertRow only: insert below the target row (default: false)'),
+        insertRight: coerceBoolean.optional().describe('insertColumn only: insert right of the target column (default: false)'),
         rowSpan: z.number().min(1).optional().describe('mergeCells only: how many rows the merged cell spans (default 1)'),
         columnSpan: z.number().min(1).optional().describe('mergeCells/unmergeCells: column span (default 1)'),
       },
@@ -1073,7 +1074,7 @@ export function registerDocsTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         documentId: z.string().describe('Google Docs document ID'),
-        requests: z.array(z.record(z.string(), z.any())).describe('Array of Request objects, each with one request-type key'),
+        requests: coerceJson(z.array(z.record(z.string(), z.any()))).describe('Array of Request objects, each with one request-type key'),
         writeControl: z.object({
           requiredRevisionId: z.string().optional(),
           targetRevisionId: z.string().optional(),
