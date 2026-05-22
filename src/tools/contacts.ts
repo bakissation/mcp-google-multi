@@ -1,4 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
@@ -37,7 +37,7 @@ function formatContact(person: any) {
   };
 }
 
-export function registerContactsTools(server: McpServer): void {
+export function registerContactsTools(server: ToolRegistry): void {
   server.registerTool(
     'contacts_search',
     {

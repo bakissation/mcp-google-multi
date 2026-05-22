@@ -1,4 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean } from './_coerce.js';
 import { google } from 'googleapis';
@@ -80,7 +80,7 @@ function parseMessage(msg: any): GmailMessageFull {
   };
 }
 
-export function registerGmailTools(server: McpServer): void {
+export function registerGmailTools(server: ToolRegistry): void {
   server.registerTool(
     'gmail_search',
     {

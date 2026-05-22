@@ -1,4 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 import { google } from 'googleapis';
@@ -9,7 +9,7 @@ import { handleGoogleApiError } from './_errors.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
-export function registerSheetsTools(server: McpServer): void {
+export function registerSheetsTools(server: ToolRegistry): void {
   server.registerTool(
     'sheets_create',
     {
