@@ -20,7 +20,7 @@ You'll get an acknowledgement and can track the fix in the private advisory. Onc
 
 This server brokers OAuth access to Google accounts — Gmail, Drive, Calendar, and (when enabled) Workspace **Admin SDK** scopes. A vulnerability could expose mail, files, or directory data. Of particular interest:
 
-- **Token handling** — tokens live under `tokens/<alias>/token.json` (mode `0600`) and must never be logged or transmitted.
+- **Token handling** — refresh tokens are **AES-256-GCM encrypted at rest** (`~/.config/mcp-google-multi/tokens/<alias>.enc`, mode `0600`) with a key derived from `MASTER_KEY`; tokens must never be logged or transmitted, and `MASTER_KEY` must never be committed or logged. Error payloads carry only `message` + code — never raw error objects (which can hold the `Authorization` header).
 - **Header / MIME construction** — Gmail tools build raw RFC 5322 messages; injection (e.g. CRLF in headers) is in scope.
 - **Scope escalation** — anything that grants an account scopes it didn't consent to.
 
@@ -31,4 +31,4 @@ This server brokers OAuth access to Google accounts — Gmail, Drive, Calendar, 
 
 ## Good hygiene for everyone
 
-Never paste OAuth tokens, client secrets, authorization codes, or `.env` contents into issues, PRs, or logs.
+Never paste OAuth tokens, client secrets, `MASTER_KEY`, authorization codes, or `.env` contents into issues, PRs, or logs.

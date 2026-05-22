@@ -17,7 +17,7 @@ import { registerTasksTools } from './tools/tasks.js';
 import { registerMeetTools } from './tools/meet.js';
 import { registerFormsTools } from './tools/forms.js';
 import { registerChatTools } from './tools/chat.js';
-import { registerAdminTools, registerAlertCenterTools } from './tools/admin.js';
+import { registerAdminTools } from './tools/admin.js';
 import { getOptionalBundles, getAdminAccounts } from './auth.js';
 import { ToolRegistry } from './registry.js';
 import { resolvePolicy, isAllowed, describePolicy, type Policy } from './write-control.js';
@@ -39,7 +39,6 @@ function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
   const optional = new Set(getOptionalBundles());
   if (optional.has('forms')) registerFormsTools(registry);
   if (optional.has('chat')) registerChatTools(registry);
-  if (optional.has('alertcenter')) registerAlertCenterTools(registry);
   if (getAdminAccounts().length > 0) registerAdminTools(registry);
   return registry;
 }
