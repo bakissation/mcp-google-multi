@@ -2,11 +2,10 @@ import { google } from 'googleapis';
 import http from 'node:http';
 import { URL } from 'node:url';
 import { randomBytes } from 'node:crypto';
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import open from 'open';
 import destroyer from 'server-destroy';
 import { ACCOUNTS, ACCOUNT_CONFIG } from './accounts.js';
+import { writeToken } from './token-store.js';
 
 // ─── Scope tiers ────────────────────────────────────────────────────────
 //
@@ -39,13 +38,6 @@ export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
     'https://www.googleapis.com/auth/chat.spaces',
     'https://www.googleapis.com/auth/chat.messages',
     'https://www.googleapis.com/auth/chat.messages.create',
-  ],
-  // Alert Center's apps.alerts scope is NOT grantable through the interactive
-  // user-consent flow this server uses — it requires a service account with
-  // domain-wide delegation. It lives in its own opt-in bundle so it never
-  // blocks the working Admin SDK admin scopes. See README "Alert Center".
-  alertcenter: [
-    'https://www.googleapis.com/auth/apps.alerts',
   ],
 };
 
@@ -92,10 +84,6 @@ export function resolveScopesForAccount(alias: string): string[] {
   return Array.from(new Set(scopes));
 }
 
-/** True if admin writes are explicitly enabled. Default refuses to prevent accidents on small orgs. */
-export function adminWritesEnabled(): boolean {
-  return process.env.GOOGLE_ALLOW_ADMIN_WRITES === 'true';
-}
 
 export async function runAuthFlow(args: string[]): Promise<void> {
   const accountIdx = args.indexOf('--account');
@@ -113,6 +101,13 @@ export async function runAuthFlow(args: string[]): Promise<void> {
 
   const config = ACCOUNT_CONFIG[alias];
   const scopes = resolveScopesForAccount(alias);
+
+  if (!process.env.MASTER_KEY) {
+    console.error(
+      'MASTER_KEY is not set. Generate one (openssl rand -base64 32) and add it to .env before authenticating.',
+    );
+    process.exit(1);
+  }
 
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -174,13 +169,7 @@ export async function runAuthFlow(args: string[]): Promise<void> {
 
             const { tokens } = await oauth2Client.getToken(code);
 
-            await fs.mkdir(path.dirname(config.tokenPath), { recursive: true });
-            // 0o600: tokens grant full account access; keep them user-only.
-            await fs.writeFile(
-              config.tokenPath,
-              JSON.stringify(tokens, null, 2),
-              { mode: 0o600 },
-            );
+            writeToken(alias, tokens);
 
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(
@@ -188,7 +177,7 @@ export async function runAuthFlow(args: string[]): Promise<void> {
             );
             (server as any).destroy();
 
-            console.log(`Token saved to ${config.tokenPath}`);
+            console.log(`Token saved (encrypted) for ${alias}.`);
             resolve();
           }
         } catch (e) {

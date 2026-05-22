@@ -1,5 +1,6 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
+import { coerceArray, coerceBoolean } from './_coerce.js';
 import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
@@ -29,7 +30,7 @@ const COMMENT_LIST_FIELDS = `nextPageToken,comments(${COMMENT_BASE_FIELDS},repli
 const REPLY_FIELDS = `kind,htmlContent,${REPLY_SUBFIELDS}`;
 const REPLY_LIST_FIELDS = `nextPageToken,replies(${REPLY_FIELDS})`;
 
-export function registerDriveTools(server: McpServer): void {
+export function registerDriveTools(server: ToolRegistry): void {
   // ─── Read / search / list ──────────────────────────────────────────────
 
   server.registerTool(
@@ -607,9 +608,9 @@ export function registerDriveTools(server: McpServer): void {
         role: z.enum(['reader', 'commenter', 'writer', 'fileOrganizer', 'organizer', 'owner']).describe('Permission role'),
         emailAddress: z.string().optional().describe('Required when type is "user" or "group"'),
         domain: z.string().optional().describe('Required when type is "domain"'),
-        sendNotification: z.boolean().optional().describe('Send notification email (default: true)'),
+        sendNotification: coerceBoolean.optional().describe('Send notification email (default: true)'),
         emailMessage: z.string().optional().describe('Custom message in notification email'),
-        transferOwnership: z.boolean().optional().describe('Transfer ownership to the recipient. Requires role="owner". Recipient must accept ownership.'),
+        transferOwnership: coerceBoolean.optional().describe('Transfer ownership to the recipient. Requires role="owner". Recipient must accept ownership.'),
         expirationTime: z.string().optional().describe('RFC 3339 timestamp when access expires. Only valid for role="reader" or "commenter".'),
       },
     },
@@ -677,9 +678,9 @@ export function registerDriveTools(server: McpServer): void {
           .describe('New role'),
         expirationTime: z.string().optional()
           .describe('New RFC 3339 expiration timestamp. Only valid for role "reader" or "commenter".'),
-        removeExpiration: z.boolean().optional()
+        removeExpiration: coerceBoolean.optional()
           .describe('Clear the existing expirationTime'),
-        transferOwnership: z.boolean().optional()
+        transferOwnership: coerceBoolean.optional()
           .describe('Promote to owner. Requires role="owner".'),
       },
     },
@@ -779,7 +780,7 @@ export function registerDriveTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().describe('Google Drive file ID'),
-        includeDeleted: z.boolean().optional().describe('Include deleted comments (default: false)'),
+        includeDeleted: coerceBoolean.optional().describe('Include deleted comments (default: false)'),
         pageSize: z.number().min(1).max(100).optional().describe('Max comments per page (default: 20)'),
         pageToken: z.string().optional().describe('Token from a previous page'),
         startModifiedTime: z.string().optional().describe('Only return comments modified after this RFC 3339 timestamp'),
@@ -814,7 +815,7 @@ export function registerDriveTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().describe('Google Drive file ID'),
         commentId: z.string().describe('Comment ID'),
-        includeDeleted: z.boolean().optional(),
+        includeDeleted: coerceBoolean.optional(),
       },
     },
     async ({ account, fileId, commentId, includeDeleted }) => {
@@ -935,7 +936,7 @@ export function registerDriveTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().describe('Google Drive file ID'),
         commentId: z.string().describe('Parent comment ID'),
-        includeDeleted: z.boolean().optional(),
+        includeDeleted: coerceBoolean.optional(),
         pageSize: z.number().min(1).max(100).optional(),
         pageToken: z.string().optional(),
       },
@@ -1058,10 +1059,10 @@ export function registerDriveTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().describe('Google Drive file ID'),
         revisionId: z.string().describe('Revision ID'),
-        keepForever: z.boolean().optional().describe('Pin this revision indefinitely'),
-        published: z.boolean().optional().describe('Toggle published state (Docs only)'),
-        publishAuto: z.boolean().optional().describe('Auto-publish subsequent revisions'),
-        publishedOutsideDomain: z.boolean().optional().describe('Allow publish outside domain'),
+        keepForever: coerceBoolean.optional().describe('Pin this revision indefinitely'),
+        published: coerceBoolean.optional().describe('Toggle published state (Docs only)'),
+        publishAuto: coerceBoolean.optional().describe('Auto-publish subsequent revisions'),
+        publishedOutsideDomain: coerceBoolean.optional().describe('Allow publish outside domain'),
       },
     },
     async ({ account, fileId, revisionId, keepForever, published, publishAuto, publishedOutsideDomain }) => {
@@ -1153,10 +1154,10 @@ export function registerDriveTools(server: McpServer): void {
         fileId: z.string().describe('Google Drive file ID'),
         proposalId: z.string().describe('Access proposal ID'),
         action: z.enum(['ACCEPT', 'DENY']).describe('Whether to accept or deny the proposal'),
-        role: z.array(z.enum(['reader', 'commenter', 'writer', 'fileOrganizer'])).optional()
+        role: coerceArray(z.enum(['reader', 'commenter', 'writer', 'fileOrganizer'])).optional()
           .describe('Required when action is ACCEPT'),
         view: z.string().optional().describe('Optional view, e.g. "published"'),
-        sendNotification: z.boolean().optional()
+        sendNotification: coerceBoolean.optional()
           .describe('Email the requester about the resolution'),
       },
     },

@@ -1,4 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
@@ -8,7 +8,7 @@ import { handleGoogleApiError } from './_errors.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
-export function registerMeetTools(server: McpServer): void {
+export function registerMeetTools(server: ToolRegistry): void {
   // ─── Conference records (past meetings) ────────────────────────────────
 
   server.registerTool(

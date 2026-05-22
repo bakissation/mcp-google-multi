@@ -1,5 +1,6 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
+import { coerceArray, coerceBoolean } from './_coerce.js';
 import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
@@ -79,7 +80,7 @@ function parseMessage(msg: any): GmailMessageFull {
   };
 }
 
-export function registerGmailTools(server: McpServer): void {
+export function registerGmailTools(server: ToolRegistry): void {
   server.registerTool(
     'gmail_search',
     {
@@ -381,8 +382,8 @@ export function registerGmailTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         messageId: z.string().describe('Gmail message ID'),
-        addLabelIds: z.array(z.string()).optional().describe('Label IDs to add'),
-        removeLabelIds: z.array(z.string()).optional().describe('Label IDs to remove'),
+        addLabelIds: coerceArray(z.string()).optional().describe('Label IDs to add'),
+        removeLabelIds: coerceArray(z.string()).optional().describe('Label IDs to remove'),
       },
     },
     async ({ account, messageId, addLabelIds, removeLabelIds }) => {
@@ -458,9 +459,9 @@ export function registerGmailTools(server: McpServer): void {
       description: 'Add/remove labels across up to 1000 Gmail messages at once. Useful for bulk archiving, marking as read, etc.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageIds: z.array(z.string()).describe('Message IDs (up to 1000)'),
-        addLabelIds: z.array(z.string()).optional().describe('Label IDs to add'),
-        removeLabelIds: z.array(z.string()).optional().describe('Label IDs to remove'),
+        messageIds: coerceArray(z.string()).describe('Message IDs (up to 1000)'),
+        addLabelIds: coerceArray(z.string()).optional().describe('Label IDs to add'),
+        removeLabelIds: coerceArray(z.string()).optional().describe('Label IDs to remove'),
       },
     },
     async ({ account, messageIds, addLabelIds, removeLabelIds }) => {
@@ -490,7 +491,7 @@ export function registerGmailTools(server: McpServer): void {
       description: 'Permanently delete multiple Gmail messages. Irreversible.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageIds: z.array(z.string()).describe('Message IDs (up to 1000)'),
+        messageIds: coerceArray(z.string()).describe('Message IDs (up to 1000)'),
       },
     },
     async ({ account, messageIds }) => {
@@ -702,7 +703,7 @@ export function registerGmailTools(server: McpServer): void {
         startHistoryId: z.string().describe('History ID from a previous gmail_get_profile or gmail_read response'),
         maxResults: z.number().min(1).max(500).default(100).optional()
           .describe('Max results to return (default: 100)'),
-        historyTypes: z.array(z.enum(['messageAdded', 'messageDeleted', 'labelAdded', 'labelRemoved'])).optional()
+        historyTypes: coerceArray(z.enum(['messageAdded', 'messageDeleted', 'labelAdded', 'labelRemoved'])).optional()
           .describe('Filter by history event types'),
       },
     },
@@ -753,13 +754,13 @@ export function registerGmailTools(server: McpServer): void {
       description: 'Enable or disable Gmail vacation responder with a custom message',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        enableAutoReply: z.boolean().describe('Whether to enable the vacation responder'),
+        enableAutoReply: coerceBoolean.describe('Whether to enable the vacation responder'),
         responseSubject: z.string().optional().describe('Subject line for auto-reply'),
         responseBodyPlainText: z.string().optional().describe('Plain text body for auto-reply'),
         startTime: z.string().optional().describe('Start time as Unix timestamp in ms'),
         endTime: z.string().optional().describe('End time as Unix timestamp in ms'),
-        restrictToContacts: z.boolean().optional().describe('Only reply to contacts (default: false)'),
-        restrictToDomain: z.boolean().optional().describe('Only reply to same domain (default: false)'),
+        restrictToContacts: coerceBoolean.optional().describe('Only reply to contacts (default: false)'),
+        restrictToDomain: coerceBoolean.optional().describe('Only reply to same domain (default: false)'),
       },
     },
     async ({ account, enableAutoReply, responseSubject, responseBodyPlainText, startTime, endTime, restrictToContacts, restrictToDomain }) => {

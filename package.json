@@ -1,7 +1,7 @@
 {
   "name": "mcp-google-multi",
   "version": "0.0.0-semantically-released",
-  "description": "MCP server for Gmail, Google Drive, Calendar, Sheets, Docs, and Contacts with multi-account support",
+  "description": "Local MCP server for Google Workspace (Gmail, Drive, Calendar, Sheets, Docs, Contacts, Tasks, Meet, Search Console, +Forms/Chat/Admin) across multiple accounts — OAuth-only, encrypted token storage, deny-by-default writes.",
   "type": "module",
   "license": "MIT",
   "bin": {
@@ -36,6 +36,12 @@
     "google-sheets",
     "google-docs",
     "google-contacts",
+    "google-workspace",
+    "google-tasks",
+    "google-meet",
+    "search-console",
+    "oauth",
+    "mcp-server",
     "claude",
     "claude-code"
   ],
@@ -44,6 +50,7 @@
     "prepublishOnly": "npm run build",
     "watch": "tsc --watch",
     "auth": "node dist/index.js auth --account",
+    "migrate-tokens": "node dist/index.js migrate-tokens",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
