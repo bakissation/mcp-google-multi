@@ -1,4 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean } from './_coerce.js';
 import { google } from 'googleapis';
@@ -30,7 +30,7 @@ const COMMENT_LIST_FIELDS = `nextPageToken,comments(${COMMENT_BASE_FIELDS},repli
 const REPLY_FIELDS = `kind,htmlContent,${REPLY_SUBFIELDS}`;
 const REPLY_LIST_FIELDS = `nextPageToken,replies(${REPLY_FIELDS})`;
 
-export function registerDriveTools(server: McpServer): void {
+export function registerDriveTools(server: ToolRegistry): void {
   // ─── Read / search / list ──────────────────────────────────────────────
 
   server.registerTool(

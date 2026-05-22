@@ -1,4 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceBoolean } from './_coerce.js';
 import { google } from 'googleapis';
@@ -17,7 +17,7 @@ const accountEnum = z.enum(ACCOUNTS);
  * Writes are gated behind GOOGLE_ALLOW_ADMIN_WRITES=true to prevent accidents on small orgs
  * (a stray users.update on a 3-person Workspace is a bad day).
  */
-export function registerAdminTools(server: McpServer): void {
+export function registerAdminTools(server: ToolRegistry): void {
   // ─── Reports / audit log ───────────────────────────────────────────────
 
   server.registerTool(
@@ -276,7 +276,7 @@ export function registerAdminTools(server: McpServer): void {
  * domain-wide delegation. Registered separately so a missing/ungrantable
  * apps.alerts scope never blocks the working Admin SDK admin tools.
  */
-export function registerAlertCenterTools(server: McpServer): void {
+export function registerAlertCenterTools(server: ToolRegistry): void {
   server.registerTool(
     'alertcenter_alerts_list',
     {

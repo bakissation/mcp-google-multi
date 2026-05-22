@@ -1,4 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceJson } from './_coerce.js';
 import { google } from 'googleapis';
@@ -9,7 +9,7 @@ import { handleGoogleApiError } from './_errors.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
-export function registerChatTools(server: McpServer): void {
+export function registerChatTools(server: ToolRegistry): void {
   server.registerTool(
     'chat_spaces_list',
     {

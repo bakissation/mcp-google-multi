@@ -1,4 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceBoolean, coerceJson } from './_coerce.js';
 import { google } from 'googleapis';
@@ -30,7 +30,7 @@ function extractPlainText(body: any): string {
   return text;
 }
 
-export function registerDocsTools(server: McpServer): void {
+export function registerDocsTools(server: ToolRegistry): void {
   server.registerTool(
     'docs_create',
     {

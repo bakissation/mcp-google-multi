@@ -19,6 +19,7 @@ import { registerFormsTools } from './tools/forms.js';
 import { registerChatTools } from './tools/chat.js';
 import { registerAdminTools, registerAlertCenterTools } from './tools/admin.js';
 import { getOptionalBundles, getAdminAccounts } from './auth.js';
+import { ToolRegistry } from './registry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
@@ -41,20 +42,21 @@ async function main() {
     name: 'mcp-google-multi',
     version: pkg.version,
   });
-  registerGmailTools(server);
-  registerDriveTools(server);
-  registerCalendarTools(server);
-  registerSheetsTools(server);
-  registerDocsTools(server);
-  registerContactsTools(server);
-  registerSearchConsoleTools(server);
-  registerTasksTools(server);
-  registerMeetTools(server);
+  const registry = new ToolRegistry(server);
+  registerGmailTools(registry);
+  registerDriveTools(registry);
+  registerCalendarTools(registry);
+  registerSheetsTools(registry);
+  registerDocsTools(registry);
+  registerContactsTools(registry);
+  registerSearchConsoleTools(registry);
+  registerTasksTools(registry);
+  registerMeetTools(registry);
   const optional = new Set(getOptionalBundles());
-  if (optional.has('forms')) registerFormsTools(server);
-  if (optional.has('chat')) registerChatTools(server);
-  if (optional.has('alertcenter')) registerAlertCenterTools(server);
-  if (getAdminAccounts().length > 0) registerAdminTools(server);
+  if (optional.has('forms')) registerFormsTools(registry);
+  if (optional.has('chat')) registerChatTools(registry);
+  if (optional.has('alertcenter')) registerAlertCenterTools(registry);
+  if (getAdminAccounts().length > 0) registerAdminTools(registry);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
