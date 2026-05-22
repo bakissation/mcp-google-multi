@@ -1,8 +1,9 @@
 name: backmerge
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["release"]
+    types: [completed]
 
 permissions:
   contents: write
@@ -10,20 +11,26 @@ permissions:
 
 jobs:
   backmerge:
-    if: ${{ !github.event.release.prerelease }}
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
       - name: Open + auto-merge main into staging and dev
         env:
           GH_TOKEN: ${{ secrets.BACKMERGE_TOKEN }}
           REPO: ${{ github.repository }}
-          TAG: ${{ github.event.release.tag_name }}
         run: |
           set -uo pipefail
+          TAG=$(gh release view --repo "$REPO" --json tagName --jq .tagName 2>/dev/null || echo "")
           for target in staging dev; do
             url=$(gh pr create --repo "$REPO" --base "$target" --head main \
-                  --title "chore: back-merge main into $target (resync after $TAG)" \
-                  --body "Automated post-release resync so the \`$target\` prerelease base tracks \`main\` ($TAG). No content change." || true)
+                  --title "chore: back-merge main into $target (resync after ${TAG:-latest release})" \
+                  --body "Automated post-release resync so the \`$target\` prerelease base tracks \`main\` (${TAG:-latest release}). No content change." || true)
             if [ -n "${url:-}" ]; then
               gh pr merge "$url" --repo "$REPO" --auto --merge
               echo "queued auto-merge: $url"
