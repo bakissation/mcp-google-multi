@@ -4,6 +4,8 @@ A **local** [MCP](https://modelcontextprotocol.io) server that gives Claude Code
 
 [![npm](https://img.shields.io/npm/v/mcp-google-multi?label=npm&color=cb3837)](https://www.npmjs.com/package/mcp-google-multi)
 
+> Open-source and **funded by [IdeaCrafters](https://github.com/IdeaCraftersHQ)** — the studio that pays for its development and upkeep.
+
 - 🔑 **Multi-account** — drive any number of your Google accounts from one server, each by a short alias.
 - 🔒 **Secure by default** — refresh tokens **encrypted at rest** (AES-256-GCM); **writes are deny-by-default**; no telemetry — it talks only to Google.
 - 📦 **npm-first** — install and run with `npx`; everything configured through env vars.
@@ -120,7 +122,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) and the [Code of Conduct](./CODE_OF_CON
 
 Built and maintained by **Abdelbaki Berkati** — [berkati.xyz](https://berkati.xyz) · [@bakissation](https://github.com/bakissation). [Read the case study →](https://berkati.xyz/case-studies/mcp-google-multi/)
 
-Sponsored by **[IdeaCrafters](https://ideacrafters.com)** ([@IdeaCraftersHQ](https://github.com/IdeaCraftersHQ)).
+Development is **funded by [IdeaCrafters](https://ideacrafters.com)** ([@IdeaCraftersHQ](https://github.com/IdeaCraftersHQ)) — the studio that pays for this OSS to exist.
 
 ## License
 
