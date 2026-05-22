@@ -1,15 +1,26 @@
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { homedir } from 'node:os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+dotenv.config();
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
-const tokenDir = path.resolve(__dirname, '..', 'tokens');
+
+const defaultTokenDir = path.join(
+  process.env.XDG_CONFIG_HOME || path.join(homedir(), '.config'),
+  'mcp-google-multi',
+  'tokens',
+);
+const tokenDir = process.env.TOKEN_STORE_PATH
+  ? path.resolve(process.env.TOKEN_STORE_PATH)
+  : defaultTokenDir;
 
 export interface AccountConfig {
   email: string;
   tokenPath: string;
+  encPath: string;
 }
 
 /**
@@ -61,6 +72,7 @@ function parseAccounts(): { aliases: [string, ...string[]]; configs: Record<stri
     configs[alias] = {
       email,
       tokenPath: path.join(tokenDir, alias, 'token.json'),
+      encPath: path.join(tokenDir, `${alias}.enc`),
     };
   }
 

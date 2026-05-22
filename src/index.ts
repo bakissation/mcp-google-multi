@@ -17,11 +17,31 @@ import { registerTasksTools } from './tools/tasks.js';
 import { registerMeetTools } from './tools/meet.js';
 import { registerFormsTools } from './tools/forms.js';
 import { registerChatTools } from './tools/chat.js';
-import { registerAdminTools, registerAlertCenterTools } from './tools/admin.js';
+import { registerAdminTools } from './tools/admin.js';
 import { getOptionalBundles, getAdminAccounts } from './auth.js';
+import { ToolRegistry } from './registry.js';
+import { resolvePolicy, isAllowed, describePolicy, type Policy } from './write-control.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
+
+function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
+  const registry = new ToolRegistry(server, policy);
+  registerGmailTools(registry);
+  registerDriveTools(registry);
+  registerCalendarTools(registry);
+  registerSheetsTools(registry);
+  registerDocsTools(registry);
+  registerContactsTools(registry);
+  registerSearchConsoleTools(registry);
+  registerTasksTools(registry);
+  registerMeetTools(registry);
+  const optional = new Set(getOptionalBundles());
+  if (optional.has('forms')) registerFormsTools(registry);
+  if (optional.has('chat')) registerChatTools(registry);
+  if (getAdminAccounts().length > 0) registerAdminTools(registry);
+  return registry;
+}
 
 async function main() {
   if (process.argv.includes('auth')) {
@@ -30,25 +50,32 @@ async function main() {
     return;
   }
 
-  // MCP server mode — no console.log (stdio is the MCP channel)
+  if (process.argv.includes('migrate-tokens')) {
+    const { runMigrateTokens } = await import('./migrate-tokens.js');
+    runMigrateTokens();
+    return;
+  }
+
+  if (process.argv.includes('config') && process.argv.includes('check')) {
+    const policy = resolvePolicy();
+    const registry = buildRegistry(
+      new McpServer({ name: 'mcp-google-multi', version: pkg.version }),
+      policy,
+    );
+    const cud = registry.tools.filter((t) => t.cud !== 'read');
+    const disabled = cud.filter((t) => !isAllowed(t, policy));
+    console.log(`Write-control: ${describePolicy(policy)}`);
+    console.log(`CUD tools enabled: ${cud.length - disabled.length}/${cud.length}`);
+    console.log(`Disabled: ${disabled.map((t) => t.name).join(', ') || '(none)'}`);
+    return;
+  }
+
+  const policy = resolvePolicy();
   const server = new McpServer({
     name: 'mcp-google-multi',
     version: pkg.version,
   });
-  registerGmailTools(server);
-  registerDriveTools(server);
-  registerCalendarTools(server);
-  registerSheetsTools(server);
-  registerDocsTools(server);
-  registerContactsTools(server);
-  registerSearchConsoleTools(server);
-  registerTasksTools(server);
-  registerMeetTools(server);
-  const optional = new Set(getOptionalBundles());
-  if (optional.has('forms')) registerFormsTools(server);
-  if (optional.has('chat')) registerChatTools(server);
-  if (optional.has('alertcenter')) registerAlertCenterTools(server);
-  if (getAdminAccounts().length > 0) registerAdminTools(server);
+  buildRegistry(server, policy);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

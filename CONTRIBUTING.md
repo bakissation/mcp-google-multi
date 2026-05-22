@@ -18,6 +18,7 @@ your fork ──PR──▶ dev ──▶ staging ──▶ main (releases tagge
 - **Open all PRs against `dev`.** PRs to `staging` or `main` from contributors will be redirected.
 - The maintainer promotes `dev → staging → main` and cuts releases from `main`.
 - `dev`, `staging`, and `main` are all protected: CI must pass and changes land via pull request.
+- **Merges use merge commits** (squash & rebase are disabled), so keep each branch's commits clean Conventional Commits — they land individually and drive the release version.
 
 ## Dev setup
 
@@ -25,7 +26,7 @@ your fork ──PR──▶ dev ──▶ staging ──▶ main (releases tagge
 git clone https://github.com/bakissation/mcp-google-multi.git
 cd mcp-google-multi
 npm install
-cp .env.example .env          # add your GOOGLE_CLIENT_ID/SECRET and GOOGLE_ACCOUNTS
+cp .env.example .env          # add GOOGLE_CLIENT_ID/SECRET, GOOGLE_ACCOUNTS, and MASTER_KEY
 npm run build
 node dist/index.js auth --account <alias>   # OAuth each account you'll test with
 ```
@@ -49,7 +50,7 @@ npm run build
 
 The full spec lives in [`CLAUDE.md`](./CLAUDE.md). The essentials:
 
-- **One service per file** in `src/tools/<service>.ts`, exporting `register<Service>Tools(server)`.
+- **One service per file** in `src/tools/<service>.ts`, exporting `register<Service>Tools(server: ToolRegistry)`. `cud` (read/create/update/delete) is inferred from the tool name; CUD tools are auto-gated by write-control.
 - **Tool shape:** `server.registerTool(name, { description, inputSchema }, handler)`. `inputSchema` is a flat `zod` object with `account: accountEnum` as the first field. Tool names are `snake_case`, prefixed by service.
 - **Errors:** wrap handlers in `try/catch` and delegate to the per-service `handle<Service>Error` shim (which calls `handleGoogleApiError`). Set `isError: true` on error responses.
 - **Scopes** are tiered in `src/auth.ts`: `BASE_SCOPES` (always), `OPTIONAL_SCOPE_BUNDLES` (env opt-in), `ADMIN_SCOPES` (per-account opt-in). Any new scope must be documented and noted as requiring re-auth.
@@ -62,14 +63,14 @@ Versioning and releases are **fully automated** by [semantic-release](https://se
 
 - `fix:` → patch, `feat:` → minor, `feat!:` / `BREAKING CHANGE:` → major. `docs:`/`chore:`/`refactor:` don't trigger a release.
 - On merge, a release is cut automatically per channel: **`dev` → `x.y.z-alpha.n`**, **`staging` → `x.y.z-beta.n`**, **`main` → `x.y.z`** (stable). Release notes are generated into [GitHub Releases](https://github.com/bakissation/mcp-google-multi/releases).
-- Still update the relevant **README** tables in your PR when you add/change a tool. (`package.json` `version` is a managed placeholder — the git tag / GitHub Release is the source of truth.)
+- Update **[COVERAGE.md](./COVERAGE.md)** when you add/change a tool. (`package.json` `version` is a managed placeholder — the git tag / GitHub Release is the source of truth.)
 
 ## PR checklist
 
 - [ ] Targets `dev`
 - [ ] `typecheck`, `lint`, `test`, `build` all pass
 - [ ] Conventional commit messages
-- [ ] README tables updated (no manual version bump / changelog — automated from your commits)
+- [ ] COVERAGE.md updated (no manual version bump / changelog — automated from your commits)
 - [ ] No secrets, tokens, or `.env` committed
 
 ## Security

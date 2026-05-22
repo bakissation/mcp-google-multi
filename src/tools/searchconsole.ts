@@ -1,5 +1,6 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
+import { coerceArray, coerceJson } from './_coerce.js';
 import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
@@ -8,7 +9,7 @@ import { handleGoogleApiError } from './_errors.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
-export function registerSearchConsoleTools(server: McpServer): void {
+export function registerSearchConsoleTools(server: ToolRegistry): void {
   // ─── Sites ───────────────────────────────────────────────
 
   server.registerTool(
@@ -210,18 +211,18 @@ export function registerSearchConsoleTools(server: McpServer): void {
         siteUrl: z.string().describe('Site URL (e.g. "https://example.com/" or "sc-domain:example.com")'),
         startDate: z.string().describe('Start date (YYYY-MM-DD). Data is available starting ~3 days ago.'),
         endDate: z.string().describe('End date (YYYY-MM-DD)'),
-        dimensions: z.array(z.enum(['query', 'page', 'country', 'device', 'searchAppearance', 'date'])).optional()
+        dimensions: coerceArray(z.enum(['query', 'page', 'country', 'device', 'searchAppearance', 'date'])).optional()
           .describe('Dimensions to group by. Common: ["query", "page"], ["date"], ["query", "date"]'),
         type: z.enum(['web', 'image', 'video', 'news', 'discover', 'googleNews']).optional()
           .describe('Search type filter (default: web)'),
-        dimensionFilterGroups: z.array(z.object({
+        dimensionFilterGroups: coerceJson(z.array(z.object({
           groupType: z.enum(['and']).optional(),
           filters: z.array(z.object({
             dimension: z.enum(['query', 'page', 'country', 'device', 'searchAppearance']),
             operator: z.enum(['contains', 'equals', 'notContains', 'notEquals', 'includingRegex', 'excludingRegex']),
             expression: z.string(),
           })),
-        })).optional()
+        }))).optional()
           .describe('Filters to narrow results. Example: filter by page containing "/blog/" or query containing "keyword"'),
         rowLimit: z.number().min(1).max(25000).optional()
           .describe('Max rows to return (default: 1000, max: 25000)'),

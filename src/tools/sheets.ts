@@ -1,5 +1,6 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
+import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 import { google } from 'googleapis';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
@@ -8,7 +9,7 @@ import { handleGoogleApiError } from './_errors.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
-export function registerSheetsTools(server: McpServer): void {
+export function registerSheetsTools(server: ToolRegistry): void {
   server.registerTool(
     'sheets_create',
     {
@@ -16,7 +17,7 @@ export function registerSheetsTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         title: z.string().describe('Spreadsheet title'),
-        sheetTitles: z.array(z.string()).optional()
+        sheetTitles: coerceArray(z.string()).optional()
           .describe('Optional tab/sheet names (default: one sheet named "Sheet1")'),
       },
     },
@@ -129,7 +130,7 @@ export function registerSheetsTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias'),
         spreadsheetId: z.string().describe('Spreadsheet ID'),
         range: z.string().describe('A1 notation target range, e.g. "Sheet1!A1:C3"'),
-        values: z.array(z.array(z.any())).describe('2D array of values (rows x columns)'),
+        values: coerceJson(z.array(z.array(z.any()))).describe('2D array of values (rows x columns)'),
         valueInputOption: z.enum(['RAW', 'USER_ENTERED']).default('USER_ENTERED').optional()
           .describe('How to interpret values: RAW (literal) or USER_ENTERED (formulas/dates parsed). Default: USER_ENTERED'),
       },
@@ -166,7 +167,7 @@ export function registerSheetsTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias'),
         spreadsheetId: z.string().describe('Spreadsheet ID'),
         range: z.string().describe('A1 notation range to search for the table (e.g. "Sheet1")'),
-        values: z.array(z.array(z.any())).describe('2D array of rows to append'),
+        values: coerceJson(z.array(z.array(z.any()))).describe('2D array of rows to append'),
         valueInputOption: z.enum(['RAW', 'USER_ENTERED']).default('USER_ENTERED').optional()
           .describe('How to interpret values. Default: USER_ENTERED'),
       },
@@ -233,7 +234,7 @@ export function registerSheetsTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         spreadsheetId: z.string().describe('Spreadsheet ID'),
-        ranges: z.array(z.string()).describe('Array of A1 notation ranges'),
+        ranges: coerceArray(z.string()).describe('Array of A1 notation ranges'),
         valueRenderOption: z.enum(['FORMATTED_VALUE', 'UNFORMATTED_VALUE', 'FORMULA'])
           .default('FORMATTED_VALUE').optional()
           .describe('How to render values. Default: FORMATTED_VALUE'),
@@ -268,10 +269,10 @@ export function registerSheetsTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         spreadsheetId: z.string().describe('Spreadsheet ID'),
-        data: z.array(z.object({
+        data: coerceJson(z.array(z.object({
           range: z.string().describe('A1 notation range'),
-          values: z.array(z.array(z.any())).describe('2D array of values'),
-        })).describe('Array of { range, values } objects to write'),
+          values: coerceJson(z.array(z.array(z.any()))).describe('2D array of values'),
+        }))).describe('Array of { range, values } objects to write'),
         valueInputOption: z.enum(['RAW', 'USER_ENTERED']).default('USER_ENTERED').optional()
           .describe('How to interpret values. Default: USER_ENTERED'),
       },
@@ -427,7 +428,7 @@ export function registerSheetsTools(server: McpServer): void {
         sheetId: z.number().describe('Sheet ID'),
         title: z.string().optional().describe('New tab title'),
         index: z.number().optional().describe('New position among tabs'),
-        hidden: z.boolean().optional().describe('Hide the tab from the UI'),
+        hidden: coerceBoolean.optional().describe('Hide the tab from the UI'),
         tabColor: rgbColorSchema.optional().describe('Tab color (RGB 0..1)'),
         frozenRowCount: z.number().min(0).optional().describe('Number of frozen header rows'),
         frozenColumnCount: z.number().min(0).optional().describe('Number of frozen header columns'),
@@ -498,10 +499,10 @@ export function registerSheetsTools(server: McpServer): void {
         backgroundColor: rgbColorSchema.optional().describe('Cell background (RGB 0..1)'),
         textFormat: z.object({
           foregroundColor: rgbColorSchema.optional(),
-          bold: z.boolean().optional(),
-          italic: z.boolean().optional(),
-          underline: z.boolean().optional(),
-          strikethrough: z.boolean().optional(),
+          bold: coerceBoolean.optional(),
+          italic: coerceBoolean.optional(),
+          underline: coerceBoolean.optional(),
+          strikethrough: coerceBoolean.optional(),
           fontFamily: z.string().optional(),
           fontSize: z.number().min(1).optional(),
         }).optional(),
@@ -658,19 +659,19 @@ export function registerSheetsTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         spreadsheetId: z.string().describe('Spreadsheet ID'),
-        ranges: z.array(gridRangeSchema).describe('Ranges the rule applies to'),
+        ranges: coerceJson(z.array(gridRangeSchema)).describe('Ranges the rule applies to'),
         index: z.number().min(0).optional().describe('Where in the rule order to insert (0 = highest priority)'),
         booleanRule: z.object({
           conditionType: z.string().describe(BOOLEAN_CONDITION_TYPE_DESC),
-          conditionValues: z.array(z.string()).optional().describe('Values for the condition (e.g. ["100"] for NUMBER_GREATER, or ["=A1>10"] for CUSTOM_FORMULA)'),
+          conditionValues: coerceArray(z.string()).optional().describe('Values for the condition (e.g. ["100"] for NUMBER_GREATER, or ["=A1>10"] for CUSTOM_FORMULA)'),
           format: z.object({
             backgroundColor: rgbColorSchema.optional(),
             textFormat: z.object({
               foregroundColor: rgbColorSchema.optional(),
-              bold: z.boolean().optional(),
-              italic: z.boolean().optional(),
-              strikethrough: z.boolean().optional(),
-              underline: z.boolean().optional(),
+              bold: coerceBoolean.optional(),
+              italic: coerceBoolean.optional(),
+              strikethrough: coerceBoolean.optional(),
+              underline: coerceBoolean.optional(),
             }).optional(),
           }).describe('Format to apply when condition is true. Conditional formatting only supports bold/italic/strikethrough/underline/foregroundColor/backgroundColor.'),
         }).optional(),
@@ -749,7 +750,7 @@ export function registerSheetsTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias'),
         spreadsheetId: z.string().describe('Spreadsheet ID'),
         range: gridRangeSchema,
-        sortSpecs: z.array(sortSpecSchema).describe('One spec per sort column (in priority order)'),
+        sortSpecs: coerceJson(z.array(sortSpecSchema)).describe('One spec per sort column (in priority order)'),
       },
     },
     async ({ account, spreadsheetId, range, sortSpecs }) => {
@@ -779,13 +780,13 @@ export function registerSheetsTools(server: McpServer): void {
         account: accountEnum.describe('Google account alias'),
         spreadsheetId: z.string().describe('Spreadsheet ID'),
         range: gridRangeSchema,
-        sortSpecs: z.array(sortSpecSchema).optional(),
-        filterSpecs: z.array(z.object({
+        sortSpecs: coerceJson(z.array(sortSpecSchema)).optional(),
+        filterSpecs: coerceJson(z.array(z.object({
           columnIndex: z.number().min(0),
-          hiddenValues: z.array(z.string()).optional().describe('Values to hide in this column'),
+          hiddenValues: coerceArray(z.string()).optional().describe('Values to hide in this column'),
           conditionType: z.string().optional().describe(BOOLEAN_CONDITION_TYPE_DESC),
-          conditionValues: z.array(z.string()).optional(),
-        })).optional(),
+          conditionValues: coerceArray(z.string()).optional(),
+        }))).optional(),
       },
     },
     async ({ account, spreadsheetId, range, sortSpecs, filterSpecs }) => {
@@ -861,10 +862,10 @@ export function registerSheetsTools(server: McpServer): void {
         scope: z.enum(['allSheets', 'sheet', 'range']).describe('Search scope'),
         sheetId: z.number().optional().describe('Required when scope=sheet'),
         range: gridRangeSchema.optional().describe('Required when scope=range'),
-        matchCase: z.boolean().optional(),
-        matchEntireCell: z.boolean().optional(),
-        searchByRegex: z.boolean().optional(),
-        includeFormulas: z.boolean().optional(),
+        matchCase: coerceBoolean.optional(),
+        matchEntireCell: coerceBoolean.optional(),
+        searchByRegex: coerceBoolean.optional(),
+        includeFormulas: coerceBoolean.optional(),
       },
     },
     async ({ account, spreadsheetId, find, replacement, scope, sheetId, range, matchCase, matchEntireCell, searchByRegex, includeFormulas }) => {
@@ -957,7 +958,7 @@ export function registerSheetsTools(server: McpServer): void {
         dimension: z.enum(['ROWS', 'COLUMNS']),
         startIndex: z.number().min(0).describe('0-based, inclusive'),
         endIndex: z.number().min(1).describe('0-based, exclusive'),
-        inheritFromBefore: z.boolean().optional(),
+        inheritFromBefore: coerceBoolean.optional(),
       },
     },
     async ({ account, spreadsheetId, sheetId, dimension, startIndex, endIndex, inheritFromBefore }) => {
@@ -1031,10 +1032,10 @@ export function registerSheetsTools(server: McpServer): void {
         spreadsheetId: z.string().describe('Spreadsheet ID'),
         range: gridRangeSchema,
         conditionType: z.string().describe(BOOLEAN_CONDITION_TYPE_DESC),
-        conditionValues: z.array(z.string()).optional().describe('Values per condition type (list items for ONE_OF_LIST, range A1 for ONE_OF_RANGE, etc.)'),
+        conditionValues: coerceArray(z.string()).optional().describe('Values per condition type (list items for ONE_OF_LIST, range A1 for ONE_OF_RANGE, etc.)'),
         inputMessage: z.string().optional().describe('Tooltip shown when cell is selected'),
-        strict: z.boolean().optional().describe('Reject invalid input (default: false = warning only)'),
-        showCustomUi: z.boolean().optional().describe('Show dropdown UI for list-type validations'),
+        strict: coerceBoolean.optional().describe('Reject invalid input (default: false = warning only)'),
+        showCustomUi: coerceBoolean.optional().describe('Show dropdown UI for list-type validations'),
       },
     },
     async ({ account, spreadsheetId, range, conditionType, conditionValues, inputMessage, strict, showCustomUi }) => {
@@ -1135,7 +1136,7 @@ export function registerSheetsTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         spreadsheetId: z.string().describe('Spreadsheet ID'),
-        ranges: z.array(z.string()).describe('Array of A1 notation ranges'),
+        ranges: coerceArray(z.string()).describe('Array of A1 notation ranges'),
       },
     },
     async ({ account, spreadsheetId, ranges }) => {
@@ -1164,10 +1165,10 @@ export function registerSheetsTools(server: McpServer): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         spreadsheetId: z.string().describe('Spreadsheet ID'),
-        requests: z.array(z.record(z.string(), z.any())).describe('Array of Request objects. Each object has exactly one key (the request type) like {repeatCell: {...}}, {addChart: {...}}, {updateBanding: {...}}, etc.'),
-        includeSpreadsheetInResponse: z.boolean().optional(),
-        responseRanges: z.array(z.string()).optional(),
-        responseIncludeGridData: z.boolean().optional(),
+        requests: coerceJson(z.array(z.record(z.string(), z.any()))).describe('Array of Request objects. Each object has exactly one key (the request type) like {repeatCell: {...}}, {addChart: {...}}, {updateBanding: {...}}, etc.'),
+        includeSpreadsheetInResponse: coerceBoolean.optional(),
+        responseRanges: coerceArray(z.string()).optional(),
+        responseIncludeGridData: coerceBoolean.optional(),
       },
     },
     async ({ account, spreadsheetId, requests, includeSpreadsheetInResponse, responseRanges, responseIncludeGridData }) => {
