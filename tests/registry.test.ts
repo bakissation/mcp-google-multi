@@ -56,7 +56,7 @@ describe('ToolRegistry', () => {
     const fakeServer = {
       registerTool: (...a: unknown[]) => { calls.push(a); return 'ok'; },
     } as never;
-    const reg = new ToolRegistry(fakeServer);
+    const reg = new ToolRegistry(fakeServer, { profile: 'full-writes', readOnly: false, allow: [], deny: [] });
     const ret = reg.registerTool('gmail_send', { description: 'x' }, () => {});
     expect(ret).toBe('ok');
     expect(calls).toHaveLength(1);

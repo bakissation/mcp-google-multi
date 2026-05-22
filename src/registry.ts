@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { type Policy, isAllowed, writeDisabledResult } from './write-control.js';
 
 export type Cud = 'read' | 'create' | 'update' | 'delete';
 
@@ -29,11 +30,19 @@ export class ToolRegistry {
   readonly tools: ToolEntry[] = [];
   readonly registerTool: McpServer['registerTool'];
 
-  constructor(server: McpServer) {
-    this.registerTool = ((name: string, ...rest: unknown[]) => {
+  constructor(server: McpServer, policy: Policy) {
+    this.registerTool = ((name: string, config: unknown, handler: (...a: unknown[]) => unknown) => {
       const service = name.includes('_') ? name.slice(0, name.indexOf('_')) : name;
-      this.tools.push({ name, service, cud: inferCud(name) });
-      return (server.registerTool as (...args: unknown[]) => unknown)(name, ...rest);
+      const cud = inferCud(name);
+      this.tools.push({ name, service, cud });
+      const guarded =
+        cud === 'read'
+          ? handler
+          : (...args: unknown[]) =>
+              isAllowed({ name, service, cud }, policy)
+                ? handler(...args)
+                : writeDisabledResult({ name, service, cud }, policy);
+      return (server.registerTool as (...a: unknown[]) => unknown)(name, config, guarded);
     }) as McpServer['registerTool'];
   }
 }
