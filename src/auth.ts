@@ -39,13 +39,6 @@ export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
     'https://www.googleapis.com/auth/chat.messages',
     'https://www.googleapis.com/auth/chat.messages.create',
   ],
-  // Alert Center's apps.alerts scope is NOT grantable through the interactive
-  // user-consent flow this server uses — it requires a service account with
-  // domain-wide delegation. It lives in its own opt-in bundle so it never
-  // blocks the working Admin SDK admin scopes. See README "Alert Center".
-  alertcenter: [
-    'https://www.googleapis.com/auth/apps.alerts',
-  ],
 };
 
 export const ADMIN_SCOPES = [
@@ -91,10 +84,6 @@ export function resolveScopesForAccount(alias: string): string[] {
   return Array.from(new Set(scopes));
 }
 
-/** True if admin writes are explicitly enabled. Default refuses to prevent accidents on small orgs. */
-export function adminWritesEnabled(): boolean {
-  return process.env.GOOGLE_ALLOW_ADMIN_WRITES === 'true';
-}
 
 export async function runAuthFlow(args: string[]): Promise<void> {
   const accountIdx = args.indexOf('--account');

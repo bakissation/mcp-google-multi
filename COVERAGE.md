@@ -156,6 +156,6 @@ Requires the listed account to be a Workspace **super-admin** (its own OAuth —
 | `admin_users_update` | User edits (gated by write-control) |
 | `admin_groups_list` / `admin_group_members_list` | Group + member reads |
 
-## Google Alert Center — deferred to v6
+## Not yet available
 
-`alertcenter_alerts_list` / `alertcenter_alert_get` exist behind `GOOGLE_OPTIONAL_SCOPES=alertcenter`, **but the `apps.alerts` scope cannot be granted via user OAuth** — it needs a service account with domain-wide delegation. v5 is user-OAuth only, so these register but the API rejects the tokens. Service-account support (and a working Alert Center) is planned for **[v6](https://github.com/bakissation/mcp-google-multi/milestones)** ([#4](https://github.com/bakissation/mcp-google-multi/issues/4)).
+**Alert Center** (security alerts) requires a service account with domain-wide delegation, which user OAuth can't grant — planned for **[v6](https://github.com/bakissation/mcp-google-multi/milestones)** ([#4](https://github.com/bakissation/mcp-google-multi/issues/4)).
