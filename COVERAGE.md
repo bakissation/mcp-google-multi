@@ -52,6 +52,7 @@ Every tool takes an `account` argument matching one of your `GOOGLE_ACCOUNTS` al
 | `drive_revision_list` / `_update` / `_delete` | Version history (`keepForever`) |
 | `drive_access_proposal_list` / `_resolve` | Triage "Request access" submissions |
 | `drive_shared_drives_list` / `drive_shared_drive_get` | Shared drive discovery |
+| `drive_transfer` | Copy or move a file to another configured account (share+copy, download+upload fallback; move is delete-gated) |
 | `drive_get_about` | Storage quota and account info |
 
 ## Google Calendar

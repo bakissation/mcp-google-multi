@@ -33,6 +33,7 @@ describe('inferCud', () => {
     ['gmail_set_vacation', 'update'],
     ['drive_access_proposal_resolve', 'update'],
     ['drive_untrash', 'update'],
+    ['drive_transfer', 'create'],
     ['gmail_delete', 'delete'],
     ['gmail_batch_delete', 'delete'],
     ['drive_trash', 'delete'],
@@ -277,6 +278,30 @@ describe('ToolRegistry', () => {
 
     const deduped = await handler({ account: 'test,test', query: 'q' });
     expect(JSON.parse(deduped.content[0].text)).toEqual({ hit: 'q' });
+  });
+
+  it('gates drive_transfer move as a delete while copy stays create-gated', async () => {
+    const { registerDriveTools } = await import('../src/tools/drive.js');
+    const policies: [string, Policy, { move: boolean }, string][] = [
+      ['safe-writes blocks move', { profile: 'safe-writes', readOnly: false, allow: [], deny: [] }, { move: true }, 'write_disabled'],
+      ['safe-writes allows copy', { profile: 'safe-writes', readOnly: false, allow: [], deny: [] }, { move: false }, 'validation_error'],
+      ['allow drive:transfer does not grant move', { profile: 'safe-writes', readOnly: false, allow: ['drive:transfer'], deny: [] }, { move: true }, 'write_disabled'],
+      ['deny *:delete blocks move under full-writes', { profile: 'full-writes', readOnly: false, allow: [], deny: ['*:delete'] }, { move: true }, 'write_disabled'],
+      ['deny drive:transfer blocks copy', { profile: 'full-writes', readOnly: false, allow: [], deny: ['drive:transfer'] }, { move: false }, 'write_disabled'],
+    ];
+    for (const [label, policy, { move }, expected] of policies) {
+      const { server, registered } = fakeServer();
+      const reg = new ToolRegistry(server as never, policy);
+      registerDriveTools(reg as never);
+      const transfer = registered.find((r) => r.name === 'drive_transfer')!;
+      const out = (await (transfer.handler as (...a: unknown[]) => Promise<{ content: { text: string }[] }>)({
+        fromAccount: 'test',
+        toAccount: 'test',
+        fileId: 'x',
+        move,
+      }));
+      expect(JSON.parse(out.content[0].text).error, label).toBe(expected);
+    }
   });
 
   it('installListHandler throws when nothing is registered', () => {
