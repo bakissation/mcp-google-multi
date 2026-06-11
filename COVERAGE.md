@@ -2,7 +2,7 @@
 
 Every tool takes an `account` argument matching one of your `GOOGLE_ACCOUNTS` aliases. **Create / update / delete tools are gated by [write-control](./README.md#write-control-deny-by-default)** — deny-by-default; reads are always available. Run `mcp-google-multi config check` to see exactly which CUD tools your current profile enables.
 
-~170 tools across the services below. Tools load **[discover-first](./README.md#discover-first-tools-tiny-idle-context)**: each service also exposes a `{service}_discover` meta-tool, and only those appear in `tools/list` until discovered (everything stays directly callable). `GOOGLE_TOOLSETS` can switch whole services off. (Exhaustive API coverage is on the [roadmap](https://github.com/bakissation/mcp-google-multi/milestones).)
+~170 tools across the services below. Tools load **[discover-first](./README.md#discover-first-tools-tiny-idle-context)**: each service also exposes a `{service}_discover` meta-tool, and only those appear in `tools/list` until discovered (everything stays directly callable). `GOOGLE_TOOLSETS` can switch whole services off. Anything not listed below is reachable through the **[escape hatch](./README.md#escape-hatch-any-workspace-rest-method)** (`google_api_search` + `google_api_call`). (Codegen'd dedicated tools for the long tail are on the [roadmap](https://github.com/bakissation/mcp-google-multi/milestones).)
 
 ## Gmail
 

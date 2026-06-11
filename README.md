@@ -71,6 +71,7 @@ Now the only thing on disk is the **encrypted** token store. Pass the token via 
 | `GOOGLE_ADMIN_ACCOUNTS` | — | aliases granted Workspace-admin scopes (the account's own super-admin OAuth) |
 | `GOOGLE_TOOLSETS` | — | `all` (default) or a CSV filter of: `gmail`, `drive`, `calendar`, `sheets`, `docs`, `contacts`, `searchconsole`, `tasks`, `meet`, `forms`, `chat`, `admin` |
 | `TOKEN_STORE_PATH` | — | override the encrypted token dir (default: `~/.config/mcp-google-multi/tokens`) |
+| `DISCOVERY_CACHE_PATH` | — | override the Discovery-doc cache dir (default: `~/.config/mcp-google-multi/discovery`) |
 
 Inspect the resolved setup any time: `mcp-google-multi config check`.
 
@@ -79,6 +80,12 @@ Inspect the resolved setup any time: `mcp-google-multi config check`.
 The server does **not** dump ~170 tool schemas into your model's context. At boot, `tools/list` exposes only one small `{service}_discover` tool per service (plus nothing else). Calling e.g. `drive_discover` returns that service's operation catalog (name, one-line summary, arguments, read/write class), reveals the operational tools, and emits `notifications/tools/list_changed` so the client re-fetches the list. An optional `query` argument filters the catalog.
 
 Hidden is a listing concept, not a security boundary: operational tools stay callable at all times (existing prompts that call tools directly keep working), and write-control + OAuth scopes remain the real enforcement. Use `GOOGLE_TOOLSETS` to switch entire services off — it is a filter only: listing `forms`/`chat`/`admin` does not enable them without their `GOOGLE_OPTIONAL_SCOPES` / `GOOGLE_ADMIN_ACCOUNTS` gates.
+
+## Escape hatch: any Workspace REST method
+
+Two eager tools cover everything the curated set doesn't: `google_api_search` finds any method in Google's API Discovery index (including APIs with no dedicated tools here, like Slides), and `google_api_call` invokes a method by its Discovery id (`drive.revisions.list`, `slides.presentations.create`, …) with path/query params and a JSON body. Calls run through your account's OAuth client and the **same write-control policy** as named tools: the read/create/update/delete class is derived from the method's HTTP verb and name (POST deletes like `batchDelete`/`clear` count as deletes), and policy globs/`GOOGLE_TOOLSETS` match the same service names as named tools (`people` counts as `contacts`, `admin_*` as `admin`; `slides`/`driveactivity`/`drivelabels`/`groupssettings` have no named service and are always available).
+
+Discovery documents are fetched from Google on first use and cached on disk for 7 days (`DISCOVERY_CACHE_PATH`, default `~/.config/mcp-google-multi/discovery`); a stale cache is used when offline.
 
 ## Write-control (deny-by-default)
 

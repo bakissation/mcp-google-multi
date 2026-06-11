@@ -21,6 +21,7 @@ import { registerAdminTools } from './tools/admin.js';
 import { getOptionalBundles, getAdminAccounts } from './auth.js';
 import { ToolRegistry } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
+import { registerEscapeTools } from './tools/google-api.js';
 import { getToolsets, toolsetEnabled } from './toolsets.js';
 import { resolvePolicy, isAllowed, describePolicy, type Policy } from './write-control.js';
 
@@ -68,14 +69,15 @@ function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
     }
     svc.register(registry);
   }
-  registerDiscoverTools(registry, policy);
-  if (registry.tools.length === 0) {
+  if (registry.services().length === 0) {
     throw new Error(
       `GOOGLE_TOOLSETS="${process.env.GOOGLE_TOOLSETS ?? ''}" selected no enabled services. ` +
         `Known services: ${SERVICES.map((s) => s.name).join(', ')}. ` +
         `Note: forms/chat require GOOGLE_OPTIONAL_SCOPES, admin requires GOOGLE_ADMIN_ACCOUNTS.`,
     );
   }
+  registerDiscoverTools(registry, policy);
+  registerEscapeTools(registry, policy);
   return registry;
 }
 
@@ -105,7 +107,8 @@ async function main() {
     console.log(`CUD tools enabled: ${cud.length - disabled.length}/${cud.length}`);
     console.log(`Disabled: ${disabled.map((t) => t.name).join(', ') || '(none)'}`);
     console.log(`Services: ${registry.services().join(', ')}`);
-    console.log(`Tool surface: ${counts.eager} eager (discover), ${counts.hidden} deferred until discovery`);
+    console.log(`Tool surface: ${counts.eager} eager (discover + escape hatch), ${counts.hidden} deferred until discovery`);
+    console.log(`Escape hatch: google_api_call CUD verdicts follow profile=${policy.profile} and your allow/deny globs`);
     return;
   }
 
