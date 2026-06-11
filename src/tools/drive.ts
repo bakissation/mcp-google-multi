@@ -1495,18 +1495,27 @@ async function shareAndCopy(
   intendedName: string,
   parentFolderId: string | undefined,
 ): Promise<{ data: drive_v3.Schema$File; cleanupFailed: boolean; renameFailed: boolean }> {
-  const perm = await sourceDrive.permissions.create({
-    fileId,
-    requestBody: {
-      type: 'user',
-      role: 'reader',
-      emailAddress: targetEmail,
-      expirationTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-    },
-    sendNotificationEmail: false,
-    supportsAllDrives: true,
-    fields: 'id',
-  });
+  const share = (expiration: boolean) =>
+    sourceDrive.permissions.create({
+      fileId,
+      requestBody: {
+        type: 'user',
+        role: 'reader',
+        emailAddress: targetEmail,
+        ...(expiration ? { expirationTime: new Date(Date.now() + 60 * 60 * 1000).toISOString() } : {}),
+      },
+      sendNotificationEmail: false,
+      supportsAllDrives: true,
+      fields: 'id',
+    });
+  let perm;
+  try {
+    perm = await share(true);
+  } catch (err) {
+    // consumer Gmail rejects expirationTime; the finally-revoke still cleans up
+    if (!/expiration/i.test((err as Error).message ?? '')) throw err;
+    perm = await share(false);
+  }
   let cleanupFailed = false;
   let renameFailed = false;
   let data: drive_v3.Schema$File;
