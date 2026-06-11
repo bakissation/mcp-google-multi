@@ -68,6 +68,12 @@ function parseAccounts(): { aliases: [string, ...string[]]; configs: Record<stri
       );
     }
 
+    if (aliases.includes(alias)) {
+      throw new Error(
+        `Duplicate alias "${alias}" in GOOGLE_ACCOUNTS. Each alias must be unique.`,
+      );
+    }
+
     aliases.push(alias);
     configs[alias] = {
       email,

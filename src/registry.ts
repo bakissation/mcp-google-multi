@@ -3,6 +3,7 @@ import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { type Policy, isAllowed, writeDisabledResult } from './write-control.js';
 import { compactResult, trimEnabled } from './trim.js';
+import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFanout } from './fanout.js';
 
 export type Cud = 'read' | 'create' | 'update' | 'delete';
 
@@ -36,6 +37,14 @@ const CUD_OVERRIDES: Record<string, Cud> = {
 const SERVICE_OVERRIDES: Record<string, string> = {
   reports_activities_list: 'admin',
 };
+
+// Read tools that write to the local filesystem: fanning the same savePath
+// across accounts would clobber (last write wins).
+const FANOUT_EXCLUDE = new Set(['gmail_download_attachment', 'drive_download', 'drive_export']);
+
+function isAccountEnum(field: unknown): boolean {
+  return (field as { _zod?: { def?: { type?: string } } } | undefined)?._zod?.def?.type === 'enum';
+}
 
 const DELETE_VERB = /(^|_)(delete|remove|trash|clear|empty)(_|$)/;
 const CREATE_VERB = /(^|_)(create|add|insert|send|upload|copy|import|append|submit|duplicate|share|quick)(_|$)/;
@@ -72,26 +81,43 @@ export class ToolRegistry {
         destructiveHint: cud === 'delete' || cud === 'update',
         ...config.annotations,
       };
+
+      // Fan-out is read-only and never applies to meta tools: google_api_call's
+      // registry cud is "read" but it executes arbitrary writes.
+      let inputShape = config.inputSchema ?? {};
+      let baseHandler = handler;
+      if (cud === 'read' && !this.registeringMeta && !FANOUT_EXCLUDE.has(name) && isAccountEnum(inputShape.account)) {
+        const description = (inputShape.account as z.ZodType).description ?? 'Google account alias';
+        inputShape = { ...inputShape, account: fanoutAccountField(description) };
+        baseHandler = async (...args: unknown[]) => {
+          const first = args[0] as { account?: string } | undefined;
+          const parsed = parseAccountSelector(typeof first?.account === 'string' ? first.account : '');
+          if (!parsed.ok) return invalidAccountsResult(parsed.invalid);
+          if (!parsed.fanout) return handler({ ...first, account: parsed.aliases[0] }, ...args.slice(1));
+          return runFanout(handler, args, parsed.aliases);
+        };
+      }
+
       this.tools.push({
         name,
         service,
         cud,
         description: config.description ?? '',
-        inputShape: config.inputSchema ?? {},
+        inputShape,
         annotations,
         meta: this.registeringMeta,
       });
       const guarded =
         cud === 'read'
-          ? handler
+          ? baseHandler
           : (...args: unknown[]) =>
               isAllowed({ name, service, cud }, policy)
-                ? handler(...args)
+                ? baseHandler(...args)
                 : writeDisabledResult({ name, service, cud }, policy);
       const finalHandler = this.compactOutput
         ? async (...args: unknown[]) => compactResult(await (guarded(...args) as Promise<Parameters<typeof compactResult>[0]>))
         : guarded;
-      return (server.registerTool as (...a: unknown[]) => unknown)(name, { ...config, annotations }, finalHandler);
+      return (server.registerTool as (...a: unknown[]) => unknown)(name, { ...config, inputSchema: inputShape, annotations }, finalHandler);
     }) as McpServer['registerTool'];
   }
 

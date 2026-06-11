@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { mapGoogleError } from '../src/tools/_errors.js';
 
-const acc = 'ic';
+const acc = 'work';
 
 describe('mapGoogleError', () => {
   it('401 → auth_required with a re-auth hint', () => {
     const e = mapGoogleError({ code: 401, message: 'Invalid Credentials' }, acc);
     expect(e.error).toBe('auth_required');
     expect(e.retriable).toBe(false);
-    expect(e.hint).toContain('auth --account ic');
+    expect(e.hint).toContain('auth --account work');
   });
 
   it('403 insufficientPermissions → insufficient_scope', () => {

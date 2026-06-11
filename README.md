@@ -82,6 +82,20 @@ The server does **not** dump ~170 tool schemas into your model's context. At boo
 
 Hidden is a listing concept, not a security boundary: operational tools stay callable at all times (existing prompts that call tools directly keep working), and write-control + OAuth scopes remain the real enforcement. Use `GOOGLE_TOOLSETS` to switch entire services off — it is a filter only: listing `forms`/`chat`/`admin` does not enable them without their `GOOGLE_OPTIONAL_SCOPES` / `GOOGLE_ADMIN_ACCOUNTS` gates.
 
+## Multi-account: fan out one call across accounts
+
+Every read tool's `account` argument also accepts `"*"` (all configured accounts) or a CSV subset (`"work,personal"`). The server runs the call once per account (bounded concurrency) and returns per-account results — one account failing never hides the others:
+
+```jsonc
+{ "results": [
+    { "account": "work", "ok": true, "data": { /* … */ } },
+    { "account": "personal", "ok": false, "error": { "error": "auth_required", /* … */ } }
+  ],
+  "partial": true }
+```
+
+Fan-out is **read-only by design** (write tools take exactly one account), and the three read tools that save files to disk (`drive_download`, `drive_export`, `gmail_download_attachment`) are excluded so parallel accounts can't clobber the same path. `account_list` shows what's configured: alias, email, token health (`ok` / `expired_refreshable` / `needs_reauth` / `missing` / `decrypt_error`), and granted-vs-configured scopes — without ever touching token values.
+
 ## Escape hatch: any Workspace REST method
 
 Two eager tools cover everything the curated set doesn't: `google_api_search` finds any method in Google's API Discovery index (including APIs with no dedicated tools here, like Slides), and `google_api_call` invokes a method by its Discovery id (`drive.revisions.list`, `slides.presentations.create`, …) with path/query params and a JSON body. Calls run through your account's OAuth client and the **same write-control policy** as named tools: the read/create/update/delete class is derived from the method's HTTP verb and name (POST deletes like `batchDelete`/`clear` count as deletes), and policy globs/`GOOGLE_TOOLSETS` match the same service names as named tools (`people` counts as `contacts`, `admin_*` as `admin`; `slides`/`driveactivity`/`drivelabels`/`groupssettings` have no named service and are always available).

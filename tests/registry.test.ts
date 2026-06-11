@@ -224,6 +224,61 @@ describe('ToolRegistry', () => {
     }
   });
 
+  it('rewrites the account schema to accept */CSV on eligible read tools only', async () => {
+    const { server, getListHandler } = fakeServer();
+    const reg = new ToolRegistry(server as never, FULL_WRITES);
+    const account = z.enum(['test']).describe('Google account alias');
+    reg.registerTool('gmail_search', { description: 'x', inputSchema: { account, query: z.string() } }, () => {});
+    reg.registerTool('gmail_send', { description: 'x', inputSchema: { account, to: z.string() } }, () => {});
+    reg.registerTool('drive_download', { description: 'x', inputSchema: { account, savePath: z.string() } }, () => {});
+    reg.registerMeta('google_api_call', { description: 'x', inputSchema: { account } }, () => {});
+    reg.installListHandler();
+    reg.reveal('gmail');
+    reg.reveal('drive');
+    const tools = (await getListHandler()!()).tools as { name: string; inputSchema: { properties: Record<string, { anyOf?: unknown[]; enum?: string[] }> } }[];
+    const schemaOf = (n: string) => tools.find((t) => t.name === n)!.inputSchema.properties.account;
+
+    expect(schemaOf('gmail_search').anyOf).toBeDefined();
+    expect((schemaOf('gmail_search').anyOf![0] as { enum: string[] }).enum).toEqual(['test', '*']);
+    expect(schemaOf('gmail_send').enum).toEqual(['test']);
+    expect(schemaOf('drive_download').enum).toEqual(['test']);
+    expect(schemaOf('google_api_call').enum).toEqual(['test']);
+  });
+
+  it('fans a read call out per account and tags results', async () => {
+    const { server, registered } = fakeServer();
+    const reg = new ToolRegistry(server as never, FULL_WRITES);
+    const account = z.enum(['test']).describe('Google account alias');
+    const calls: string[] = [];
+    reg.registerTool(
+      'gmail_search',
+      { description: 'x', inputSchema: { account, query: z.string() } },
+      (async (args: { account: string; query: string }) => {
+        calls.push(args.account);
+        return { content: [{ type: 'text', text: JSON.stringify({ hit: args.query }) }] };
+      }) as never,
+    );
+    const handler = registered[0].handler as (...a: unknown[]) => Promise<{ content: { text: string }[] }>;
+    const out = await handler({ account: '*', query: 'q' });
+    const body = JSON.parse(out.content[0].text);
+    expect(calls).toEqual(['test']);
+    expect(body.results).toEqual([{ account: 'test', ok: true, data: { hit: 'q' } }]);
+    expect(body.partial).toBe(false);
+    expect(out.content[0].text).not.toContain('\n');
+
+    const single = await handler({ account: 'test', query: 'q' });
+    expect(JSON.parse(single.content[0].text)).toEqual({ hit: 'q' });
+
+    const invalid = await handler({ account: 'test,bogus', query: 'q' });
+    expect((invalid as { isError?: boolean }).isError).toBe(true);
+    const invalidBody = JSON.parse(invalid.content[0].text);
+    expect(invalidBody.error).toBe('validation_error');
+    expect(invalidBody.message).toContain('bogus');
+
+    const deduped = await handler({ account: 'test,test', query: 'q' });
+    expect(JSON.parse(deduped.content[0].text)).toEqual({ hit: 'q' });
+  });
+
   it('installListHandler throws when nothing is registered', () => {
     const { server } = fakeServer();
     const reg = new ToolRegistry(server as never, FULL_WRITES);
