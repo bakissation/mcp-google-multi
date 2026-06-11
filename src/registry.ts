@@ -1,4 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 import { type Policy, isAllowed, writeDisabledResult } from './write-control.js';
 
 export type Cud = 'read' | 'create' | 'update' | 'delete';
@@ -7,10 +9,31 @@ export interface ToolEntry {
   name: string;
   service: string;
   cud: Cud;
+  description: string;
+  inputShape: z.ZodRawShape;
+  annotations: Record<string, unknown>;
+  meta: boolean;
+}
+
+export interface CatalogOperation {
+  tool: string;
+  summary: string;
+  args: string[];
+  cud: Cud;
+}
+
+interface ToolConfig {
+  description?: string;
+  inputSchema?: z.ZodRawShape;
+  annotations?: Record<string, unknown>;
 }
 
 const CUD_OVERRIDES: Record<string, Cud> = {
   drive_untrash: 'update',
+};
+
+const SERVICE_OVERRIDES: Record<string, string> = {
+  reports_activities_list: 'admin',
 };
 
 const DELETE_VERB = /(^|_)(delete|remove|trash|clear|empty)(_|$)/;
@@ -29,12 +52,33 @@ export function inferCud(name: string): Cud {
 export class ToolRegistry {
   readonly tools: ToolEntry[] = [];
   readonly registerTool: McpServer['registerTool'];
+  private readonly revealed = new Set<string>();
+  private readonly jsonSchemaCache = new Map<string, unknown>();
+  private registeringMeta = false;
 
-  constructor(server: McpServer, policy: Policy) {
-    this.registerTool = ((name: string, config: unknown, handler: (...a: unknown[]) => unknown) => {
-      const service = name.includes('_') ? name.slice(0, name.indexOf('_')) : name;
+  constructor(
+    private readonly server: McpServer,
+    policy: Policy,
+  ) {
+    this.registerTool = ((name: string, config: ToolConfig, handler: (...a: unknown[]) => unknown) => {
+      const service =
+        SERVICE_OVERRIDES[name] ?? (name.includes('_') ? name.slice(0, name.indexOf('_')) : name);
       const cud = inferCud(name);
-      this.tools.push({ name, service, cud });
+      // destructiveHint=false claims "additive only" (MCP spec) — updates overwrite, so they stay true.
+      const annotations = {
+        readOnlyHint: cud === 'read',
+        destructiveHint: cud === 'delete' || cud === 'update',
+        ...config.annotations,
+      };
+      this.tools.push({
+        name,
+        service,
+        cud,
+        description: config.description ?? '',
+        inputShape: config.inputSchema ?? {},
+        annotations,
+        meta: this.registeringMeta,
+      });
       const guarded =
         cud === 'read'
           ? handler
@@ -42,7 +86,75 @@ export class ToolRegistry {
               isAllowed({ name, service, cud }, policy)
                 ? handler(...args)
                 : writeDisabledResult({ name, service, cud }, policy);
-      return (server.registerTool as (...a: unknown[]) => unknown)(name, config, guarded);
+      return (server.registerTool as (...a: unknown[]) => unknown)(name, { ...config, annotations }, guarded);
     }) as McpServer['registerTool'];
+  }
+
+  registerMeta: McpServer['registerTool'] = ((name: string, config: unknown, handler: unknown) => {
+    this.registeringMeta = true;
+    try {
+      return (this.registerTool as (...a: unknown[]) => unknown)(name, config, handler);
+    } finally {
+      this.registeringMeta = false;
+    }
+  }) as McpServer['registerTool'];
+
+  services(): string[] {
+    return [...new Set(this.tools.filter((t) => !t.meta).map((t) => t.service))];
+  }
+
+  catalog(service: string, query?: string): CatalogOperation[] {
+    const q = query?.trim().toLowerCase();
+    return this.tools
+      .filter((t) => !t.meta && t.service === service)
+      .filter((t) => !q || t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q))
+      .map((t) => ({
+        tool: t.name,
+        summary: t.description,
+        args: Object.keys(t.inputShape),
+        cud: t.cud,
+      }));
+  }
+
+  reveal(service: string): boolean {
+    if (this.revealed.has(service)) return false;
+    this.revealed.add(service);
+    this.server.sendToolListChanged();
+    return true;
+  }
+
+  isVisible(tool: ToolEntry): boolean {
+    return tool.meta || this.revealed.has(tool.service);
+  }
+
+  visibleCount(): { eager: number; revealed: number; hidden: number } {
+    const meta = this.tools.filter((t) => t.meta).length;
+    const visible = this.tools.filter((t) => !t.meta && this.isVisible(t)).length;
+    return { eager: meta, revealed: visible, hidden: this.tools.length - meta - visible };
+  }
+
+  // Replaces the SDK list handler so hidden tools stay registered (and callable —
+  // graceful dispatch) while tools/list only advertises the visible set.
+  installListHandler(): void {
+    if (this.tools.length === 0) {
+      throw new Error('installListHandler() requires at least one registered tool');
+    }
+    this.server.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: this.tools.filter((t) => this.isVisible(t)).map((t) => this.toToolJson(t)),
+    }));
+  }
+
+  private toToolJson(tool: ToolEntry): { name: string; description: string; inputSchema: unknown; annotations: Record<string, unknown> } {
+    let inputSchema = this.jsonSchemaCache.get(tool.name);
+    if (!inputSchema) {
+      inputSchema = z.toJSONSchema(z.object(tool.inputShape), { target: 'draft-7', io: 'input' });
+      this.jsonSchemaCache.set(tool.name, inputSchema);
+    }
+    return {
+      name: tool.name,
+      description: tool.description,
+      inputSchema,
+      annotations: tool.annotations,
+    };
   }
 }

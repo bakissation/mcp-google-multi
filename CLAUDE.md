@@ -4,8 +4,10 @@ Conventions for AI assistants modifying this codebase. v5 is **local, stdio, use
 
 ## Project shape
 
-- `src/index.ts` — entry. `buildRegistry()` registers every service into a `ToolRegistry`; `main()` runs the stdio MCP server, or the `auth` / `migrate-tokens` / `config check` CLI commands.
-- `src/registry.ts` — `ToolRegistry` wraps the MCP server: records `{name, service, cud}` per tool, derives `cud` (read/create/update/delete) from the tool name via `inferCud`, and **enforces write-control** by wrapping every CUD handler. Service files still call `server.registerTool(...)` — `server` is now a `ToolRegistry`.
+- `src/index.ts` — entry. `buildRegistry()` registers every enabled service (the `SERVICES` table, filtered by `GOOGLE_TOOLSETS`) into a `ToolRegistry`, then `registerDiscoverTools()`; `main()` installs the registry's custom `tools/list` handler and runs the stdio MCP server, or the `auth` / `migrate-tokens` / `config check` CLI commands.
+- `src/registry.ts` — `ToolRegistry` wraps the MCP server: records `{name, service, cud, description, inputShape, meta}` per tool, derives `cud` (read/create/update/delete) from the tool name via `inferCud`, **enforces write-control** by wrapping every CUD handler, injects computed annotations (`readOnlyHint`/`destructiveHint`), and owns **discover-first visibility**: all tools register eagerly (always callable — graceful dispatch), but the custom `tools/list` handler only advertises meta tools + `reveal()`ed services. `installListHandler()` must run after registration, before connect. Service files still call `server.registerTool(...)` — `server` is now a `ToolRegistry`.
+- `src/discover.ts` — `registerDiscoverTools()`: one eager `{service}_discover` meta-tool per service; returns the catalog (`registry.catalog`), reveals the service, triggers `tools/list_changed`. Never emit `tool_reference` content blocks or top-level `defer_loading` fields — strict SDK clients reject/strip them (verified against SDK 1.29).
+- `src/toolsets.ts` — `GOOGLE_TOOLSETS` parsing (`all` | CSV of service names).
 - `src/write-control.ts` — `resolvePolicy()` (env → policy) + `isAllowed()` (deny-by-default verdict) + `config check` rendering.
 - `src/token-store.ts` — encrypted token store (AES-256-GCM, key from `MASTER_KEY`); `readToken`/`writeToken` + the `migrate-tokens` source.
 - `src/auth.ts` — OAuth flow + scope tiers (`BASE_SCOPES` always, `OPTIONAL_SCOPE_BUNDLES` env-gated, `ADMIN_SCOPES` per-account).
