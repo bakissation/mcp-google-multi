@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { type Policy, isAllowed, writeDisabledResult } from './write-control.js';
+import { compactResult, trimEnabled } from './trim.js';
 
 export type Cud = 'read' | 'create' | 'update' | 'delete';
 
@@ -54,6 +55,7 @@ export class ToolRegistry {
   readonly registerTool: McpServer['registerTool'];
   private readonly revealed = new Set<string>();
   private readonly jsonSchemaCache = new Map<string, unknown>();
+  private readonly compactOutput = trimEnabled();
   private registeringMeta = false;
 
   constructor(
@@ -86,7 +88,10 @@ export class ToolRegistry {
               isAllowed({ name, service, cud }, policy)
                 ? handler(...args)
                 : writeDisabledResult({ name, service, cud }, policy);
-      return (server.registerTool as (...a: unknown[]) => unknown)(name, { ...config, annotations }, guarded);
+      const finalHandler = this.compactOutput
+        ? async (...args: unknown[]) => compactResult(await (guarded(...args) as Promise<Parameters<typeof compactResult>[0]>))
+        : guarded;
+      return (server.registerTool as (...a: unknown[]) => unknown)(name, { ...config, annotations }, finalHandler);
     }) as McpServer['registerTool'];
   }
 

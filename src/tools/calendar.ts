@@ -6,6 +6,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { sliceClean } from '../trim.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
@@ -45,7 +46,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
   server.registerTool(
     'calendar_list_events',
     {
-      description: 'List events from a Google Calendar',
+      description: 'List events from a Google Calendar (trimmed view: descriptions capped, created/updated and empty fields omitted — use calendar_get_event for a full event)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         calendarId: z.string().default('primary').optional()
@@ -79,7 +80,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
         }
 
         const res = await cal.events.list(params);
-        const events = (res.data.items ?? []).map(formatEvent);
+        const events = (res.data.items ?? []).map((e) => formatEvent(e, { full: false }));
 
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(events, null, 2) }],
@@ -336,7 +337,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
   server.registerTool(
     'calendar_list_instances',
     {
-      description: 'List all occurrences of a recurring calendar event',
+      description: 'List all occurrences of a recurring calendar event (trimmed view like calendar_list_events — use calendar_get_event for a full event)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         calendarId: z.string().default('primary').optional()
@@ -359,7 +360,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
           timeMax,
           maxResults: maxResults ?? 25,
         });
-        const events = (res.data.items ?? []).map(formatEvent);
+        const events = (res.data.items ?? []).map((e) => formatEvent(e, { full: false }));
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(events, null, 2) }],
         };
@@ -434,11 +435,21 @@ export function registerCalendarTools(server: ToolRegistry): void {
   );
 }
 
-function formatEvent(event: any) {
-  return {
+const LIST_DESCRIPTION_CAP = 300;
+const TRUNCATION_MARKER = '… [truncated, use calendar_get_event]';
+
+export function formatEvent(event: any, opts: { full?: boolean } = {}) {
+  const full = opts.full ?? true;
+  const description: string = event.description ?? '';
+  // Slack margin: truncating a 301-char description to 300 + 37-char marker would GROW it.
+  const cappedDescription =
+    full || description.length <= LIST_DESCRIPTION_CAP + TRUNCATION_MARKER.length
+      ? description
+      : `${sliceClean(description, LIST_DESCRIPTION_CAP)}${TRUNCATION_MARKER}`;
+  const base = {
     id: event.id,
     summary: event.summary ?? '',
-    description: event.description ?? '',
+    description: cappedDescription,
     location: event.location ?? '',
     start: event.start?.dateTime ?? event.start?.date ?? '',
     end: event.end?.dateTime ?? event.end?.date ?? '',
@@ -449,9 +460,17 @@ function formatEvent(event: any) {
       email: a.email,
       responseStatus: a.responseStatus,
     })),
-    created: event.created,
-    updated: event.updated,
+    recurringEventId: event.recurringEventId,
+    hangoutLink: event.hangoutLink,
+    created: full ? event.created : undefined,
+    updated: full ? event.updated : undefined,
   };
+  if (full) return base;
+  return Object.fromEntries(
+    Object.entries(base).filter(
+      ([, v]) => v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0),
+    ),
+  );
 }
 
 function handleCalendarError(error: any, account: Account) {

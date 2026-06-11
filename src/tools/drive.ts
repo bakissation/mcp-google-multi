@@ -6,6 +6,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { capText } from '../trim.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { pipeline } from 'node:stream/promises';
@@ -76,13 +77,17 @@ export function registerDriveTools(server: ToolRegistry): void {
   server.registerTool(
     'drive_read',
     {
-      description: 'Read the content of a Google Drive file',
+      description: 'Read the content of a Google Drive file (returns up to maxChars characters per call; non-Google-native files over 2MB return too_large)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().describe('Google Drive file ID'),
+        maxChars: z.number().min(1).max(2_000_000).default(100_000).optional()
+          .describe('Max characters of content to return (default: 100000)'),
+        offset: z.number().min(0).default(0).optional()
+          .describe('Character offset to continue a truncated read (Google Docs/Sheets/Slides exports page fine; plain files >2MB are rejected, not paged)'),
       },
     },
-    async ({ account, fileId }) => {
+    async ({ account, fileId, maxChars, offset }) => {
       try {
         const auth = await getClient(account as Account);
         const drive = google.drive({ version: 'v3', auth });
@@ -95,11 +100,9 @@ export function registerDriveTools(server: ToolRegistry): void {
 
         const { name, mimeType, size, webViewLink } = meta.data;
 
-        if (mimeType && GOOGLE_WORKSPACE_TYPES.has(mimeType)) {
-          const exported = await drive.files.export({
-            fileId,
-            mimeType: 'text/plain',
-          });
+        const respond = (raw: string) => {
+          const from = offset ?? 0;
+          const capped = capText(raw, maxChars ?? 100_000, from);
           return {
             content: [{
               type: 'text' as const,
@@ -107,10 +110,21 @@ export function registerDriveTools(server: ToolRegistry): void {
                 id: fileId,
                 name,
                 mimeType,
-                content: String(exported.data),
+                content: capped.text,
+                ...(capped.truncated || from > 0
+                  ? { truncated: capped.truncated, totalChars: capped.totalChars, offset: from }
+                  : {}),
               }, null, 2),
             }],
           };
+        };
+
+        if (mimeType && GOOGLE_WORKSPACE_TYPES.has(mimeType)) {
+          const exported = await drive.files.export({
+            fileId,
+            mimeType: 'text/plain',
+          });
+          return respond(String(exported.data));
         }
 
         if (mimeType === 'application/pdf') {
@@ -149,17 +163,7 @@ export function registerDriveTools(server: ToolRegistry): void {
             { fileId, alt: 'media', supportsAllDrives: true },
             { responseType: 'text' },
           );
-          return {
-            content: [{
-              type: 'text' as const,
-              text: JSON.stringify({
-                id: fileId,
-                name,
-                mimeType,
-                content: String(downloaded.data),
-              }, null, 2),
-            }],
-          };
+          return respond(String(downloaded.data));
         }
 
         return {

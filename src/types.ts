@@ -30,6 +30,8 @@ export interface GmailMessageFull {
   cc: string;
   date: string;
   body: string;
+  bodyTruncated?: boolean;
+  bodyTotalChars?: number;
   attachments: GmailAttachment[];
 }
 

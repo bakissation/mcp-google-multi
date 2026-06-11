@@ -72,6 +72,7 @@ Now the only thing on disk is the **encrypted** token store. Pass the token via 
 | `GOOGLE_TOOLSETS` | — | `all` (default) or a CSV filter of: `gmail`, `drive`, `calendar`, `sheets`, `docs`, `contacts`, `searchconsole`, `tasks`, `meet`, `forms`, `chat`, `admin` |
 | `TOKEN_STORE_PATH` | — | override the encrypted token dir (default: `~/.config/mcp-google-multi/tokens`) |
 | `DISCOVERY_CACHE_PATH` | — | override the Discovery-doc cache dir (default: `~/.config/mcp-google-multi/discovery`) |
+| `GOOGLE_TRIM` | — | `off` (or `0`/`false`/`no`) disables compact JSON serialization of tool responses |
 
 Inspect the resolved setup any time: `mcp-google-multi config check`.
 
@@ -86,6 +87,14 @@ Hidden is a listing concept, not a security boundary: operational tools stay cal
 Two eager tools cover everything the curated set doesn't: `google_api_search` finds any method in Google's API Discovery index (including APIs with no dedicated tools here, like Slides), and `google_api_call` invokes a method by its Discovery id (`drive.revisions.list`, `slides.presentations.create`, …) with path/query params and a JSON body. Calls run through your account's OAuth client and the **same write-control policy** as named tools: the read/create/update/delete class is derived from the method's HTTP verb and name (POST deletes like `batchDelete`/`clear` count as deletes), and policy globs/`GOOGLE_TOOLSETS` match the same service names as named tools (`people` counts as `contacts`, `admin_*` as `admin`; `slides`/`driveactivity`/`drivelabels`/`groupssettings` have no named service and are always available).
 
 Discovery documents are fetched from Google on first use and cached on disk for 7 days (`DISCOVERY_CACHE_PATH`, default `~/.config/mcp-google-multi/discovery`); a stale cache is used when offline.
+
+## Lean responses by default
+
+Tool responses are serialized compactly (no pretty-print token tax; set `GOOGLE_TRIM=off` to restore pretty JSON), and the fat readers ship sensible caps with per-call escape valves. The caps are per-call controls (`full` / `maxChars`) and are NOT affected by `GOOGLE_TRIM`:
+
+- `drive_read` returns up to `maxChars` characters (default 100k) with `truncated`/`totalChars`/`offset` for paging — this also bounds Google Doc exports, which can reach 10MB. (Non-Google-native files over 2MB are still rejected with `too_large`, not paged.)
+- `gmail_read` / `gmail_read_thread` cap each message body at 50k chars (`bodyTruncated` + `bodyTotalChars` flags); pass `full: true` for the whole body.
+- `calendar_list_events` / `calendar_list_instances` trim descriptions to ~300 chars and drop empty/audit fields (`created`/`updated`) in list view; `calendar_get_event` always returns the full event.
 
 ## Write-control (deny-by-default)
 
