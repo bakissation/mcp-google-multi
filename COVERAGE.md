@@ -1,8 +1,8 @@
 # Tool Coverage
 
-Every tool takes an `account` argument matching one of your `GOOGLE_ACCOUNTS` aliases. **Create / update / delete tools are gated by [write-control](./README.md#write-control-deny-by-default)** — deny-by-default; reads are always available. Run `mcp-google-multi config check` to see exactly which CUD tools your current profile enables.
+Every tool takes an `account` argument matching one of your `GOOGLE_ACCOUNTS` aliases — and on read tools (except the three that save files locally: `drive_download`, `drive_export`, `gmail_download_attachment`) it also accepts `"*"` or a CSV subset for **[cross-account fan-out](./README.md#multi-account-fan-out-one-call-across-accounts)**. **Create / update / delete tools are gated by [write-control](./README.md#write-control-deny-by-default)** — deny-by-default; reads are always available. Run `mcp-google-multi config check` to see exactly which CUD tools your current profile enables. `account_list` (always visible) reports each alias's email, token health, and scopes.
 
-~170 tools across the services below. (This is the curated surface; discover-first deferral and exhaustive API coverage are on the [roadmap](https://github.com/bakissation/mcp-google-multi/milestones).)
+~170 tools across the services below. Tools load **[discover-first](./README.md#discover-first-tools-tiny-idle-context)**: each service also exposes a `{service}_discover` meta-tool, and only those appear in `tools/list` until discovered (everything stays directly callable). `GOOGLE_TOOLSETS` can switch whole services off. Anything not listed below is reachable through the **[escape hatch](./README.md#escape-hatch-any-workspace-rest-method)** (`google_api_search` + `google_api_call`). (Codegen'd dedicated tools for the long tail are on the [roadmap](https://github.com/bakissation/mcp-google-multi/milestones).)
 
 ## Gmail
 
@@ -52,6 +52,7 @@ Every tool takes an `account` argument matching one of your `GOOGLE_ACCOUNTS` al
 | `drive_revision_list` / `_update` / `_delete` | Version history (`keepForever`) |
 | `drive_access_proposal_list` / `_resolve` | Triage "Request access" submissions |
 | `drive_shared_drives_list` / `drive_shared_drive_get` | Shared drive discovery |
+| `drive_transfer` | Copy or move a file to another configured account (share+copy, download+upload fallback; move is delete-gated) |
 | `drive_get_about` | Storage quota and account info |
 
 ## Google Calendar

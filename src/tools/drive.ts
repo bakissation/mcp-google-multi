@@ -1,19 +1,24 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean } from './_coerce.js';
-import { google } from 'googleapis';
-import { ACCOUNTS } from '../accounts.js';
+import { google, type drive_v3 } from 'googleapis';
+import { ACCOUNTS, ACCOUNT_CONFIG } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { isAllowed, writeDisabledResult } from '../write-control.js';
+import { capText } from '../trim.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
 import { pipeline } from 'node:stream/promises';
 import mime from 'mime-types';
 
 const accountEnum = z.enum(ACCOUNTS);
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+const FALLBACK_MAX_BYTES = 1024 * 1024 * 1024; // 1GB
 
 const GOOGLE_WORKSPACE_TYPES = new Set([
   'application/vnd.google-apps.document',
@@ -76,13 +81,17 @@ export function registerDriveTools(server: ToolRegistry): void {
   server.registerTool(
     'drive_read',
     {
-      description: 'Read the content of a Google Drive file',
+      description: 'Read the content of a Google Drive file (returns up to maxChars characters per call; non-Google-native files over 2MB return too_large)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().describe('Google Drive file ID'),
+        maxChars: z.number().min(1).max(2_000_000).default(100_000).optional()
+          .describe('Max characters of content to return (default: 100000)'),
+        offset: z.number().min(0).default(0).optional()
+          .describe('Character offset to continue a truncated read (Google Docs/Sheets/Slides exports page fine; plain files >2MB are rejected, not paged)'),
       },
     },
-    async ({ account, fileId }) => {
+    async ({ account, fileId, maxChars, offset }) => {
       try {
         const auth = await getClient(account as Account);
         const drive = google.drive({ version: 'v3', auth });
@@ -95,11 +104,9 @@ export function registerDriveTools(server: ToolRegistry): void {
 
         const { name, mimeType, size, webViewLink } = meta.data;
 
-        if (mimeType && GOOGLE_WORKSPACE_TYPES.has(mimeType)) {
-          const exported = await drive.files.export({
-            fileId,
-            mimeType: 'text/plain',
-          });
+        const respond = (raw: string) => {
+          const from = offset ?? 0;
+          const capped = capText(raw, maxChars ?? 100_000, from);
           return {
             content: [{
               type: 'text' as const,
@@ -107,10 +114,21 @@ export function registerDriveTools(server: ToolRegistry): void {
                 id: fileId,
                 name,
                 mimeType,
-                content: String(exported.data),
+                content: capped.text,
+                ...(capped.truncated || from > 0
+                  ? { truncated: capped.truncated, totalChars: capped.totalChars, offset: from }
+                  : {}),
               }, null, 2),
             }],
           };
+        };
+
+        if (mimeType && GOOGLE_WORKSPACE_TYPES.has(mimeType)) {
+          const exported = await drive.files.export({
+            fileId,
+            mimeType: 'text/plain',
+          });
+          return respond(String(exported.data));
         }
 
         if (mimeType === 'application/pdf') {
@@ -149,17 +167,7 @@ export function registerDriveTools(server: ToolRegistry): void {
             { fileId, alt: 'media', supportsAllDrives: true },
             { responseType: 'text' },
           );
-          return {
-            content: [{
-              type: 'text' as const,
-              text: JSON.stringify({
-                id: fileId,
-                name,
-                mimeType,
-                content: String(downloaded.data),
-              }, null, 2),
-            }],
-          };
+          return respond(String(downloaded.data));
         }
 
         return {
@@ -1242,6 +1250,150 @@ export function registerDriveTools(server: ToolRegistry): void {
     },
   );
 
+  // ─── Cross-account transfer ────────────────────────────────────────────
+
+  server.registerTool(
+    'drive_transfer',
+    {
+      description:
+        'Copy or move a file from one configured account to another (server-side share+copy, with a ' +
+        'download+upload fallback). The copy is owned by the target account with a clean name ' +
+        '(no "Copy of"); the temporary share on the source is revoked afterwards. Comments, ' +
+        'revision history, and permissions do not transfer. move=true trashes the source after a ' +
+        'successful copy and requires deletes to be allowed by write-control.',
+      inputSchema: {
+        fromAccount: accountEnum.describe('Source account alias'),
+        toAccount: accountEnum.describe('Target account alias'),
+        fileId: z.string().describe('File ID in the source account (folders are not supported)'),
+        parentFolderId: z.string().optional().describe('Target folder ID (default: target My Drive root)'),
+        newName: z.string().optional().describe('Rename the copy (default: keep the source name)'),
+        move: coerceBoolean.optional().describe('Trash the source after a successful copy (delete-gated)'),
+      },
+    },
+    async ({ fromAccount, toAccount, fileId, parentFolderId, newName, move }) => {
+      // op candidate is transfer_move, not transfer: allowing "drive:transfer" must not grant the delete
+      const moveRef = { name: 'drive_transfer_move', service: 'drive', cud: 'delete' as const };
+      if (move && !isAllowed(moveRef, server.policy)) {
+        return writeDisabledResult(moveRef, server.policy);
+      }
+      if (fromAccount === toAccount) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              error: 'validation_error',
+              message: 'fromAccount and toAccount are the same.',
+              hint: 'Use drive_copy to duplicate a file within one account.',
+              retriable: false,
+            }),
+          }],
+          isError: true as const,
+        };
+      }
+      let activeAccount = fromAccount as Account;
+      try {
+        const sourceAuth = await getClient(fromAccount as Account);
+        const sourceDrive = google.drive({ version: 'v3', auth: sourceAuth });
+        activeAccount = toAccount as Account;
+        const targetAuth = await getClient(toAccount as Account);
+        const targetDrive = google.drive({ version: 'v3', auth: targetAuth });
+        activeAccount = fromAccount as Account;
+
+        const meta = await sourceDrive.files.get({
+          fileId,
+          fields: 'id,name,mimeType,size',
+          supportsAllDrives: true,
+        });
+        if (meta.data.mimeType === 'application/vnd.google-apps.folder') {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: 'validation_error',
+                message: 'Folders cannot be transferred.',
+                hint: 'Transfer files individually, or create the folder on the target with drive_create_folder.',
+                retriable: false,
+              }),
+            }],
+            isError: true as const,
+          };
+        }
+        const intendedName = newName ?? meta.data.name ?? 'transferred-file';
+        const targetEmail = ACCOUNT_CONFIG[toAccount as Account].email;
+
+        const finish = async (
+          data: drive_v3.Schema$File,
+          strategy: 'share_copy' | 'download_upload',
+          flags: { cleanupFailed?: boolean; renameFailed?: boolean; lossy?: boolean },
+        ) => {
+          let moveFailed = false;
+          let moveSkipped = false;
+          if (move && flags.lossy) {
+            moveSkipped = true;
+          } else if (move) {
+            activeAccount = fromAccount as Account;
+            try {
+              await sourceDrive.files.update({ fileId, requestBody: { trashed: true }, supportsAllDrives: true });
+            } catch {
+              moveFailed = true;
+            }
+          }
+          return transferResult(data, strategy, fromAccount as string, toAccount as string, {
+            ...flags,
+            moved: move ? !moveFailed && !moveSkipped : undefined,
+            moveFailed,
+            moveSkipped,
+          });
+        };
+
+        try {
+          const { data, cleanupFailed, renameFailed } = await shareAndCopy(
+            sourceDrive, targetDrive, fileId, targetEmail, intendedName, parentFolderId,
+          );
+          return await finish(data, 'share_copy', { cleanupFailed, renameFailed });
+        } catch {
+          // fall through to download+upload
+        }
+
+        const plan = transferExportPlan(meta.data.mimeType);
+        if (plan.kind === 'unsupported') {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: 'unsupported_type',
+                message: `Cannot transfer "${meta.data.mimeType}": share+copy was blocked and this native type has no export fallback.`,
+                retriable: false,
+              }),
+            }],
+            isError: true as const,
+          };
+        }
+        if (plan.kind === 'binary' && Number(meta.data.size ?? 0) > FALLBACK_MAX_BYTES) {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: 'too_large',
+                message: `Share+copy was blocked and the file (${meta.data.size} bytes) exceeds the ${FALLBACK_MAX_BYTES} byte download+upload fallback cap (uploads are not resumable).`,
+                hint: 'Use drive_download + drive_upload manually, or fix sharing between the accounts.',
+                retriable: false,
+              }),
+            }],
+            isError: true as const,
+          };
+        }
+        const data = await downloadAndUpload(
+          sourceDrive, targetDrive, fileId, meta.data.mimeType ?? null, plan, intendedName, parentFolderId,
+          (side) => { activeAccount = (side === 'source' ? fromAccount : toAccount) as Account; },
+        );
+        return await finish(data, 'download_upload', { lossy: plan.kind === 'native' && !plan.convertTo });
+      } catch (error: any) {
+        return handleDriveError(error, activeAccount);
+      }
+    },
+  );
+
   // ─── About ─────────────────────────────────────────────────────────────
 
   server.registerTool(
@@ -1271,4 +1423,190 @@ export function registerDriveTools(server: ToolRegistry): void {
 
 function handleDriveError(error: any, account: Account) {
   return handleGoogleApiError(error, account);
+}
+
+export type TransferPlan =
+  | { kind: 'binary' }
+  | { kind: 'native'; exportMime: string; convertTo?: string }
+  | { kind: 'unsupported' };
+
+export function transferExportPlan(mimeType: string | null | undefined): TransferPlan {
+  if (!mimeType || !mimeType.startsWith('application/vnd.google-apps.')) return { kind: 'binary' };
+  switch (mimeType) {
+    case 'application/vnd.google-apps.document':
+      return {
+        kind: 'native',
+        exportMime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        convertTo: mimeType,
+      };
+    case 'application/vnd.google-apps.spreadsheet':
+      return {
+        kind: 'native',
+        exportMime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        convertTo: mimeType,
+      };
+    case 'application/vnd.google-apps.presentation':
+      return {
+        kind: 'native',
+        exportMime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        convertTo: mimeType,
+      };
+    case 'application/vnd.google-apps.drawing':
+      return { kind: 'native', exportMime: 'image/png' };
+    default:
+      return { kind: 'unsupported' };
+  }
+}
+
+function transferResult(
+  data: drive_v3.Schema$File,
+  strategy: 'share_copy' | 'download_upload',
+  from: string,
+  to: string,
+  flags: { cleanupFailed?: boolean; renameFailed?: boolean; lossy?: boolean; moved?: boolean; moveFailed?: boolean; moveSkipped?: boolean },
+) {
+  return {
+    content: [{
+      type: 'text' as const,
+      text: JSON.stringify({
+        id: data.id,
+        name: data.name,
+        mimeType: data.mimeType,
+        webViewLink: data.webViewLink,
+        strategy,
+        from,
+        to,
+        ...(flags.lossy ? { lossy: true } : {}),
+        ...(flags.moved !== undefined ? { moved: flags.moved } : {}),
+        ...(flags.moveSkipped ? { hint: 'Move skipped: the fallback changed the file format (e.g. Drawing → PNG), so the editable source was kept. Trash it manually if intended.' } : {}),
+        ...(flags.moveFailed ? { moveFailed: true, hint: 'Copy succeeded but trashing the source failed — the source file is still present.' } : {}),
+        ...(flags.renameFailed ? { renameFailed: true } : {}),
+        ...(flags.cleanupFailed ? { cleanupFailed: true } : {}),
+      }, null, 2),
+    }],
+  };
+}
+
+async function shareAndCopy(
+  sourceDrive: drive_v3.Drive,
+  targetDrive: drive_v3.Drive,
+  fileId: string,
+  targetEmail: string,
+  intendedName: string,
+  parentFolderId: string | undefined,
+): Promise<{ data: drive_v3.Schema$File; cleanupFailed: boolean; renameFailed: boolean }> {
+  const share = (expiration: boolean) =>
+    sourceDrive.permissions.create({
+      fileId,
+      requestBody: {
+        type: 'user',
+        role: 'reader',
+        emailAddress: targetEmail,
+        ...(expiration ? { expirationTime: new Date(Date.now() + 60 * 60 * 1000).toISOString() } : {}),
+      },
+      sendNotificationEmail: false,
+      supportsAllDrives: true,
+      fields: 'id',
+    });
+  let perm;
+  try {
+    perm = await share(true);
+  } catch (err) {
+    // consumer Gmail rejects expirationTime; the finally-revoke still cleans up
+    if (!/expiration/i.test((err as Error).message ?? '')) throw err;
+    perm = await share(false);
+  }
+  let cleanupFailed = false;
+  let renameFailed = false;
+  let data: drive_v3.Schema$File;
+  try {
+    const copy = await targetDrive.files.copy({
+      fileId,
+      requestBody: {
+        name: intendedName,
+        // cross-account copy with omitted parents lands in an indeterminate place
+        parents: [parentFolderId ?? 'root'],
+      },
+      supportsAllDrives: true,
+      fields: 'id,name,mimeType,webViewLink',
+    });
+    data = copy.data;
+    if (data.name !== intendedName && data.id) {
+      // copy already succeeded — a failed cosmetic rename must not trigger the fallback
+      try {
+        const renamed = await targetDrive.files.update({
+          fileId: data.id,
+          requestBody: { name: intendedName },
+          supportsAllDrives: true,
+          fields: 'id,name,mimeType,webViewLink',
+        });
+        data = renamed.data;
+      } catch {
+        renameFailed = true;
+      }
+    }
+  } finally {
+    if (perm.data.id) {
+      try {
+        await sourceDrive.permissions.delete({ fileId, permissionId: perm.data.id, supportsAllDrives: true });
+      } catch {
+        cleanupFailed = true;
+      }
+    }
+  }
+  return { data, cleanupFailed, renameFailed };
+}
+
+async function downloadAndUpload(
+  sourceDrive: drive_v3.Drive,
+  targetDrive: drive_v3.Drive,
+  fileId: string,
+  sourceMime: string | null,
+  plan: Exclude<TransferPlan, { kind: 'unsupported' }>,
+  intendedName: string,
+  parentFolderId: string | undefined,
+  onSide: (side: 'source' | 'target') => void,
+): Promise<drive_v3.Schema$File> {
+  const tmp = path.join(os.tmpdir(), `gmulti-transfer-${crypto.randomBytes(8).toString('hex')}`);
+  try {
+    onSide('source');
+    let download;
+    try {
+      download =
+        plan.kind === 'native'
+          ? await sourceDrive.files.export({ fileId, mimeType: plan.exportMime }, { responseType: 'stream' })
+          : await sourceDrive.files.get({ fileId, alt: 'media', supportsAllDrives: true }, { responseType: 'stream' });
+    } catch (err) {
+      if (plan.kind === 'native' && /too large/i.test((err as Error).message ?? '')) {
+        throw new Error(
+          "Google caps native-file exports at 10MB and share+copy was blocked — use drive_export + drive_upload manually, or google_api_call (drive.files.download).",
+          { cause: err },
+        );
+      }
+      throw err;
+    }
+    try {
+      await pipeline(download.data, fs.createWriteStream(tmp, { mode: 0o600 }));
+    } catch (err) {
+      throw new Error(`Local temp-file write failed (not a Google error): ${(err as Error).message}`, { cause: err });
+    }
+
+    onSide('target');
+    const created = await targetDrive.files.create({
+      requestBody: {
+        name: intendedName,
+        ...(plan.kind === 'native' && plan.convertTo ? { mimeType: plan.convertTo } : {}),
+        ...(parentFolderId ? { parents: [parentFolderId] } : {}),
+      },
+      media: {
+        mimeType: plan.kind === 'native' ? plan.exportMime : (sourceMime ?? 'application/octet-stream'),
+        body: fs.createReadStream(tmp),
+      },
+      supportsAllDrives: true,
+      fields: 'id,name,mimeType,webViewLink',
+    });
+    return created.data;
+  } finally {
+    await fs.promises.unlink(tmp).catch(() => {});
+  }
 }
