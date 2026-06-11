@@ -7,6 +7,7 @@ import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 import { buildMultipartAlternative, encodeAddressHeader, encodeHeaderValue, normalizeBodyLineEndings } from './gmail-mime.js';
+import { sliceClean } from '../trim.js';
 import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../types.js';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -65,8 +66,12 @@ function getAttachments(payload: any): GmailAttachment[] {
   return attachments;
 }
 
-function parseMessage(msg: any): GmailMessageFull {
+const BODY_CAP_CHARS = 50_000;
+
+export function parseMessage(msg: any, bodyCap?: number): GmailMessageFull {
   const headers = msg.payload?.headers ?? [];
+  const body = decodeBody(msg.payload);
+  const capped = bodyCap !== undefined && body.length > bodyCap;
   return {
     id: msg.id ?? '',
     threadId: msg.threadId ?? '',
@@ -75,7 +80,8 @@ function parseMessage(msg: any): GmailMessageFull {
     to: getHeader(headers, 'To'),
     cc: getHeader(headers, 'Cc'),
     date: getHeader(headers, 'Date'),
-    body: decodeBody(msg.payload),
+    body: capped ? sliceClean(body, bodyCap) : body,
+    ...(capped ? { bodyTruncated: true, bodyTotalChars: body.length } : {}),
     attachments: getAttachments(msg.payload),
   };
 }
@@ -134,13 +140,14 @@ export function registerGmailTools(server: ToolRegistry): void {
   server.registerTool(
     'gmail_read',
     {
-      description: 'Read a full Gmail message by ID',
+      description: 'Read a full Gmail message by ID (body capped at 50k chars unless full=true)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         messageId: z.string().describe('Gmail message ID'),
+        full: coerceBoolean.optional().describe('Return the entire body without the character cap'),
       },
     },
-    async ({ account, messageId }) => {
+    async ({ account, messageId, full }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -151,7 +158,7 @@ export function registerGmailTools(server: ToolRegistry): void {
           format: 'full',
         });
 
-        const result = parseMessage(res.data);
+        const result = parseMessage(res.data, full ? undefined : BODY_CAP_CHARS);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         };
@@ -163,13 +170,14 @@ export function registerGmailTools(server: ToolRegistry): void {
   server.registerTool(
     'gmail_read_thread',
     {
-      description: 'Read all messages in a Gmail thread',
+      description: 'Read all messages in a Gmail thread (bodies capped at 50k chars each unless full=true)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         threadId: z.string().describe('Gmail thread ID'),
+        full: coerceBoolean.optional().describe('Return entire bodies without the character cap'),
       },
     },
-    async ({ account, threadId }) => {
+    async ({ account, threadId, full }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -180,7 +188,7 @@ export function registerGmailTools(server: ToolRegistry): void {
           format: 'full',
         });
 
-        const messages = (res.data.messages ?? []).map(parseMessage);
+        const messages = (res.data.messages ?? []).map((m) => parseMessage(m, full ? undefined : BODY_CAP_CHARS));
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(messages, null, 2) }],
         };
