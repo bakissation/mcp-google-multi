@@ -198,6 +198,32 @@ describe('ToolRegistry', () => {
     expect(schemaOf(after, 'drive_discover')).toBe(schemaOf(before, 'drive_discover'));
   });
 
+  it('compacts pretty-printed JSON output from handlers', async () => {
+    const { server, registered } = fakeServer();
+    const reg = new ToolRegistry(server as never, FULL_WRITES);
+    reg.registerTool('gmail_search', { description: 'x' }, async () => ({
+      content: [{ type: 'text', text: JSON.stringify({ a: 1, b: [2] }, null, 2) }],
+    }));
+    const out = (await (registered[0].handler as (...a: unknown[]) => Promise<{ content: { text: string }[] }>)()) ;
+    expect(out.content[0].text).toBe('{"a":1,"b":[2]}');
+  });
+
+  it('passes output through untouched when GOOGLE_TRIM=off', async () => {
+    vi.stubEnv('GOOGLE_TRIM', 'off');
+    try {
+      const { server, registered } = fakeServer();
+      const reg = new ToolRegistry(server as never, FULL_WRITES);
+      const pretty = JSON.stringify({ a: 1 }, null, 2);
+      reg.registerTool('gmail_search', { description: 'x' }, async () => ({
+        content: [{ type: 'text', text: pretty }],
+      }));
+      const out = (await (registered[0].handler as (...a: unknown[]) => Promise<{ content: { text: string }[] }>)()) ;
+      expect(out.content[0].text).toBe(pretty);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('installListHandler throws when nothing is registered', () => {
     const { server } = fakeServer();
     const reg = new ToolRegistry(server as never, FULL_WRITES);
