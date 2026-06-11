@@ -32,14 +32,14 @@ interface ToolConfig {
 
 const CUD_OVERRIDES: Record<string, Cud> = {
   drive_untrash: 'update',
+  drive_transfer: 'create',
 };
 
 const SERVICE_OVERRIDES: Record<string, string> = {
   reports_activities_list: 'admin',
 };
 
-// Read tools that write to the local filesystem: fanning the same savePath
-// across accounts would clobber (last write wins).
+// read tools that write local files — same savePath fanned across accounts would clobber
 const FANOUT_EXCLUDE = new Set(['gmail_download_attachment', 'drive_download', 'drive_export']);
 
 function isAccountEnum(field: unknown): boolean {
@@ -61,6 +61,7 @@ export function inferCud(name: string): Cud {
 
 export class ToolRegistry {
   readonly tools: ToolEntry[] = [];
+  readonly policy: Policy;
   readonly registerTool: McpServer['registerTool'];
   private readonly revealed = new Set<string>();
   private readonly jsonSchemaCache = new Map<string, unknown>();
@@ -71,6 +72,7 @@ export class ToolRegistry {
     private readonly server: McpServer,
     policy: Policy,
   ) {
+    this.policy = policy;
     this.registerTool = ((name: string, config: ToolConfig, handler: (...a: unknown[]) => unknown) => {
       const service =
         SERVICE_OVERRIDES[name] ?? (name.includes('_') ? name.slice(0, name.indexOf('_')) : name);
@@ -82,8 +84,7 @@ export class ToolRegistry {
         ...config.annotations,
       };
 
-      // Fan-out is read-only and never applies to meta tools: google_api_call's
-      // registry cud is "read" but it executes arbitrary writes.
+      // never fan out meta tools: google_api_call infers cud=read but executes writes
       let inputShape = config.inputSchema ?? {};
       let baseHandler = handler;
       if (cud === 'read' && !this.registeringMeta && !FANOUT_EXCLUDE.has(name) && isAccountEnum(inputShape.account)) {

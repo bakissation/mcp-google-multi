@@ -47,8 +47,8 @@ server.registerTool(
 ```
 
 **Hard rules:**
-- Flat `zod` `inputSchema`; `account` first. Coerce array/object/bool inputs — clients send them string-encoded.
-- `cud` is inferred from the tool name (no manual flag). CUD tools are auto-gated by write-control; **never** add your own write gate. Fix a misclassified verb in `CUD_OVERRIDES` (`registry.ts`).
+- Flat `zod` `inputSchema`; `account` first (sole exception: `drive_transfer` takes `fromAccount`/`toAccount`). Coerce array/object/bool inputs — clients send them string-encoded.
+- `cud` is inferred from the tool name (no manual flag). CUD tools are auto-gated by write-control; **never** add your own write gate. Fix a misclassified verb in `CUD_OVERRIDES` (`registry.ts`). Two sanctioned exceptions self-check via `isAllowed`: `google_api_call` (per-method cud) and `drive_transfer`'s `move` flag (delete inside a create-classified tool, checked against `registry.policy`).
 - Wrap handlers in try/catch → `handle<Service>Error` (→ `mapGoogleError`); errors return `{error, message, hint?, retriable, account}` with `isError: true`. **Never embed the raw error / `error.config` / `error.response`** — token-leak.
 - Return `{ content: [{ type: 'text', text: JSON.stringify(...) }] }`.
 
