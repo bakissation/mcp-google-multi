@@ -69,9 +69,16 @@ Now the only thing on disk is the **encrypted** token store. Pass the token via 
 | `GOOGLE_WRITE_ALLOW` / `GOOGLE_WRITE_DENY` | — | glob overrides, e.g. `calendar:*`, `*:delete*` |
 | `GOOGLE_OPTIONAL_SCOPES` | — | extra bundles: `forms`, `chat` |
 | `GOOGLE_ADMIN_ACCOUNTS` | — | aliases granted Workspace-admin scopes (the account's own super-admin OAuth) |
+| `GOOGLE_TOOLSETS` | — | `all` (default) or a CSV filter of: `gmail`, `drive`, `calendar`, `sheets`, `docs`, `contacts`, `searchconsole`, `tasks`, `meet`, `forms`, `chat`, `admin` |
 | `TOKEN_STORE_PATH` | — | override the encrypted token dir (default: `~/.config/mcp-google-multi/tokens`) |
 
 Inspect the resolved setup any time: `mcp-google-multi config check`.
+
+## Discover-first tools (tiny idle context)
+
+The server does **not** dump ~170 tool schemas into your model's context. At boot, `tools/list` exposes only one small `{service}_discover` tool per service (plus nothing else). Calling e.g. `drive_discover` returns that service's operation catalog (name, one-line summary, arguments, read/write class), reveals the operational tools, and emits `notifications/tools/list_changed` so the client re-fetches the list. An optional `query` argument filters the catalog.
+
+Hidden is a listing concept, not a security boundary: operational tools stay callable at all times (existing prompts that call tools directly keep working), and write-control + OAuth scopes remain the real enforcement. Use `GOOGLE_TOOLSETS` to switch entire services off — it is a filter only: listing `forms`/`chat`/`admin` does not enable them without their `GOOGLE_OPTIONAL_SCOPES` / `GOOGLE_ADMIN_ACCOUNTS` gates.
 
 ## Write-control (deny-by-default)
 
@@ -112,7 +119,7 @@ Your OAuth, your machine. Refresh tokens are **AES-256-GCM encrypted at rest** (
 
 ## Roadmap
 
-Maintainer-led. Direction is tracked publicly as **[GitHub Milestones](https://github.com/bakissation/mcp-google-multi/milestones)** (discover-first tooling → exhaustive API coverage → service accounts + hosting in v6). Not accepting unsolicited feature PRs; bug reports are welcome.
+Maintainer-led. Direction is tracked publicly as **[GitHub Milestones](https://github.com/bakissation/mcp-google-multi/milestones)** (exhaustive API coverage → service accounts + hosting in v6). Not accepting unsolicited feature PRs; bug reports are welcome.
 
 ## Contributing
 

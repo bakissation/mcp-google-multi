@@ -2,3 +2,4 @@ node_modules/
 dist/
 tokens/
 .env
+discovery/
