@@ -241,11 +241,18 @@ describe('google_api_call', () => {
     expect(JSON.parse(searchBlocked.content[0].text).error).toBe('toolset_disabled');
   });
 
-  it('keeps serviceless APIs available regardless of GOOGLE_TOOLSETS', async () => {
-    const { call, dir } = setup(FULL, { toolsets: new Set(['drive']) });
+  it('requires an explicit toolset for APIs without dedicated named tools', async () => {
+    const { call, search, dir } = setup(FULL, { toolsets: new Set(['drive']) });
     cleanupDirs.push(dir);
-    const res = await call({ account: 'test', api: 'slides', methodId: 'slides.nope' });
-    expect(JSON.parse(res.content[0].text).error).toBe('unknown_method');
+    const blockedCall = await call({ account: 'test', api: 'slides', methodId: 'slides.nope' });
+    expect(JSON.parse(blockedCall.content[0].text).error).toBe('toolset_disabled');
+    const blockedSearch = await search({ query: 'presentation', api: 'slides' });
+    expect(JSON.parse(blockedSearch.content[0].text).error).toBe('toolset_disabled');
+
+    const explicit = setup(FULL, { toolsets: new Set(['slides']) });
+    cleanupDirs.push(explicit.dir);
+    const enabled = await explicit.call({ account: 'test', api: 'slides', methodId: 'slides.nope' });
+    expect(JSON.parse(enabled.content[0].text).error).toBe('unknown_method');
   });
 
   it('refuses to send credentials to non-googleapis hosts (poisoned cache)', async () => {
