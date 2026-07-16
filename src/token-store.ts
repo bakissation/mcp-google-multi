@@ -6,6 +6,8 @@ import type { TokenData } from './types.js';
 
 const ENC_VERSION = 1;
 const ALGO = 'aes-256-gcm';
+const LOCK_TIMEOUT_MS = 5_000;
+const LOCK_RETRY_MS = 10;
 
 interface EncFile {
   v: number;
@@ -71,10 +73,92 @@ export function readToken(alias: string): TokenData | null {
   return decryptToken(contents, masterKey());
 }
 
-export function writeToken(alias: string, data: object): void {
+function sleep(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function withTokenLock<T>(alias: string, fn: () => T): T {
   const p = ACCOUNT_CONFIG[alias].encPath;
-  fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, encryptToken(data, masterKey()), { mode: 0o600 });
+  const dir = path.dirname(p);
+  const lock = path.join(dir, `.${path.basename(p)}.lock`);
+  const ownerFile = `${lock}.${process.pid}.${randomBytes(6).toString('hex')}.owner`;
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(ownerFile, String(process.pid), { mode: 0o600, flag: 'wx' });
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+
+  try {
+    while (true) {
+      try {
+        fs.linkSync(ownerFile, lock);
+        break;
+      } catch (error) {
+        const err = error as NodeJS.ErrnoException;
+        if (err.code !== 'EEXIST') throw error;
+        try {
+          const observedOwner = fs.readFileSync(lock, 'utf8');
+          const owner = Number(observedOwner);
+          if (Number.isSafeInteger(owner) && owner > 0) {
+            try {
+              process.kill(owner, 0);
+            } catch (ownerError) {
+              if ((ownerError as NodeJS.ErrnoException).code !== 'ESRCH') throw ownerError;
+              if (fs.readFileSync(lock, 'utf8') === observedOwner) fs.rmSync(lock, { force: true });
+              continue;
+            }
+          }
+        } catch (readError) {
+          if ((readError as NodeJS.ErrnoException).code === 'ENOENT') {
+            continue;
+          }
+          throw readError;
+        }
+        if (Date.now() >= deadline) {
+          throw new Error(`Timed out waiting for token lock: ${alias}`, { cause: error });
+        }
+        sleep(LOCK_RETRY_MS);
+      }
+    }
+  } finally {
+    fs.rmSync(ownerFile, { force: true });
+  }
+
+  try {
+    return fn();
+  } finally {
+    fs.rmSync(lock, { force: true });
+  }
+}
+
+function writeTokenAtomic(alias: string, data: object): void {
+  const p = ACCOUNT_CONFIG[alias].encPath;
+  const dir = path.dirname(p);
+  const tmp = path.join(dir, `.${path.basename(p)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`);
+  try {
+    fs.writeFileSync(tmp, encryptToken(data, masterKey()), { mode: 0o600, flag: 'wx' });
+    const fd = fs.openSync(tmp, 'r');
+    try {
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    fs.renameSync(tmp, p);
+  } finally {
+    fs.rmSync(tmp, { force: true });
+  }
+}
+
+export function writeToken(alias: string, data: object): void {
+  withTokenLock(alias, () => writeTokenAtomic(alias, data));
+}
+
+export function updateToken(alias: string, updates: object): void {
+  withTokenLock(alias, () => {
+    const existing = readToken(alias) ?? {};
+    const definedUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([, value]) => value !== null && value !== undefined),
+    );
+    writeTokenAtomic(alias, { ...existing, ...definedUpdates });
+  });
 }
 
 export function hasToken(alias: string): boolean {

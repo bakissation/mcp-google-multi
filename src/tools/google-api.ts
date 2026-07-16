@@ -23,24 +23,24 @@ const MAX_RESPONSE_CHARS = 100_000;
 
 // Policy/toolset namespace for each API alias must match the NAMED tools' service
 // names, or user deny globs and GOOGLE_TOOLSETS silently miss escape-hatch calls.
-const SERVICE_FOR_ALIAS: Record<string, string | null> = {
+const SERVICE_FOR_ALIAS: Record<string, string> = {
   gmail: 'gmail',
   drive: 'drive',
   calendar: 'calendar',
   sheets: 'sheets',
   docs: 'docs',
-  slides: null,
+  slides: 'slides',
   forms: 'forms',
   people: 'contacts',
   searchconsole: 'searchconsole',
   tasks: 'tasks',
   chat: 'chat',
   meet: 'meet',
-  driveactivity: null,
-  drivelabels: null,
+  driveactivity: 'driveactivity',
+  drivelabels: 'drivelabels',
   admin_directory: 'admin',
   admin_reports: 'admin',
-  groupssettings: null,
+  groupssettings: 'groupssettings',
 };
 
 export interface EscapeDeps extends DiscoveryDeps {
@@ -83,9 +83,9 @@ function describeMethod(m: DiscoveryMethod) {
 export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps: EscapeDeps = {}): void {
   const getClientFn = deps.getClientFn ?? getClient;
   const toolsets = deps.toolsets ?? getToolsets();
+  const serviceForAlias = (alias: string): string => SERVICE_FOR_ALIAS[alias] ?? alias;
   const apiEnabled = (alias: string): boolean => {
-    const service = SERVICE_FOR_ALIAS[alias];
-    return service === null || service === undefined || toolsetEnabled(toolsets, service);
+    return toolsetEnabled(toolsets, serviceForAlias(alias));
   };
   const enabledApis = Object.keys(WORKSPACE_APIS).filter(apiEnabled);
   const apiList = enabledApis.join(', ');
@@ -93,7 +93,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
     jsonResult(
       {
         error: 'toolset_disabled',
-        message: `API "${alias}" maps to service "${SERVICE_FOR_ALIAS[alias]}", which is excluded by GOOGLE_TOOLSETS.`,
+        message: `API "${alias}" maps to service "${serviceForAlias(alias)}", which is excluded by GOOGLE_TOOLSETS.`,
         hint: 'Add the service to GOOGLE_TOOLSETS (or unset it) to use this API.',
         retriable: false,
       },
@@ -206,7 +206,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       }
 
       const cud = cudFromMethod(method);
-      const policyService = SERVICE_FOR_ALIAS[api as string] ?? (api as string);
+      const policyService = serviceForAlias(api as string);
       const lastSegment = method.id.split('.').pop() ?? method.id;
       const toolRef = { name: `${policyService}_${lastSegment}`, service: policyService, cud };
       if (cud !== 'read' && !isAllowed(toolRef, policy)) {
