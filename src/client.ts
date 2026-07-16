@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { ACCOUNT_CONFIG } from './accounts.js';
 import type { Account } from './accounts.js';
-import { readToken, writeToken } from './token-store.js';
+import { readToken, updateToken } from './token-store.js';
 
 export async function getClient(account: Account) {
   const config = ACCOUNT_CONFIG[account];
@@ -30,8 +30,7 @@ export async function getClient(account: Account) {
   oauth2Client.setCredentials(tokenData);
 
   oauth2Client.on('tokens', (tokens) => {
-    const existing = readToken(account) ?? {};
-    writeToken(account, { ...existing, ...tokens });
+    updateToken(account, tokens);
   });
 
   return oauth2Client;
