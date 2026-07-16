@@ -1,8 +1,22 @@
-import { describe, it, expect } from 'vitest';
-import { deriveKey, encryptToken, decryptToken } from '../src/token-store.js';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { ACCOUNT_CONFIG } from '../src/accounts.js';
+import { deriveKey, encryptToken, decryptToken, readToken, writeToken, updateToken } from '../src/token-store.js';
 
 const KEY = 'test-master-key';
 const sample = { refresh_token: 'r', access_token: 'a', scope: 's', expiry_date: 123 };
+
+const originalPath = ACCOUNT_CONFIG.test.encPath;
+const cleanupDirs: string[] = [];
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  ACCOUNT_CONFIG.test.encPath = originalPath;
+  delete process.env.MASTER_KEY;
+  for (const dir of cleanupDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
 
 describe('token-store crypto', () => {
   it('round-trips a token object', () => {
@@ -52,5 +66,82 @@ describe('token-store crypto', () => {
 
   it('derives a 32-byte key from an arbitrary passphrase', () => {
     expect(deriveKey('short')).toHaveLength(32);
+  });
+
+  it('keeps the previous token readable when a replacement write fails', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+    writeToken('test', sample);
+
+    const originalWrite = fs.writeFileSync.bind(fs);
+    let interrupted = false;
+    vi.spyOn(fs, 'writeFileSync').mockImplementation((file, data, options) => {
+      if (typeof file === 'number' || interrupted) return originalWrite(file, data, options);
+      interrupted = true;
+      originalWrite(file, String(data).slice(0, 12), options);
+      throw new Error('simulated interrupted write');
+    });
+
+    expect(() => writeToken('test', { ...sample, access_token: 'new' })).toThrow(/interrupted/);
+    expect(interrupted).toBe(true);
+    expect(readToken('test')).toEqual(sample);
+  });
+
+  it('recovers a token lock left by a dead process', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+    fs.writeFileSync(path.join(dir, '.test.enc.lock'), '2147483647', { mode: 0o600 });
+
+    writeToken('test', sample);
+
+    expect(readToken('test')).toEqual(sample);
+  });
+
+  it('recovers a token lock containing non-PID garbage', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+    fs.writeFileSync(path.join(dir, '.test.enc.lock'), 'not-a-pid', { mode: 0o600 });
+
+    writeToken('test', sample);
+
+    expect(readToken('test')).toEqual(sample);
+  });
+
+  it('treats an unsignalable lock owner (EPERM) as alive and times out', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+    const lock = path.join(dir, '.test.enc.lock');
+    fs.writeFileSync(lock, '12345', { mode: 0o600 });
+
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+      const err = new Error('EPERM') as NodeJS.ErrnoException;
+      err.code = 'EPERM';
+      throw err;
+    });
+    let now = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 6_000));
+
+    expect(() => writeToken('test', sample)).toThrow(/Timed out waiting for token lock/);
+    expect(fs.readFileSync(lock, 'utf8')).toBe('12345');
+  });
+
+  it('merges refresh updates with the latest token inside the store boundary', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+    writeToken('test', sample);
+
+    updateToken('test', { access_token: 'new', refresh_token: null, expiry_date: 456 });
+
+    expect(readToken('test')).toEqual({ ...sample, access_token: 'new', expiry_date: 456 });
   });
 });
