@@ -97,14 +97,24 @@ function withTokenLock<T>(alias: string, fn: () => T): T {
         try {
           const observedOwner = fs.readFileSync(lock, 'utf8');
           const owner = Number(observedOwner);
-          if (Number.isSafeInteger(owner) && owner > 0) {
+          // Non-PID content can only come from a corrupt or interrupted lock
+          // write — recover it like a dead owner instead of spinning to timeout.
+          let ownerDead = !(Number.isSafeInteger(owner) && owner > 0);
+          if (!ownerDead) {
             try {
               process.kill(owner, 0);
             } catch (ownerError) {
-              if ((ownerError as NodeJS.ErrnoException).code !== 'ESRCH') throw ownerError;
-              if (fs.readFileSync(lock, 'utf8') === observedOwner) fs.rmSync(lock, { force: true });
-              continue;
+              const code = (ownerError as NodeJS.ErrnoException).code;
+              // EPERM: the PID exists but is not signalable (recycled by another
+              // user) — treat as alive and wait out the timeout rather than
+              // break a lock we cannot verify.
+              if (code === 'ESRCH') ownerDead = true;
+              else if (code !== 'EPERM') throw ownerError;
             }
+          }
+          if (ownerDead) {
+            if (fs.readFileSync(lock, 'utf8') === observedOwner) fs.rmSync(lock, { force: true });
+            continue;
           }
         } catch (readError) {
           if ((readError as NodeJS.ErrnoException).code === 'ENOENT') {

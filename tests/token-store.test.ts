@@ -101,6 +101,38 @@ describe('token-store crypto', () => {
     expect(readToken('test')).toEqual(sample);
   });
 
+  it('recovers a token lock containing non-PID garbage', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+    fs.writeFileSync(path.join(dir, '.test.enc.lock'), 'not-a-pid', { mode: 0o600 });
+
+    writeToken('test', sample);
+
+    expect(readToken('test')).toEqual(sample);
+  });
+
+  it('treats an unsignalable lock owner (EPERM) as alive and times out', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+    const lock = path.join(dir, '.test.enc.lock');
+    fs.writeFileSync(lock, '12345', { mode: 0o600 });
+
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+      const err = new Error('EPERM') as NodeJS.ErrnoException;
+      err.code = 'EPERM';
+      throw err;
+    });
+    let now = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 6_000));
+
+    expect(() => writeToken('test', sample)).toThrow(/Timed out waiting for token lock/);
+    expect(fs.readFileSync(lock, 'utf8')).toBe('12345');
+  });
+
   it('merges refresh updates with the latest token inside the store boundary', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
     cleanupDirs.push(dir);
