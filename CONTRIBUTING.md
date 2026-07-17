@@ -2,7 +2,7 @@
 
 Thanks for your interest! This is an MCP server exposing Gmail, Drive, Calendar, Sheets, Docs, Contacts, Search Console, Tasks, Meet, Forms, Chat, and Admin SDK tools with multi-account OAuth.
 
-> **This project is maintainer-led.** The roadmap is published as **[GitHub Milestones](https://github.com/bakissation/mcp-google-multi/milestones)** — there is no code-ready issue backlog, and **unsolicited feature PRs aren't being accepted** right now. **Bug reports and security reports are very welcome** (open an issue for bugs; see [SECURITY.md](./SECURITY.md) for vulnerabilities). If you'd like to contribute a fix, please **open an issue first** so we can confirm it fits the roadmap. The branching/PR mechanics below apply to changes that have been agreed.
+> **This project is maintainer-led.** The roadmap is published as **[GitHub Milestones](https://github.com/bakissation/mcp-google-multi/milestones)** — there is no code-ready issue backlog, and **unsolicited feature PRs aren't being accepted** right now. **Bug reports and security reports are very welcome** (open an issue for bugs; see [SECURITY.md](./SECURITY.md) for vulnerabilities). If you'd like to contribute a fix, please **open an issue first** so we can confirm it fits the roadmap. v5 is complete and in a feedback period — issues describing pain points and missing capabilities directly shape the v6 roadmap. The branching/PR mechanics below apply to changes that have been agreed.
 
 ## Branching model
 
