@@ -145,7 +145,9 @@ function writeTokenAtomic(alias: string, data: object): void {
   const tmp = path.join(dir, `.${path.basename(p)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`);
   try {
     fs.writeFileSync(tmp, encryptToken(data, masterKey()), { mode: 0o600, flag: 'wx' });
-    const fd = fs.openSync(tmp, 'r');
+    // Open read-write, not read-only: on Windows fsync maps to FlushFileBuffers,
+    // which returns EPERM on a read-only handle.
+    const fd = fs.openSync(tmp, 'r+');
     try {
       fs.fsyncSync(fd);
     } finally {
