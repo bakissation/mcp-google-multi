@@ -186,7 +186,15 @@ export const CUD_OVERRIDES: Record<string, Cud> = {};
 
 // Replacement tool names for methodIds whose derived name exceeds the 64-char
 // MCP limit or collides with another generated name.
-export const NAME_OVERRIDES: Record<string, string> = {};
+export const NAME_OVERRIDES: Record<string, string> = {
+  'classroom.courses.courseWork.addOnAttachments.studentSubmissions.get': 'classroom_coursework_addon_submissions_get',
+  'classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch': 'classroom_coursework_addon_submissions_patch',
+  'classroom.courses.courseWork.studentSubmissions.modifyAttachments': 'classroom_coursework_submissions_modify_attachments',
+  'classroom.courses.courseWorkMaterials.addOnAttachments.create': 'classroom_coursework_materials_addons_create',
+  'classroom.courses.courseWorkMaterials.addOnAttachments.delete': 'classroom_coursework_materials_addons_delete',
+  'classroom.courses.posts.addOnAttachments.studentSubmissions.get': 'classroom_posts_addon_submissions_get',
+  'classroom.courses.posts.addOnAttachments.studentSubmissions.patch': 'classroom_posts_addon_submissions_patch',
+};
 
 // Better model-facing descriptions than the Discovery text.
 export const DESCRIPTION_OVERRIDES: Record<string, string> = {};

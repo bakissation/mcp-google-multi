@@ -53,7 +53,28 @@ const SERVICES: Array<{
 
 // Opt-in gates for generated-only services whose scopes are not granted by
 // default; shared services (admin, forms, chat) reuse their curated gate below.
-const GENERATED_GATES: Record<string, { enabled: () => boolean; hint: string }> = {};
+// workspaceevents has no dedicated scope (subscriptions use the underlying
+// resource scopes), so it registers ungated.
+const bundleGate = (name: string) => ({
+  enabled: () => new Set(getOptionalBundles()).has(name),
+  hint: `add "${name}" to GOOGLE_OPTIONAL_SCOPES`,
+});
+const GENERATED_GATES: Record<string, { enabled: () => boolean; hint: string }> = {
+  appsmarket: bundleGate('appsmarket'),
+  classroom: bundleGate('classroom'),
+  cloudidentity: bundleGate('cloudidentity'),
+  cloudsearch: bundleGate('cloudsearch'),
+  driveactivity: bundleGate('driveactivity'),
+  drivelabels: bundleGate('drivelabels'),
+  groupsmigration: bundleGate('groupsmigration'),
+  groupssettings: bundleGate('groupssettings'),
+  keep: bundleGate('keep'),
+  licensing: bundleGate('licensing'),
+  postmaster: bundleGate('postmaster'),
+  reseller: bundleGate('reseller'),
+  script: bundleGate('script'),
+  vault: bundleGate('vault'),
+};
 
 function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
   const registry = new ToolRegistry(server, policy);
@@ -90,10 +111,11 @@ function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
     gen.register(registry);
   }
   if (registry.services().length === 0) {
+    const known = [...new Set([...SERVICES.map((s) => s.name), ...GENERATED_SERVICES.map((s) => s.name)])].sort();
     throw new Error(
       `GOOGLE_TOOLSETS="${process.env.GOOGLE_TOOLSETS ?? ''}" selected no enabled services. ` +
-        `Known services: ${SERVICES.map((s) => s.name).join(', ')}. ` +
-        `Note: slides/forms/chat require GOOGLE_OPTIONAL_SCOPES, admin requires GOOGLE_ADMIN_ACCOUNTS.`,
+        `Known services: ${known.join(', ')}. ` +
+        `Note: optional services require their bundle in GOOGLE_OPTIONAL_SCOPES, admin requires GOOGLE_ADMIN_ACCOUNTS.`,
     );
   }
   registerDiscoverTools(registry, policy);

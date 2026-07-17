@@ -90,7 +90,7 @@ function paramZod(name: string, param: DiscoveryParam, looseParams: string[], co
   return out;
 }
 
-export function planTools(doc: DiscoveryDocJson, api: GenApi): { plans: ToolPlan[]; report: ServiceReport } {
+export function planTools(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: Set<string> = new Set()): { plans: ToolPlan[]; report: ServiceReport } {
   const index = buildMethodIndex(doc, api.service).sort((a, b) => a.id.localeCompare(b.id));
   const report: ServiceReport = { service: api.service, emitted: 0, skippedCurated: 0, overrideHits: 0, looseParams: [] };
   const rawById = new Map<string, RawMethod>();
@@ -109,6 +109,10 @@ export function planTools(doc: DiscoveryDocJson, api: GenApi): { plans: ToolPlan
       report.skippedCurated += 1;
       continue;
     }
+    // The same method id can appear in several docs of one service
+    // (admin.channels.stop ships in directory_v1 and reports_v1) — emit once.
+    if (alreadyEmitted.has(method.id)) continue;
+    alreadyEmitted.add(method.id);
     const name = toolNameFromId(api.service, method.id);
     if (name.length > MAX_TOOL_NAME) {
       throw new Error(`Tool name "${name}" (${name.length} chars) exceeds ${MAX_TOOL_NAME}; add NAME_OVERRIDES["${method.id}"]`);
@@ -161,8 +165,8 @@ function emitShapeField(field: string, zod: string): string {
   return `      ${/^[a-zA-Z_$][\w$]*$/.test(field) ? field : stringLiteral(field)}: ${zod},`;
 }
 
-export function emitService(doc: DiscoveryDocJson, api: GenApi): { fileText: string; report: ServiceReport; names: string[] } {
-  const { plans, report } = planTools(doc, api);
+export function emitService(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: Set<string> = new Set()): { fileText: string; report: ServiceReport; names: string[] } {
+  const { plans, report } = planTools(doc, api, alreadyEmitted);
   const lines: string[] = [
     `export function register${api.service[0].toUpperCase()}${api.service.slice(1)}GeneratedTools(registry: ToolRegistry): void {`,
   ];
@@ -262,8 +266,9 @@ async function main(): Promise<void> {
     const bodies: string[] = [];
     const serviceReport: ServiceReport = { service, emitted: 0, skippedCurated: 0, overrideHits: 0, looseParams: [] };
     const serviceNames = new Set<string>();
+    const serviceMethodIds = new Set<string>();
     for (const { doc, api } of entry.docs) {
-      const { fileText, report, names } = emitService(doc, api);
+      const { fileText, report, names } = emitService(doc, api, serviceMethodIds);
       for (const n of names) {
         if (serviceNames.has(n)) throw new Error(`Cross-document name collision "${n}" in service "${service}"; add NAME_OVERRIDES`);
         serviceNames.add(n);

@@ -42,6 +42,39 @@ export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
     'https://www.googleapis.com/auth/chat.messages',
     'https://www.googleapis.com/auth/chat.messages.create',
   ],
+  classroom: [
+    'https://www.googleapis.com/auth/classroom.courses',
+    'https://www.googleapis.com/auth/classroom.coursework.me',
+    'https://www.googleapis.com/auth/classroom.coursework.students',
+    'https://www.googleapis.com/auth/classroom.courseworkmaterials',
+    'https://www.googleapis.com/auth/classroom.rosters',
+    'https://www.googleapis.com/auth/classroom.announcements',
+    'https://www.googleapis.com/auth/classroom.topics',
+  ],
+  cloudidentity: [
+    'https://www.googleapis.com/auth/cloud-identity.groups',
+    'https://www.googleapis.com/auth/cloud-identity.devices',
+  ],
+  cloudsearch: ['https://www.googleapis.com/auth/cloud_search'],
+  vault: ['https://www.googleapis.com/auth/ediscovery'],
+  keep: ['https://www.googleapis.com/auth/keep'],
+  driveactivity: ['https://www.googleapis.com/auth/drive.activity.readonly'],
+  drivelabels: [
+    'https://www.googleapis.com/auth/drive.labels',
+    'https://www.googleapis.com/auth/drive.admin.labels',
+  ],
+  script: [
+    'https://www.googleapis.com/auth/script.projects',
+    'https://www.googleapis.com/auth/script.deployments',
+    'https://www.googleapis.com/auth/script.processes',
+    'https://www.googleapis.com/auth/script.metrics',
+  ],
+  postmaster: ['https://www.googleapis.com/auth/postmaster.readonly'],
+  groupssettings: ['https://www.googleapis.com/auth/apps.groups.settings'],
+  groupsmigration: ['https://www.googleapis.com/auth/apps.groups.migration'],
+  licensing: ['https://www.googleapis.com/auth/apps.licensing'],
+  reseller: ['https://www.googleapis.com/auth/apps.order'],
+  appsmarket: ['https://www.googleapis.com/auth/appsmarketplace.license'],
 };
 
 export const ADMIN_SCOPES = [
