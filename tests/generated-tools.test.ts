@@ -198,9 +198,42 @@ describe('gen-tools generator', () => {
     expect(first).toBe(committed);
   });
 
-  it('matches the committed barrel', () => {
+  it('matches the committed barrel', async () => {
+    const { GENERATED_SERVICES } = await import('../src/tools/generated/index.js');
     const committed = fs.readFileSync(path.join(__dirname, '..', 'src', 'tools', 'generated', 'index.ts'), 'utf-8');
-    expect(emitBarrel(['tasks'])).toBe(committed);
+    expect(emitBarrel(GENERATED_SERVICES.map((s) => s.name))).toBe(committed);
+  });
+
+  it('registers a generated-only service with correct service grouping, hiding, and cud spread', async () => {
+    const { registerVaultGeneratedTools } = await import('../src/tools/generated/vault.js');
+    const { registry } = harness(FULL);
+    registerVaultGeneratedTools(registry);
+    const tools = registry.tools.filter((t) => !t.meta);
+    expect(tools).toHaveLength(33);
+    expect(tools.every((t) => t.service === 'vault')).toBe(true);
+    expect(tools.every((t) => !registry.isVisible(t))).toBe(true);
+    expect(tools.some((t) => t.cud === 'delete')).toBe(true);
+    expect(tools.some((t) => t.cud === 'read')).toBe(true);
+  });
+
+  it('gates generated write tools through write-control policy', async () => {
+    const { registerVaultGeneratedTools } = await import('../src/tools/generated/vault.js');
+    const { registry, registered } = harness(READ_ONLY);
+    registerVaultGeneratedTools(registry);
+    const del = registry.tools.find((t) => t.cud === 'delete')!;
+    const handler = registered.find((r) => r.name === del.name)!.handler;
+    const res = await handler({ account: 'test' });
+    expect(res.isError).toBe(true);
+  });
+
+  it('exposes every new optional bundle used by generated gates', async () => {
+    const { OPTIONAL_SCOPE_BUNDLES } = await import('../src/auth.js');
+    for (const bundle of ['classroom', 'cloudidentity', 'cloudsearch', 'vault', 'keep', 'driveactivity', 'drivelabels', 'script', 'postmaster', 'groupssettings', 'groupsmigration', 'licensing', 'reseller', 'appsmarket']) {
+      expect(OPTIONAL_SCOPE_BUNDLES[bundle]?.length, bundle).toBeGreaterThan(0);
+      for (const scope of OPTIONAL_SCOPE_BUNDLES[bundle]) {
+        expect(scope, bundle).toMatch(/^https:\/\/www\.googleapis\.com\/auth\//);
+      }
+    }
   });
 
   it('fails loudly on name collisions', () => {

@@ -36,6 +36,7 @@ const SERVICE_FOR_ALIAS: Record<string, string> = {
   drivelabels: 'drivelabels',
   admin_directory: 'admin',
   admin_reports: 'admin',
+  admin_datatransfer: 'admin',
   groupssettings: 'groupssettings',
 };
 
