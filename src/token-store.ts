@@ -8,6 +8,8 @@ const ENC_VERSION = 1;
 const ALGO = 'aes-256-gcm';
 const LOCK_TIMEOUT_MS = 5_000;
 const LOCK_RETRY_MS = 10;
+const RENAME_ATTEMPTS = 5;
+const RENAME_RETRY_MS = 20;
 
 interface EncFile {
   v: number;
@@ -153,9 +155,33 @@ function writeTokenAtomic(alias: string, data: object): void {
     } finally {
       fs.closeSync(fd);
     }
-    fs.renameSync(tmp, p);
+    renameWithRetry(tmp, p);
   } finally {
-    fs.rmSync(tmp, { force: true });
+    try {
+      fs.rmSync(tmp, { force: true });
+    } catch {
+      // force only suppresses ENOENT; a Windows handle-holder can make this
+      // throw and mask the real write error. The orphan tmp is harmless.
+    }
+  }
+}
+
+// Windows uses classic rename semantics (MoveFileExW without POSIX semantics),
+// so replacing a token file that another process momentarily holds open — a
+// concurrent readToken, antivirus, an indexer — fails with a transient
+// EPERM/EACCES/EBUSY. Reads take no lock, so the token lock cannot prevent
+// this; a short bounded retry absorbs it. POSIX rename never fails this way.
+function renameWithRetry(from: string, to: string): void {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      fs.renameSync(from, to);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      const transient = code === 'EPERM' || code === 'EACCES' || code === 'EBUSY';
+      if (!transient || attempt >= RENAME_ATTEMPTS) throw error;
+      sleep(RENAME_RETRY_MS * attempt);
+    }
   }
 }
 
