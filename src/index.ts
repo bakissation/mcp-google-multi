@@ -20,6 +20,7 @@ import { registerFormsTools } from './tools/forms.js';
 import { registerChatTools } from './tools/chat.js';
 import { registerAdminTools } from './tools/admin.js';
 import { getOptionalBundles, getAdminAccounts } from './auth.js';
+import { GENERATED_SERVICES } from './tools/generated/index.js';
 import { ToolRegistry } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
@@ -50,11 +51,15 @@ const SERVICES: Array<{
   { name: 'admin', register: registerAdminTools, enabled: () => getAdminAccounts().length > 0 },
 ];
 
+// Opt-in gates for generated-only services whose scopes are not granted by
+// default; shared services (admin, forms, chat) reuse their curated gate below.
+const GENERATED_GATES: Record<string, { enabled: () => boolean; hint: string }> = {};
+
 function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
   const registry = new ToolRegistry(server, policy);
   const toolsets = getToolsets();
   if (toolsets !== 'all') {
-    const known = new Set(SERVICES.map((s) => s.name));
+    const known = new Set([...SERVICES.map((s) => s.name), ...GENERATED_SERVICES.map((s) => s.name)]);
     for (const requested of toolsets) {
       if (!known.has(requested)) {
         process.stderr.write(`GOOGLE_TOOLSETS: unknown service "${requested}" ignored\n`);
@@ -71,6 +76,18 @@ function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
       continue;
     }
     svc.register(registry);
+  }
+  for (const gen of GENERATED_SERVICES) {
+    if (!toolsetEnabled(toolsets, gen.name)) continue;
+    const curated = SERVICES.find((s) => s.name === gen.name);
+    const gate = curated?.enabled ?? GENERATED_GATES[gen.name]?.enabled;
+    if (gate && !gate()) {
+      if (!curated && toolsets !== 'all') {
+        process.stderr.write(`GOOGLE_TOOLSETS: "${gen.name}" requested but not enabled — ${GENERATED_GATES[gen.name].hint}\n`);
+      }
+      continue;
+    }
+    gen.register(registry);
   }
   if (registry.services().length === 0) {
     throw new Error(
