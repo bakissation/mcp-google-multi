@@ -10,7 +10,7 @@ import { writeToken } from './token-store.js';
 // ─── Scope tiers ────────────────────────────────────────────────────────
 //
 // BASE: always granted. Existing v3 surface + Tasks + Meet (added in v4.0.0).
-// OPTIONAL: per-account opt-in via env GOOGLE_OPTIONAL_SCOPES="forms,chat".
+// OPTIONAL: per-account opt-in via env GOOGLE_OPTIONAL_SCOPES="slides,forms,chat".
 // ADMIN: per-account opt-in via env GOOGLE_ADMIN_ACCOUNTS="alias1,alias2".
 //
 // Personal Gmail accounts will 403 on admin scopes — never grant by default.
@@ -30,6 +30,9 @@ export const BASE_SCOPES = [
 ];
 
 export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
+  slides: [
+    'https://www.googleapis.com/auth/presentations',
+  ],
   forms: [
     'https://www.googleapis.com/auth/forms.body',
     'https://www.googleapis.com/auth/forms.responses.readonly',
