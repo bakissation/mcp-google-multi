@@ -6,7 +6,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
-import { buildMultipartAlternative, encodeAddressHeader, encodeHeaderValue, normalizeBodyLineEndings } from './gmail-mime.js';
+import { buildMultipartAlternative, buildReplyHeaders, encodeAddressHeader, encodeHeaderValue, htmlToText, normalizeBodyLineEndings } from './gmail-mime.js';
 import { sliceClean } from '../trim.js';
 import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../types.js';
 import * as path from 'path';
@@ -21,41 +21,51 @@ function getHeader(
   return headers?.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? '';
 }
 
+function collectTextParts(part: any, plain: string[], html: string[], topLevel = false): void {
+  if (!part) return;
+  const isAttachment = Boolean(part.filename) || Boolean(part.body?.attachmentId);
+  if (!isAttachment && part.body?.data) {
+    const decoded = Buffer.from(part.body.data, 'base64url').toString('utf-8');
+    if (part.mimeType === 'text/html') html.push(decoded);
+    // Simple (non-multipart) messages can carry any mimeType at the top level;
+    // returning their raw body preserves pre-collect behavior.
+    else if (part.mimeType === 'text/plain' || !part.mimeType || topLevel) plain.push(decoded);
+  }
+  for (const child of part.parts ?? []) {
+    collectTextParts(child, plain, html);
+  }
+}
+
 function decodeBody(
   payload: any,
-): string {
-  if (payload.body?.data) {
-    return Buffer.from(payload.body.data, 'base64url').toString('utf-8');
+  rawHtml = false,
+): { body: string; bodyOrigin?: 'text/plain' | 'text/html' } {
+  const plain: string[] = [];
+  const html: string[] = [];
+  collectTextParts(payload, plain, html, true);
+  // Concatenating every plain leaf keeps forwarded/mixed messages whole;
+  // any plain content beats HTML because alternatives duplicate the same body.
+  if (plain.length > 0) return { body: plain.join('\n\n'), bodyOrigin: 'text/plain' };
+  if (html.length > 0) {
+    const joined = html.join('\n\n');
+    return { body: rawHtml ? joined : htmlToText(joined), bodyOrigin: 'text/html' };
   }
-  if (payload.parts) {
-    for (const part of payload.parts) {
-      if (part.mimeType === 'text/plain' && part.body?.data) {
-        return Buffer.from(part.body.data, 'base64url').toString('utf-8');
-      }
-    }
-    for (const part of payload.parts) {
-      if (part.mimeType === 'text/html' && part.body?.data) {
-        return Buffer.from(part.body.data, 'base64url').toString('utf-8');
-      }
-    }
-    for (const part of payload.parts) {
-      if (part.parts) {
-        const result = decodeBody(part);
-        if (result) return result;
-      }
-    }
-  }
-
-  return '';
+  return { body: '' };
 }
 
 function getAttachments(payload: any): GmailAttachment[] {
   const attachments: GmailAttachment[] = [];
   if (payload.filename && payload.body?.attachmentId) {
+    const disposition = getHeader(payload.headers, 'Content-Disposition');
+    const inline = disposition.toLowerCase().startsWith('inline')
+      || getHeader(payload.headers, 'Content-ID') !== '';
     attachments.push({
       filename: payload.filename,
       attachmentId: payload.body.attachmentId,
       mimeType: payload.mimeType ?? 'application/octet-stream',
+      ...(typeof payload.body.size === 'number' ? { sizeBytes: payload.body.size } : {}),
+      ...(payload.partId ? { partId: payload.partId } : {}),
+      ...(inline ? { inline: true } : {}),
     });
   }
   if (payload.parts) {
@@ -66,12 +76,42 @@ function getAttachments(payload: any): GmailAttachment[] {
   return attachments;
 }
 
+async function resolveReplyHeaders(
+  gmail: any,
+  replyToMessageId: string,
+): Promise<{ inReplyTo: string; references: string }> {
+  try {
+    const meta = await gmail.users.messages.get({
+      userId: 'me',
+      id: replyToMessageId,
+      format: 'metadata',
+      metadataHeaders: ['Message-ID', 'References'],
+    });
+    const headers = meta.data.payload?.headers;
+    return buildReplyHeaders(
+      replyToMessageId,
+      getHeader(headers, 'Message-ID'),
+      getHeader(headers, 'References'),
+    );
+  } catch {
+    // Degrade to the API id (pre-lookup behavior) rather than blocking the send.
+    return { inReplyTo: replyToMessageId, references: replyToMessageId };
+  }
+}
+
 const BODY_CAP_CHARS = 50_000;
 
-export function parseMessage(msg: any, bodyCap?: number): GmailMessageFull {
+export function parseMessage(
+  msg: any,
+  bodyCap?: number,
+  opts?: { rawHtml?: boolean },
+): GmailMessageFull {
   const headers = msg.payload?.headers ?? [];
-  const body = decodeBody(msg.payload);
+  const { body, bodyOrigin } = decodeBody(msg.payload, opts?.rawHtml === true);
   const capped = bodyCap !== undefined && body.length > bodyCap;
+  const messageIdHeader = getHeader(headers, 'Message-ID');
+  const inReplyTo = getHeader(headers, 'In-Reply-To');
+  const references = getHeader(headers, 'References');
   return {
     id: msg.id ?? '',
     threadId: msg.threadId ?? '',
@@ -81,7 +121,13 @@ export function parseMessage(msg: any, bodyCap?: number): GmailMessageFull {
     cc: getHeader(headers, 'Cc'),
     date: getHeader(headers, 'Date'),
     body: capped ? sliceClean(body, bodyCap) : body,
+    ...(bodyOrigin ? { bodyOrigin } : {}),
     ...(capped ? { bodyTruncated: true, bodyTotalChars: body.length } : {}),
+    ...(messageIdHeader ? { messageIdHeader } : {}),
+    ...(inReplyTo ? { inReplyTo } : {}),
+    ...(references ? { references } : {}),
+    ...(msg.labelIds ? { labelIds: msg.labelIds } : {}),
+    ...(msg.internalDate ? { internalDate: msg.internalDate } : {}),
     attachments: getAttachments(msg.payload),
   };
 }
@@ -112,21 +158,30 @@ export function registerGmailTools(server: ToolRegistry): void {
         const messages = listRes.data.messages ?? [];
         const results: GmailMessageHeader[] = [];
 
-        for (const m of messages) {
-          const detail = await gmail.users.messages.get({
-            userId: 'me',
-            id: m.id!,
-            format: 'metadata',
-            metadataHeaders: ['From', 'Subject', 'Date'],
-          });
-          results.push({
-            id: detail.data.id ?? '',
-            threadId: detail.data.threadId ?? '',
-            subject: getHeader(detail.data.payload?.headers, 'Subject'),
-            from: getHeader(detail.data.payload?.headers, 'From'),
-            date: getHeader(detail.data.payload?.headers, 'Date'),
-            snippet: detail.data.snippet ?? '',
-          });
+        // Bounded parallelism: chunked Promise.all keeps order and avoids
+        // hammering the per-user quota with an unbounded fan-out.
+        const CHUNK_SIZE = 10;
+        for (let i = 0; i < messages.length; i += CHUNK_SIZE) {
+          const details = await Promise.all(
+            messages.slice(i, i + CHUNK_SIZE).map((m) => gmail.users.messages.get({
+              userId: 'me',
+              id: m.id!,
+              format: 'metadata',
+              metadataHeaders: ['From', 'To', 'Subject', 'Date'],
+            })),
+          );
+          for (const detail of details) {
+            results.push({
+              id: detail.data.id ?? '',
+              threadId: detail.data.threadId ?? '',
+              subject: getHeader(detail.data.payload?.headers, 'Subject'),
+              from: getHeader(detail.data.payload?.headers, 'From'),
+              to: getHeader(detail.data.payload?.headers, 'To'),
+              date: getHeader(detail.data.payload?.headers, 'Date'),
+              snippet: detail.data.snippet ?? '',
+              labelIds: detail.data.labelIds ?? [],
+            });
+          }
         }
 
         return {
@@ -145,9 +200,11 @@ export function registerGmailTools(server: ToolRegistry): void {
         account: accountEnum.describe('Google account alias'),
         messageId: z.string().describe('Gmail message ID'),
         full: coerceBoolean.optional().describe('Return the entire body without the character cap'),
+        rawHtml: coerceBoolean.optional()
+          .describe('Return the HTML body unconverted instead of the plain-text rendering (HTML-only messages)'),
       },
     },
-    async ({ account, messageId, full }) => {
+    async ({ account, messageId, full, rawHtml }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -158,7 +215,7 @@ export function registerGmailTools(server: ToolRegistry): void {
           format: 'full',
         });
 
-        const result = parseMessage(res.data, full ? undefined : BODY_CAP_CHARS);
+        const result = parseMessage(res.data, full ? undefined : BODY_CAP_CHARS, { rawHtml });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         };
@@ -170,17 +227,42 @@ export function registerGmailTools(server: ToolRegistry): void {
   server.registerTool(
     'gmail_read_thread',
     {
-      description: 'Read all messages in a Gmail thread (bodies capped at 50k chars each unless full=true)',
+      description: 'Read all messages in a Gmail thread (bodies capped at 50k chars each unless full=true). mode=summary returns headers + snippets only.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         threadId: z.string().describe('Gmail thread ID'),
         full: coerceBoolean.optional().describe('Return entire bodies without the character cap'),
+        rawHtml: coerceBoolean.optional()
+          .describe('Return HTML bodies unconverted instead of the plain-text rendering (HTML-only messages)'),
+        mode: z.enum(['full', 'summary']).default('full')
+          .describe('full = complete bodies; summary = per-message headers and snippet only'),
       },
     },
-    async ({ account, threadId, full }) => {
+    async ({ account, threadId, full, rawHtml, mode }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
+
+        if (mode === 'summary') {
+          const res = await gmail.users.threads.get({
+            userId: 'me',
+            id: threadId,
+            format: 'metadata',
+            metadataHeaders: ['From', 'To', 'Subject', 'Date', 'Message-ID'],
+          });
+          const summaries = (res.data.messages ?? []).map((m) => ({
+            id: m.id ?? '',
+            from: getHeader(m.payload?.headers, 'From'),
+            to: getHeader(m.payload?.headers, 'To'),
+            subject: getHeader(m.payload?.headers, 'Subject'),
+            date: getHeader(m.payload?.headers, 'Date'),
+            snippet: m.snippet ?? '',
+            labelIds: m.labelIds ?? [],
+          }));
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(summaries, null, 2) }],
+          };
+        }
 
         const res = await gmail.users.threads.get({
           userId: 'me',
@@ -188,7 +270,7 @@ export function registerGmailTools(server: ToolRegistry): void {
           format: 'full',
         });
 
-        const messages = (res.data.messages ?? []).map((m) => parseMessage(m, full ? undefined : BODY_CAP_CHARS));
+        const messages = (res.data.messages ?? []).map((m) => parseMessage(m, full ? undefined : BODY_CAP_CHARS, { rawHtml }));
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(messages, null, 2) }],
         };
@@ -241,8 +323,9 @@ export function registerGmailTools(server: ToolRegistry): void {
 
         if (cc) headers.push(`Cc: ${encodeAddressHeader(cc)}`);
         if (replyToMessageId) {
-          headers.push(`In-Reply-To: ${replyToMessageId}`);
-          headers.push(`References: ${replyToMessageId}`);
+          const { inReplyTo, references } = await resolveReplyHeaders(gmail, replyToMessageId);
+          headers.push(`In-Reply-To: ${inReplyTo}`);
+          headers.push(`References: ${references}`);
         }
 
         const rawMessage = [...headers, '', bodyText].join('\r\n');
@@ -321,11 +404,13 @@ export function registerGmailTools(server: ToolRegistry): void {
         htmlBody: z.string().optional()
           .describe('Optional HTML body. When set, drafts as multipart/alternative so HTML-capable clients render the rich version. Use bare tags only: <p>, <a>, <br>, <strong>, <em>, <ul><li>.'),
         cc: z.string().optional().describe('CC recipients, comma-separated'),
+        replyToMessageId: z.string().optional()
+          .describe('Message ID to reply to (sets In-Reply-To and References headers)'),
         replyToThreadId: z.string().optional()
           .describe('Thread ID to associate the draft with'),
       },
     },
-    async ({ account, to, subject, body, htmlBody, cc, replyToThreadId }) => {
+    async ({ account, to, subject, body, htmlBody, cc, replyToMessageId, replyToThreadId }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = google.gmail({ version: 'v1', auth });
@@ -350,6 +435,11 @@ export function registerGmailTools(server: ToolRegistry): void {
         }
 
         if (cc) headers.push(`Cc: ${encodeAddressHeader(cc)}`);
+        if (replyToMessageId) {
+          const { inReplyTo, references } = await resolveReplyHeaders(gmail, replyToMessageId);
+          headers.push(`In-Reply-To: ${inReplyTo}`);
+          headers.push(`References: ${references}`);
+        }
 
         const rawMessage = [...headers, '', bodyText].join('\r\n');
         const encoded = Buffer.from(rawMessage, 'utf-8').toString('base64url');

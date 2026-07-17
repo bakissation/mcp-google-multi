@@ -11,14 +11,19 @@ export interface GmailMessageHeader {
   threadId: string;
   subject: string;
   from: string;
+  to: string;
   date: string;
   snippet: string;
+  labelIds: string[];
 }
 
 export interface GmailAttachment {
   filename: string;
   attachmentId: string;
   mimeType: string;
+  sizeBytes?: number;
+  partId?: string;
+  inline?: boolean;
 }
 
 export interface GmailMessageFull {
@@ -30,8 +35,14 @@ export interface GmailMessageFull {
   cc: string;
   date: string;
   body: string;
+  bodyOrigin?: 'text/plain' | 'text/html';
   bodyTruncated?: boolean;
   bodyTotalChars?: number;
+  messageIdHeader?: string;
+  inReplyTo?: string;
+  references?: string;
+  labelIds?: string[];
+  internalDate?: string;
   attachments: GmailAttachment[];
 }
 
