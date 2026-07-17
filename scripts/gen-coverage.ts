@@ -81,7 +81,7 @@ for (const r of rows) {
   lines.push(`<details><summary><strong>${r.service}</strong> — ${r.tools.length} tools (${r.curated} curated, ${r.generated} generated)</summary>`, '', '| Tool | Tier | CUD | Description |', '|---|---|---|---|');
   for (const t of [...r.tools].sort((a, b) => a.name.localeCompare(b.name))) {
     const tier = curatedNames.has(t.name) ? 'curated' : 'generated';
-    const desc = t.description.split('\n')[0].slice(0, 120).replace(/\|/g, '\\|');
+    const desc = t.description.split('\n')[0].slice(0, 120).replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
     lines.push(`| \`${t.name}\` | ${tier} | ${t.cud} | ${desc} |`);
   }
   lines.push('', '</details>', '');
