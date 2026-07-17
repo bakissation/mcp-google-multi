@@ -6,21 +6,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { registerGmailTools } from './tools/gmail.js';
-import { registerDriveTools } from './tools/drive.js';
-import { registerCalendarTools } from './tools/calendar.js';
-import { registerSheetsTools } from './tools/sheets.js';
-import { registerDocsTools } from './tools/docs.js';
-import { registerContactsTools } from './tools/contacts.js';
-import { registerSearchConsoleTools } from './tools/searchconsole.js';
-import { registerTasksTools } from './tools/tasks.js';
-import { registerMeetTools } from './tools/meet.js';
-import { registerSlidesTools } from './tools/slides.js';
-import { registerFormsTools } from './tools/forms.js';
-import { registerChatTools } from './tools/chat.js';
-import { registerAdminTools } from './tools/admin.js';
-import { getOptionalBundles, getAdminAccounts } from './auth.js';
 import { GENERATED_SERVICES } from './tools/generated/index.js';
+import { GENERATED_GATES, SERVICES } from './services.js';
 import { ToolRegistry } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
@@ -30,51 +17,6 @@ import { resolvePolicy, isAllowed, describePolicy, type Policy } from './write-c
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
-
-const SERVICES: Array<{
-  name: string;
-  register: (registry: ToolRegistry) => void;
-  enabled?: () => boolean;
-}> = [
-  { name: 'gmail', register: registerGmailTools },
-  { name: 'drive', register: registerDriveTools },
-  { name: 'calendar', register: registerCalendarTools },
-  { name: 'sheets', register: registerSheetsTools },
-  { name: 'docs', register: registerDocsTools },
-  { name: 'contacts', register: registerContactsTools },
-  { name: 'searchconsole', register: registerSearchConsoleTools },
-  { name: 'tasks', register: registerTasksTools },
-  { name: 'meet', register: registerMeetTools },
-  { name: 'slides', register: registerSlidesTools, enabled: () => new Set(getOptionalBundles()).has('slides') },
-  { name: 'forms', register: registerFormsTools, enabled: () => new Set(getOptionalBundles()).has('forms') },
-  { name: 'chat', register: registerChatTools, enabled: () => new Set(getOptionalBundles()).has('chat') },
-  { name: 'admin', register: registerAdminTools, enabled: () => getAdminAccounts().length > 0 },
-];
-
-// Opt-in gates for generated-only services whose scopes are not granted by
-// default; shared services (admin, forms, chat) reuse their curated gate below.
-// workspaceevents has no dedicated scope (subscriptions use the underlying
-// resource scopes), so it registers ungated.
-const bundleGate = (name: string) => ({
-  enabled: () => new Set(getOptionalBundles()).has(name),
-  hint: `add "${name}" to GOOGLE_OPTIONAL_SCOPES`,
-});
-const GENERATED_GATES: Record<string, { enabled: () => boolean; hint: string }> = {
-  appsmarket: bundleGate('appsmarket'),
-  classroom: bundleGate('classroom'),
-  cloudidentity: bundleGate('cloudidentity'),
-  cloudsearch: bundleGate('cloudsearch'),
-  driveactivity: bundleGate('driveactivity'),
-  drivelabels: bundleGate('drivelabels'),
-  groupsmigration: bundleGate('groupsmigration'),
-  groupssettings: bundleGate('groupssettings'),
-  keep: bundleGate('keep'),
-  licensing: bundleGate('licensing'),
-  postmaster: bundleGate('postmaster'),
-  reseller: bundleGate('reseller'),
-  script: bundleGate('script'),
-  vault: bundleGate('vault'),
-};
 
 function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
   const registry = new ToolRegistry(server, policy);

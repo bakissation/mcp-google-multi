@@ -56,7 +56,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "gen:discovery": "tsx scripts/fetch-discovery.ts",
-    "gen:tools": "tsx scripts/gen-tools.ts"
+    "gen:tools": "tsx scripts/gen-tools.ts",
+    "gen:coverage": "tsx scripts/gen-coverage.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

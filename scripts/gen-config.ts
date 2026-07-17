@@ -187,6 +187,9 @@ export const CUD_OVERRIDES: Record<string, Cud> = {};
 // Replacement tool names for methodIds whose derived name exceeds the 64-char
 // MCP limit or collides with another generated name.
 export const NAME_OVERRIDES: Record<string, string> = {
+  // curated admin_users_update wraps directory.users.patch; the full-PUT
+  // variant needs its own name
+  'directory.users.update': 'admin_users_replace',
   'classroom.courses.courseWork.addOnAttachments.studentSubmissions.get': 'classroom_coursework_addon_submissions_get',
   'classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch': 'classroom_coursework_addon_submissions_patch',
   'classroom.courses.courseWork.studentSubmissions.modifyAttachments': 'classroom_coursework_submissions_modify_attachments',
