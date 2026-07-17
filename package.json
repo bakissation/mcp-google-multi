@@ -1,7 +1,7 @@
 {
   "name": "mcp-google-multi",
   "version": "0.0.0-semantically-released",
-  "description": "Local MCP server for Google Workspace (Gmail, Drive, Calendar, Sheets, Docs, Contacts, Tasks, Meet, Search Console, +Forms/Chat/Admin) across multiple accounts — OAuth-only, encrypted token storage, deny-by-default writes.",
+  "description": "Local MCP server for Google Workspace (Gmail, Drive, Calendar, Sheets, Docs, Contacts, Tasks, Meet, Search Console, +Forms/Chat/Admin) across multiple accounts \u2014 OAuth-only, encrypted token storage, deny-by-default writes.",
   "type": "module",
   "license": "MIT",
   "bin": {
@@ -52,9 +52,12 @@
     "auth": "node dist/index.js auth --account",
     "migrate-tokens": "node dist/index.js migrate-tokens",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "gen:discovery": "tsx scripts/fetch-discovery.ts",
+    "gen:tools": "tsx scripts/gen-tools.ts",
+    "gen:coverage": "tsx scripts/gen-coverage.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -72,6 +75,7 @@
     "@types/server-destroy": "^1.0.3",
     "eslint": "^10.2.1",
     "semantic-release": "^25.0.3",
+    "tsx": "^4.23.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.1",
     "vitest": "^3.2.6"

@@ -297,7 +297,7 @@ export function registerDriveTools(server: ToolRegistry): void {
         );
 
         // pipeline destroys both streams on source/sink error; raw .pipe leaks the partial file.
-        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest));
+        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600 }));
 
         const { size } = fs.statSync(dest);
         return {
@@ -333,7 +333,7 @@ export function registerDriveTools(server: ToolRegistry): void {
         );
 
         // pipeline destroys both streams on source/sink error; raw .pipe leaks the partial file.
-        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest));
+        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600 }));
 
         const { size } = fs.statSync(dest);
         return {
