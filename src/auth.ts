@@ -124,8 +124,16 @@ export function resolveScopesForAccount(alias: string): string[] {
 export async function runAuthFlow(args: string[]): Promise<void> {
   const accountIdx = args.indexOf('--account');
   if (accountIdx === -1 || !args[accountIdx + 1]) {
-    console.error('Usage: node dist/index.js auth --account <alias>');
+    console.error('Usage: mcp-google-multi auth --account <alias>');
     console.error(`Valid aliases: ${ACCOUNTS.join(', ')}`);
+    process.exit(1);
+  }
+
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.error(
+      'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not set. Create an OAuth Desktop client ' +
+        '(see docs/google-cloud-setup.md) and add both to your environment before authenticating.',
+    );
     process.exit(1);
   }
 
@@ -214,6 +222,7 @@ export async function runAuthFlow(args: string[]): Promise<void> {
             (server as any).destroy();
 
             console.log(`Token saved (encrypted) for ${alias}.`);
+            console.log('Next: authenticate your other aliases, then verify with: mcp-google-multi config check');
             resolve();
           }
         } catch (e) {
@@ -225,6 +234,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
       })
       // Bind to loopback only — never expose the OAuth callback to the local network.
       .listen(4242, '127.0.0.1', () => {
+        // Always print the URL: `open` silently no-ops on headless/SSH sessions.
+        console.log(`Opening your browser to authorize "${alias}". If nothing opens, visit:\n${authorizeUrl}`);
         open(authorizeUrl, { wait: false }).then((cp) => cp.unref());
       });
 

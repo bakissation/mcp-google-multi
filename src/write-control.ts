@@ -23,6 +23,11 @@ function parseGlobs(value: string | undefined): string[] {
 
 export function resolvePolicy(env: NodeJS.ProcessEnv = process.env): Policy {
   const raw = (env.GOOGLE_PROFILE ?? 'read-only').trim() as Profile;
+  if (raw && !PROFILES.includes(raw)) {
+    // Fail-closed to read-only, but say so — a typo'd profile otherwise looks
+    // like every write tool silently breaking.
+    process.stderr.write(`GOOGLE_PROFILE="${raw}" is not valid (${PROFILES.join(' | ')}); using read-only\n`);
+  }
   return {
     profile: PROFILES.includes(raw) ? raw : 'read-only',
     readOnly: /^(1|true|yes)$/i.test(env.GOOGLE_READ_ONLY ?? ''),

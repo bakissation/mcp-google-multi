@@ -382,7 +382,7 @@ export function registerGmailTools(server: ToolRegistry): void {
         const buffer = Buffer.from(data, 'base64url');
         // Strip path components so callers can't escape savePath via "../".
         const fullPath = path.join(savePath, path.basename(filename));
-        await fs.promises.writeFile(fullPath, buffer);
+        await fs.promises.writeFile(fullPath, buffer, { mode: 0o600 });
 
         return {
           content: [{ type: 'text' as const, text: `Saved to ${fullPath} (${buffer.length} bytes)` }],
