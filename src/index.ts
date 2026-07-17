@@ -90,7 +90,18 @@ async function main() {
     const counts = registry.visibleCount();
     console.log(`Write-control: ${describePolicy(policy)}`);
     console.log(`CUD tools enabled: ${cud.length - disabled.length}/${cud.length}`);
-    console.log(`Disabled: ${disabled.map((t) => t.name).join(', ') || '(none)'}`);
+    // At full-coverage scale, a flat name dump is unreadable — summarize per
+    // service unless the list is short.
+    let disabledLine = '(none)';
+    if (disabled.length > 0 && disabled.length <= 20) {
+      disabledLine = disabled.map((t) => t.name).join(', ');
+    } else if (disabled.length > 20) {
+      const perService = new Map<string, number>();
+      for (const t of disabled) perService.set(t.service, (perService.get(t.service) ?? 0) + 1);
+      const summary = [...perService.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([s, n]) => `${s} ${n}`).join(', ');
+      disabledLine = `${disabled.length} write tools (${summary}) — enable via GOOGLE_PROFILE / GOOGLE_WRITE_ALLOW`;
+    }
+    console.log(`Disabled: ${disabledLine}`);
     console.log(`Services: ${registry.services().join(', ')}`);
     console.log(`Tool surface: ${counts.eager} eager (discover + escape hatch), ${counts.hidden} deferred until discovery`);
     console.log(`Escape hatch: google_api_call CUD verdicts follow profile=${policy.profile} and your allow/deny globs`);

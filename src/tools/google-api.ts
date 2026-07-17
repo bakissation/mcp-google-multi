@@ -149,14 +149,14 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
     },
     async ({ account, api, methodId, pathParams, queryParams, body }) => {
       if (!WORKSPACE_APIS[api as string]) {
-        return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false }, true);
+        return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false, account }, true);
       }
       if (!apiEnabled(api as string)) return toolsetDisabled(api as string);
       let index: DiscoveryMethod[];
       try {
         index = await loadMethodIndex(api as string, deps);
       } catch (err) {
-        return jsonResult({ error: 'discovery_unavailable', message: (err as Error).message, retriable: true }, true);
+        return jsonResult({ error: 'discovery_unavailable', message: (err as Error).message, retriable: true, account }, true);
       }
       const method = index.find((m) => m.id === methodId);
       if (!method) {
@@ -166,6 +166,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
             message: `No method "${methodId}" in ${api}.`,
             hint: `Use google_api_search({query: "...", api: "${api}"}) to find the right method id.`,
             retriable: false,
+            account,
           },
           true,
         );
