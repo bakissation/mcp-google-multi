@@ -1777,7 +1777,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     },
   });
   registerGeneratedTool(registry, {
-    name: "admin_users_update",
+    name: "admin_users_replace",
     cud: "update",
     description: "Updates a user. This method supports patch semantics, meaning that you only need to include the fields you wish to update. Fields that are not present in the re",
     method: { id: "directory.users.update", httpMethod: "PUT", path: "admin/directory/v1/users/{userKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["userKey"] },

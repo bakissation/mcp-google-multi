@@ -245,11 +245,24 @@ export function emitBarrel(services: string[]): string {
   return lines.join('\n');
 }
 
+async function curatedToolNames(): Promise<Set<string>> {
+  process.env.GOOGLE_ACCOUNTS ??= 'example:user@example.com';
+  process.env.GOOGLE_CLIENT_ID ??= 'gen';
+  process.env.GOOGLE_CLIENT_SECRET ??= 'gen';
+  const { ToolRegistry } = await import('../src/registry.js');
+  const { SERVICES } = await import('../src/services.js');
+  const server = { registerTool: () => 'ok', sendToolListChanged: () => {}, server: { setRequestHandler: () => {} } };
+  const registry = new ToolRegistry(server as never, { profile: 'full-writes', readOnly: false, allow: [], deny: [] });
+  for (const svc of SERVICES) svc.register(registry);
+  return new Set(registry.tools.map((t) => t.name));
+}
+
 async function main(): Promise<void> {
   const filter = new Set(process.argv.slice(2));
   const discoveryDir = path.join(process.cwd(), 'discovery');
   const outDir = path.join(process.cwd(), 'src', 'tools', 'generated');
   fs.mkdirSync(outDir, { recursive: true });
+  const curatedNames = await curatedToolNames();
 
   const byService = new Map<string, { docs: Array<{ doc: DiscoveryDocJson; api: GenApi }> }>();
   for (const api of GEN_APIS) {
@@ -271,6 +284,7 @@ async function main(): Promise<void> {
       const { fileText, report, names } = emitService(doc, api, serviceMethodIds);
       for (const n of names) {
         if (serviceNames.has(n)) throw new Error(`Cross-document name collision "${n}" in service "${service}"; add NAME_OVERRIDES`);
+        if (curatedNames.has(n)) throw new Error(`Generated name "${n}" collides with a curated tool; add NAME_OVERRIDES`);
         serviceNames.add(n);
       }
       serviceReport.emitted += report.emitted;

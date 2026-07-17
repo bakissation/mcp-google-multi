@@ -9,7 +9,7 @@ A **local** [MCP](https://modelcontextprotocol.io) server that gives Claude Code
 - 🔑 **Multi-account** — drive any number of your Google accounts from one server, each by a short alias.
 - 🔒 **Secure by default** — refresh tokens **encrypted at rest** (AES-256-GCM); **writes are deny-by-default**; no telemetry — it talks only to Google.
 - 📦 **npm-first** — install and run with `npx`; everything configured through env vars.
-- 🧰 **~175 tools** across 13 services → full list in **[COVERAGE.md](./COVERAGE.md)**.
+- 🧰 **Exhaustive coverage** — every OAuth-reachable Workspace API method is a named tool: **871 tools across 28 services** (182 hand-curated + 689 generated from Google's API Discovery), plus an escape hatch for anything else → full list in **[COVERAGE.md](./COVERAGE.md)**.
 
 > v5 is **local + user-OAuth only**. Service accounts and hosting (and the APIs they unlock) are on the [roadmap](https://github.com/bakissation/mcp-google-multi/milestones). **Upgrading from v4?** Jump to [Upgrading](#upgrading-from-v4).
 
@@ -126,7 +126,7 @@ Reads are never gated. **Every create/update/delete is off until you opt in** �
 
 ## What's covered
 
-~175 tools across Gmail, Drive, Calendar, Sheets, Docs, Contacts, Search Console, Tasks, Meet, and (optional) Slides, Forms, Chat, Workspace Admin. **Full per-tool list → [COVERAGE.md](./COVERAGE.md).** Every tool takes an `account` argument matching one of your aliases.
+Every OAuth-reachable Workspace API method is a named tool — 871 across 28 services. Core services (Gmail, Drive, Calendar, Sheets, Docs, Contacts, Search Console, Tasks, Meet) are on by default; Slides, Forms, Chat, Classroom, Vault, Keep, Apps Script, Cloud Search, Drive Labels and more enable via `GOOGLE_OPTIONAL_SCOPES` bundles, and Workspace Admin APIs via `GOOGLE_ADMIN_ACCOUNTS`. Curated tools give shaped, token-lean responses for everyday operations; generated tools (from Google's API Discovery documents) cover the long tail with the same write-control and account fan-out. **Full per-tool list → [COVERAGE.md](./COVERAGE.md).** Every tool takes an `account` argument matching one of your aliases.
 
 ## Google Cloud setup
 
