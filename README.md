@@ -1,6 +1,6 @@
 # mcp-google-multi
 
-A **local** [MCP](https://modelcontextprotocol.io) server that gives Claude Code (and any MCP client) access to your **Google Workspace** — Gmail, Drive, Calendar, Sheets, Docs, Contacts, Tasks, Meet, Search Console (plus optional Forms, Chat, and Workspace Admin) — across **multiple Google accounts** at once.
+A **local** [MCP](https://modelcontextprotocol.io) server that gives Claude Code (and any MCP client) access to your **Google Workspace** — Gmail, Drive, Calendar, Sheets, Docs, Contacts, Tasks, Meet, Search Console (plus optional Slides, Forms, Chat, and Workspace Admin) — across **multiple Google accounts** at once.
 
 [![npm](https://img.shields.io/npm/v/mcp-google-multi?label=npm&color=cb3837)](https://www.npmjs.com/package/mcp-google-multi)
 
@@ -9,7 +9,7 @@ A **local** [MCP](https://modelcontextprotocol.io) server that gives Claude Code
 - 🔑 **Multi-account** — drive any number of your Google accounts from one server, each by a short alias.
 - 🔒 **Secure by default** — refresh tokens **encrypted at rest** (AES-256-GCM); **writes are deny-by-default**; no telemetry — it talks only to Google.
 - 📦 **npm-first** — install and run with `npx`; everything configured through env vars.
-- 🧰 **~170 tools** across 12 services → full list in **[COVERAGE.md](./COVERAGE.md)**.
+- 🧰 **~175 tools** across 13 services → full list in **[COVERAGE.md](./COVERAGE.md)**.
 
 > v5 is **local + user-OAuth only**. Service accounts and hosting (and the APIs they unlock) are on the [roadmap](https://github.com/bakissation/mcp-google-multi/milestones). **Upgrading from v4?** Jump to [Upgrading](#upgrading-from-v4).
 
@@ -67,9 +67,9 @@ Now the only thing on disk is the **encrypted** token store. Pass the token via 
 | `GOOGLE_PROFILE` | — | write policy: `read-only` (default) · `safe-writes` · `full-writes` |
 | `GOOGLE_READ_ONLY` | — | `true` = hard kill-switch for all writes |
 | `GOOGLE_WRITE_ALLOW` / `GOOGLE_WRITE_DENY` | — | glob overrides, e.g. `calendar:*`, `*:delete*` |
-| `GOOGLE_OPTIONAL_SCOPES` | — | extra bundles: `forms`, `chat` |
+| `GOOGLE_OPTIONAL_SCOPES` | — | extra bundles: `slides`, `forms`, `chat` |
 | `GOOGLE_ADMIN_ACCOUNTS` | — | aliases granted Workspace-admin scopes (the account's own super-admin OAuth) |
-| `GOOGLE_TOOLSETS` | — | `all` (default) or a CSV filter of: `gmail`, `drive`, `calendar`, `sheets`, `docs`, `contacts`, `searchconsole`, `tasks`, `meet`, `forms`, `chat`, `admin` |
+| `GOOGLE_TOOLSETS` | — | `all` (default) or a CSV filter of: `gmail`, `drive`, `calendar`, `sheets`, `docs`, `contacts`, `searchconsole`, `tasks`, `meet`, `slides`, `forms`, `chat`, `admin` |
 | `TOKEN_STORE_PATH` | — | override the encrypted token dir (default: `~/.config/mcp-google-multi/tokens`) |
 | `DISCOVERY_CACHE_PATH` | — | override the Discovery-doc cache dir (default: `~/.config/mcp-google-multi/discovery`) |
 | `GOOGLE_TRIM` | — | `off` (or `0`/`false`/`no`) disables compact JSON serialization of tool responses |
@@ -80,7 +80,7 @@ Inspect the resolved setup any time: `mcp-google-multi config check`.
 
 The server does **not** dump ~170 tool schemas into your model's context. At boot, `tools/list` exposes only one small `{service}_discover` tool per service (plus nothing else). Calling e.g. `drive_discover` returns that service's operation catalog (name, one-line summary, arguments, read/write class), reveals the operational tools, and emits `notifications/tools/list_changed` so the client re-fetches the list. An optional `query` argument filters the catalog.
 
-Hidden is a listing concept, not a security boundary: operational tools stay callable at all times (existing prompts that call tools directly keep working), and write-control + OAuth scopes remain the real enforcement. Use `GOOGLE_TOOLSETS` to switch entire services off — it is a filter only: listing `forms`/`chat`/`admin` does not enable them without their `GOOGLE_OPTIONAL_SCOPES` / `GOOGLE_ADMIN_ACCOUNTS` gates.
+Hidden is a listing concept, not a security boundary: operational tools stay callable at all times (existing prompts that call tools directly keep working), and write-control + OAuth scopes remain the real enforcement. Use `GOOGLE_TOOLSETS` to switch entire services off — it is a filter only: listing `slides`/`forms`/`chat`/`admin` does not enable them without their `GOOGLE_OPTIONAL_SCOPES` / `GOOGLE_ADMIN_ACCOUNTS` gates.
 
 ## Multi-account: fan out one call across accounts
 
@@ -100,7 +100,7 @@ Fan-out is **read-only by design** (write tools take exactly one account), and t
 
 ## Escape hatch: any Workspace REST method
 
-Two eager tools cover everything the curated set doesn't: `google_api_search` finds any method in Google's API Discovery index (including APIs with no dedicated tools here, like Slides), and `google_api_call` invokes a method by its Discovery id (`drive.revisions.list`, `slides.presentations.create`, …) with path/query params and a JSON body. Calls run through your account's OAuth client and the **same write-control policy** as named tools: the read/create/update/delete class is derived from the method's HTTP verb and name (POST deletes like `batchDelete`/`clear` count as deletes), and policy globs/`GOOGLE_TOOLSETS` match the same service names as named tools (`people` counts as `contacts`, `admin_*` as `admin`; `slides`/`driveactivity`/`drivelabels`/`groupssettings` have no named service and are always available).
+Two eager tools cover everything the curated set doesn't: `google_api_search` finds any method in Google's API Discovery index (including APIs with no dedicated tools here, like Drive Activity), and `google_api_call` invokes a method by its Discovery id (`drive.revisions.list`, `slides.presentations.create`, …) with path/query params and a JSON body. Calls run through your account's OAuth client and the **same write-control policy** as named tools: the read/create/update/delete class is derived from the method's HTTP verb and name (POST deletes like `batchDelete`/`clear` count as deletes), and policy globs/`GOOGLE_TOOLSETS` match the same service names as named tools (`people` counts as `contacts`, `admin_*` as `admin`; `driveactivity`/`drivelabels`/`groupssettings` have no named service and are always available).
 
 Discovery documents are fetched from Google on first use and cached on disk for 7 days (`DISCOVERY_CACHE_PATH`, default `~/.config/mcp-google-multi/discovery`); a stale cache is used when offline.
 
@@ -126,12 +126,12 @@ Reads are never gated. **Every create/update/delete is off until you opt in** �
 
 ## What's covered
 
-~170 tools across Gmail, Drive, Calendar, Sheets, Docs, Contacts, Search Console, Tasks, Meet, and (optional) Forms, Chat, Workspace Admin. **Full per-tool list → [COVERAGE.md](./COVERAGE.md).** Every tool takes an `account` argument matching one of your aliases.
+~175 tools across Gmail, Drive, Calendar, Sheets, Docs, Contacts, Search Console, Tasks, Meet, and (optional) Slides, Forms, Chat, Workspace Admin. **Full per-tool list → [COVERAGE.md](./COVERAGE.md).** Every tool takes an `account` argument matching one of your aliases.
 
 ## Google Cloud setup
 
 1. [Google Cloud Console](https://console.cloud.google.com) → create or select a project.
-2. Enable the APIs you'll use: Gmail, Drive, Calendar, Sheets, Docs, People, Search Console, Tasks, Meet (+ Forms / Chat / Admin SDK if you enable those bundles).
+2. Enable the APIs you'll use: Gmail, Drive, Calendar, Sheets, Docs, People, Search Console, Tasks, Meet (+ Slides / Forms / Chat / Admin SDK if you enable those bundles).
 3. **APIs & Services → Credentials → Create Credentials → OAuth client ID → Desktop app**.
 4. Add the redirect URI `http://localhost:4242/oauth2callback`.
 5. Copy the **Client ID** + **Client Secret** into your environment.

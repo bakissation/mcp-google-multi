@@ -15,6 +15,7 @@ import { registerContactsTools } from './tools/contacts.js';
 import { registerSearchConsoleTools } from './tools/searchconsole.js';
 import { registerTasksTools } from './tools/tasks.js';
 import { registerMeetTools } from './tools/meet.js';
+import { registerSlidesTools } from './tools/slides.js';
 import { registerFormsTools } from './tools/forms.js';
 import { registerChatTools } from './tools/chat.js';
 import { registerAdminTools } from './tools/admin.js';
@@ -43,6 +44,7 @@ const SERVICES: Array<{
   { name: 'searchconsole', register: registerSearchConsoleTools },
   { name: 'tasks', register: registerTasksTools },
   { name: 'meet', register: registerMeetTools },
+  { name: 'slides', register: registerSlidesTools, enabled: () => new Set(getOptionalBundles()).has('slides') },
   { name: 'forms', register: registerFormsTools, enabled: () => new Set(getOptionalBundles()).has('forms') },
   { name: 'chat', register: registerChatTools, enabled: () => new Set(getOptionalBundles()).has('chat') },
   { name: 'admin', register: registerAdminTools, enabled: () => getAdminAccounts().length > 0 },
@@ -74,7 +76,7 @@ function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
     throw new Error(
       `GOOGLE_TOOLSETS="${process.env.GOOGLE_TOOLSETS ?? ''}" selected no enabled services. ` +
         `Known services: ${SERVICES.map((s) => s.name).join(', ')}. ` +
-        `Note: forms/chat require GOOGLE_OPTIONAL_SCOPES, admin requires GOOGLE_ADMIN_ACCOUNTS.`,
+        `Note: slides/forms/chat require GOOGLE_OPTIONAL_SCOPES, admin requires GOOGLE_ADMIN_ACCOUNTS.`,
     );
   }
   registerDiscoverTools(registry, policy);

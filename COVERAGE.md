@@ -2,7 +2,7 @@
 
 Every tool takes an `account` argument matching one of your `GOOGLE_ACCOUNTS` aliases — and on read tools (except the three that save files locally: `drive_download`, `drive_export`, `gmail_download_attachment`) it also accepts `"*"` or a CSV subset for **[cross-account fan-out](./README.md#multi-account-fan-out-one-call-across-accounts)**. **Create / update / delete tools are gated by [write-control](./README.md#write-control-deny-by-default)** — deny-by-default; reads are always available. Run `mcp-google-multi config check` to see exactly which CUD tools your current profile enables. `account_list` (always visible) reports each alias's email, token health, and scopes.
 
-~170 tools across the services below. Tools load **[discover-first](./README.md#discover-first-tools-tiny-idle-context)**: each service also exposes a `{service}_discover` meta-tool, and only those appear in `tools/list` until discovered (everything stays directly callable). `GOOGLE_TOOLSETS` can switch whole services off. Anything not listed below is reachable through the **[escape hatch](./README.md#escape-hatch-any-workspace-rest-method)** (`google_api_search` + `google_api_call`). (Codegen'd dedicated tools for the long tail are on the [roadmap](https://github.com/bakissation/mcp-google-multi/milestones).)
+~175 tools across the services below. Tools load **[discover-first](./README.md#discover-first-tools-tiny-idle-context)**: each service also exposes a `{service}_discover` meta-tool, and only those appear in `tools/list` until discovered (everything stays directly callable). `GOOGLE_TOOLSETS` can switch whole services off. Anything not listed below is reachable through the **[escape hatch](./README.md#escape-hatch-any-workspace-rest-method)** (`google_api_search` + `google_api_call`). (Codegen'd dedicated tools for the long tail are on the [roadmap](https://github.com/bakissation/mcp-google-multi/milestones).)
 
 ## Gmail
 
@@ -134,11 +134,24 @@ Every tool takes an `account` argument matching one of your `GOOGLE_ACCOUNTS` al
 | `meet_conference_records_list` / `meet_conference_record_get` | Past Meet sessions |
 | `meet_recordings_list` / `meet_transcripts_list` / `meet_transcript_entries_list` | Recordings & transcripts |
 
+## Google Slides — optional bundle (`GOOGLE_OPTIONAL_SCOPES=slides`)
+
+| Tool | Description |
+|------|-------------|
+| `slides_create` | Create a presentation |
+| `slides_get` | Compact summary (per-slide objectId + text digest); `full: true` for raw JSON |
+| `slides_page_get` | Full JSON of one slide/page |
+| `slides_page_thumbnail` | Rendered thumbnail URL for one slide |
+| `slides_batch_update` | Generic batchUpdate escape hatch |
+
 ## Google Forms — optional bundle (`GOOGLE_OPTIONAL_SCOPES=forms`)
 
 | Tool | Description |
 |------|-------------|
 | `forms_get` / `forms_responses_list` / `forms_response_get` / `forms_watches_list` | Form + responses (read) |
+| `forms_create` | Create a form (add questions with `forms_batch_update`) |
+| `forms_batch_update` | Generic batchUpdate escape hatch (questions, info, settings) |
+| `forms_set_publish_settings` | Publish/unpublish, toggle accepting responses |
 
 ## Google Chat — optional bundle (`GOOGLE_OPTIONAL_SCOPES=chat`)
 
