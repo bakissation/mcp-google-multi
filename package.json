@@ -55,7 +55,8 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "gen:discovery": "tsx scripts/fetch-discovery.ts"
+    "gen:discovery": "tsx scripts/fetch-discovery.ts",
+    "gen:tools": "tsx scripts/gen-tools.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
