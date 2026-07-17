@@ -759,7 +759,7 @@ Optional scope bundles: `appsmarket`, `chat`, `classroom`, `cloudidentity`, `clo
 | `gmail_list_labels` | curated | read | List all Gmail labels (system and user-defined). Use to get label IDs for gmail_modify_labels. |
 | `gmail_modify_labels` | curated | update | Add or remove labels on a Gmail message. Use system label IDs like STARRED, UNREAD, INBOX, TRASH, or custom label IDs fr |
 | `gmail_read` | curated | read | Read a full Gmail message by ID (body capped at 50k chars unless full=true) |
-| `gmail_read_thread` | curated | read | Read all messages in a Gmail thread (bodies capped at 50k chars each unless full=true) |
+| `gmail_read_thread` | curated | read | Read all messages in a Gmail thread (bodies capped at 50k chars each unless full=true). mode=summary returns headers + s |
 | `gmail_search` | curated | read | Search messages in a Gmail account |
 | `gmail_send` | curated | create | Send an email from a Gmail account |
 | `gmail_send_draft` | curated | create | Send an existing Gmail draft by its draft ID |
