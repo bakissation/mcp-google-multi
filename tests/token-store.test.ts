@@ -133,6 +133,87 @@ describe('token-store crypto', () => {
     expect(fs.readFileSync(lock, 'utf8')).toBe('12345');
   });
 
+  it('retries the token rename through transient sharing violations', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+
+    const originalRename = fs.renameSync.bind(fs);
+    let failures = 0;
+    const spy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (failures < 2) {
+        failures++;
+        const err = new Error('EPERM: operation not permitted, rename') as NodeJS.ErrnoException;
+        err.code = 'EPERM';
+        throw err;
+      }
+      return originalRename(from, to);
+    });
+
+    writeToken('test', sample);
+
+    expect(spy).toHaveBeenCalledTimes(3);
+    expect(readToken('test')).toEqual(sample);
+  });
+
+  it('gives up on the rename after bounded attempts', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+
+    const spy = vi.spyOn(fs, 'renameSync').mockImplementation(() => {
+      const err = new Error('EBUSY: resource busy or locked, rename') as NodeJS.ErrnoException;
+      err.code = 'EBUSY';
+      throw err;
+    });
+
+    expect(() => writeToken('test', sample)).toThrow(/EBUSY/);
+    expect(spy).toHaveBeenCalledTimes(5);
+    expect(readToken('test')).toBeNull();
+  });
+
+  it('does not retry the rename on non-transient errors', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+
+    const spy = vi.spyOn(fs, 'renameSync').mockImplementation(() => {
+      const err = new Error('ENOENT: no such file or directory, rename') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    });
+
+    expect(() => writeToken('test', sample)).toThrow(/ENOENT/);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let tmp cleanup failures mask the rename error', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+
+    vi.spyOn(fs, 'renameSync').mockImplementation(() => {
+      const err = new Error('EBUSY: resource busy or locked, rename') as NodeJS.ErrnoException;
+      err.code = 'EBUSY';
+      throw err;
+    });
+    const originalRm = fs.rmSync.bind(fs);
+    vi.spyOn(fs, 'rmSync').mockImplementation((target, options) => {
+      if (String(target).endsWith('.tmp')) {
+        const err = new Error('EPERM: operation not permitted, unlink') as NodeJS.ErrnoException;
+        err.code = 'EPERM';
+        throw err;
+      }
+      return originalRm(target, options);
+    });
+
+    expect(() => writeToken('test', sample)).toThrow(/EBUSY/);
+  });
+
   it('merges refresh updates with the latest token inside the store boundary', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
     cleanupDirs.push(dir);

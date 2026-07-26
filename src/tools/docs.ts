@@ -6,28 +6,134 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
+import { capText } from '../trim.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
 function extractPlainText(body: any): string {
+  return extractPlainTextInRange(body, 0, Infinity);
+}
+
+export function extractPlainTextInRange(body: any, start: number, end: number): string {
   if (!body?.content) return '';
   let text = '';
   for (const element of body.content) {
+    const es = element.startIndex ?? 0;
+    const ee = element.endIndex ?? Infinity;
+    if (ee <= start || es >= end) continue;
     if (element.paragraph) {
       for (const pe of element.paragraph.elements ?? []) {
-        if (pe.textRun?.content) {
-          text += pe.textRun.content;
-        }
+        const run = pe.textRun?.content;
+        if (!run) continue;
+        const ps = pe.startIndex ?? es;
+        const from = Math.max(0, start - ps);
+        const to = Math.min(run.length, end - ps);
+        if (to > from) text += run.slice(from, to);
       }
     } else if (element.table) {
       for (const row of element.table.tableRows ?? []) {
         for (const cell of row.tableCells ?? []) {
-          text += extractPlainText(cell);
+          text += extractPlainTextInRange(cell, start, end);
         }
       }
     }
   }
   return text;
+}
+
+const HEADING_RANKS: Record<string, number> = {
+  TITLE: 0,
+  HEADING_1: 1,
+  HEADING_2: 2,
+  HEADING_3: 3,
+  HEADING_4: 4,
+  HEADING_5: 5,
+  HEADING_6: 6,
+};
+
+export type HeadingLevel = 'title' | 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface HeadingEntry {
+  i: number;
+  level: HeadingLevel;
+  text: string;
+  startIndex: number;
+  endIndex: number;
+}
+
+export function buildHeadingIndex(body: any): HeadingEntry[] {
+  const found: { rank: number; text: string; startIndex: number }[] = [];
+  let docEnd = 0;
+  const walk = (b: any) => {
+    if (!b?.content) return;
+    for (const element of b.content) {
+      if (typeof element.endIndex === 'number' && element.endIndex > docEnd) docEnd = element.endIndex;
+      if (element.paragraph) {
+        const rank = HEADING_RANKS[element.paragraph.paragraphStyle?.namedStyleType ?? ''];
+        if (rank !== undefined) {
+          let text = '';
+          for (const pe of element.paragraph.elements ?? []) {
+            if (pe.textRun?.content) text += pe.textRun.content;
+          }
+          found.push({ rank, text: text.trim(), startIndex: element.startIndex ?? 0 });
+        }
+      } else if (element.table) {
+        for (const row of element.table.tableRows ?? []) {
+          for (const cell of row.tableCells ?? []) walk(cell);
+        }
+      }
+    }
+  };
+  walk(body);
+  return found.map((h, i) => {
+    let endIndex = docEnd;
+    for (let j = i + 1; j < found.length; j++) {
+      if (found[j].rank <= h.rank) {
+        endIndex = found[j].startIndex;
+        break;
+      }
+    }
+    return {
+      i,
+      level: (h.rank === 0 ? 'title' : h.rank) as HeadingLevel,
+      text: h.text,
+      startIndex: h.startIndex,
+      endIndex,
+    };
+  });
+}
+
+export type HeadingResolution =
+  | { match: HeadingEntry }
+  | { error: 'not_found' | 'ambiguous'; candidates: HeadingEntry[] };
+
+export function resolveHeading(headings: HeadingEntry[], query: string): HeadingResolution {
+  const q = query.trim().toLowerCase();
+  const exact = headings.filter((h) => h.text.toLowerCase() === q);
+  if (exact.length === 1) return { match: exact[0] };
+  if (exact.length > 1) return { error: 'ambiguous', candidates: exact };
+  const partial = headings.filter((h) => h.text.toLowerCase().includes(q));
+  if (partial.length === 1) return { match: partial[0] };
+  if (partial.length > 1) return { error: 'ambiguous', candidates: partial };
+  return { error: 'not_found', candidates: headings };
+}
+
+export function findTab(tabs: any[] | undefined, tabId: string): any | undefined {
+  for (const tab of tabs ?? []) {
+    if (tab.tabProperties?.tabId === tabId) return tab;
+    const nested = findTab(tab.childTabs, tabId);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
+export function listTabs(tabs: any[] | undefined): { tabId: string; title: string }[] {
+  const out: { tabId: string; title: string }[] = [];
+  for (const tab of tabs ?? []) {
+    out.push({ tabId: tab.tabProperties?.tabId ?? '', title: tab.tabProperties?.title ?? '' });
+    out.push(...listTabs(tab.childTabs));
+  }
+  return out;
 }
 
 export function registerDocsTools(server: ToolRegistry): void {
@@ -103,23 +209,105 @@ export function registerDocsTools(server: ToolRegistry): void {
   server.registerTool(
     'docs_read',
     {
-      description: 'Read document content as plain text',
+      description: 'Read document content as plain text with a heading index (returns up to maxChars characters per call). Pass heading or headingIndex to read one section, tabId to read a specific tab.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         documentId: z.string().describe('Google Docs document ID'),
+        heading: z.string().optional()
+          .describe('Read only the section under this heading (case-insensitive; exact match first, then substring)'),
+        headingIndex: z.number().int().min(0).optional()
+          .describe('Read only the section at this position in the headings array (the `i` field)'),
+        tabId: z.string().optional()
+          .describe('Read a specific tab instead of the first tab'),
+        maxChars: z.number().min(1).max(2_000_000).default(50_000).optional()
+          .describe('Max characters of text to return (default: 50000)'),
+        offset: z.number().min(0).default(0).optional()
+          .describe('Character offset to continue a truncated read'),
       },
     },
-    async ({ account, documentId }) => {
+    async ({ account, documentId, heading, headingIndex, tabId, maxChars, offset }) => {
       try {
+        if (heading !== undefined && headingIndex !== undefined) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({
+              error: 'invalid_params',
+              message: 'Provide either heading or headingIndex, not both',
+            }, null, 2) }],
+            isError: true,
+          };
+        }
         const auth = await getClient(account as Account);
         const docs = google.docs({ version: 'v1', auth });
-        const res = await docs.documents.get({ documentId });
-        const text = extractPlainText(res.data.body);
+        const res = await docs.documents.get({
+          documentId,
+          ...(tabId !== undefined ? { includeTabsContent: true } : {}),
+        });
+
+        let body = res.data.body;
+        if (tabId !== undefined) {
+          const tab = findTab(res.data.tabs as any[], tabId);
+          if (!tab) {
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify({
+                error: 'not_found',
+                message: `Tab "${tabId}" not found in document ${documentId}`,
+                availableTabs: listTabs(res.data.tabs as any[]),
+              }, null, 2) }],
+              isError: true,
+            };
+          }
+          body = tab.documentTab?.body;
+        }
+
+        const headings = buildHeadingIndex(body);
+
+        let section: HeadingEntry | undefined;
+        if (headingIndex !== undefined) {
+          section = headings[headingIndex];
+          if (!section) {
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify({
+                error: 'invalid_params',
+                message: `headingIndex ${headingIndex} is out of range (document has ${headings.length} headings)`,
+                headings: headings.map(({ i, level, text }) => ({ i, level, text })),
+              }, null, 2) }],
+              isError: true,
+            };
+          }
+        } else if (heading !== undefined) {
+          const resolved = resolveHeading(headings, heading);
+          if ('error' in resolved) {
+            return {
+              content: [{ type: 'text' as const, text: JSON.stringify({
+                error: resolved.error === 'ambiguous' ? 'ambiguous_heading' : 'not_found',
+                message: resolved.error === 'ambiguous'
+                  ? `Heading "${heading}" matches multiple headings; use headingIndex to disambiguate`
+                  : `Heading "${heading}" not found in document ${documentId}`,
+                candidates: resolved.candidates.map(({ i, level, text }) => ({ i, level, text })),
+              }, null, 2) }],
+              isError: true,
+            };
+          }
+          section = resolved.match;
+        }
+
+        const text = section
+          ? extractPlainTextInRange(body, section.startIndex, section.endIndex)
+          : extractPlainText(body);
+        const from = offset ?? 0;
+        const capped = capText(text, maxChars ?? 50_000, from);
+
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             documentId: res.data.documentId,
             title: res.data.title,
-            text,
+            ...(tabId !== undefined ? { tabId } : {}),
+            headings: headings.map(({ i, level, text: t }) => ({ i, level, text: t })),
+            ...(section ? { section: { i: section.i, level: section.level, text: section.text } } : {}),
+            text: capped.text,
+            ...(capped.truncated || from > 0
+              ? { truncated: capped.truncated, totalChars: capped.totalChars, offset: from }
+              : {}),
           }, null, 2) }],
         };
       } catch (error: any) {

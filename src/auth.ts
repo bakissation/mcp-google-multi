@@ -10,7 +10,7 @@ import { writeToken } from './token-store.js';
 // ─── Scope tiers ────────────────────────────────────────────────────────
 //
 // BASE: always granted. Existing v3 surface + Tasks + Meet (added in v4.0.0).
-// OPTIONAL: per-account opt-in via env GOOGLE_OPTIONAL_SCOPES="forms,chat".
+// OPTIONAL: per-account opt-in via env GOOGLE_OPTIONAL_SCOPES="slides,forms,chat".
 // ADMIN: per-account opt-in via env GOOGLE_ADMIN_ACCOUNTS="alias1,alias2".
 //
 // Personal Gmail accounts will 403 on admin scopes — never grant by default.
@@ -30,6 +30,9 @@ export const BASE_SCOPES = [
 ];
 
 export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
+  slides: [
+    'https://www.googleapis.com/auth/presentations',
+  ],
   forms: [
     'https://www.googleapis.com/auth/forms.body',
     'https://www.googleapis.com/auth/forms.responses.readonly',
@@ -39,6 +42,39 @@ export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
     'https://www.googleapis.com/auth/chat.messages',
     'https://www.googleapis.com/auth/chat.messages.create',
   ],
+  classroom: [
+    'https://www.googleapis.com/auth/classroom.courses',
+    'https://www.googleapis.com/auth/classroom.coursework.me',
+    'https://www.googleapis.com/auth/classroom.coursework.students',
+    'https://www.googleapis.com/auth/classroom.courseworkmaterials',
+    'https://www.googleapis.com/auth/classroom.rosters',
+    'https://www.googleapis.com/auth/classroom.announcements',
+    'https://www.googleapis.com/auth/classroom.topics',
+  ],
+  cloudidentity: [
+    'https://www.googleapis.com/auth/cloud-identity.groups',
+    'https://www.googleapis.com/auth/cloud-identity.devices',
+  ],
+  cloudsearch: ['https://www.googleapis.com/auth/cloud_search'],
+  vault: ['https://www.googleapis.com/auth/ediscovery'],
+  keep: ['https://www.googleapis.com/auth/keep'],
+  driveactivity: ['https://www.googleapis.com/auth/drive.activity.readonly'],
+  drivelabels: [
+    'https://www.googleapis.com/auth/drive.labels',
+    'https://www.googleapis.com/auth/drive.admin.labels',
+  ],
+  script: [
+    'https://www.googleapis.com/auth/script.projects',
+    'https://www.googleapis.com/auth/script.deployments',
+    'https://www.googleapis.com/auth/script.processes',
+    'https://www.googleapis.com/auth/script.metrics',
+  ],
+  postmaster: ['https://www.googleapis.com/auth/postmaster.readonly'],
+  groupssettings: ['https://www.googleapis.com/auth/apps.groups.settings'],
+  groupsmigration: ['https://www.googleapis.com/auth/apps.groups.migration'],
+  licensing: ['https://www.googleapis.com/auth/apps.licensing'],
+  reseller: ['https://www.googleapis.com/auth/apps.order'],
+  appsmarket: ['https://www.googleapis.com/auth/appsmarketplace.license'],
 };
 
 export const ADMIN_SCOPES = [
@@ -88,8 +124,16 @@ export function resolveScopesForAccount(alias: string): string[] {
 export async function runAuthFlow(args: string[]): Promise<void> {
   const accountIdx = args.indexOf('--account');
   if (accountIdx === -1 || !args[accountIdx + 1]) {
-    console.error('Usage: node dist/index.js auth --account <alias>');
+    console.error('Usage: mcp-google-multi auth --account <alias>');
     console.error(`Valid aliases: ${ACCOUNTS.join(', ')}`);
+    process.exit(1);
+  }
+
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    console.error(
+      'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not set. Create an OAuth Desktop client ' +
+        '(see docs/google-cloud-setup.md) and add both to your environment before authenticating.',
+    );
     process.exit(1);
   }
 
@@ -178,6 +222,7 @@ export async function runAuthFlow(args: string[]): Promise<void> {
             (server as any).destroy();
 
             console.log(`Token saved (encrypted) for ${alias}.`);
+            console.log('Next: authenticate your other aliases, then verify with: mcp-google-multi config check');
             resolve();
           }
         } catch (e) {
@@ -189,6 +234,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
       })
       // Bind to loopback only — never expose the OAuth callback to the local network.
       .listen(4242, '127.0.0.1', () => {
+        // Always print the URL: `open` silently no-ops on headless/SSH sessions.
+        console.log(`Opening your browser to authorize "${alias}". If nothing opens, visit:\n${authorizeUrl}`);
         open(authorizeUrl, { wait: false }).then((cp) => cp.unref());
       });
 

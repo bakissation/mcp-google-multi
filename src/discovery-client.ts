@@ -19,7 +19,20 @@ export const WORKSPACE_APIS: Record<string, { id: string; version: string }> = {
   drivelabels: { id: 'drivelabels', version: 'v2' },
   admin_directory: { id: 'admin', version: 'directory_v1' },
   admin_reports: { id: 'admin', version: 'reports_v1' },
+  admin_datatransfer: { id: 'admin', version: 'datatransfer_v1' },
   groupssettings: { id: 'groupssettings', version: 'v1' },
+  appsmarket: { id: 'appsmarket', version: 'v2' },
+  classroom: { id: 'classroom', version: 'v1' },
+  cloudidentity: { id: 'cloudidentity', version: 'v1' },
+  cloudsearch: { id: 'cloudsearch', version: 'v1' },
+  groupsmigration: { id: 'groupsmigration', version: 'v1' },
+  keep: { id: 'keep', version: 'v1' },
+  licensing: { id: 'licensing', version: 'v1' },
+  postmaster: { id: 'gmailpostmastertools', version: 'v1' },
+  reseller: { id: 'reseller', version: 'v1' },
+  script: { id: 'script', version: 'v1' },
+  vault: { id: 'vault', version: 'v1' },
+  workspaceevents: { id: 'workspaceevents', version: 'v1' },
 };
 
 export interface DiscoveryParam {

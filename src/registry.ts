@@ -28,6 +28,10 @@ interface ToolConfig {
   description?: string;
   inputSchema?: z.ZodRawShape;
   annotations?: Record<string, unknown>;
+  // Generated tools pass the cud computed from HTTP semantics at gen time —
+  // Discovery verbs (undeploy, wipeout, …) are open-ended, so name inference
+  // alone would let writes slip past write-control. Curated tools omit it.
+  cud?: Cud;
 }
 
 const CUD_OVERRIDES: Record<string, Cud> = {
@@ -76,7 +80,7 @@ export class ToolRegistry {
     this.registerTool = ((name: string, config: ToolConfig, handler: (...a: unknown[]) => unknown) => {
       const service =
         SERVICE_OVERRIDES[name] ?? (name.includes('_') ? name.slice(0, name.indexOf('_')) : name);
-      const cud = inferCud(name);
+      const cud = config.cud ?? inferCud(name);
       // destructiveHint=false claims "additive only" (MCP spec) — updates overwrite, so they stay true.
       const annotations = {
         readOnlyHint: cud === 'read',
@@ -118,7 +122,8 @@ export class ToolRegistry {
       const finalHandler = this.compactOutput
         ? async (...args: unknown[]) => compactResult(await (guarded(...args) as Promise<Parameters<typeof compactResult>[0]>))
         : guarded;
-      return (server.registerTool as (...a: unknown[]) => unknown)(name, { ...config, inputSchema: inputShape, annotations }, finalHandler);
+      const { cud: _cud, ...sdkConfig } = config;
+      return (server.registerTool as (...a: unknown[]) => unknown)(name, { ...sdkConfig, inputSchema: inputShape, annotations }, finalHandler);
     }) as McpServer['registerTool'];
   }
 

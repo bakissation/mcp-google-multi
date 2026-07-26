@@ -6,19 +6,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { registerGmailTools } from './tools/gmail.js';
-import { registerDriveTools } from './tools/drive.js';
-import { registerCalendarTools } from './tools/calendar.js';
-import { registerSheetsTools } from './tools/sheets.js';
-import { registerDocsTools } from './tools/docs.js';
-import { registerContactsTools } from './tools/contacts.js';
-import { registerSearchConsoleTools } from './tools/searchconsole.js';
-import { registerTasksTools } from './tools/tasks.js';
-import { registerMeetTools } from './tools/meet.js';
-import { registerFormsTools } from './tools/forms.js';
-import { registerChatTools } from './tools/chat.js';
-import { registerAdminTools } from './tools/admin.js';
-import { getOptionalBundles, getAdminAccounts } from './auth.js';
+import { GENERATED_SERVICES } from './tools/generated/index.js';
+import { GENERATED_GATES, SERVICES } from './services.js';
 import { ToolRegistry } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
@@ -29,30 +18,11 @@ import { resolvePolicy, isAllowed, describePolicy, type Policy } from './write-c
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
 
-const SERVICES: Array<{
-  name: string;
-  register: (registry: ToolRegistry) => void;
-  enabled?: () => boolean;
-}> = [
-  { name: 'gmail', register: registerGmailTools },
-  { name: 'drive', register: registerDriveTools },
-  { name: 'calendar', register: registerCalendarTools },
-  { name: 'sheets', register: registerSheetsTools },
-  { name: 'docs', register: registerDocsTools },
-  { name: 'contacts', register: registerContactsTools },
-  { name: 'searchconsole', register: registerSearchConsoleTools },
-  { name: 'tasks', register: registerTasksTools },
-  { name: 'meet', register: registerMeetTools },
-  { name: 'forms', register: registerFormsTools, enabled: () => new Set(getOptionalBundles()).has('forms') },
-  { name: 'chat', register: registerChatTools, enabled: () => new Set(getOptionalBundles()).has('chat') },
-  { name: 'admin', register: registerAdminTools, enabled: () => getAdminAccounts().length > 0 },
-];
-
 function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
   const registry = new ToolRegistry(server, policy);
   const toolsets = getToolsets();
   if (toolsets !== 'all') {
-    const known = new Set(SERVICES.map((s) => s.name));
+    const known = new Set([...SERVICES.map((s) => s.name), ...GENERATED_SERVICES.map((s) => s.name)]);
     for (const requested of toolsets) {
       if (!known.has(requested)) {
         process.stderr.write(`GOOGLE_TOOLSETS: unknown service "${requested}" ignored\n`);
@@ -70,11 +40,24 @@ function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
     }
     svc.register(registry);
   }
+  for (const gen of GENERATED_SERVICES) {
+    if (!toolsetEnabled(toolsets, gen.name)) continue;
+    const curated = SERVICES.find((s) => s.name === gen.name);
+    const gate = curated?.enabled ?? GENERATED_GATES[gen.name]?.enabled;
+    if (gate && !gate()) {
+      if (!curated && toolsets !== 'all') {
+        process.stderr.write(`GOOGLE_TOOLSETS: "${gen.name}" requested but not enabled — ${GENERATED_GATES[gen.name].hint}\n`);
+      }
+      continue;
+    }
+    gen.register(registry);
+  }
   if (registry.services().length === 0) {
+    const known = [...new Set([...SERVICES.map((s) => s.name), ...GENERATED_SERVICES.map((s) => s.name)])].sort();
     throw new Error(
       `GOOGLE_TOOLSETS="${process.env.GOOGLE_TOOLSETS ?? ''}" selected no enabled services. ` +
-        `Known services: ${SERVICES.map((s) => s.name).join(', ')}. ` +
-        `Note: forms/chat require GOOGLE_OPTIONAL_SCOPES, admin requires GOOGLE_ADMIN_ACCOUNTS.`,
+        `Known services: ${known.join(', ')}. ` +
+        `Note: optional services require their bundle in GOOGLE_OPTIONAL_SCOPES, admin requires GOOGLE_ADMIN_ACCOUNTS.`,
     );
   }
   registerDiscoverTools(registry, policy);
@@ -107,7 +90,18 @@ async function main() {
     const counts = registry.visibleCount();
     console.log(`Write-control: ${describePolicy(policy)}`);
     console.log(`CUD tools enabled: ${cud.length - disabled.length}/${cud.length}`);
-    console.log(`Disabled: ${disabled.map((t) => t.name).join(', ') || '(none)'}`);
+    // At full-coverage scale, a flat name dump is unreadable — summarize per
+    // service unless the list is short.
+    let disabledLine = '(none)';
+    if (disabled.length > 0 && disabled.length <= 20) {
+      disabledLine = disabled.map((t) => t.name).join(', ');
+    } else if (disabled.length > 20) {
+      const perService = new Map<string, number>();
+      for (const t of disabled) perService.set(t.service, (perService.get(t.service) ?? 0) + 1);
+      const summary = [...perService.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([s, n]) => `${s} ${n}`).join(', ');
+      disabledLine = `${disabled.length} write tools (${summary}) — enable via GOOGLE_PROFILE / GOOGLE_WRITE_ALLOW`;
+    }
+    console.log(`Disabled: ${disabledLine}`);
     console.log(`Services: ${registry.services().join(', ')}`);
     console.log(`Tool surface: ${counts.eager} eager (discover + escape hatch), ${counts.hidden} deferred until discovery`);
     console.log(`Escape hatch: google_api_call CUD verdicts follow profile=${policy.profile} and your allow/deny globs`);

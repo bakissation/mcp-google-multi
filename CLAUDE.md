@@ -59,6 +59,15 @@ server.registerTool(
 3. Wire into `buildRegistry()` (`index.ts`).
 4. Update `COVERAGE.md` + `README.md`.
 
+## Generated tools (Layer 2)
+
+- `src/tools/generated/*.ts` are EMITTED by `npm run gen:tools` from the `discovery/` snapshot (`npm run gen:discovery` refreshes it) — **never hand-edit**; change `scripts/gen-config.ts` (curated skip-list, NAME/CUD/DESCRIPTION overrides) and regenerate.
+- When a new curated tool covers a Discovery method, append the methodId to `CURATED_METHOD_IDS` and regenerate so the generated duplicate disappears; the generator fails the build on name collisions with curated tools.
+- Generated tools pass an explicit `cud` (derived from HTTP semantics) through the registry config — the only sanctioned use of `config.cud`; curated tools keep name-verb inference.
+- They dispatch through `executeApiMethod` (`src/executor.ts`) with method metadata baked at gen time; the escape hatch shares the same executor (no runtime discovery fetch for generated tools).
+- A new generated-only service needs: a `GEN_APIS` entry, an optional-scope bundle in `auth.ts` + `GENERATED_GATES` entry in `services.ts` (or ungated when it authorizes via already-granted resource scopes), and a `WORKSPACE_APIS` alias for escape-hatch/policy parity.
+- `npm run gen:coverage` regenerates COVERAGE.md from the registry — run it whenever the tool surface changes.
+
 ## Auth / tokens
 
 - Tokens are **encrypted at rest** — never write plaintext. `MASTER_KEY` is required; it lives only in env (never in the store, never logged).
