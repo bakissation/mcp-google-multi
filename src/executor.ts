@@ -59,6 +59,21 @@ export async function executeApiMethod(method: ApiMethodRef, args: ExecuteArgs, 
     );
   }
 
+  // drive.files.export streams binary and, without alt=media, Google returns a confusing
+  // "Export requires alt=media" — either way the escape hatch can't surface the content.
+  if (method.id === 'drive.files.export') {
+    return jsonResult(
+      {
+        error: 'binary_unsupported',
+        message: 'drive.files.export returns binary content, not JSON, through this tool.',
+        hint: 'Use drive_export to export a Google Workspace file to disk.',
+        retriable: false,
+        account: args.account,
+      },
+      true,
+    );
+  }
+
   let url: string;
   try {
     url = method.baseUrl + expandPath(method.path, (args.pathParams as Record<string, string> | undefined) ?? {});
