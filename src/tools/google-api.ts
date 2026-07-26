@@ -123,7 +123,8 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       description:
         'Invoke any Google Workspace REST method by Discovery id (escape hatch for operations without a ' +
         'dedicated tool). Find methods with google_api_search first. Subject to the same write-control ' +
-        'policy as named tools.',
+        'policy as named tools. Returns JSON only — for binary/file content (media downloads, ' +
+        'drive.files.export) use drive_download / drive_export instead.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         api: z.string().describe(`API alias: ${apiList}`),

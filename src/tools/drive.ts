@@ -35,6 +35,28 @@ const COMMENT_LIST_FIELDS = `nextPageToken,comments(${COMMENT_BASE_FIELDS},repli
 const REPLY_FIELDS = `kind,htmlContent,${REPLY_SUBFIELDS}`;
 const REPLY_LIST_FIELDS = `nextPageToken,replies(${REPLY_FIELDS})`;
 
+// basename-sanitize the caller filename (never escapes savePath), create the destination
+// directory if missing (callers otherwise hit ENOENT on a non-existent savePath), and
+// return the absolute path to write.
+export function prepareLocalDest(savePath: string, filename: string): string {
+  const dest = path.join(savePath, path.basename(filename));
+  fs.mkdirSync(savePath, { recursive: true });
+  return dest;
+}
+
+// sendNotificationEmail is only valid for user/group permissions, and Google forbids
+// disabling it on an ownership transfer. Returns undefined to omit the param entirely.
+export function resolveShareNotification(opts: {
+  type: string;
+  role: string;
+  transferOwnership?: boolean;
+  sendNotification?: boolean;
+}): boolean | undefined {
+  if (opts.type !== 'user' && opts.type !== 'group') return undefined;
+  if (opts.transferOwnership || opts.role === 'owner') return true;
+  return opts.sendNotification ?? true;
+}
+
 export function registerDriveTools(server: ToolRegistry): void {
   // ─── Read / search / list ──────────────────────────────────────────────
 
@@ -290,7 +312,7 @@ export function registerDriveTools(server: ToolRegistry): void {
         const auth = await getClient(account as Account);
         const drive = google.drive({ version: 'v3', auth });
 
-        const dest = path.join(savePath, path.basename(filename));
+        const dest = prepareLocalDest(savePath, filename);
         const res = await drive.files.get(
           { fileId, alt: 'media', supportsAllDrives: true },
           { responseType: 'stream' },
@@ -326,7 +348,7 @@ export function registerDriveTools(server: ToolRegistry): void {
         const auth = await getClient(account as Account);
         const drive = google.drive({ version: 'v3', auth });
 
-        const dest = path.join(savePath, path.basename(filename));
+        const dest = prepareLocalDest(savePath, filename);
         const res = await drive.files.export(
           { fileId, mimeType: exportMime },
           { responseType: 'stream' },
@@ -629,9 +651,10 @@ export function registerDriveTools(server: ToolRegistry): void {
         const requestBody: any = { type, role, emailAddress, domain };
         if (expirationTime) requestBody.expirationTime = expirationTime;
 
+        const notify = resolveShareNotification({ type, role, transferOwnership, sendNotification });
         const res = await drive.permissions.create({
           fileId,
-          sendNotificationEmail: sendNotification ?? true,
+          ...(notify === undefined ? {} : { sendNotificationEmail: notify }),
           emailMessage,
           transferOwnership: transferOwnership ?? false,
           supportsAllDrives: true,
