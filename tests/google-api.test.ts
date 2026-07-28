@@ -158,6 +158,33 @@ describe('google_api_call', () => {
     });
   });
 
+  it('drops a caller-supplied empty body on GET reads (undici rejects a GET body)', async () => {
+    const { call, request, dir } = setup(READ_ONLY);
+    cleanupDirs.push(dir);
+    const res = await call({
+      account: 'test',
+      api: 'gmail',
+      methodId: 'gmail.users.messages.list',
+      pathParams: { userId: 'me' },
+      body: {},
+    });
+    expect(res.isError).toBeUndefined();
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ method: 'GET', data: undefined }));
+  });
+
+  it('forwards a real body on write verbs unchanged', async () => {
+    const { call, request, dir } = setup(FULL);
+    cleanupDirs.push(dir);
+    await call({
+      account: 'test',
+      api: 'gmail',
+      methodId: 'gmail.users.messages.batchDelete',
+      pathParams: { userId: 'me' },
+      body: { ids: ['a', 'b'] },
+    });
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST', data: { ids: ['a', 'b'] } }));
+  });
+
   it('serializes repeated query params as repeated keys', async () => {
     const { call, request, dir } = setup(FULL);
     cleanupDirs.push(dir);
