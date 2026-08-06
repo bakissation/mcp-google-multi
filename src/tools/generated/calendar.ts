@@ -9,7 +9,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     name: "calendar_acl_delete",
     cud: "delete",
     description: "Deletes an access control rule.",
-    method: { id: "calendar.acl.delete", httpMethod: "DELETE", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","ruleId"] },
+    method: { id: "calendar.acl.delete", httpMethod: "DELETE", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["ruleId","calendarId"] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"ruleId","api":"ruleId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -23,7 +23,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     name: "calendar_acl_get",
     cud: "read",
     description: "Returns an access control rule.",
-    method: { id: "calendar.acl.get", httpMethod: "GET", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","ruleId"] },
+    method: { id: "calendar.acl.get", httpMethod: "GET", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["ruleId","calendarId"] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"ruleId","api":"ruleId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -69,7 +69,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     name: "calendar_acl_patch",
     cud: "update",
     description: "Updates an access control rule. This method supports patch semantics.",
-    method: { id: "calendar.acl.patch", httpMethod: "PATCH", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["ruleId","calendarId"] },
+    method: { id: "calendar.acl.patch", httpMethod: "PATCH", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","ruleId"] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"ruleId","api":"ruleId","location":"path"},{"field":"sendNotifications","api":"sendNotifications","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -85,7 +85,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     name: "calendar_acl_update",
     cud: "update",
     description: "Updates an access control rule.",
-    method: { id: "calendar.acl.update", httpMethod: "PUT", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["ruleId","calendarId"] },
+    method: { id: "calendar.acl.update", httpMethod: "PUT", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","ruleId"] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"ruleId","api":"ruleId","location":"path"},{"field":"sendNotifications","api":"sendNotifications","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -262,7 +262,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     name: "calendar_calendars_transfer_ownership",
     cud: "create",
     description: "Transfers a secondary calendar between users within a Google Workspace organization. Requires user authentication with Manage Calendars administrator privilege,",
-    method: { id: "calendar.calendars.transferOwnership", httpMethod: "POST", path: "calendars/{calendarId}/transferOwnership", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["newDataOwner","useAdminAccess","calendarId"] },
+    method: { id: "calendar.calendars.transferOwnership", httpMethod: "POST", path: "calendars/{calendarId}/transferOwnership", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","newDataOwner","useAdminAccess"] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"newDataOwner","api":"newDataOwner","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -333,7 +333,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     name: "calendar_events_update",
     cud: "update",
     description: "Updates an event.",
-    method: { id: "calendar.events.update", httpMethod: "PUT", path: "calendars/{calendarId}/events/{eventId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["eventId","calendarId"] },
+    method: { id: "calendar.events.update", httpMethod: "PUT", path: "calendars/{calendarId}/events/{eventId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","eventId"] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"eventId","api":"eventId","location":"path"},{"field":"alwaysIncludeEmail","api":"alwaysIncludeEmail","location":"query"},{"field":"conferenceDataVersion","api":"conferenceDataVersion","location":"query"},{"field":"eventLabelVersion","api":"eventLabelVersion","location":"query"},{"field":"maxAttendees","api":"maxAttendees","location":"query"},{"field":"sendNotifications","api":"sendNotifications","location":"query"},{"field":"sendUpdates","api":"sendUpdates","location":"query"},{"field":"supportsAttachments","api":"supportsAttachments","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

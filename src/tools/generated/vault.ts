@@ -163,7 +163,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_accounts_delete",
     cud: "delete",
     description: "Removes an account from a hold.",
-    method: { id: "vault.matters.holds.accounts.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}/holds/{holdId}/accounts/{accountId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["holdId","matterId","accountId"] },
+    method: { id: "vault.matters.holds.accounts.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}/holds/{holdId}/accounts/{accountId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId","accountId"] },
     params: [{"field":"accountId","api":"accountId","location":"path"},{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -178,7 +178,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_accounts_list",
     cud: "read",
     description: "Lists the accounts covered by a hold. This can list only individually-specified accounts covered by the hold. If the hold covers an organizational unit, use the",
-    method: { id: "vault.matters.holds.accounts.list", httpMethod: "GET", path: "v1/matters/{matterId}/holds/{holdId}/accounts", baseUrl: "https://vault.googleapis.com/", requiredParams: ["holdId","matterId"] },
+    method: { id: "vault.matters.holds.accounts.list", httpMethod: "GET", path: "v1/matters/{matterId}/holds/{holdId}/accounts", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"] },
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -281,7 +281,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_update",
     cud: "update",
     description: "Updates the scope (organizational unit or accounts) and query parameters of a hold. You cannot add accounts to a hold that covers an organizational unit, nor ca",
-    method: { id: "vault.matters.holds.update", httpMethod: "PUT", path: "v1/matters/{matterId}/holds/{holdId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["holdId","matterId"] },
+    method: { id: "vault.matters.holds.update", httpMethod: "PUT", path: "v1/matters/{matterId}/holds/{holdId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"] },
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

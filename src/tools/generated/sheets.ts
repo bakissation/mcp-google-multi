@@ -9,7 +9,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     name: "sheets_spreadsheets_developer_metadata_get",
     cud: "read",
     description: "Returns the developer metadata with the specified ID. The caller must specify the spreadsheet ID and the developer metadata's unique metadataId. For more inform",
-    method: { id: "sheets.spreadsheets.developerMetadata.get", httpMethod: "GET", path: "v4/spreadsheets/{spreadsheetId}/developerMetadata/{metadataId}", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["metadataId","spreadsheetId"] },
+    method: { id: "sheets.spreadsheets.developerMetadata.get", httpMethod: "GET", path: "v4/spreadsheets/{spreadsheetId}/developerMetadata/{metadataId}", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId","metadataId"] },
     params: [{"field":"metadataId","api":"metadataId","location":"path"},{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -51,7 +51,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     name: "sheets_spreadsheets_sheets_copy_to",
     cud: "create",
     description: "Copies a single sheet from a spreadsheet to another spreadsheet. Returns the properties of the newly created sheet.",
-    method: { id: "sheets.spreadsheets.sheets.copyTo", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/sheets/{sheetId}:copyTo", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["sheetId","spreadsheetId"] },
+    method: { id: "sheets.spreadsheets.sheets.copyTo", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/sheets/{sheetId}:copyTo", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId","sheetId"] },
     params: [{"field":"sheetId","api":"sheetId","location":"path"},{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
