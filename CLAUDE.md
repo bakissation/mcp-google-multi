@@ -1,10 +1,10 @@
 # Working on mcp-google-multi
 
-Conventions for AI assistants modifying this codebase. v5 is **local, stdio, user-OAuth only**.
+Conventions for AI assistants modifying this codebase. v5 is **local, stdio, user-OAuth only**. User-facing rationale for the big mechanisms (discover-first, fan-out, trimming, write-control, escape hatch) lives in `docs/features.md`; implementation rationale too long for a code comment (Windows rename retry, GET/HEAD body stripping, admin-scope gating) lives in `docs/internals.md`. Keep both in sync when behavior changes — comments stay one-line and point there.
 
 ## Project shape
 
-- `src/index.ts` — entry. `buildRegistry()` registers every enabled service (the `SERVICES` table, filtered by `GOOGLE_TOOLSETS`), fails fast if `registry.services()` is empty (BEFORE meta tools register — escape tools would mask an empty service set), then `registerDiscoverTools()` + `registerEscapeTools()`; `main()` installs the registry's custom `tools/list` handler and runs the stdio MCP server, or the `auth` / `migrate-tokens` / `config check` CLI commands.
+- `src/index.ts` — entry. `buildRegistry()` registers every enabled service (the curated `SERVICES` table plus `GENERATED_SERVICES`, gates in `src/services.ts`, all filtered by `GOOGLE_TOOLSETS`), fails fast if `registry.services()` is empty (BEFORE meta tools register — escape tools would mask an empty service set), then `registerDiscoverTools()` + `registerEscapeTools()` + `registerAccountTools()`; `main()` installs the registry's custom `tools/list` handler and runs the stdio MCP server, or the `auth` / `migrate-tokens` / `config check` CLI commands.
 - `src/registry.ts` — `ToolRegistry` wraps the MCP server: records `{name, service, cud, description, inputShape, meta}` per tool, derives `cud` (read/create/update/delete) from the tool name via `inferCud`, **enforces write-control** by wrapping every CUD handler, injects computed annotations (`readOnlyHint`/`destructiveHint`), and owns **discover-first visibility**: all tools register eagerly (always callable — graceful dispatch), but the custom `tools/list` handler only advertises meta tools + `reveal()`ed services. `installListHandler()` must run after registration, before connect. Service files still call `server.registerTool(...)` — `server` is now a `ToolRegistry`.
 - `src/discover.ts` — `registerDiscoverTools()`: one eager `{service}_discover` meta-tool per service; returns the catalog (`registry.catalog`), reveals the service, triggers `tools/list_changed`. Never emit `tool_reference` content blocks or top-level `defer_loading` fields — strict SDK clients reject/strip them (verified against SDK 1.29).
 - `src/toolsets.ts` — `GOOGLE_TOOLSETS` parsing (`all` | CSV of service names).
@@ -14,11 +14,11 @@ Conventions for AI assistants modifying this codebase. v5 is **local, stdio, use
 - `src/tools/accounts-tool.ts` — eager `account_list` meta tool + `deriveAccountHealth` (pure, deps-injectable). Reads the token store directly — NEVER `getClient` (would attach refresh listeners). `readToken` throws on decrypt failure (only returns null when missing) — keep the per-account try/catch. Never output token values.
 - `src/trim.ts` — response trimming: `compactResult` (registry re-serializes every JSON text output compactly; `GOOGLE_TRIM=off` opts out — compaction only, never the caps), `capText` (paging caps with truncated/totalChars), `sliceClean` (permanent caps — drops a trailing lone surrogate). Fat readers own their caps: `drive_read` `maxChars`/`offset`, gmail reads 50k body cap + `full` param, `calendar_list_events` AND `calendar_list_instances` list-mode `formatEvent(e, {full:false})`. New fat-payload tools should reuse these helpers.
 - `src/write-control.ts` — `resolvePolicy()` (env → policy) + `isAllowed()` (deny-by-default verdict) + `config check` rendering.
-- `src/token-store.ts` — encrypted token store (AES-256-GCM, key from `MASTER_KEY`); `readToken`/`writeToken` + the `migrate-tokens` source.
+- `src/token-store.ts` — encrypted token store (AES-256-GCM, key from `MASTER_KEY`); `readToken`/`writeToken`/`updateToken`. The `migrate-tokens` CLI lives in `src/migrate-tokens.ts`.
 - `src/auth.ts` — OAuth flow + scope tiers (`BASE_SCOPES` always, `OPTIONAL_SCOPE_BUNDLES` env-gated, `ADMIN_SCOPES` per-account).
-- `src/client.ts` — `getClient(account)`: cached OAuth2Client from the encrypted token; refreshes + re-encrypts.
+- `src/client.ts` — `getClient(account)`: fresh OAuth2Client per call from the encrypted token; its `tokens` listener re-encrypts on refresh (`updateToken`).
 - `src/accounts.ts` — parses `GOOGLE_ACCOUNTS`; token dir defaults to `~/.config/mcp-google-multi/tokens` (override `TOKEN_STORE_PATH`).
-- `src/tools/_errors.ts` — `mapGoogleError` typed taxonomy + per-service `handle<Service>Error` shims.
+- `src/tools/_errors.ts` — `mapGoogleError` typed taxonomy + `handleGoogleApiError` result wrapper; each service file defines its own `handle<Service>Error` shim over it (optionally with a service-specific 403 hint).
 - `src/tools/_coerce.ts` — `coerceArray`/`coerceJson`/`coerceBoolean` for string-encoded client args.
 
 ## Adding a tool
@@ -56,8 +56,8 @@ server.registerTool(
 
 1. `src/tools/<service>.ts` exporting `register<Service>Tools(server: ToolRegistry)`.
 2. Scopes in `auth.ts`: always-on → `BASE_SCOPES` (breaking — forces re-auth → `feat!:`); optional → `OPTIONAL_SCOPE_BUNDLES`; admin → `ADMIN_SCOPES`.
-3. Wire into `buildRegistry()` (`index.ts`).
-4. Update `COVERAGE.md` + `README.md`.
+3. Add a `ServiceEntry` to `SERVICES` (`src/services.ts`), with an `enabled()` gate for optional bundles — `buildRegistry()` picks it up.
+4. Run `npm run gen:coverage` to regenerate `COVERAGE.md` (never hand-edit it), and update the tool/service counts in `README.md` and `docs/features.md`.
 
 ## Generated tools (Layer 2)
 
@@ -72,10 +72,11 @@ server.registerTool(
 
 - Tokens are **encrypted at rest** — never write plaintext. `MASTER_KEY` is required; it lives only in env (never in the store, never logged).
 - Always go through `getClient(account)` (handles refresh + re-encrypt). Token files are `0600`.
+- Secret-injection patterns (why `MASTER_KEY` shouldn't live in `.env` long-term): `docs/secrets.md`.
 
 ## Write-control
 
-Reads are never gated. CUD is **deny-by-default**: `GOOGLE_PROFILE` (read-only / safe-writes / full-writes) + `GOOGLE_READ_ONLY` + `GOOGLE_WRITE_ALLOW`/`DENY` globs. Verdict + precedence in `write-control.ts`, tested in `tests/write-control.test.ts`.
+Reads are never gated. CUD is **deny-by-default**: `GOOGLE_PROFILE` (read-only / safe-writes / full-writes) + `GOOGLE_READ_ONLY` + `GOOGLE_WRITE_ALLOW`/`DENY` globs. Verdict + precedence in `write-control.ts`, tested in `tests/write-control.test.ts`. User-facing env reference: `docs/configuration.md`.
 
 ## Drive specifics
 
@@ -101,7 +102,7 @@ Reads are never gated. CUD is **deny-by-default**: `GOOGLE_PROFILE` (read-only /
 
 ## Don'ts
 
-- No `console.log` from handlers (stdio is the MCP channel) — `process.stderr.write` only.
+- No `console.log` from handlers, and nothing may write to stdout at import time either — stdio is the MCP channel (the dotenv v17 banner corrupted it; `dotenv.config` must keep `quiet: true`, guarded by `tests/stdout-purity.test.ts`). `process.stderr.write` only.
 - Don't hardcode aliases — read `ACCOUNTS` / `ACCOUNT_CONFIG`.
 - Don't bypass `getClient`; don't write plaintext tokens or perms wider than `0o600`.
 - Don't re-implement error mapping or write gating — use the shared helpers.
