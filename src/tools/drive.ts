@@ -35,9 +35,7 @@ const COMMENT_LIST_FIELDS = `nextPageToken,comments(${COMMENT_BASE_FIELDS},repli
 const REPLY_FIELDS = `kind,htmlContent,${REPLY_SUBFIELDS}`;
 const REPLY_LIST_FIELDS = `nextPageToken,replies(${REPLY_FIELDS})`;
 
-// basename-sanitize the caller filename (never escapes savePath), create the destination
-// directory if missing (callers otherwise hit ENOENT on a non-existent savePath), and
-// return the absolute path to write.
+// path.basename() is a traversal guard — a caller-supplied filename must never escape savePath.
 export function prepareLocalDest(savePath: string, filename: string): string {
   const dest = path.join(savePath, path.basename(filename));
   fs.mkdirSync(savePath, { recursive: true });

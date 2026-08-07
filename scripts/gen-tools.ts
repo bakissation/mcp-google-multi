@@ -4,9 +4,7 @@ import { buildMethodIndex, cudFromMethod, type DiscoveryMethod, type DiscoveryPa
 import type { Cud } from '../src/registry.js';
 import { CURATED_METHOD_IDS, CUD_OVERRIDES, DESCRIPTION_OVERRIDES, GEN_APIS, NAME_OVERRIDES, type GenApi } from './gen-config.js';
 
-// Coverage generator: discovery snapshot -> src/tools/generated/<service>.ts.
-// Usage: npm run gen:tools [service ...]   (no args = all configured services)
-// Output is deterministic; generated files are never hand-edited.
+// npm run gen:tools [service ...] — emits deterministic src/tools/generated/<service>.ts from the discovery/ snapshot; never hand-edit output.
 
 const MAX_TOOL_NAME = 64;
 const RESERVED_FIELDS = new Set(['account', 'body']);

@@ -45,11 +45,7 @@ export function buildQueryString(queryParams: QueryParams | undefined): string {
   return usp.toString();
 }
 
-// GET/HEAD must never carry a request body: no Google Discovery GET/HEAD method
-// declares a request schema, and undici/fetch throw ("Request with GET/HEAD method
-// cannot have body") if one is attached. gaxios stringifies any object `data`
-// without checking the verb, so a caller-supplied `{}` on a read would otherwise
-// crash the request. Write verbs keep prior semantics: null/undefined -> no body.
+// GET/HEAD bodies are stripped — undici rejects them and gaxios attaches `data` regardless of verb (docs/internals.md).
 export function resolveRequestBody(httpMethod: string, body: unknown): unknown {
   const verb = httpMethod.toUpperCase();
   if (verb === 'GET' || verb === 'HEAD') return undefined;

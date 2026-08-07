@@ -5,9 +5,8 @@ import { homedir } from 'node:os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// quiet: dotenv v17 prints a banner to stdout by default, which corrupts the
-// stdio JSON-RPC channel (DOTENV_CONFIG_QUIET can't help — it would be read
-// from .env after config() already ran).
+// dotenv v17 prints a banner to stdout, corrupting the stdio JSON-RPC channel;
+// DOTENV_CONFIG_QUIET cannot help, it would be read from .env after config() ran.
 dotenv.config({ quiet: true });
 dotenv.config({ path: path.resolve(__dirname, '..', '.env'), quiet: true });
 
@@ -26,11 +25,7 @@ export interface AccountConfig {
   encPath: string;
 }
 
-/**
- * Parse accounts from the GOOGLE_ACCOUNTS env var.
- * Format: "alias1:email1,alias2:email2,..."
- * Example: "work:me@company.com,personal:me@gmail.com"
- */
+/** Format: GOOGLE_ACCOUNTS="alias1:email1,alias2:email2". */
 function parseAccounts(): { aliases: [string, ...string[]]; configs: Record<string, AccountConfig> } {
   const raw = process.env.GOOGLE_ACCOUNTS;
   if (!raw || raw.trim() === '') {

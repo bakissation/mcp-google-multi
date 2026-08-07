@@ -9,12 +9,7 @@ import { handleGoogleApiError } from './_errors.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
-/**
- * Admin SDK tools require Workspace super-admin (or delegated admin) privileges on the target account.
- * Personal `@gmail.com` accounts will 403 on every endpoint.
- *
- * Writes (e.g. admin_users_update) are gated by write-control like any CUD tool.
- */
+// Admin SDK requires Workspace super-admin (or delegated admin) on the account — personal @gmail.com accounts 403 on every endpoint.
 export function registerAdminTools(server: ToolRegistry): void {
   // ─── Reports / audit log ───────────────────────────────────────────────
 

@@ -7,14 +7,7 @@ import destroyer from 'server-destroy';
 import { ACCOUNTS, ACCOUNT_CONFIG } from './accounts.js';
 import { writeToken } from './token-store.js';
 
-// ─── Scope tiers ────────────────────────────────────────────────────────
-//
-// BASE: always granted. Existing v3 surface + Tasks + Meet (added in v4.0.0).
-// OPTIONAL: per-account opt-in via env GOOGLE_OPTIONAL_SCOPES="slides,forms,chat".
-// ADMIN: per-account opt-in via env GOOGLE_ADMIN_ACCOUNTS="alias1,alias2".
-//
-// Personal Gmail accounts will 403 on admin scopes — never grant by default.
-// ────────────────────────────────────────────────────────────────────────
+// Personal (non-Workspace) accounts 403 on admin scopes; ADMIN_SCOPES stays per-account opt-in, never granted by default.
 
 export const BASE_SCOPES = [
   'https://www.googleapis.com/auth/gmail.modify',
@@ -42,10 +35,8 @@ export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
     'https://www.googleapis.com/auth/chat.messages',
     'https://www.googleapis.com/auth/chat.messages.create',
   ],
-  // Unlike the service bundles these extend the always-on gmail service:
-  // users.settings.* writes only accept the settings scopes (reads already
-  // work via gmail.modify). sharing is separate — it governs delegation,
-  // auto-forwarding and send-as, a different risk profile from e.g. filters.
+  // These extend the always-on gmail service: users.settings.* writes require these
+  // scopes (reads already work via gmail.modify); sharing is split out as riskier.
   gmail_settings: [
     'https://www.googleapis.com/auth/gmail.settings.basic',
   ],
@@ -112,10 +103,7 @@ export function getAdminAccounts(): string[] {
   return parseCsvEnv('GOOGLE_ADMIN_ACCOUNTS');
 }
 
-/**
- * Compose the scope list for a single account at consent time.
- * Resolves env flags: GOOGLE_OPTIONAL_SCOPES (global) and GOOGLE_ADMIN_ACCOUNTS (per-account allowlist).
- */
+/** Scopes are fixed at consent time: changing GOOGLE_OPTIONAL_SCOPES or GOOGLE_ADMIN_ACCOUNTS requires re-running auth. */
 export function resolveScopesForAccount(alias: string): string[] {
   const scopes = [...BASE_SCOPES];
 

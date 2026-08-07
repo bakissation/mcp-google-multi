@@ -1,10 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// Google Workspace API Discovery snapshot fetcher.
-// Usage: npm run gen:discovery
-// Writes discovery/<id>.<version>.json + discovery/MANIFEST.md (directory is gitignored;
-// the snapshot feeds gen:tools and is refreshed on Google API revisions).
+// Fetches the Discovery snapshot into discovery/ (gitignored) — npm run gen:discovery; feeds gen:tools, re-run on Google API revisions.
 
 interface Api {
   id: string;
