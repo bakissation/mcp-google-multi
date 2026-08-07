@@ -28,9 +28,8 @@ interface ToolConfig {
   description?: string;
   inputSchema?: z.ZodRawShape;
   annotations?: Record<string, unknown>;
-  // Generated tools pass the cud computed from HTTP semantics at gen time —
-  // Discovery verbs (undeploy, wipeout, …) are open-ended, so name inference
-  // alone would let writes slip past write-control. Curated tools omit it.
+  // Set only by generated tools (cud from HTTP semantics at gen time): open-ended
+  // Discovery verbs (undeploy, wipeout, …) would slip past name-based write-control.
   cud?: Cud;
 }
 
