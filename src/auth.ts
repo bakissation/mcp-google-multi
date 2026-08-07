@@ -42,6 +42,16 @@ export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
     'https://www.googleapis.com/auth/chat.messages',
     'https://www.googleapis.com/auth/chat.messages.create',
   ],
+  // Unlike the service bundles these extend the always-on gmail service:
+  // users.settings.* writes only accept the settings scopes (reads already
+  // work via gmail.modify). sharing is separate — it governs delegation,
+  // auto-forwarding and send-as, a different risk profile from e.g. filters.
+  gmail_settings: [
+    'https://www.googleapis.com/auth/gmail.settings.basic',
+  ],
+  gmail_settings_sharing: [
+    'https://www.googleapis.com/auth/gmail.settings.sharing',
+  ],
   classroom: [
     'https://www.googleapis.com/auth/classroom.courses',
     'https://www.googleapis.com/auth/classroom.coursework.me',
