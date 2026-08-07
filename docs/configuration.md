@@ -47,6 +47,13 @@ Add bundle names to `GOOGLE_OPTIONAL_SCOPES` (CSV), then re-run `auth` for each 
 
 `slides`, `forms`, `chat`, `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket`.
 
+Two bundles extend the always-on `gmail` service instead of enabling a new one — Gmail settings **writes** only accept the dedicated settings scopes (reads already work with the base scope):
+
+| Bundle | Scope | Unlocks |
+|---|---|---|
+| `gmail_settings` | `gmail.settings.basic` | writing filters, vacation responder, IMAP/POP, language |
+| `gmail_settings_sharing` | `gmail.settings.sharing` | send-as, delegates, auto-forwarding — kept separate because it can redirect or delegate your mail |
+
 A tool whose scope was never granted returns a typed `insufficient_scope` error with a re-auth hint instead of failing silently.
 
 ## Secrets management

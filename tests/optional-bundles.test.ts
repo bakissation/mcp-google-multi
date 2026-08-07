@@ -42,4 +42,23 @@ describe('optional scope bundles', () => {
     process.env.GOOGLE_OPTIONAL_SCOPES = ' slides , forms ,bogus';
     expect(getOptionalBundles()).toEqual(['slides', 'forms']);
   });
+
+  it('gmail_settings grants settings.basic only; sharing needs its own bundle', () => {
+    process.env.GOOGLE_OPTIONAL_SCOPES = 'gmail_settings';
+    const scopes = resolveScopesForAccount('test');
+    expect(scopes).toContain('https://www.googleapis.com/auth/gmail.settings.basic');
+    expect(scopes).not.toContain('https://www.googleapis.com/auth/gmail.settings.sharing');
+  });
+
+  it('gmail_settings_sharing grants settings.sharing', () => {
+    process.env.GOOGLE_OPTIONAL_SCOPES = 'gmail_settings,gmail_settings_sharing';
+    const scopes = resolveScopesForAccount('test');
+    expect(scopes).toContain('https://www.googleapis.com/auth/gmail.settings.basic');
+    expect(scopes).toContain('https://www.googleapis.com/auth/gmail.settings.sharing');
+  });
+
+  it('gmail settings scopes are absent by default', () => {
+    const scopes = resolveScopesForAccount('test');
+    expect(scopes.join()).not.toContain('gmail.settings');
+  });
 });

@@ -187,7 +187,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_identities_patch",
     cud: "update",
     description: "Associates a different key pair with an existing client-side encryption identity. The updated key pair must validate against Google's [S/MIME certificate profil",
-    method: { id: "gmail.users.settings.cse.identities.patch", httpMethod: "PATCH", path: "gmail/v1/users/{userId}/settings/cse/identities/{emailAddress}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["emailAddress","userId"] },
+    method: { id: "gmail.users.settings.cse.identities.patch", httpMethod: "PATCH", path: "gmail/v1/users/{userId}/settings/cse/identities/{emailAddress}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","emailAddress"] },
     params: [{"field":"emailAddress","api":"emailAddress","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -203,11 +203,12 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     cud: "create",
     description: "Creates and uploads a client-side encryption S/MIME public key certificate chain and private key metadata for the authenticated user. For administrators managin",
     method: { id: "gmail.users.settings.cse.keypairs.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
-    params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
+    params: [{"field":"userId","api":"userId","location":"path"},{"field":"chainValidation","api":"chainValidation","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
       account: accountField(),
       userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
+      chainValidation: z.enum(["all","none"]).describe("The type of certificate chain validation to perform at creation. The request will be rejected if the uploaded chain fails to satisfy the requested validation checks. When unspecified, this parameter d").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CseKeyPair JSON request body. Top-level fields: disableTime, enablementState, keyPairId, pem, pkcs7, privateKeyMetadata, subjectEmailAddresses."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -216,7 +217,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_keypairs_disable",
     cud: "create",
     description: "Turns off a client-side encryption key pair. The authenticated user can no longer use the key pair to decrypt incoming CSE message texts or sign outgoing CSE ma",
-    method: { id: "gmail.users.settings.cse.keypairs.disable", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:disable", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["keyPairId","userId"] },
+    method: { id: "gmail.users.settings.cse.keypairs.disable", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:disable", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"] },
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -246,7 +247,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_keypairs_get",
     cud: "read",
     description: "Retrieves an existing client-side encryption key pair. For administrators managing identities and keypairs for users in their organization, requests require aut",
-    method: { id: "gmail.users.settings.cse.keypairs.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["keyPairId","userId"] },
+    method: { id: "gmail.users.settings.cse.keypairs.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"] },
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -304,7 +305,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_delegates_delete",
     cud: "delete",
     description: "Removes the specified delegate (which can be of any verification status), and revokes any verification that may have been required for using it. For more inform",
-    method: { id: "gmail.users.settings.delegates.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/delegates/{delegateEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","delegateEmail"] },
+    method: { id: "gmail.users.settings.delegates.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/delegates/{delegateEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["delegateEmail","userId"] },
     params: [{"field":"delegateEmail","api":"delegateEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -521,7 +522,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_delete",
     cud: "delete",
     description: "Deletes the specified send-as alias. Revokes any verification that may have been required for using it. For more information, see [Manage aliases and signatures",
-    method: { id: "gmail.users.settings.sendAs.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["sendAsEmail","userId"] },
+    method: { id: "gmail.users.settings.sendAs.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -577,7 +578,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_delete",
     cud: "delete",
     description: "Deletes the specified S/MIME config for the specified send-as alias. For more information, see [Manage S/MIME certificates with the Gmail API](https://developer",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id","sendAsEmail"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["id","userId","sendAsEmail"] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -592,7 +593,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_get",
     cud: "read",
     description: "Gets the specified S/MIME config for the specified send-as alias. For more information, see [Manage S/MIME certificates with the Gmail API](https://developers.g",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id","sendAsEmail"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail","id"] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -607,7 +608,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_insert",
     cud: "create",
     description: "Insert (upload) the given S/MIME config for the specified send-as alias. Note that `pkcs12` format is required for the key. For more information, see [Manage S/",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.insert", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["sendAsEmail","userId"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.insert", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -622,7 +623,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_list",
     cud: "read",
     description: "Lists S/MIME configs for the specified send-as alias. For more information, see [Manage S/MIME certificates with the Gmail API](https://developers.google.com/wo",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["sendAsEmail","userId"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -636,7 +637,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_set_default",
     cud: "update",
     description: "Sets the default S/MIME config for the specified send-as alias. For more information, see [Manage S/MIME certificates with the Gmail API](https://developers.goo",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.setDefault", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}/setDefault", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["sendAsEmail","userId","id"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.setDefault", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}/setDefault", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["id","userId","sendAsEmail"] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -651,7 +652,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_update",
     cud: "update",
     description: "Updates a send-as alias. If a signature is provided, Gmail will sanitize the HTML before saving it with the alias. For more information, see [Manage aliases and",
-    method: { id: "gmail.users.settings.sendAs.update", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["sendAsEmail","userId"] },
+    method: { id: "gmail.users.settings.sendAs.update", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
