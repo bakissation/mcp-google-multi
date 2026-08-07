@@ -5,8 +5,11 @@ import { homedir } from 'node:os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-dotenv.config();
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+// quiet: dotenv v17 prints a banner to stdout by default, which corrupts the
+// stdio JSON-RPC channel (DOTENV_CONFIG_QUIET can't help — it would be read
+// from .env after config() already ran).
+dotenv.config({ quiet: true });
+dotenv.config({ path: path.resolve(__dirname, '..', '.env'), quiet: true });
 
 const defaultTokenDir = path.join(
   process.env.XDG_CONFIG_HOME || path.join(homedir(), '.config'),
