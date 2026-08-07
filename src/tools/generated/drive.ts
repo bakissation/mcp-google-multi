@@ -53,7 +53,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_approvals_comment",
     cud: "create",
     description: "Comments on an approval. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). This sends a notifica",
-    method: { id: "drive.approvals.comment", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:comment", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["approvalId","fileId"] },
+    method: { id: "drive.approvals.comment", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:comment", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -68,7 +68,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_approvals_decline",
     cud: "create",
     description: "Declines an approval. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). This is used to update t",
-    method: { id: "drive.approvals.decline", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:decline", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["approvalId","fileId"] },
+    method: { id: "drive.approvals.decline", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:decline", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -83,7 +83,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_approvals_get",
     cud: "read",
     description: "Gets an approval by ID. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals).",
-    method: { id: "drive.approvals.get", httpMethod: "GET", path: "files/{fileId}/approvals/{approvalId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["approvalId","fileId"] },
+    method: { id: "drive.approvals.get", httpMethod: "GET", path: "files/{fileId}/approvals/{approvalId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -443,7 +443,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_replies_get",
     cud: "read",
     description: "Gets a reply by ID. For more information, see [Manage comments and replies](https://developers.google.com/workspace/drive/api/guides/manage-comments).",
-    method: { id: "drive.replies.get", httpMethod: "GET", path: "files/{fileId}/comments/{commentId}/replies/{replyId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","replyId","commentId"] },
+    method: { id: "drive.replies.get", httpMethod: "GET", path: "files/{fileId}/comments/{commentId}/replies/{replyId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["commentId","replyId","fileId"] },
     params: [{"field":"commentId","api":"commentId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"replyId","api":"replyId","location":"path"},{"field":"includeDeleted","api":"includeDeleted","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
