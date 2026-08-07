@@ -23,7 +23,7 @@ export function registerFormsGeneratedTools(registry: ToolRegistry): void {
     name: "forms_forms_watches_delete",
     cud: "delete",
     description: "Delete a watch.",
-    method: { id: "forms.forms.watches.delete", httpMethod: "DELETE", path: "v1/forms/{formId}/watches/{watchId}", baseUrl: "https://forms.googleapis.com/", requiredParams: ["formId","watchId"] },
+    method: { id: "forms.forms.watches.delete", httpMethod: "DELETE", path: "v1/forms/{formId}/watches/{watchId}", baseUrl: "https://forms.googleapis.com/", requiredParams: ["watchId","formId"] },
     params: [{"field":"formId","api":"formId","location":"path"},{"field":"watchId","api":"watchId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {

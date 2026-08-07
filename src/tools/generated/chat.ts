@@ -267,11 +267,12 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     cud: "read",
     description: "Returns details about a message. For an example, see [Get details about a message](https://developers.google.com/workspace/chat/get-messages). Supports the foll",
     method: { id: "chat.spaces.messages.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
-    params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
+    params: [{"field":"name","api":"name","location":"path"},{"field":"markupSyntax","api":"markupSyntax","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
       account: accountField(),
       name: z.string().describe("Required. Resource name of the message. Format: `spaces/{space}/messages/{message}` If you've set a custom ID for your message, you can use the value from the `clientAssignedMessageId` field for `{mes"),
+      markupSyntax: z.enum(["MARKUP_SYNTAX_UNSPECIFIED","MARKUP_SYNTAX_CHAT","MARKUP_SYNTAX_MARKDOWN"]).describe("Optional. Specifies the desired output syntax for the Chat message `formatted_text` field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -287,7 +288,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
       name: z.string().describe("Identifier. Resource name of the message. Format: `spaces/{space}/messages/{message}` Where `{space}` is the ID of the space where the message is posted and `{message}` is a system-assigned ID for the"),
       allowMissing: coerceBoolean.describe("Optional. If `true` and the message isn't found, a new message is created and `updateMask` is ignored. The specified message ID must be [client-assigned](https://developers.google.com/workspace/chat/c").optional(),
       updateMask: z.string().describe("Required. The field paths to update. Separate multiple values with commas or use `*` to update all field paths. Currently supported field paths: - `text` - `attachment` - `cards` (Requires [app authen").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Message JSON request body. Top-level fields: accessoryWidgets, actionResponse, annotations, argumentText, attachedGifs, attachment, cards, cardsV2, clientAssignedMessageId, createTime, deleteTime, deletionMetadata, +15 more."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("Message JSON request body. Top-level fields: accessoryWidgets, actionResponse, annotations, argumentText, attachedGifs, attachment, cards, cardsV2, clientAssignedMessageId, createTime, deleteTime, deletionMetadata, +16 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -335,6 +336,20 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     },
   });
   registerGeneratedTool(registry, {
+    name: "chat_spaces_messages_search",
+    cud: "read",
+    description: "Searches for messages in Google Chat that the calling user has access to. Returns a list of messages matching the search criteria. To search across all spaces t",
+    method: { id: "chat.spaces.messages.search", httpMethod: "POST", path: "v1/{+parent}/messages:search", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"] },
+    params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
+    hasBody: true,
+    shape: {
+      account: accountField(),
+      parent: z.string().describe("Required. The resource name of the space to search within. To search across all spaces the user has access to, set this field to `spaces/-`. Using any other value for `parent` results in an `INVALID_A"),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchMessagesRequest JSON request body. Top-level fields: filter, markupSyntax, orderBy, pageSize, pageToken, view."),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  });
+  registerGeneratedTool(registry, {
     name: "chat_spaces_messages_update",
     cud: "update",
     description: "Updates a message. There's a difference between the `patch` and `update` methods. The `patch` method uses a `patch` request while the `update` method uses a `pu",
@@ -346,7 +361,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
       name: z.string().describe("Identifier. Resource name of the message. Format: `spaces/{space}/messages/{message}` Where `{space}` is the ID of the space where the message is posted and `{message}` is a system-assigned ID for the"),
       allowMissing: coerceBoolean.describe("Optional. If `true` and the message isn't found, a new message is created and `updateMask` is ignored. The specified message ID must be [client-assigned](https://developers.google.com/workspace/chat/c").optional(),
       updateMask: z.string().describe("Required. The field paths to update. Separate multiple values with commas or use `*` to update all field paths. Currently supported field paths: - `text` - `attachment` - `cards` (Requires [app authen").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Message JSON request body. Top-level fields: accessoryWidgets, actionResponse, annotations, argumentText, attachedGifs, attachment, cards, cardsV2, clientAssignedMessageId, createTime, deleteTime, deletionMetadata, +15 more."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("Message JSON request body. Top-level fields: accessoryWidgets, actionResponse, annotations, argumentText, attachedGifs, attachment, cards, cardsV2, clientAssignedMessageId, createTime, deleteTime, deletionMetadata, +16 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

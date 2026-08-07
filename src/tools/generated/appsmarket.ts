@@ -8,7 +8,7 @@ export function registerAppsmarketGeneratedTools(registry: ToolRegistry): void {
     name: "appsmarket_customer_license_get",
     cud: "read",
     description: "Gets the customer's licensing status to determine if they have access to a given app. For more information, see [Getting app installation and licensing details]",
-    method: { id: "appsmarket.customerLicense.get", httpMethod: "GET", path: "appsmarket/v2/customerLicense/{applicationId}/{customerId}", baseUrl: "https://appsmarket.googleapis.com/", requiredParams: ["applicationId","customerId"] },
+    method: { id: "appsmarket.customerLicense.get", httpMethod: "GET", path: "appsmarket/v2/customerLicense/{applicationId}/{customerId}", baseUrl: "https://appsmarket.googleapis.com/", requiredParams: ["customerId","applicationId"] },
     params: [{"field":"applicationId","api":"applicationId","location":"path"},{"field":"customerId","api":"customerId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -22,7 +22,7 @@ export function registerAppsmarketGeneratedTools(registry: ToolRegistry): void {
     name: "appsmarket_user_license_get",
     cud: "read",
     description: "Gets the user's licensing status to determine if they have permission to use a given app. For more information, see [Getting app installation and licensing deta",
-    method: { id: "appsmarket.userLicense.get", httpMethod: "GET", path: "appsmarket/v2/userLicense/{applicationId}/{userId}", baseUrl: "https://appsmarket.googleapis.com/", requiredParams: ["applicationId","userId"] },
+    method: { id: "appsmarket.userLicense.get", httpMethod: "GET", path: "appsmarket/v2/userLicense/{applicationId}/{userId}", baseUrl: "https://appsmarket.googleapis.com/", requiredParams: ["userId","applicationId"] },
     params: [{"field":"applicationId","api":"applicationId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {

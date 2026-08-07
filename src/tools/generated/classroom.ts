@@ -23,7 +23,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_aliases_delete",
     cud: "delete",
     description: "Deletes an alias of a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to remove the alias o",
-    method: { id: "classroom.courses.aliases.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/aliases/{alias}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["alias","courseId"] },
+    method: { id: "classroom.courses.aliases.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/aliases/{alias}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","alias"] },
     params: [{"field":"alias","api":"alias","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -69,7 +69,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_announcements_add_on_attachments_delete",
     cud: "delete",
     description: "Deletes an add-on attachment. Requires the add-on to have been the original creator of the attachment. This method returns the following error codes: * `PERMISS",
-    method: { id: "classroom.courses.announcements.addOnAttachments.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/announcements/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","attachmentId","itemId"] },
+    method: { id: "classroom.courses.announcements.addOnAttachments.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/announcements/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","attachmentId","courseId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"postId","api":"postId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -85,7 +85,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_announcements_add_on_attachments_get",
     cud: "read",
     description: "Returns an add-on attachment. Requires the add-on requesting the attachment to be the original creator of the attachment. This method returns the following erro",
-    method: { id: "classroom.courses.announcements.addOnAttachments.get", httpMethod: "GET", path: "v1/courses/{courseId}/announcements/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","attachmentId","itemId"] },
+    method: { id: "classroom.courses.announcements.addOnAttachments.get", httpMethod: "GET", path: "v1/courses/{courseId}/announcements/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","attachmentId","courseId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"postId","api":"postId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -150,7 +150,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_announcements_delete",
     cud: "delete",
     description: "Deletes an announcement. This request must be made by the Developer Console project of the [OAuth client ID](https://support.google.com/cloud/answer/6158849) us",
-    method: { id: "classroom.courses.announcements.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/announcements/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId"] },
+    method: { id: "classroom.courses.announcements.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/announcements/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -164,7 +164,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_announcements_get",
     cud: "read",
     description: "Returns an announcement. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to access the requested co",
-    method: { id: "classroom.courses.announcements.get", httpMethod: "GET", path: "v1/courses/{courseId}/announcements/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId"] },
+    method: { id: "classroom.courses.announcements.get", httpMethod: "GET", path: "v1/courses/{courseId}/announcements/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -212,7 +212,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_announcements_modify_assignees",
     cud: "update",
     description: "Modifies assignee mode and options of an announcement. Only a teacher of the course that contains the announcement may call this method. This method returns the",
-    method: { id: "classroom.courses.announcements.modifyAssignees", httpMethod: "POST", path: "v1/courses/{courseId}/announcements/{id}:modifyAssignees", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId"] },
+    method: { id: "classroom.courses.announcements.modifyAssignees", httpMethod: "POST", path: "v1/courses/{courseId}/announcements/{id}:modifyAssignees", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -227,7 +227,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_announcements_patch",
     cud: "update",
     description: "Updates one or more fields of an announcement. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting developer project did not",
-    method: { id: "classroom.courses.announcements.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/announcements/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"] },
+    method: { id: "classroom.courses.announcements.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/announcements/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -260,7 +260,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_add_on_attachments_delete",
     cud: "delete",
     description: "Deletes an add-on attachment. Requires the add-on to have been the original creator of the attachment. This method returns the following error codes: * `PERMISS",
-    method: { id: "classroom.courses.courseWork.addOnAttachments.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","courseId","attachmentId"] },
+    method: { id: "classroom.courses.courseWork.addOnAttachments.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","attachmentId","courseId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"postId","api":"postId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -276,7 +276,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_add_on_attachments_get",
     cud: "read",
     description: "Returns an add-on attachment. Requires the add-on requesting the attachment to be the original creator of the attachment. This method returns the following erro",
-    method: { id: "classroom.courses.courseWork.addOnAttachments.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","attachmentId","itemId"] },
+    method: { id: "classroom.courses.courseWork.addOnAttachments.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","attachmentId","courseId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"postId","api":"postId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -309,7 +309,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_add_on_attachments_patch",
     cud: "update",
     description: "Updates an add-on attachment. Requires the add-on to have been the original creator of the attachment. This method returns the following error codes: * `PERMISS",
-    method: { id: "classroom.courses.courseWork.addOnAttachments.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","courseId","attachmentId"] },
+    method: { id: "classroom.courses.courseWork.addOnAttachments.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","attachmentId","courseId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"postId","api":"postId","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -327,7 +327,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_coursework_addon_submissions_get",
     cud: "read",
     description: "Returns a student submission for an add-on attachment. This method returns the following error codes: * `PERMISSION_DENIED` for access errors. * `INVALID_ARGUME",
-    method: { id: "classroom.courses.courseWork.addOnAttachments.studentSubmissions.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}/studentSubmissions/{submissionId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["attachmentId","itemId","courseId","submissionId"] },
+    method: { id: "classroom.courses.courseWork.addOnAttachments.studentSubmissions.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}/studentSubmissions/{submissionId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","itemId","attachmentId","submissionId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"submissionId","api":"submissionId","location":"path"},{"field":"postId","api":"postId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -344,7 +344,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_coursework_addon_submissions_patch",
     cud: "update",
     description: "Updates data associated with an add-on attachment submission. Requires the add-on to have been the original creator of the attachment and the attachment to have",
-    method: { id: "classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}/studentSubmissions/{submissionId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","courseId","submissionId","attachmentId"] },
+    method: { id: "classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}/studentSubmissions/{submissionId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","itemId","attachmentId","submissionId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"submissionId","api":"submissionId","location":"path"},{"field":"postId","api":"postId","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -391,7 +391,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_get",
     cud: "read",
     description: "Returns course work. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to access the requested course",
-    method: { id: "classroom.courses.courseWork.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId"] },
+    method: { id: "classroom.courses.courseWork.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -405,7 +405,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_get_add_on_context",
     cud: "read",
     description: "Gets metadata for Classroom add-ons in the context of a specific post. To maintain the integrity of its own data and permissions model, an add-on should call th",
-    method: { id: "classroom.courses.courseWork.getAddOnContext", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnContext", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","itemId"] },
+    method: { id: "classroom.courses.courseWork.getAddOnContext", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnContext", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"addOnToken","api":"addOnToken","location":"query"},{"field":"attachmentId","api":"attachmentId","location":"query"},{"field":"postId","api":"postId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -470,7 +470,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_rubrics_create",
     cud: "create",
     description: "Creates a rubric. The requesting user and course owner must have rubrics creation capabilities. For details, see [licensing requirements](https://developers.goo",
-    method: { id: "classroom.courses.courseWork.rubrics.create", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/rubrics", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId"] },
+    method: { id: "classroom.courses.courseWork.rubrics.create", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/rubrics", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseWorkId","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -485,7 +485,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_rubrics_delete",
     cud: "delete",
     description: "Deletes a rubric. The requesting user and course owner must have rubrics creation capabilities. For details, see [licensing requirements](https://developers.goo",
-    method: { id: "classroom.courses.courseWork.rubrics.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/rubrics/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId","courseWorkId"] },
+    method: { id: "classroom.courses.courseWork.rubrics.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/rubrics/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id","courseWorkId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -500,7 +500,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_rubrics_get",
     cud: "read",
     description: "Returns a rubric. This method returns the following error codes: * `PERMISSION_DENIED` for access errors. * `INVALID_ARGUMENT` if the request is malformed. * `N",
-    method: { id: "classroom.courses.courseWork.rubrics.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/rubrics/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId","id"] },
+    method: { id: "classroom.courses.courseWork.rubrics.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/rubrics/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseWorkId","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -515,7 +515,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_rubrics_list",
     cud: "read",
     description: "Returns a list of rubrics that the requester is permitted to view. This method returns the following error codes: * `PERMISSION_DENIED` for access errors. * `IN",
-    method: { id: "classroom.courses.courseWork.rubrics.list", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/rubrics", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId"] },
+    method: { id: "classroom.courses.courseWork.rubrics.list", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/rubrics", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseWorkId","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -531,7 +531,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_rubrics_patch",
     cud: "update",
     description: "Updates a rubric. See google.classroom.v1.Rubric for details of which fields can be updated. Rubric update capabilities are [limited](/classroom/rubrics/limitat",
-    method: { id: "classroom.courses.courseWork.rubrics.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/rubrics/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId","id"] },
+    method: { id: "classroom.courses.courseWork.rubrics.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/rubrics/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id","courseWorkId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -548,7 +548,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_student_submissions_get",
     cud: "read",
     description: "Returns a student submission. * `PERMISSION_DENIED` if the requesting user is not permitted to access the requested course, course work, or student submission o",
-    method: { id: "classroom.courses.courseWork.studentSubmissions.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId","id"] },
+    method: { id: "classroom.courses.courseWork.studentSubmissions.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseWorkId","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -582,7 +582,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_coursework_submissions_modify_attachments",
     cud: "update",
     description: "Modifies attachments of student submission. Attachments may only be added to student submissions belonging to course work objects with a `workType` of `ASSIGNME",
-    method: { id: "classroom.courses.courseWork.studentSubmissions.modifyAttachments", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:modifyAttachments", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId","courseWorkId"] },
+    method: { id: "classroom.courses.courseWork.studentSubmissions.modifyAttachments", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:modifyAttachments", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseWorkId","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -615,7 +615,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_student_submissions_reclaim",
     cud: "create",
     description: "Reclaims a student submission on behalf of the student that owns it. Reclaiming a student submission transfers ownership of attached Drive files to the student",
-    method: { id: "classroom.courses.courseWork.studentSubmissions.reclaim", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:reclaim", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId","courseWorkId"] },
+    method: { id: "classroom.courses.courseWork.studentSubmissions.reclaim", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:reclaim", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseWorkId","id","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -647,7 +647,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_student_submissions_turn_in",
     cud: "create",
     description: "Turns in a student submission. Turning in a student submission transfers ownership of attached Drive files to the teacher and may also update the submission sta",
-    method: { id: "classroom.courses.courseWork.studentSubmissions.turnIn", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:turnIn", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId","id"] },
+    method: { id: "classroom.courses.courseWork.studentSubmissions.turnIn", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:turnIn", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id","courseWorkId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -680,7 +680,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_coursework_materials_addons_create",
     cud: "create",
     description: "Creates an add-on attachment under a post. Requires the add-on to have permission to create new attachments on the post. This method returns the following error",
-    method: { id: "classroom.courses.courseWorkMaterials.addOnAttachments.create", httpMethod: "POST", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnAttachments", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","itemId"] },
+    method: { id: "classroom.courses.courseWorkMaterials.addOnAttachments.create", httpMethod: "POST", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnAttachments", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"addOnToken","api":"addOnToken","location":"query"},{"field":"postId","api":"postId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -697,7 +697,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_coursework_materials_addons_delete",
     cud: "delete",
     description: "Deletes an add-on attachment. Requires the add-on to have been the original creator of the attachment. This method returns the following error codes: * `PERMISS",
-    method: { id: "classroom.courses.courseWorkMaterials.addOnAttachments.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","courseId","attachmentId"] },
+    method: { id: "classroom.courses.courseWorkMaterials.addOnAttachments.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","attachmentId","courseId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"postId","api":"postId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -713,7 +713,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_materials_add_on_attachments_get",
     cud: "read",
     description: "Returns an add-on attachment. Requires the add-on requesting the attachment to be the original creator of the attachment. This method returns the following erro",
-    method: { id: "classroom.courses.courseWorkMaterials.addOnAttachments.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","attachmentId","itemId"] },
+    method: { id: "classroom.courses.courseWorkMaterials.addOnAttachments.get", httpMethod: "GET", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","attachmentId","courseId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"postId","api":"postId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -729,7 +729,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_materials_add_on_attachments_list",
     cud: "read",
     description: "Returns all attachments created by an add-on under the post. Requires the add-on to have active attachments on the post or have permission to create new attachm",
-    method: { id: "classroom.courses.courseWorkMaterials.addOnAttachments.list", httpMethod: "GET", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnAttachments", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","itemId"] },
+    method: { id: "classroom.courses.courseWorkMaterials.addOnAttachments.list", httpMethod: "GET", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnAttachments", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"postId","api":"postId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -746,7 +746,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_materials_add_on_attachments_patch",
     cud: "update",
     description: "Updates an add-on attachment. Requires the add-on to have been the original creator of the attachment. This method returns the following error codes: * `PERMISS",
-    method: { id: "classroom.courses.courseWorkMaterials.addOnAttachments.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","itemId","attachmentId"] },
+    method: { id: "classroom.courses.courseWorkMaterials.addOnAttachments.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","attachmentId","courseId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"postId","api":"postId","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -778,7 +778,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_materials_delete",
     cud: "delete",
     description: "Deletes a course work material. This request must be made by the Developer Console project of the [OAuth client ID](https://support.google.com/cloud/answer/6158",
-    method: { id: "classroom.courses.courseWorkMaterials.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/courseWorkMaterials/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId"] },
+    method: { id: "classroom.courses.courseWorkMaterials.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/courseWorkMaterials/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -806,7 +806,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_course_work_materials_get_add_on_context",
     cud: "read",
     description: "Gets metadata for Classroom add-ons in the context of a specific post. To maintain the integrity of its own data and permissions model, an add-on should call th",
-    method: { id: "classroom.courses.courseWorkMaterials.getAddOnContext", httpMethod: "GET", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnContext", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","itemId"] },
+    method: { id: "classroom.courses.courseWorkMaterials.getAddOnContext", httpMethod: "GET", path: "v1/courses/{courseId}/courseWorkMaterials/{itemId}/addOnContext", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["itemId","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"addOnToken","api":"addOnToken","location":"query"},{"field":"attachmentId","api":"attachmentId","location":"query"},{"field":"postId","api":"postId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -942,7 +942,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_posts_add_on_attachments_create",
     cud: "create",
     description: "Creates an add-on attachment under a post. Requires the add-on to have permission to create new attachments on the post. This method returns the following error",
-    method: { id: "classroom.courses.posts.addOnAttachments.create", httpMethod: "POST", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["postId","courseId"] },
+    method: { id: "classroom.courses.posts.addOnAttachments.create", httpMethod: "POST", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","postId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"postId","api":"postId","location":"path"},{"field":"addOnToken","api":"addOnToken","location":"query"},{"field":"itemId","api":"itemId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -959,7 +959,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_posts_add_on_attachments_delete",
     cud: "delete",
     description: "Deletes an add-on attachment. Requires the add-on to have been the original creator of the attachment. This method returns the following error codes: * `PERMISS",
-    method: { id: "classroom.courses.posts.addOnAttachments.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["postId","courseId","attachmentId"] },
+    method: { id: "classroom.courses.posts.addOnAttachments.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","postId","attachmentId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"postId","api":"postId","location":"path"},{"field":"itemId","api":"itemId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -975,7 +975,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_posts_add_on_attachments_get",
     cud: "read",
     description: "Returns an add-on attachment. Requires the add-on requesting the attachment to be the original creator of the attachment. This method returns the following erro",
-    method: { id: "classroom.courses.posts.addOnAttachments.get", httpMethod: "GET", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","attachmentId","postId"] },
+    method: { id: "classroom.courses.posts.addOnAttachments.get", httpMethod: "GET", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["attachmentId","courseId","postId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"postId","api":"postId","location":"path"},{"field":"itemId","api":"itemId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -991,7 +991,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_posts_add_on_attachments_list",
     cud: "read",
     description: "Returns all attachments created by an add-on under the post. Requires the add-on to have active attachments on the post or have permission to create new attachm",
-    method: { id: "classroom.courses.posts.addOnAttachments.list", httpMethod: "GET", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["postId","courseId"] },
+    method: { id: "classroom.courses.posts.addOnAttachments.list", httpMethod: "GET", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","postId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"postId","api":"postId","location":"path"},{"field":"itemId","api":"itemId","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -1008,7 +1008,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_posts_add_on_attachments_patch",
     cud: "update",
     description: "Updates an add-on attachment. Requires the add-on to have been the original creator of the attachment. This method returns the following error codes: * `PERMISS",
-    method: { id: "classroom.courses.posts.addOnAttachments.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","attachmentId","postId"] },
+    method: { id: "classroom.courses.posts.addOnAttachments.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments/{attachmentId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["postId","courseId","attachmentId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"postId","api":"postId","location":"path"},{"field":"itemId","api":"itemId","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -1026,7 +1026,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_posts_addon_submissions_get",
     cud: "read",
     description: "Returns a student submission for an add-on attachment. This method returns the following error codes: * `PERMISSION_DENIED` for access errors. * `INVALID_ARGUME",
-    method: { id: "classroom.courses.posts.addOnAttachments.studentSubmissions.get", httpMethod: "GET", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments/{attachmentId}/studentSubmissions/{submissionId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["postId","attachmentId","submissionId","courseId"] },
+    method: { id: "classroom.courses.posts.addOnAttachments.studentSubmissions.get", httpMethod: "GET", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments/{attachmentId}/studentSubmissions/{submissionId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","attachmentId","postId","submissionId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"postId","api":"postId","location":"path"},{"field":"submissionId","api":"submissionId","location":"path"},{"field":"itemId","api":"itemId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -1043,7 +1043,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_posts_addon_submissions_patch",
     cud: "update",
     description: "Updates data associated with an add-on attachment submission. Requires the add-on to have been the original creator of the attachment and the attachment to have",
-    method: { id: "classroom.courses.posts.addOnAttachments.studentSubmissions.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments/{attachmentId}/studentSubmissions/{submissionId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["postId","attachmentId","courseId","submissionId"] },
+    method: { id: "classroom.courses.posts.addOnAttachments.studentSubmissions.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments/{attachmentId}/studentSubmissions/{submissionId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["submissionId","postId","attachmentId","courseId"] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"postId","api":"postId","location":"path"},{"field":"submissionId","api":"submissionId","location":"path"},{"field":"itemId","api":"itemId","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -1093,7 +1093,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_student_groups_delete",
     cud: "delete",
     description: "Deletes a student group. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to delete the requested st",
-    method: { id: "classroom.courses.studentGroups.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/studentGroups/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId"] },
+    method: { id: "classroom.courses.studentGroups.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/studentGroups/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -1122,7 +1122,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_student_groups_patch",
     cud: "update",
     description: "Updates one or more fields in a student group. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to m",
-    method: { id: "classroom.courses.studentGroups.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/studentGroups/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId"] },
+    method: { id: "classroom.courses.studentGroups.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/studentGroups/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -1168,7 +1168,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_student_groups_student_group_members_list",
     cud: "read",
     description: "Returns a list of students in a group. This method returns the following error codes: * `NOT_FOUND` if the course or student group does not exist.",
-    method: { id: "classroom.courses.studentGroups.studentGroupMembers.list", httpMethod: "GET", path: "v1/courses/{courseId}/studentGroups/{studentGroupId}/studentGroupMembers", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","studentGroupId"] },
+    method: { id: "classroom.courses.studentGroups.studentGroupMembers.list", httpMethod: "GET", path: "v1/courses/{courseId}/studentGroups/{studentGroupId}/studentGroupMembers", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["studentGroupId","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"studentGroupId","api":"studentGroupId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -1270,7 +1270,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_teachers_get",
     cud: "read",
     description: "Returns a teacher of a course. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to view teachers of",
-    method: { id: "classroom.courses.teachers.get", httpMethod: "GET", path: "v1/courses/{courseId}/teachers/{userId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","userId"] },
+    method: { id: "classroom.courses.teachers.get", httpMethod: "GET", path: "v1/courses/{courseId}/teachers/{userId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["userId","courseId"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -1313,7 +1313,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_topics_delete",
     cud: "delete",
     description: "Deletes a topic. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not allowed to delete the requested topic or for",
-    method: { id: "classroom.courses.topics.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/topics/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId"] },
+    method: { id: "classroom.courses.topics.delete", httpMethod: "DELETE", path: "v1/courses/{courseId}/topics/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -1327,7 +1327,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_courses_topics_get",
     cud: "read",
     description: "Returns a topic. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to access the requested course or",
-    method: { id: "classroom.courses.topics.get", httpMethod: "GET", path: "v1/courses/{courseId}/topics/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id","courseId"] },
+    method: { id: "classroom.courses.topics.get", httpMethod: "GET", path: "v1/courses/{courseId}/topics/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -1522,7 +1522,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_user_profiles_guardian_invitations_get",
     cud: "read",
     description: "Returns a specific guardian invitation. This method returns the following error codes: * `PERMISSION_DENIED` if the requesting user is not permitted to view gua",
-    method: { id: "classroom.userProfiles.guardianInvitations.get", httpMethod: "GET", path: "v1/userProfiles/{studentId}/guardianInvitations/{invitationId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["invitationId","studentId"] },
+    method: { id: "classroom.userProfiles.guardianInvitations.get", httpMethod: "GET", path: "v1/userProfiles/{studentId}/guardianInvitations/{invitationId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["studentId","invitationId"] },
     params: [{"field":"invitationId","api":"invitationId","location":"path"},{"field":"studentId","api":"studentId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -1553,7 +1553,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_user_profiles_guardian_invitations_patch",
     cud: "update",
     description: "Modifies a guardian invitation. Currently, the only valid modification is to change the `state` from `PENDING` to `COMPLETE`. This has the effect of withdrawing",
-    method: { id: "classroom.userProfiles.guardianInvitations.patch", httpMethod: "PATCH", path: "v1/userProfiles/{studentId}/guardianInvitations/{invitationId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["invitationId","studentId"] },
+    method: { id: "classroom.userProfiles.guardianInvitations.patch", httpMethod: "PATCH", path: "v1/userProfiles/{studentId}/guardianInvitations/{invitationId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["studentId","invitationId"] },
     params: [{"field":"invitationId","api":"invitationId","location":"path"},{"field":"studentId","api":"studentId","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -1569,7 +1569,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     name: "classroom_user_profiles_guardians_delete",
     cud: "delete",
     description: "Deletes a guardian. The guardian will no longer receive guardian notifications and the guardian will no longer be accessible via the API. This method returns th",
-    method: { id: "classroom.userProfiles.guardians.delete", httpMethod: "DELETE", path: "v1/userProfiles/{studentId}/guardians/{guardianId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["guardianId","studentId"] },
+    method: { id: "classroom.userProfiles.guardians.delete", httpMethod: "DELETE", path: "v1/userProfiles/{studentId}/guardians/{guardianId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["studentId","guardianId"] },
     params: [{"field":"guardianId","api":"guardianId","location":"path"},{"field":"studentId","api":"studentId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
