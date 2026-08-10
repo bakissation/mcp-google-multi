@@ -3,7 +3,6 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import open from 'open';
-import destroyer from 'server-destroy';
 import { ACCOUNTS, ACCOUNT_CONFIG } from './accounts.js';
 import { writeToken } from './token-store.js';
 
@@ -186,7 +185,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
             if (error) {
               res.writeHead(400, { 'Content-Type': 'text/plain' });
               res.end(`Authorization denied: ${error}`);
-              (server as any).destroy();
+              server.close();
+              server.closeAllConnections();
               reject(new Error(`Authorization denied: ${error}`));
               return;
             }
@@ -195,7 +195,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
             if (!code) {
               res.writeHead(400, { 'Content-Type': 'text/plain' });
               res.end('No authorization code received.');
-              (server as any).destroy();
+              server.close();
+              server.closeAllConnections();
               reject(new Error('No authorization code received'));
               return;
             }
@@ -204,7 +205,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
             if (returnedState !== expectedState) {
               res.writeHead(400, { 'Content-Type': 'text/plain' });
               res.end('State mismatch — possible CSRF attempt. Aborting.');
-              (server as any).destroy();
+              server.close();
+              server.closeAllConnections();
               reject(new Error('OAuth state token mismatch'));
               return;
             }
@@ -217,7 +219,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
             res.end(
               '<h2>Authentication successful!</h2><p>You can close this tab.</p>',
             );
-            (server as any).destroy();
+            server.close();
+            server.closeAllConnections();
 
             console.log(`Token saved (encrypted) for ${alias}.`);
             console.log('Next: authenticate your other aliases, then verify with: mcp-google-multi config check');
@@ -226,7 +229,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
         } catch (e) {
           res.writeHead(500, { 'Content-Type': 'text/plain' });
           res.end('Internal error during authentication.');
-          (server as any).destroy();
+          server.close();
+          server.closeAllConnections();
           reject(e);
         }
       })
@@ -237,7 +241,6 @@ export async function runAuthFlow(args: string[]): Promise<void> {
         open(authorizeUrl, { wait: false }).then((cp) => cp.unref());
       });
 
-    destroyer(server);
 
     server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
