@@ -22,6 +22,54 @@ Accounts live in a mutable, plaintext-by-design `config.json` (no secrets ever; 
 - Secrets (`GOOGLE_CLIENT_ID`/`SECRET`, `MASTER_KEY`) are never config fields — a secret-shaped key fails validation (`E_CONFIG_INVALID`).
 - Startup errors: no accounts anywhere = `E_NO_ACCOUNTS_CONFIGURED`; invalid file = `E_CONFIG_INVALID`; a file written by a newer version = `E_CONFIG_VERSION_UNSUPPORTED` (upgrade the package).
 
+## Scope profiles (per-account consent)
+
+Each account can point at a named **scope profile** so consent is exactly what that account uses — a Workspace account can carry admin + `gmail_settings` while a personal account is never asked for them:
+
+```jsonc
+{
+  "version": 1,
+  "accounts": {
+    "work":     { "email": "you@company.com", "scopeProfile": "workspace-admin" },
+    "personal": { "email": "you@gmail.com" }
+  },
+  "scopeProfiles": {
+    "workspace-admin": { "bundles": ["gmail_settings", "chat"], "admin": true }
+  }
+}
+```
+
+- A missing `scopeProfile` means the built-in `base` profile (base scopes only). `admin: true` on a profile equals including the `admin` bundle.
+- Services register for the **union** of every account's bundles; authorization stays per account at call time (an account without the bundle gets a scope error with a re-auth hint, not silent access).
+- Changing a profile changes that account's consent set — re-run `auth --account <alias>` for it.
+- An unknown bundle name fails startup with `E_UNKNOWN_BUNDLE` and a did-you-mean suggestion (v5 silently ignored typos).
+- `GOOGLE_OPTIONAL_SCOPES` still works as a legacy global override applied to every account (warns `E_LEGACY_GLOBAL_SCOPES`; `migrate-config` folds it into an explicit `legacy-global` profile).
+
+### Bundle catalog
+
+| Bundle | Risk | Unlocks |
+|---|---|---|
+| `slides` | low | Create and edit Slides presentations |
+| `keep` | low | Read and edit Keep notes |
+| `driveactivity` | low | Read the Drive activity feed |
+| `postmaster` | low | Read Postmaster Tools deliverability data |
+| `forms` | medium | Build Forms and read responses |
+| `chat` | medium | Read/send Chat messages, manage spaces |
+| `gmail_settings` | medium | Mailbox settings: filters, labels, vacation |
+| `classroom` | medium | Courses, coursework, rosters, announcements |
+| `cloudsearch` | medium | Query Cloud Search across Workspace content |
+| `drivelabels` | medium | Manage Drive labels |
+| `script` | medium | Apps Script projects and deployments |
+| `groupssettings` | medium | Google Groups settings |
+| `gmail_settings_sharing` | high | Forwarding/delegation — can route mail out |
+| `cloudidentity` | high | Cloud Identity groups and devices |
+| `groupsmigration` | high | Migrate messages into Groups |
+| `licensing` | high | Assign/revoke license seats |
+| `reseller` | high | Reseller subscriptions and orders |
+| `appsmarket` | high | Marketplace license assignments |
+| `vault` | high (Workspace-only) | eDiscovery over the whole domain |
+| `admin` | high (Workspace-only) | Directory management + audit reports |
+
 ## Environment variables
 
 | Env var | Required | Description |

@@ -1,5 +1,6 @@
 import { CONFIG_VERSION, configFilePath, loadConfigFile, mutateConfigFile } from './config-file.js';
 import type { ConfigFile } from './config-file.js';
+import { BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from './scope-catalog.js';
 
 function parseCsv(value: string | undefined): string[] {
   return (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -37,6 +38,32 @@ export function runMigrateConfig(env: NodeJS.ProcessEnv = process.env): void {
     desired[alias] = { email };
   }
 
+  // Legacy global scopes (BC7) become an explicit named profile every account
+  // points at, so removing the env var later changes nothing.
+  const legacyNames = parseCsv(env.GOOGLE_OPTIONAL_SCOPES);
+  let legacyProfile: { bundles: string[] } | undefined;
+  if (legacyNames.length > 0) {
+    const bundles = resolveBundleAliases(legacyNames);
+    for (const bundle of bundles) {
+      if (bundle === 'admin') {
+        console.error(
+          'E_UNKNOWN_BUNDLE: "admin" is not a global bundle: use GOOGLE_ADMIN_ACCOUNTS or an "admin: true" scope profile. Nothing written.',
+        );
+        process.exitCode = 1;
+        return;
+      }
+      if (!(bundle in BUNDLE_CATALOG)) {
+        const hint = closestBundle(bundle);
+        console.error(
+          `E_UNKNOWN_BUNDLE: unknown bundle "${bundle}" in GOOGLE_OPTIONAL_SCOPES${hint ? ` — did you mean "${hint}"?` : ''}. Nothing written.`,
+        );
+        process.exitCode = 1;
+        return;
+      }
+    }
+    legacyProfile = { bundles };
+  }
+
   const filePath = configFilePath(env);
   const before = loadConfigFile(filePath);
   // Merge per-alias: env owns the alias set and emails, but file-only fields
@@ -46,7 +73,8 @@ export function runMigrateConfig(env: NodeJS.ProcessEnv = process.env): void {
   const dropped = Object.keys(existing).filter((a) => !(a in desired));
   for (const [alias, entry] of Object.entries(desired)) {
     const prev = existing[alias];
-    if (prev?.scopeProfile) entry.scopeProfile = prev.scopeProfile;
+    if (legacyProfile) entry.scopeProfile = 'legacy-global';
+    else if (prev?.scopeProfile) entry.scopeProfile = prev.scopeProfile;
     if (adminAliases.length > 0) {
       if (adminAliases.includes(alias)) entry.admin = true;
     } else if (prev?.admin) {
@@ -54,7 +82,11 @@ export function runMigrateConfig(env: NodeJS.ProcessEnv = process.env): void {
     }
   }
   const beforeAccounts = JSON.stringify(existing);
-  if (beforeAccounts === JSON.stringify(desired)) {
+  const beforeProfiles = JSON.stringify(before?.scopeProfiles ?? {});
+  const desiredProfiles = legacyProfile
+    ? { ...(before?.scopeProfiles ?? {}), 'legacy-global': legacyProfile }
+    : (before?.scopeProfiles ?? {});
+  if (beforeAccounts === JSON.stringify(desired) && beforeProfiles === JSON.stringify(desiredProfiles)) {
     console.log(`${filePath} already matches the environment — nothing to do.`);
     return;
   }
@@ -62,6 +94,7 @@ export function runMigrateConfig(env: NodeJS.ProcessEnv = process.env): void {
   mutateConfigFile((current) => {
     current.version = current.version || CONFIG_VERSION;
     current.accounts = desired;
+    if (legacyProfile) current.scopeProfiles = desiredProfiles;
     return current;
   }, filePath);
 

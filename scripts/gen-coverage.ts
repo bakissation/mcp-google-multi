@@ -39,7 +39,7 @@ function gatingFor(service: string): string {
   if (service === 'admin') return '`GOOGLE_ADMIN_ACCOUNTS`';
   const curated = SERVICES.find((s) => s.name === service);
   if (curated?.enabled || GENERATED_GATES[service]) {
-    return `\`GOOGLE_OPTIONAL_SCOPES=${service}\``;
+    return `scope profile bundle \`${service}\``;
   }
   return 'default';
 }

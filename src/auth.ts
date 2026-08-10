@@ -4,6 +4,8 @@ import { URL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { openUrl } from './open-url.js';
 import { ACCOUNTS, getAccountSet } from './accounts.js';
+import { ADMIN_SCOPES, BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from './scope-catalog.js';
+import type { ScopeProfile } from './scope-catalog.js';
 import { writeToken } from './token-store.js';
 
 // Personal (non-Workspace) accounts 403 on admin scopes; ADMIN_SCOPES stays per-account opt-in, never granted by default.
@@ -21,68 +23,15 @@ export const BASE_SCOPES = [
   'https://www.googleapis.com/auth/meetings.space.readonly',
 ];
 
-export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
-  slides: [
-    'https://www.googleapis.com/auth/presentations',
-  ],
-  forms: [
-    'https://www.googleapis.com/auth/forms.body',
-    'https://www.googleapis.com/auth/forms.responses.readonly',
-  ],
-  chat: [
-    'https://www.googleapis.com/auth/chat.spaces',
-    'https://www.googleapis.com/auth/chat.messages',
-    'https://www.googleapis.com/auth/chat.messages.create',
-  ],
-  // These extend the always-on gmail service: users.settings.* writes require these
-  // scopes (reads already work via gmail.modify); sharing is split out as riskier.
-  gmail_settings: [
-    'https://www.googleapis.com/auth/gmail.settings.basic',
-  ],
-  gmail_settings_sharing: [
-    'https://www.googleapis.com/auth/gmail.settings.sharing',
-  ],
-  classroom: [
-    'https://www.googleapis.com/auth/classroom.courses',
-    'https://www.googleapis.com/auth/classroom.coursework.me',
-    'https://www.googleapis.com/auth/classroom.coursework.students',
-    'https://www.googleapis.com/auth/classroom.courseworkmaterials',
-    'https://www.googleapis.com/auth/classroom.rosters',
-    'https://www.googleapis.com/auth/classroom.announcements',
-    'https://www.googleapis.com/auth/classroom.topics',
-  ],
-  cloudidentity: [
-    'https://www.googleapis.com/auth/cloud-identity.groups',
-    'https://www.googleapis.com/auth/cloud-identity.devices',
-  ],
-  cloudsearch: ['https://www.googleapis.com/auth/cloud_search'],
-  vault: ['https://www.googleapis.com/auth/ediscovery'],
-  keep: ['https://www.googleapis.com/auth/keep'],
-  driveactivity: ['https://www.googleapis.com/auth/drive.activity.readonly'],
-  drivelabels: [
-    'https://www.googleapis.com/auth/drive.labels',
-    'https://www.googleapis.com/auth/drive.admin.labels',
-  ],
-  script: [
-    'https://www.googleapis.com/auth/script.projects',
-    'https://www.googleapis.com/auth/script.deployments',
-    'https://www.googleapis.com/auth/script.processes',
-    'https://www.googleapis.com/auth/script.metrics',
-  ],
-  postmaster: ['https://www.googleapis.com/auth/postmaster.readonly'],
-  groupssettings: ['https://www.googleapis.com/auth/apps.groups.settings'],
-  groupsmigration: ['https://www.googleapis.com/auth/apps.groups.migration'],
-  licensing: ['https://www.googleapis.com/auth/apps.licensing'],
-  reseller: ['https://www.googleapis.com/auth/apps.order'],
-  appsmarket: ['https://www.googleapis.com/auth/appsmarketplace.license'],
-};
+// Kept as a derived view for compat (docs generator, tests); the catalog in
+// scope-catalog.ts is the source of truth. "admin" is not an optional bundle.
+export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = Object.fromEntries(
+  Object.entries(BUNDLE_CATALOG)
+    .filter(([name]) => name !== 'admin')
+    .map(([name, entry]) => [name, entry.scopes]),
+);
 
-export const ADMIN_SCOPES = [
-  'https://www.googleapis.com/auth/admin.reports.audit.readonly',
-  'https://www.googleapis.com/auth/admin.directory.user',
-  'https://www.googleapis.com/auth/admin.directory.group.readonly',
-  'https://www.googleapis.com/auth/admin.directory.group.member.readonly',
-];
+export { ADMIN_SCOPES };
 
 /** Parse comma-separated env value into a deduplicated string array. */
 function parseCsvEnv(name: string): string[] {
@@ -92,24 +41,82 @@ function parseCsvEnv(name: string): string[] {
     .filter(Boolean);
 }
 
-/** Bundle keys enabled via GOOGLE_OPTIONAL_SCOPES (e.g. ["forms","chat"]). */
-export function getOptionalBundles(): string[] {
-  return parseCsvEnv('GOOGLE_OPTIONAL_SCOPES').filter(b => b in OPTIONAL_SCOPE_BUNDLES);
+/**
+ * Legacy global override (BC7): a set GOOGLE_OPTIONAL_SCOPES acts as an
+ * implicit "legacy-global" profile applied to every account (env wins over
+ * file profiles, cc-config R2). Unknown names now fail loudly (BR3) where v5
+ * silently dropped them — the intended migration signal.
+ */
+function legacyGlobalProfile(): ScopeProfile | null {
+  const names = parseCsvEnv('GOOGLE_OPTIONAL_SCOPES');
+  if (names.length === 0) return null;
+  const bundles = resolveBundleAliases(names);
+  // Boot-time validation lives in resolveAccounts (runs whatever
+  // GOOGLE_TOOLSETS selects); this is defense-in-depth for direct callers.
+  for (const bundle of bundles) {
+    if (bundle === 'admin') {
+      throw new Error(
+        'E_UNKNOWN_BUNDLE: "admin" is not a global bundle: grant it per account via GOOGLE_ADMIN_ACCOUNTS or an "admin: true" scope profile.',
+      );
+    }
+    if (!(bundle in BUNDLE_CATALOG)) {
+      const hint = closestBundle(bundle);
+      throw new Error(
+        `E_UNKNOWN_BUNDLE: unknown bundle "${bundle}" in GOOGLE_OPTIONAL_SCOPES${hint ? ` — did you mean "${hint}"?` : ''}`,
+      );
+    }
+  }
+  return { bundles };
 }
 
-/** Aliases granted ADMIN_SCOPES: admin flags on the AccountSet (env
- * GOOGLE_ADMIN_ACCOUNTS overrides config.json per-account admin at resolve). */
+function profileForAccount(alias: string): ScopeProfile {
+  const legacy = legacyGlobalProfile();
+  if (legacy) return legacy;
+  const set = getAccountSet();
+  const name = set.configs[alias]?.scopeProfile ?? 'base';
+  // hasOwn: a profile named like an Object.prototype member must never
+  // resolve to the inherited function.
+  return Object.hasOwn(set.scopeProfiles, name) ? set.scopeProfiles[name] : { bundles: [] };
+}
+
+/** Union of every account's resolved bundles: a service registers if ANY
+ * account can authorize it; per-account authz happens at call time (BR2). */
+export function getOptionalBundles(): string[] {
+  const legacy = legacyGlobalProfile();
+  if (legacy) return legacy.bundles.filter(b => b !== 'admin');
+  const union = new Set<string>();
+  const set = getAccountSet();
+  for (const alias of set.aliases) {
+    for (const b of profileForAccount(alias).bundles) {
+      if (b !== 'admin') union.add(b);
+    }
+  }
+  return [...union];
+}
+
+/** Aliases granted ADMIN_SCOPES: per-account admin flag (env
+ * GOOGLE_ADMIN_ACCOUNTS overrides config.json at resolve) OR the account's
+ * scope profile carrying admin (boolean or "admin" bundle) — equivalent forms. */
 export function getAdminAccounts(): string[] {
   const { aliases, configs } = getAccountSet();
-  return aliases.filter((a) => configs[a].admin === true);
+  return aliases.filter((a) => {
+    if (configs[a].admin === true) return true;
+    const p = profileForAccount(a);
+    return p.admin === true || p.bundles.includes('admin');
+  });
 }
 
-/** Scopes are fixed at consent time: changing GOOGLE_OPTIONAL_SCOPES or GOOGLE_ADMIN_ACCOUNTS requires re-running auth. */
+/** Scopes are fixed at consent time: changing an account's profile (or the
+ * legacy env) changes its consent set and requires re-running auth. Evaluated
+ * per account: `work` can carry admin + gmail_settings while `personal` is
+ * never asked for them. */
 export function resolveScopesForAccount(alias: string): string[] {
-  const scopes = [...BASE_SCOPES];
+  const profile = profileForAccount(alias);
+  const scopes = profile.includesBase === false ? [] : [...BASE_SCOPES];
 
-  for (const bundle of getOptionalBundles()) {
-    scopes.push(...OPTIONAL_SCOPE_BUNDLES[bundle]);
+  for (const bundle of profile.bundles) {
+    if (bundle === 'admin') continue;
+    scopes.push(...BUNDLE_CATALOG[bundle].scopes);
   }
 
   if (getAdminAccounts().includes(alias)) {
