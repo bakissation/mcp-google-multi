@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import type { ToolRegistry } from '../registry.js';
 import { getAccountSet, refreshAccountSetIfStale } from '../accounts.js';
+import { buildScopesReport, type ScopesReport } from '../scope-observability.js';
 import { getAdminAccounts, resolveScopesForAccount } from '../auth.js';
 import { hasToken, readToken } from '../token-store.js';
 
@@ -9,6 +10,10 @@ export interface AccountHealthDeps {
   readToken: (alias: string) => { expiry_date?: number; refresh_token?: string; scope?: string } | null;
   fileExists: (p: string) => boolean;
   now: () => number;
+  /** Scopes required by registered tools — feeds doctor's tool-grained
+   * "registered but not requestable" view (B9). account_list stays compact:
+   * its report universe is profile ∪ granted only. */
+  registeredScopes?: () => string[];
 }
 
 const DEFAULT_DEPS: AccountHealthDeps = {
@@ -27,7 +32,7 @@ export interface AccountHealth {
   source: 'config' | 'env';
   sourceNote?: string;
   token: { status: TokenStatus; expiryDate?: string; hint?: string };
-  scopes: { configured: number; granted: number; missing: string[] };
+  scopes: ScopesReport;
 }
 
 export function deriveAccountHealth(alias: string, deps: AccountHealthDeps = DEFAULT_DEPS): AccountHealth {
@@ -45,7 +50,9 @@ export function deriveAccountHealth(alias: string, deps: AccountHealthDeps = DEF
       ? { sourceNote: 'Defined by GOOGLE_ACCOUNTS env (not editable via config.json)' }
       : {}),
   };
-  const noScopes = { configured: configured.length, granted: 0, missing: configured };
+  const profileSet = new Set(configured);
+  const registered = deps.registeredScopes?.() ?? [];
+  const noScopes = buildScopesReport(new Set<string>(), profileSet, registered);
 
   if (!deps.hasToken(alias)) {
     const legacy = deps.fileExists(config.tokenPath);
@@ -73,7 +80,8 @@ export function deriveAccountHealth(alias: string, deps: AccountHealthDeps = DEF
   }
 
   const granted = typeof token?.scope === 'string' ? token.scope.split(' ').filter(Boolean) : [];
-  const missing = configured.filter((s) => !granted.includes(s));
+  const report = buildScopesReport(new Set(granted), profileSet, registered);
+  const missing = report.requestable;
   const expiry = typeof token?.expiry_date === 'number' ? token.expiry_date : undefined;
   const refreshable = typeof token?.refresh_token === 'string' && token.refresh_token.length > 0;
 
@@ -94,7 +102,7 @@ export function deriveAccountHealth(alias: string, deps: AccountHealthDeps = DEF
             ? 'Re-auth to grant the missing scopes'
             : undefined,
     },
-    scopes: { configured: configured.length, granted: granted.length, missing },
+    scopes: report,
   };
 }
 

@@ -5,11 +5,18 @@ import { coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerMeetGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_meet_v2: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/meetings.space.created","https://www.googleapis.com/auth/meetings.space.readonly"],
+    ["https://www.googleapis.com/auth/meetings.space.created"],
+    ["https://www.googleapis.com/auth/meetings.space.created","https://www.googleapis.com/auth/meetings.space.readonly","https://www.googleapis.com/auth/meetings.space.settings"],
+    ["https://www.googleapis.com/auth/meetings.space.created","https://www.googleapis.com/auth/meetings.space.settings"],
+  ];
   registerGeneratedTool(registry, {
     name: "meet_conference_records_participants_get",
     cud: "read",
     description: "Gets a participant by participant ID.",
-    method: { id: "meet.conferenceRecords.participants.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "meet.conferenceRecords.participants.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -22,7 +29,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_conference_records_participants_list",
     cud: "read",
     description: "Lists the participants in a conference record. By default, ordered by join time and in descending order. This API supports `fields` as standard parameters like",
-    method: { id: "meet.conferenceRecords.participants.list", httpMethod: "GET", path: "v2/{+parent}/participants", baseUrl: "https://meet.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "meet.conferenceRecords.participants.list", httpMethod: "GET", path: "v2/{+parent}/participants", baseUrl: "https://meet.googleapis.com/", requiredParams: ["parent"], scopes: S_meet_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -38,7 +45,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_conference_records_participants_participant_sessions_get",
     cud: "read",
     description: "Gets a participant session by participant session ID.",
-    method: { id: "meet.conferenceRecords.participants.participantSessions.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "meet.conferenceRecords.participants.participantSessions.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -51,7 +58,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_conference_records_participants_participant_sessions_list",
     cud: "read",
     description: "Lists the participant sessions of a participant in a conference record. By default, ordered by join time and in descending order. This API supports `fields` as",
-    method: { id: "meet.conferenceRecords.participants.participantSessions.list", httpMethod: "GET", path: "v2/{+parent}/participantSessions", baseUrl: "https://meet.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "meet.conferenceRecords.participants.participantSessions.list", httpMethod: "GET", path: "v2/{+parent}/participantSessions", baseUrl: "https://meet.googleapis.com/", requiredParams: ["parent"], scopes: S_meet_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -67,7 +74,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_conference_records_recordings_get",
     cud: "read",
     description: "Gets a recording by recording ID.",
-    method: { id: "meet.conferenceRecords.recordings.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "meet.conferenceRecords.recordings.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -80,7 +87,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_conference_records_smart_notes_get",
     cud: "read",
     description: "Gets smart notes by smart note ID.",
-    method: { id: "meet.conferenceRecords.smartNotes.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "meet.conferenceRecords.smartNotes.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -93,7 +100,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_conference_records_smart_notes_list",
     cud: "read",
     description: "Lists the set of smart notes from the conference record. By default, ordered by start time and in ascending order.",
-    method: { id: "meet.conferenceRecords.smartNotes.list", httpMethod: "GET", path: "v2/{+parent}/smartNotes", baseUrl: "https://meet.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "meet.conferenceRecords.smartNotes.list", httpMethod: "GET", path: "v2/{+parent}/smartNotes", baseUrl: "https://meet.googleapis.com/", requiredParams: ["parent"], scopes: S_meet_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -108,7 +115,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_conference_records_transcripts_entries_get",
     cud: "read",
     description: "Gets a `TranscriptEntry` resource by entry ID. Note: The transcript entries returned by the Google Meet API might not match the transcription found in the Googl",
-    method: { id: "meet.conferenceRecords.transcripts.entries.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "meet.conferenceRecords.transcripts.entries.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -121,7 +128,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_conference_records_transcripts_get",
     cud: "read",
     description: "Gets a transcript by transcript ID.",
-    method: { id: "meet.conferenceRecords.transcripts.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "meet.conferenceRecords.transcripts.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -134,7 +141,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_spaces_create",
     cud: "create",
     description: "Creates a space.",
-    method: { id: "meet.spaces.create", httpMethod: "POST", path: "v2/spaces", baseUrl: "https://meet.googleapis.com/", requiredParams: [] },
+    method: { id: "meet.spaces.create", httpMethod: "POST", path: "v2/spaces", baseUrl: "https://meet.googleapis.com/", requiredParams: [], scopes: S_meet_v2[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -147,7 +154,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_spaces_end_active_conference",
     cud: "create",
     description: "Ends an active conference (if there's one). For an example, see [End active conference](https://developers.google.com/workspace/meet/api/guides/meeting-spaces#e",
-    method: { id: "meet.spaces.endActiveConference", httpMethod: "POST", path: "v2/{+name}:endActiveConference", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "meet.spaces.endActiveConference", httpMethod: "POST", path: "v2/{+name}:endActiveConference", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -161,7 +168,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_spaces_get",
     cud: "read",
     description: "Gets details about a meeting space. For an example, see [Get a meeting space](https://developers.google.com/workspace/meet/api/guides/meeting-spaces#get-meeting",
-    method: { id: "meet.spaces.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "meet.spaces.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -174,7 +181,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     name: "meet_spaces_patch",
     cud: "update",
     description: "Updates details about a meeting space. For an example, see [Update a meeting space](https://developers.google.com/workspace/meet/api/guides/meeting-spaces#updat",
-    method: { id: "meet.spaces.patch", httpMethod: "PATCH", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "meet.spaces.patch", httpMethod: "PATCH", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[3] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

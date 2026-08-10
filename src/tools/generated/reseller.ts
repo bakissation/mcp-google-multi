@@ -5,11 +5,16 @@ import { coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerResellerGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_reseller_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/apps.order","https://www.googleapis.com/auth/apps.order.readonly"],
+    ["https://www.googleapis.com/auth/apps.order"],
+  ];
   registerGeneratedTool(registry, {
     name: "reseller_customers_get",
     cud: "read",
     description: "Gets a customer account. Use this operation to see a customer account already in your reseller management, or to see the minimal account information for an exis",
-    method: { id: "reseller.customers.get", httpMethod: "GET", path: "apps/reseller/v1/customers/{customerId}", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId"] },
+    method: { id: "reseller.customers.get", httpMethod: "GET", path: "apps/reseller/v1/customers/{customerId}", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId"], scopes: S_reseller_v1[0] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -22,7 +27,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_customers_insert",
     cud: "create",
     description: "Orders a new customer's account. Before ordering a new customer account, establish whether the customer account already exists using the [`customers.get`](https",
-    method: { id: "reseller.customers.insert", httpMethod: "POST", path: "apps/reseller/v1/customers", baseUrl: "https://reseller.googleapis.com/", requiredParams: [] },
+    method: { id: "reseller.customers.insert", httpMethod: "POST", path: "apps/reseller/v1/customers", baseUrl: "https://reseller.googleapis.com/", requiredParams: [], scopes: S_reseller_v1[1] },
     params: [{"field":"customerAuthToken","api":"customerAuthToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -36,7 +41,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_customers_patch",
     cud: "update",
     description: "Updates a customer account's settings. This method supports patch semantics. You cannot update `customerType` via the Reseller API, but a `\"team\"` customer can",
-    method: { id: "reseller.customers.patch", httpMethod: "PATCH", path: "apps/reseller/v1/customers/{customerId}", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId"] },
+    method: { id: "reseller.customers.patch", httpMethod: "PATCH", path: "apps/reseller/v1/customers/{customerId}", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -50,7 +55,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_customers_update",
     cud: "update",
     description: "Updates a customer account's settings. You cannot update `customerType` via the Reseller API, but a `\"team\"` customer can verify their domain and become `custom",
-    method: { id: "reseller.customers.update", httpMethod: "PUT", path: "apps/reseller/v1/customers/{customerId}", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId"] },
+    method: { id: "reseller.customers.update", httpMethod: "PUT", path: "apps/reseller/v1/customers/{customerId}", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -64,7 +69,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_resellernotify_getwatchdetails",
     cud: "read",
     description: "Returns all the details of the watch corresponding to the reseller.",
-    method: { id: "reseller.resellernotify.getwatchdetails", httpMethod: "GET", path: "apps/reseller/v1/resellernotify/getwatchdetails", baseUrl: "https://reseller.googleapis.com/", requiredParams: [] },
+    method: { id: "reseller.resellernotify.getwatchdetails", httpMethod: "GET", path: "apps/reseller/v1/resellernotify/getwatchdetails", baseUrl: "https://reseller.googleapis.com/", requiredParams: [], scopes: S_reseller_v1[0] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -76,7 +81,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_resellernotify_register",
     cud: "create",
     description: "Registers a Reseller for receiving notifications.",
-    method: { id: "reseller.resellernotify.register", httpMethod: "POST", path: "apps/reseller/v1/resellernotify/register", baseUrl: "https://reseller.googleapis.com/", requiredParams: [] },
+    method: { id: "reseller.resellernotify.register", httpMethod: "POST", path: "apps/reseller/v1/resellernotify/register", baseUrl: "https://reseller.googleapis.com/", requiredParams: [], scopes: S_reseller_v1[1] },
     params: [{"field":"serviceAccountEmailAddress","api":"serviceAccountEmailAddress","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -89,7 +94,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_resellernotify_unregister",
     cud: "create",
     description: "Unregisters a Reseller for receiving notifications.",
-    method: { id: "reseller.resellernotify.unregister", httpMethod: "POST", path: "apps/reseller/v1/resellernotify/unregister", baseUrl: "https://reseller.googleapis.com/", requiredParams: [] },
+    method: { id: "reseller.resellernotify.unregister", httpMethod: "POST", path: "apps/reseller/v1/resellernotify/unregister", baseUrl: "https://reseller.googleapis.com/", requiredParams: [], scopes: S_reseller_v1[1] },
     params: [{"field":"serviceAccountEmailAddress","api":"serviceAccountEmailAddress","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -102,7 +107,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_subscriptions_activate",
     cud: "create",
     description: "Activates a subscription previously suspended by the reseller. If you did not suspend the customer subscription and it is suspended for any other reason, such a",
-    method: { id: "reseller.subscriptions.activate", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/activate", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"] },
+    method: { id: "reseller.subscriptions.activate", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/activate", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -116,7 +121,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_subscriptions_change_plan",
     cud: "create",
     description: "Updates a subscription plan. Use this method to update a plan for a 30-day trial or a flexible plan subscription to an annual commitment plan with monthly or ye",
-    method: { id: "reseller.subscriptions.changePlan", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/changePlan", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"] },
+    method: { id: "reseller.subscriptions.changePlan", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/changePlan", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -131,7 +136,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_subscriptions_change_renewal_settings",
     cud: "create",
     description: "Updates a user license's renewal settings. This is applicable for accounts with annual commitment plans only. For more information, see the description in [mana",
-    method: { id: "reseller.subscriptions.changeRenewalSettings", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/changeRenewalSettings", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"] },
+    method: { id: "reseller.subscriptions.changeRenewalSettings", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/changeRenewalSettings", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -146,7 +151,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_subscriptions_change_seats",
     cud: "create",
     description: "Updates a subscription's user license settings. For more information about updating an annual commitment plan or a flexible plan subscription’s licenses, see [M",
-    method: { id: "reseller.subscriptions.changeSeats", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/changeSeats", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"] },
+    method: { id: "reseller.subscriptions.changeSeats", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/changeSeats", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -161,7 +166,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_subscriptions_delete",
     cud: "delete",
     description: "Cancels, suspends, or transfers a subscription to direct.",
-    method: { id: "reseller.subscriptions.delete", httpMethod: "DELETE", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId","deletionType"] },
+    method: { id: "reseller.subscriptions.delete", httpMethod: "DELETE", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId","deletionType"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"deletionType","api":"deletionType","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -176,7 +181,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_subscriptions_get",
     cud: "read",
     description: "Gets a specific subscription. The `subscriptionId` can be found using the [Retrieve all reseller subscriptions](https://developers.google.com/workspace/admin/re",
-    method: { id: "reseller.subscriptions.get", httpMethod: "GET", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"] },
+    method: { id: "reseller.subscriptions.get", httpMethod: "GET", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[0] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -190,7 +195,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_subscriptions_insert",
     cud: "create",
     description: "Creates or transfer a subscription. Create a subscription for a customer's account that you ordered using the [Order a new customer account](https://developers.",
-    method: { id: "reseller.subscriptions.insert", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId"] },
+    method: { id: "reseller.subscriptions.insert", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"action","api":"action","location":"query"},{"field":"customerAuthToken","api":"customerAuthToken","location":"query"},{"field":"sourceSkuId","api":"sourceSkuId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -207,7 +212,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_subscriptions_list",
     cud: "read",
     description: "Lists of subscriptions managed by the reseller. The list can be all subscriptions, all of a customer's subscriptions, or all of a customer's transferable subscr",
-    method: { id: "reseller.subscriptions.list", httpMethod: "GET", path: "apps/reseller/v1/subscriptions", baseUrl: "https://reseller.googleapis.com/", requiredParams: [] },
+    method: { id: "reseller.subscriptions.list", httpMethod: "GET", path: "apps/reseller/v1/subscriptions", baseUrl: "https://reseller.googleapis.com/", requiredParams: [], scopes: S_reseller_v1[0] },
     params: [{"field":"customerAuthToken","api":"customerAuthToken","location":"query"},{"field":"customerId","api":"customerId","location":"query"},{"field":"customerNamePrefix","api":"customerNamePrefix","location":"query"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -224,7 +229,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_subscriptions_start_paid_service",
     cud: "create",
     description: "Immediately move a 30-day free trial subscription to a paid service subscription. This method is only applicable if a payment plan has already been set up for t",
-    method: { id: "reseller.subscriptions.startPaidService", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/startPaidService", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"] },
+    method: { id: "reseller.subscriptions.startPaidService", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/startPaidService", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -238,7 +243,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     name: "reseller_subscriptions_suspend",
     cud: "create",
     description: "Suspends an active subscription. You can use this method to suspend a paid subscription that is currently in the `ACTIVE` state. * For `FLEXIBLE` subscriptions,",
-    method: { id: "reseller.subscriptions.suspend", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/suspend", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"] },
+    method: { id: "reseller.subscriptions.suspend", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/suspend", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {

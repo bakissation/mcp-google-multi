@@ -5,11 +5,15 @@ import { coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_groupssettings_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/apps.groups.settings"],
+  ];
   registerGeneratedTool(registry, {
     name: "groupssettings_groups_get",
     cud: "read",
     description: "Gets one resource by id.",
-    method: { id: "groupsSettings.groups.get", httpMethod: "GET", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"] },
+    method: { id: "groupsSettings.groups.get", httpMethod: "GET", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"], scopes: S_groupssettings_v1[0] },
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -22,7 +26,7 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): vo
     name: "groupssettings_groups_patch",
     cud: "update",
     description: "Updates an existing resource. This method supports patch semantics.",
-    method: { id: "groupsSettings.groups.patch", httpMethod: "PATCH", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"] },
+    method: { id: "groupsSettings.groups.patch", httpMethod: "PATCH", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"], scopes: S_groupssettings_v1[0] },
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -36,7 +40,7 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): vo
     name: "groupssettings_groups_update",
     cud: "update",
     description: "Updates an existing resource.",
-    method: { id: "groupsSettings.groups.update", httpMethod: "PUT", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"] },
+    method: { id: "groupsSettings.groups.update", httpMethod: "PUT", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"], scopes: S_groupssettings_v1[0] },
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

@@ -5,11 +5,16 @@ import { coerceBoolean, coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerVaultGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_vault_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/ediscovery"],
+    ["https://www.googleapis.com/auth/ediscovery","https://www.googleapis.com/auth/ediscovery.readonly"],
+  ];
   registerGeneratedTool(registry, {
     name: "vault_matters_add_permissions",
     cud: "create",
     description: "Adds an account as a matter collaborator.",
-    method: { id: "vault.matters.addPermissions", httpMethod: "POST", path: "v1/matters/{matterId}:addPermissions", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.addPermissions", httpMethod: "POST", path: "v1/matters/{matterId}:addPermissions", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -23,7 +28,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_close",
     cud: "create",
     description: "Closes the specified matter. Returns the matter with updated state.",
-    method: { id: "vault.matters.close", httpMethod: "POST", path: "v1/matters/{matterId}:close", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.close", httpMethod: "POST", path: "v1/matters/{matterId}:close", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -37,7 +42,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_count",
     cud: "read",
     description: "Counts the accounts processed by the specified query.",
-    method: { id: "vault.matters.count", httpMethod: "POST", path: "v1/matters/{matterId}:count", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.count", httpMethod: "POST", path: "v1/matters/{matterId}:count", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -51,7 +56,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_create",
     cud: "create",
     description: "Creates a matter with the given name and description. The initial state is open, and the owner is the method caller. Returns the created matter with default vie",
-    method: { id: "vault.matters.create", httpMethod: "POST", path: "v1/matters", baseUrl: "https://vault.googleapis.com/", requiredParams: [] },
+    method: { id: "vault.matters.create", httpMethod: "POST", path: "v1/matters", baseUrl: "https://vault.googleapis.com/", requiredParams: [], scopes: S_vault_v1[0] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -64,7 +69,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_delete",
     cud: "delete",
     description: "Deletes the specified matter. Returns the matter with updated state.",
-    method: { id: "vault.matters.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -77,7 +82,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_exports_create",
     cud: "create",
     description: "Creates an export.",
-    method: { id: "vault.matters.exports.create", httpMethod: "POST", path: "v1/matters/{matterId}/exports", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.exports.create", httpMethod: "POST", path: "v1/matters/{matterId}/exports", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -91,7 +96,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_exports_delete",
     cud: "delete",
     description: "Deletes an export.",
-    method: { id: "vault.matters.exports.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}/exports/{exportId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","exportId"] },
+    method: { id: "vault.matters.exports.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}/exports/{exportId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","exportId"], scopes: S_vault_v1[0] },
     params: [{"field":"exportId","api":"exportId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -105,7 +110,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_exports_get",
     cud: "read",
     description: "Gets an export.",
-    method: { id: "vault.matters.exports.get", httpMethod: "GET", path: "v1/matters/{matterId}/exports/{exportId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","exportId"] },
+    method: { id: "vault.matters.exports.get", httpMethod: "GET", path: "v1/matters/{matterId}/exports/{exportId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","exportId"], scopes: S_vault_v1[1] },
     params: [{"field":"exportId","api":"exportId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -119,7 +124,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_exports_list",
     cud: "read",
     description: "Lists details about the exports in the specified matter.",
-    method: { id: "vault.matters.exports.list", httpMethod: "GET", path: "v1/matters/{matterId}/exports", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.exports.list", httpMethod: "GET", path: "v1/matters/{matterId}/exports", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[1] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -134,7 +139,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_get",
     cud: "read",
     description: "Gets the specified matter.",
-    method: { id: "vault.matters.get", httpMethod: "GET", path: "v1/matters/{matterId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.get", httpMethod: "GET", path: "v1/matters/{matterId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[1] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -148,7 +153,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_accounts_create",
     cud: "create",
     description: "Adds an account to a hold. Accounts can be added only to a hold that does not have an organizational unit set. If you try to add an account to an organizational",
-    method: { id: "vault.matters.holds.accounts.create", httpMethod: "POST", path: "v1/matters/{matterId}/holds/{holdId}/accounts", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"] },
+    method: { id: "vault.matters.holds.accounts.create", httpMethod: "POST", path: "v1/matters/{matterId}/holds/{holdId}/accounts", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"], scopes: S_vault_v1[0] },
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -163,7 +168,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_accounts_delete",
     cud: "delete",
     description: "Removes an account from a hold.",
-    method: { id: "vault.matters.holds.accounts.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}/holds/{holdId}/accounts/{accountId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId","accountId"] },
+    method: { id: "vault.matters.holds.accounts.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}/holds/{holdId}/accounts/{accountId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId","accountId"], scopes: S_vault_v1[0] },
     params: [{"field":"accountId","api":"accountId","location":"path"},{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -178,7 +183,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_accounts_list",
     cud: "read",
     description: "Lists the accounts covered by a hold. This can list only individually-specified accounts covered by the hold. If the hold covers an organizational unit, use the",
-    method: { id: "vault.matters.holds.accounts.list", httpMethod: "GET", path: "v1/matters/{matterId}/holds/{holdId}/accounts", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"] },
+    method: { id: "vault.matters.holds.accounts.list", httpMethod: "GET", path: "v1/matters/{matterId}/holds/{holdId}/accounts", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"], scopes: S_vault_v1[1] },
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -192,7 +197,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_add_held_accounts",
     cud: "create",
     description: "Adds accounts to a hold. Returns a list of accounts that have been successfully added. Accounts can be added only to an existing account-based hold.",
-    method: { id: "vault.matters.holds.addHeldAccounts", httpMethod: "POST", path: "v1/matters/{matterId}/holds/{holdId}:addHeldAccounts", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"] },
+    method: { id: "vault.matters.holds.addHeldAccounts", httpMethod: "POST", path: "v1/matters/{matterId}/holds/{holdId}:addHeldAccounts", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"], scopes: S_vault_v1[0] },
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -207,7 +212,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_create",
     cud: "create",
     description: "Creates a hold in the specified matter.",
-    method: { id: "vault.matters.holds.create", httpMethod: "POST", path: "v1/matters/{matterId}/holds", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.holds.create", httpMethod: "POST", path: "v1/matters/{matterId}/holds", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -221,7 +226,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_delete",
     cud: "delete",
     description: "Removes the specified hold and releases the accounts or organizational unit covered by the hold. If the data is not preserved by another hold or retention rule,",
-    method: { id: "vault.matters.holds.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}/holds/{holdId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"] },
+    method: { id: "vault.matters.holds.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}/holds/{holdId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"], scopes: S_vault_v1[0] },
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -235,7 +240,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_get",
     cud: "read",
     description: "Gets the specified hold.",
-    method: { id: "vault.matters.holds.get", httpMethod: "GET", path: "v1/matters/{matterId}/holds/{holdId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"] },
+    method: { id: "vault.matters.holds.get", httpMethod: "GET", path: "v1/matters/{matterId}/holds/{holdId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"], scopes: S_vault_v1[1] },
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -250,7 +255,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_list",
     cud: "read",
     description: "Lists the holds in a matter.",
-    method: { id: "vault.matters.holds.list", httpMethod: "GET", path: "v1/matters/{matterId}/holds", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.holds.list", httpMethod: "GET", path: "v1/matters/{matterId}/holds", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[1] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -266,7 +271,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_remove_held_accounts",
     cud: "delete",
     description: "Removes the specified accounts from a hold. Returns a list of statuses in the same order as the request.",
-    method: { id: "vault.matters.holds.removeHeldAccounts", httpMethod: "POST", path: "v1/matters/{matterId}/holds/{holdId}:removeHeldAccounts", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"] },
+    method: { id: "vault.matters.holds.removeHeldAccounts", httpMethod: "POST", path: "v1/matters/{matterId}/holds/{holdId}:removeHeldAccounts", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"], scopes: S_vault_v1[0] },
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -281,7 +286,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_holds_update",
     cud: "update",
     description: "Updates the scope (organizational unit or accounts) and query parameters of a hold. You cannot add accounts to a hold that covers an organizational unit, nor ca",
-    method: { id: "vault.matters.holds.update", httpMethod: "PUT", path: "v1/matters/{matterId}/holds/{holdId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"] },
+    method: { id: "vault.matters.holds.update", httpMethod: "PUT", path: "v1/matters/{matterId}/holds/{holdId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","holdId"], scopes: S_vault_v1[0] },
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -296,7 +301,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_list",
     cud: "read",
     description: "Lists matters the requestor has access to.",
-    method: { id: "vault.matters.list", httpMethod: "GET", path: "v1/matters", baseUrl: "https://vault.googleapis.com/", requiredParams: [] },
+    method: { id: "vault.matters.list", httpMethod: "GET", path: "v1/matters", baseUrl: "https://vault.googleapis.com/", requiredParams: [], scopes: S_vault_v1[1] },
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"state","api":"state","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -312,7 +317,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_remove_permissions",
     cud: "delete",
     description: "Removes an account as a matter collaborator.",
-    method: { id: "vault.matters.removePermissions", httpMethod: "POST", path: "v1/matters/{matterId}:removePermissions", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.removePermissions", httpMethod: "POST", path: "v1/matters/{matterId}:removePermissions", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -326,7 +331,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_reopen",
     cud: "create",
     description: "Reopens the specified matter. Returns the matter with updated state.",
-    method: { id: "vault.matters.reopen", httpMethod: "POST", path: "v1/matters/{matterId}:reopen", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.reopen", httpMethod: "POST", path: "v1/matters/{matterId}:reopen", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -340,7 +345,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_saved_queries_create",
     cud: "create",
     description: "Creates a saved query.",
-    method: { id: "vault.matters.savedQueries.create", httpMethod: "POST", path: "v1/matters/{matterId}/savedQueries", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.savedQueries.create", httpMethod: "POST", path: "v1/matters/{matterId}/savedQueries", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -354,7 +359,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_saved_queries_delete",
     cud: "delete",
     description: "Deletes the specified saved query.",
-    method: { id: "vault.matters.savedQueries.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}/savedQueries/{savedQueryId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","savedQueryId"] },
+    method: { id: "vault.matters.savedQueries.delete", httpMethod: "DELETE", path: "v1/matters/{matterId}/savedQueries/{savedQueryId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","savedQueryId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"savedQueryId","api":"savedQueryId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -368,7 +373,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_saved_queries_get",
     cud: "read",
     description: "Retrieves the specified saved query.",
-    method: { id: "vault.matters.savedQueries.get", httpMethod: "GET", path: "v1/matters/{matterId}/savedQueries/{savedQueryId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","savedQueryId"] },
+    method: { id: "vault.matters.savedQueries.get", httpMethod: "GET", path: "v1/matters/{matterId}/savedQueries/{savedQueryId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId","savedQueryId"], scopes: S_vault_v1[1] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"savedQueryId","api":"savedQueryId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -382,7 +387,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_saved_queries_list",
     cud: "read",
     description: "Lists the saved queries in a matter.",
-    method: { id: "vault.matters.savedQueries.list", httpMethod: "GET", path: "v1/matters/{matterId}/savedQueries", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.savedQueries.list", httpMethod: "GET", path: "v1/matters/{matterId}/savedQueries", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[1] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -397,7 +402,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_undelete",
     cud: "update",
     description: "Undeletes the specified matter. Returns the matter with updated state.",
-    method: { id: "vault.matters.undelete", httpMethod: "POST", path: "v1/matters/{matterId}:undelete", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.undelete", httpMethod: "POST", path: "v1/matters/{matterId}:undelete", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -411,7 +416,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_matters_update",
     cud: "update",
     description: "Updates the specified matter. This updates only the name and description of the matter, identified by matter ID. Changes to any other fields are ignored. Return",
-    method: { id: "vault.matters.update", httpMethod: "PUT", path: "v1/matters/{matterId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"] },
+    method: { id: "vault.matters.update", httpMethod: "PUT", path: "v1/matters/{matterId}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -425,7 +430,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_operations_cancel",
     cud: "create",
     description: "Starts asynchronous cancellation on a long-running operation. The server makes a best effort to cancel the operation, but success is not guaranteed. If the serv",
-    method: { id: "vault.operations.cancel", httpMethod: "POST", path: "v1/{+name}:cancel", baseUrl: "https://vault.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "vault.operations.cancel", httpMethod: "POST", path: "v1/{+name}:cancel", baseUrl: "https://vault.googleapis.com/", requiredParams: ["name"], scopes: S_vault_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -439,7 +444,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_operations_delete",
     cud: "delete",
     description: "Deletes a long-running operation. This method indicates that the client is no longer interested in the operation result. It does not cancel the operation. If th",
-    method: { id: "vault.operations.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "vault.operations.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["name"], scopes: S_vault_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -452,7 +457,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_operations_get",
     cud: "read",
     description: "Gets the latest state of a long-running operation. Clients can use this method to poll the operation result at intervals as recommended by the API service.",
-    method: { id: "vault.operations.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "vault.operations.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["name"], scopes: S_vault_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -465,7 +470,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
     name: "vault_operations_list",
     cud: "read",
     description: "Lists operations that match the specified filter in the request. If the server doesn't support this method, it returns `UNIMPLEMENTED`.",
-    method: { id: "vault.operations.list", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "vault.operations.list", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://vault.googleapis.com/", requiredParams: ["name"], scopes: S_vault_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"returnPartialSuccess","api":"returnPartialSuccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {

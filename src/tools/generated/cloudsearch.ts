@@ -5,11 +5,21 @@ import { coerceBoolean, coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_cloudsearch_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/cloud_search","https://www.googleapis.com/auth/cloud_search.debug"],
+    ["https://www.googleapis.com/auth/cloud_search","https://www.googleapis.com/auth/cloud_search.settings","https://www.googleapis.com/auth/cloud_search.settings.indexing"],
+    ["https://www.googleapis.com/auth/cloud_search","https://www.googleapis.com/auth/cloud_search.indexing"],
+    ["https://www.googleapis.com/auth/cloud_search","https://www.googleapis.com/auth/cloud_search.debug","https://www.googleapis.com/auth/cloud_search.indexing","https://www.googleapis.com/auth/cloud_search.settings","https://www.googleapis.com/auth/cloud_search.settings.indexing","https://www.googleapis.com/auth/cloud_search.settings.query"],
+    ["https://www.googleapis.com/auth/cloud_search","https://www.googleapis.com/auth/cloud_search.query"],
+    ["https://www.googleapis.com/auth/cloud_search","https://www.googleapis.com/auth/cloud_search.settings","https://www.googleapis.com/auth/cloud_search.settings.query"],
+    ["https://www.googleapis.com/auth/cloud_search","https://www.googleapis.com/auth/cloud_search.stats","https://www.googleapis.com/auth/cloud_search.stats.indexing"],
+  ];
   registerGeneratedTool(registry, {
     name: "cloudsearch_debug_datasources_items_check_access",
     cud: "create",
     description: "Checks whether an item is accessible by specified principal. Principal must be a user; groups and domain values aren't supported. **Note:** This API requires an",
-    method: { id: "cloudsearch.debug.datasources.items.checkAccess", httpMethod: "POST", path: "v1/debug/{+name}:checkAccess", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.debug.datasources.items.checkAccess", httpMethod: "POST", path: "v1/debug/{+name}:checkAccess", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -24,7 +34,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_debug_datasources_items_search_by_view_url",
     cud: "read",
     description: "Fetches the item whose viewUrl exactly matches that of the URL provided in the request. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.debug.datasources.items.searchByViewUrl", httpMethod: "POST", path: "v1/debug/{+name}/items:searchByViewUrl", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.debug.datasources.items.searchByViewUrl", httpMethod: "POST", path: "v1/debug/{+name}/items:searchByViewUrl", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -38,7 +48,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_debug_datasources_items_unmappedids_list",
     cud: "read",
     description: "List all unmapped identities for a specific item. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.debug.datasources.items.unmappedids.list", httpMethod: "GET", path: "v1/debug/{+parent}/unmappedids", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "cloudsearch.debug.datasources.items.unmappedids.list", httpMethod: "GET", path: "v1/debug/{+parent}/unmappedids", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudsearch_v1[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -54,7 +64,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_debug_identitysources_items_list_forunmappedidentity",
     cud: "read",
     description: "Lists names of items associated with an unmapped identity. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.debug.identitysources.items.listForunmappedidentity", httpMethod: "GET", path: "v1/debug/{+parent}/items:forunmappedidentity", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "cloudsearch.debug.identitysources.items.listForunmappedidentity", httpMethod: "GET", path: "v1/debug/{+parent}/items:forunmappedidentity", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudsearch_v1[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"groupResourceName","api":"groupResourceName","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"userResourceName","api":"userResourceName","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -72,7 +82,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_debug_identitysources_unmappedids_list",
     cud: "read",
     description: "Lists unmapped user identities for an identity source. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.debug.identitysources.unmappedids.list", httpMethod: "GET", path: "v1/debug/{+parent}/unmappedids", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "cloudsearch.debug.identitysources.unmappedids.list", httpMethod: "GET", path: "v1/debug/{+parent}/unmappedids", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudsearch_v1[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"resolutionStatusCode","api":"resolutionStatusCode","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -89,7 +99,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_delete_schema",
     cud: "delete",
     description: "Deletes the schema of a data source. **Note:** This API requires an admin or service account to execute.",
-    method: { id: "cloudsearch.indexing.datasources.deleteSchema", httpMethod: "DELETE", path: "v1/indexing/{+name}/schema", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.deleteSchema", httpMethod: "DELETE", path: "v1/indexing/{+name}/schema", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -103,7 +113,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_get_schema",
     cud: "read",
     description: "Gets the schema of a data source. **Note:** This API requires an admin or service account to execute.",
-    method: { id: "cloudsearch.indexing.datasources.getSchema", httpMethod: "GET", path: "v1/indexing/{+name}/schema", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.getSchema", httpMethod: "GET", path: "v1/indexing/{+name}/schema", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -117,7 +127,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_items_delete",
     cud: "delete",
     description: "Deletes Item resource for the specified resource name. This API requires an admin or service account to execute. The service account used is the one whitelisted",
-    method: { id: "cloudsearch.indexing.datasources.items.delete", httpMethod: "DELETE", path: "v1/indexing/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.items.delete", httpMethod: "DELETE", path: "v1/indexing/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"connectorName","api":"connectorName","location":"query"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"mode","api":"mode","location":"query"},{"field":"version","api":"version","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -134,7 +144,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_items_delete_queue_items",
     cud: "delete",
     description: "Deletes all items in a queue. This method is useful for deleting stale items. This API requires an admin or service account to execute. The service account used",
-    method: { id: "cloudsearch.indexing.datasources.items.deleteQueueItems", httpMethod: "POST", path: "v1/indexing/{+name}/items:deleteQueueItems", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.items.deleteQueueItems", httpMethod: "POST", path: "v1/indexing/{+name}/items:deleteQueueItems", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -148,7 +158,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_items_get",
     cud: "read",
     description: "Gets Item resource by item name. This API requires an admin or service account to execute. The service account used is the one whitelisted in the corresponding",
-    method: { id: "cloudsearch.indexing.datasources.items.get", httpMethod: "GET", path: "v1/indexing/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.items.get", httpMethod: "GET", path: "v1/indexing/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"connectorName","api":"connectorName","location":"query"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -163,7 +173,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_items_index",
     cud: "create",
     description: "Updates Item ACL, metadata, and content. It will insert the Item if it does not exist. This method does not support partial updates. Fields with no provided val",
-    method: { id: "cloudsearch.indexing.datasources.items.index", httpMethod: "POST", path: "v1/indexing/{+name}:index", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.items.index", httpMethod: "POST", path: "v1/indexing/{+name}:index", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -177,7 +187,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_items_list",
     cud: "read",
     description: "Lists all or a subset of Item resources. This API requires an admin or service account to execute. The service account used is the one whitelisted in the corres",
-    method: { id: "cloudsearch.indexing.datasources.items.list", httpMethod: "GET", path: "v1/indexing/{+name}/items", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.items.list", httpMethod: "GET", path: "v1/indexing/{+name}/items", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"brief","api":"brief","location":"query"},{"field":"connectorName","api":"connectorName","location":"query"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -195,7 +205,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_items_poll",
     cud: "create",
     description: "Polls for unreserved items from the indexing queue and marks a set as reserved, starting with items that have the oldest timestamp from the highest priority Ite",
-    method: { id: "cloudsearch.indexing.datasources.items.poll", httpMethod: "POST", path: "v1/indexing/{+name}/items:poll", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.items.poll", httpMethod: "POST", path: "v1/indexing/{+name}/items:poll", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -209,7 +219,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_items_push",
     cud: "create",
     description: "Pushes an item onto a queue for later polling and updating. This API requires an admin or service account to execute. The service account used is the one whitel",
-    method: { id: "cloudsearch.indexing.datasources.items.push", httpMethod: "POST", path: "v1/indexing/{+name}:push", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.items.push", httpMethod: "POST", path: "v1/indexing/{+name}:push", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -223,7 +233,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_items_unreserve",
     cud: "create",
     description: "Unreserves all items from a queue, making them all eligible to be polled. This method is useful for resetting the indexing queue after a connector has been rest",
-    method: { id: "cloudsearch.indexing.datasources.items.unreserve", httpMethod: "POST", path: "v1/indexing/{+name}/items:unreserve", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.items.unreserve", httpMethod: "POST", path: "v1/indexing/{+name}/items:unreserve", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -237,7 +247,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_items_upload",
     cud: "create",
     description: "Creates an upload session for uploading item content. For items smaller than 100 KB, it's easier to embed the content inline within an index request. This API r",
-    method: { id: "cloudsearch.indexing.datasources.items.upload", httpMethod: "POST", path: "v1/indexing/{+name}:upload", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.items.upload", httpMethod: "POST", path: "v1/indexing/{+name}:upload", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -251,7 +261,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_indexing_datasources_update_schema",
     cud: "update",
     description: "Updates the schema of a data source. This method does not perform incremental updates to the schema. Instead, this method updates the schema by overwriting the",
-    method: { id: "cloudsearch.indexing.datasources.updateSchema", httpMethod: "PUT", path: "v1/indexing/{+name}/schema", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.indexing.datasources.updateSchema", httpMethod: "PUT", path: "v1/indexing/{+name}/schema", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -265,7 +275,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_initialize_customer",
     cud: "create",
     description: "Enables `third party` support in Google Cloud Search. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.initializeCustomer", httpMethod: "POST", path: "v1:initializeCustomer", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.initializeCustomer", httpMethod: "POST", path: "v1:initializeCustomer", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -278,7 +288,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_media_upload",
     cud: "create",
     description: "Uploads media for indexing. The upload endpoint supports direct and resumable upload protocols and is intended for large items that can not be [inlined during i",
-    method: { id: "cloudsearch.media.upload", httpMethod: "POST", path: "v1/media/{+resourceName}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["resourceName"] },
+    method: { id: "cloudsearch.media.upload", httpMethod: "POST", path: "v1/media/{+resourceName}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["resourceName"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"resourceName","api":"resourceName","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -292,7 +302,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_operations_get",
     cud: "read",
     description: "Gets the latest state of a long-running operation. Clients can use this method to poll the operation result at intervals as recommended by the API service.",
-    method: { id: "cloudsearch.operations.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.operations.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[3] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -305,7 +315,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_operations_lro_list",
     cud: "read",
     description: "Lists operations that match the specified filter in the request. If the server doesn't support this method, it returns `UNIMPLEMENTED`.",
-    method: { id: "cloudsearch.operations.lro.list", httpMethod: "GET", path: "v1/{+name}/lro", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.operations.lro.list", httpMethod: "GET", path: "v1/{+name}/lro", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[3] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"returnPartialSuccess","api":"returnPartialSuccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -322,7 +332,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_query_remove_activity",
     cud: "delete",
     description: "Provides functionality to remove logged activity for a user. Currently to be used only for Chat 1p clients **Note:** This API requires a standard end user accou",
-    method: { id: "cloudsearch.query.removeActivity", httpMethod: "POST", path: "v1/query:removeActivity", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.query.removeActivity", httpMethod: "POST", path: "v1/query:removeActivity", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[4] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -335,7 +345,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_query_search",
     cud: "read",
     description: "The Cloud Search Query API provides the search method, which returns the most relevant results from a user query. The results can come from Google Workspace app",
-    method: { id: "cloudsearch.query.search", httpMethod: "POST", path: "v1/query/search", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.query.search", httpMethod: "POST", path: "v1/query/search", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[4] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -348,7 +358,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_query_sources_list",
     cud: "read",
     description: "Returns list of sources that user can use for Search and Suggest APIs. **Note:** This API requires a standard end user account to execute. A service account can",
-    method: { id: "cloudsearch.query.sources.list", httpMethod: "GET", path: "v1/query/sources", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.query.sources.list", httpMethod: "GET", path: "v1/query/sources", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[4] },
     params: [{"field":"pageToken","api":"pageToken","location":"query"},{"field":"requestOptions.clientDisplayLanguageCode","api":"requestOptions.clientDisplayLanguageCode","location":"query"},{"field":"requestOptions.countryCode","api":"requestOptions.countryCode","location":"query"},{"field":"requestOptions.debugOptions.enableDebugging","api":"requestOptions.debugOptions.enableDebugging","location":"query"},{"field":"requestOptions.languageCode","api":"requestOptions.languageCode","location":"query"},{"field":"requestOptions.searchApplicationId","api":"requestOptions.searchApplicationId","location":"query"},{"field":"requestOptions.timeZone","api":"requestOptions.timeZone","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -367,7 +377,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_query_suggest",
     cud: "create",
     description: "Provides suggestions for autocompleting the query. **Note:** This API requires a standard end user account to execute. A service account can't perform Query API",
-    method: { id: "cloudsearch.query.suggest", httpMethod: "POST", path: "v1/query/suggest", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.query.suggest", httpMethod: "POST", path: "v1/query/suggest", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[4] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -380,7 +390,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_datasources_create",
     cud: "create",
     description: "Creates a datasource. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.datasources.create", httpMethod: "POST", path: "v1/settings/datasources", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.settings.datasources.create", httpMethod: "POST", path: "v1/settings/datasources", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -393,7 +403,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_datasources_delete",
     cud: "delete",
     description: "Deletes a datasource. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.datasources.delete", httpMethod: "DELETE", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.settings.datasources.delete", httpMethod: "DELETE", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -407,7 +417,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_datasources_get",
     cud: "read",
     description: "Gets a datasource. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.datasources.get", httpMethod: "GET", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.settings.datasources.get", httpMethod: "GET", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -421,7 +431,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_datasources_list",
     cud: "read",
     description: "Lists datasources. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.datasources.list", httpMethod: "GET", path: "v1/settings/datasources", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.settings.datasources.list", httpMethod: "GET", path: "v1/settings/datasources", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -436,7 +446,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_datasources_patch",
     cud: "update",
     description: "Updates a datasource. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.datasources.patch", httpMethod: "PATCH", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.settings.datasources.patch", httpMethod: "PATCH", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -452,7 +462,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_datasources_update",
     cud: "update",
     description: "Updates a datasource. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.datasources.update", httpMethod: "PUT", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.settings.datasources.update", httpMethod: "PUT", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -466,7 +476,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_get_customer",
     cud: "read",
     description: "Get customer settings. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.getCustomer", httpMethod: "GET", path: "v1/settings/customer", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.settings.getCustomer", httpMethod: "GET", path: "v1/settings/customer", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -478,7 +488,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_searchapplications_create",
     cud: "create",
     description: "Creates a search application. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.searchapplications.create", httpMethod: "POST", path: "v1/settings/searchapplications", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.settings.searchapplications.create", httpMethod: "POST", path: "v1/settings/searchapplications", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[5] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -491,7 +501,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_searchapplications_delete",
     cud: "delete",
     description: "Deletes a search application. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.searchapplications.delete", httpMethod: "DELETE", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.settings.searchapplications.delete", httpMethod: "DELETE", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[5] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -505,7 +515,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_searchapplications_get",
     cud: "read",
     description: "Gets the specified search application. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.searchapplications.get", httpMethod: "GET", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.settings.searchapplications.get", httpMethod: "GET", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[5] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -519,7 +529,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_searchapplications_list",
     cud: "read",
     description: "Lists all search applications. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.searchapplications.list", httpMethod: "GET", path: "v1/settings/searchapplications", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.settings.searchapplications.list", httpMethod: "GET", path: "v1/settings/searchapplications", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[5] },
     params: [{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -534,7 +544,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_searchapplications_patch",
     cud: "update",
     description: "Updates a search application. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.searchapplications.patch", httpMethod: "PATCH", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.settings.searchapplications.patch", httpMethod: "PATCH", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[5] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -549,7 +559,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_searchapplications_reset",
     cud: "create",
     description: "Resets a search application to default settings. This will return an empty response. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.searchapplications.reset", httpMethod: "POST", path: "v1/settings/{+name}:reset", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.settings.searchapplications.reset", httpMethod: "POST", path: "v1/settings/{+name}:reset", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[5] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -563,7 +573,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_searchapplications_update",
     cud: "update",
     description: "Updates a search application. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.searchapplications.update", httpMethod: "PUT", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.settings.searchapplications.update", httpMethod: "PUT", path: "v1/settings/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[5] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -578,7 +588,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_settings_update_customer",
     cud: "update",
     description: "Update customer settings. **Note:** This API requires an admin account to execute.",
-    method: { id: "cloudsearch.settings.updateCustomer", httpMethod: "PATCH", path: "v1/settings/customer", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.settings.updateCustomer", httpMethod: "PATCH", path: "v1/settings/customer", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -592,7 +602,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_stats_get_index",
     cud: "read",
     description: "Gets indexed item statistics aggreggated across all data sources. This API only returns statistics for previous dates; it doesn't return statistics for the curr",
-    method: { id: "cloudsearch.stats.getIndex", httpMethod: "GET", path: "v1/stats/index", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.stats.getIndex", httpMethod: "GET", path: "v1/stats/index", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[6] },
     params: [{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -610,7 +620,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_stats_get_query",
     cud: "read",
     description: "Get the query statistics for customer. **Note:** This API requires a standard end user account to execute.",
-    method: { id: "cloudsearch.stats.getQuery", httpMethod: "GET", path: "v1/stats/query", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.stats.getQuery", httpMethod: "GET", path: "v1/stats/query", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[6] },
     params: [{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -628,7 +638,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_stats_get_searchapplication",
     cud: "read",
     description: "Get search application stats for customer. **Note:** This API requires a standard end user account to execute.",
-    method: { id: "cloudsearch.stats.getSearchapplication", httpMethod: "GET", path: "v1/stats/searchapplication", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.stats.getSearchapplication", httpMethod: "GET", path: "v1/stats/searchapplication", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[6] },
     params: [{"field":"endDate.day","api":"endDate.day","location":"query"},{"field":"endDate.month","api":"endDate.month","location":"query"},{"field":"endDate.year","api":"endDate.year","location":"query"},{"field":"startDate.day","api":"startDate.day","location":"query"},{"field":"startDate.month","api":"startDate.month","location":"query"},{"field":"startDate.year","api":"startDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -646,7 +656,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_stats_get_session",
     cud: "read",
     description: "Get the # of search sessions, % of successful sessions with a click query statistics for customer. **Note:** This API requires a standard end user account to ex",
-    method: { id: "cloudsearch.stats.getSession", httpMethod: "GET", path: "v1/stats/session", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.stats.getSession", httpMethod: "GET", path: "v1/stats/session", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[6] },
     params: [{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -664,7 +674,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_stats_get_user",
     cud: "read",
     description: "Get the users statistics for customer. **Note:** This API requires a standard end user account to execute.",
-    method: { id: "cloudsearch.stats.getUser", httpMethod: "GET", path: "v1/stats/user", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [] },
+    method: { id: "cloudsearch.stats.getUser", httpMethod: "GET", path: "v1/stats/user", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[6] },
     params: [{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -682,7 +692,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_stats_index_datasources_get",
     cud: "read",
     description: "Gets indexed item statistics for a single data source. **Note:** This API requires a standard end user account to execute.",
-    method: { id: "cloudsearch.stats.index.datasources.get", httpMethod: "GET", path: "v1/stats/index/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.stats.index.datasources.get", httpMethod: "GET", path: "v1/stats/index/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[6] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -701,7 +711,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_stats_query_searchapplications_get",
     cud: "read",
     description: "Get the query statistics for search application. **Note:** This API requires a standard end user account to execute.",
-    method: { id: "cloudsearch.stats.query.searchapplications.get", httpMethod: "GET", path: "v1/stats/query/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.stats.query.searchapplications.get", httpMethod: "GET", path: "v1/stats/query/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[6] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -720,7 +730,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_stats_session_searchapplications_get",
     cud: "read",
     description: "Get the # of search sessions, % of successful sessions with a click query statistics for search application. **Note:** This API requires a standard end user acc",
-    method: { id: "cloudsearch.stats.session.searchapplications.get", httpMethod: "GET", path: "v1/stats/session/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.stats.session.searchapplications.get", httpMethod: "GET", path: "v1/stats/session/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[6] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -739,7 +749,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     name: "cloudsearch_stats_user_searchapplications_get",
     cud: "read",
     description: "Get the users statistics for search application. **Note:** This API requires a standard end user account to execute.",
-    method: { id: "cloudsearch.stats.user.searchapplications.get", httpMethod: "GET", path: "v1/stats/user/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "cloudsearch.stats.user.searchapplications.get", httpMethod: "GET", path: "v1/stats/user/{+name}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[6] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {

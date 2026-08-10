@@ -15,6 +15,9 @@ export interface ToolEntry {
   inputShape: z.ZodRawShape;
   annotations: Record<string, unknown>;
   meta: boolean;
+  /** Baked per-method scopes (generated tools); curated tools authorize at
+   * service/bundle grain and leave this undefined. */
+  requiredScopes?: readonly string[];
 }
 
 export interface CatalogOperation {
@@ -31,6 +34,7 @@ interface ToolConfig {
   // Set only by generated tools (cud from HTTP semantics at gen time): open-ended
   // Discovery verbs (undeploy, wipeout, …) would slip past name-based write-control.
   cud?: Cud;
+  requiredScopes?: readonly string[];
 }
 
 const CUD_OVERRIDES: Record<string, Cud> = {
@@ -110,6 +114,7 @@ export class ToolRegistry {
         inputShape,
         annotations,
         meta: this.registeringMeta,
+        requiredScopes: config.requiredScopes,
       });
       const guarded =
         cud === 'read'

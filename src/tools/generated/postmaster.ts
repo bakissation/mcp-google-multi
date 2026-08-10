@@ -4,11 +4,15 @@ import type { ToolRegistry } from '../../registry.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerPostmasterGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_gmailpostmastertools_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/postmaster.readonly"],
+  ];
   registerGeneratedTool(registry, {
     name: "postmaster_domains_get",
     cud: "read",
     description: "Gets a specific domain registered by the client. Returns NOT_FOUND if the domain does not exist.",
-    method: { id: "gmailpostmastertools.domains.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://gmailpostmastertools.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "gmailpostmastertools.domains.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://gmailpostmastertools.googleapis.com/", requiredParams: ["name"], scopes: S_gmailpostmastertools_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -21,7 +25,7 @@ export function registerPostmasterGeneratedTools(registry: ToolRegistry): void {
     name: "postmaster_domains_list",
     cud: "read",
     description: "Lists the domains that have been registered by the client. The order of domains in the response is unspecified and non-deterministic. Newly created domains will",
-    method: { id: "gmailpostmastertools.domains.list", httpMethod: "GET", path: "v1/domains", baseUrl: "https://gmailpostmastertools.googleapis.com/", requiredParams: [] },
+    method: { id: "gmailpostmastertools.domains.list", httpMethod: "GET", path: "v1/domains", baseUrl: "https://gmailpostmastertools.googleapis.com/", requiredParams: [], scopes: S_gmailpostmastertools_v1[0] },
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -35,7 +39,7 @@ export function registerPostmasterGeneratedTools(registry: ToolRegistry): void {
     name: "postmaster_domains_traffic_stats_get",
     cud: "read",
     description: "Get traffic statistics for a domain on a specific date. Returns PERMISSION_DENIED if user does not have permission to access TrafficStats for the domain.",
-    method: { id: "gmailpostmastertools.domains.trafficStats.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://gmailpostmastertools.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "gmailpostmastertools.domains.trafficStats.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://gmailpostmastertools.googleapis.com/", requiredParams: ["name"], scopes: S_gmailpostmastertools_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -48,7 +52,7 @@ export function registerPostmasterGeneratedTools(registry: ToolRegistry): void {
     name: "postmaster_domains_traffic_stats_list",
     cud: "read",
     description: "List traffic statistics for all available days. Returns PERMISSION_DENIED if user does not have permission to access TrafficStats for the domain.",
-    method: { id: "gmailpostmastertools.domains.trafficStats.list", httpMethod: "GET", path: "v1/{+parent}/trafficStats", baseUrl: "https://gmailpostmastertools.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "gmailpostmastertools.domains.trafficStats.list", httpMethod: "GET", path: "v1/{+parent}/trafficStats", baseUrl: "https://gmailpostmastertools.googleapis.com/", requiredParams: ["parent"], scopes: S_gmailpostmastertools_v1[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"endDate.day","api":"endDate.day","location":"query"},{"field":"endDate.month","api":"endDate.month","location":"query"},{"field":"endDate.year","api":"endDate.year","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"startDate.day","api":"startDate.day","location":"query"},{"field":"startDate.month","api":"startDate.month","location":"query"},{"field":"startDate.year","api":"startDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {

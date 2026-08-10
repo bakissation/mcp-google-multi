@@ -30,6 +30,7 @@ export function mapGoogleError(
   error: any,
   account: Account,
   forbiddenHint?: string,
+  scopeContext?: () => { hint: string; retriable: boolean } | null,
 ): ErrorEnvelope {
   const status = statusOf(error);
   const reason = reasonOf(error);
@@ -50,11 +51,15 @@ export function mapGoogleError(
       reason === 'ACCESS_TOKEN_SCOPE_INSUFFICIENT' ||
       /insufficient.*scope/i.test(message);
     if (scopeIssue) {
+      // #114 three-state enrichment when the method's required scopes are
+      // known (escape hatch / generated tools): state-specific remediation and
+      // an honest retriable so agents stop retrying dead ends.
+      const enriched = scopeContext?.() ?? null;
       return {
         error: 'insufficient_scope',
         message,
-        hint: forbiddenHint ?? `Re-auth "${account}" with the scope this operation needs.`,
-        retriable: false,
+        hint: enriched?.hint ?? forbiddenHint ?? `Re-auth "${account}" with the scope this operation needs.`,
+        retriable: enriched?.retriable ?? false,
         account,
       };
     }
@@ -82,8 +87,8 @@ export function mapGoogleError(
   return { error: 'upstream_error', message, retriable: false, account };
 }
 
-export function handleGoogleApiError(error: any, account: Account, forbiddenHint?: string) {
-  const envelope = mapGoogleError(error, account, forbiddenHint);
+export function handleGoogleApiError(error: any, account: Account, forbiddenHint?: string, scopeContext?: () => { hint: string; retriable: boolean } | null) {
+  const envelope = mapGoogleError(error, account, forbiddenHint, scopeContext);
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(envelope) }],
     isError: true as const,

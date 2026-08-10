@@ -5,11 +5,16 @@ import { coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerKeepGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_keep_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/keep","https://www.googleapis.com/auth/keep.readonly"],
+    ["https://www.googleapis.com/auth/keep"],
+  ];
   registerGeneratedTool(registry, {
     name: "keep_media_download",
     cud: "read",
     description: "Gets an attachment. To download attachment media via REST requires the alt=media query parameter. Returns a 400 bad request error if attachment media is not ava",
-    method: { id: "keep.media.download", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://keep.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "keep.media.download", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://keep.googleapis.com/", requiredParams: ["name"], scopes: S_keep_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"mimeType","api":"mimeType","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -23,7 +28,7 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     name: "keep_notes_create",
     cud: "create",
     description: "Creates a new note.",
-    method: { id: "keep.notes.create", httpMethod: "POST", path: "v1/notes", baseUrl: "https://keep.googleapis.com/", requiredParams: [] },
+    method: { id: "keep.notes.create", httpMethod: "POST", path: "v1/notes", baseUrl: "https://keep.googleapis.com/", requiredParams: [], scopes: S_keep_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -36,7 +41,7 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     name: "keep_notes_delete",
     cud: "delete",
     description: "Deletes a note. Caller must have the `OWNER` role on the note to delete. Deleting a note removes the resource immediately and cannot be undone. Any collaborator",
-    method: { id: "keep.notes.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://keep.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "keep.notes.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://keep.googleapis.com/", requiredParams: ["name"], scopes: S_keep_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -49,7 +54,7 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     name: "keep_notes_get",
     cud: "read",
     description: "Gets a note.",
-    method: { id: "keep.notes.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://keep.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "keep.notes.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://keep.googleapis.com/", requiredParams: ["name"], scopes: S_keep_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -62,7 +67,7 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     name: "keep_notes_list",
     cud: "read",
     description: "Lists notes. Every list call returns a page of results with `page_size` as the upper bound of returned items. A `page_size` of zero allows the server to choose",
-    method: { id: "keep.notes.list", httpMethod: "GET", path: "v1/notes", baseUrl: "https://keep.googleapis.com/", requiredParams: [] },
+    method: { id: "keep.notes.list", httpMethod: "GET", path: "v1/notes", baseUrl: "https://keep.googleapis.com/", requiredParams: [], scopes: S_keep_v1[0] },
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -77,7 +82,7 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     name: "keep_notes_permissions_batch_create",
     cud: "create",
     description: "Creates one or more permissions on the note. Only permissions with the `WRITER` role may be created. If adding any permission fails, then the entire request fai",
-    method: { id: "keep.notes.permissions.batchCreate", httpMethod: "POST", path: "v1/{+parent}/permissions:batchCreate", baseUrl: "https://keep.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "keep.notes.permissions.batchCreate", httpMethod: "POST", path: "v1/{+parent}/permissions:batchCreate", baseUrl: "https://keep.googleapis.com/", requiredParams: ["parent"], scopes: S_keep_v1[1] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -91,7 +96,7 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     name: "keep_notes_permissions_batch_delete",
     cud: "delete",
     description: "Deletes one or more permissions on the note. The specified entities will immediately lose access. A permission with the `OWNER` role can't be removed. If removi",
-    method: { id: "keep.notes.permissions.batchDelete", httpMethod: "POST", path: "v1/{+parent}/permissions:batchDelete", baseUrl: "https://keep.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "keep.notes.permissions.batchDelete", httpMethod: "POST", path: "v1/{+parent}/permissions:batchDelete", baseUrl: "https://keep.googleapis.com/", requiredParams: ["parent"], scopes: S_keep_v1[1] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

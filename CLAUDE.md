@@ -23,6 +23,7 @@ Conventions for AI assistants modifying this codebase. v5 is **local, stdio, use
 - `src/migrate-config.ts` — `migrate-config` CLI: env -> `config.json` accounts (idempotent, never edits env).
 - `src/tools/_errors.ts` — `mapGoogleError` typed taxonomy + `handleGoogleApiError` result wrapper; each service file defines its own `handle<Service>Error` shim over it (optionally with a service-specific 403 hint).
 - `src/tools/_coerce.ts` — `coerceArray`/`coerceJson`/`coerceBoolean` for string-encoded client args.
+- `src/scope-observability.ts` — the #114 three-state classifier (callable / requestable_not_granted / not_requestable{add_bundle|account_type|unknown_scope}): joins a method's required scopes (escape hatch: runtime Discovery; generated tools: baked+interned at gen time on `ApiMethodRef.scopes`) against the account's GRANTED token scopes, enriches `insufficient_scope` hints with copy-pasteable remediation and an honest `retriable`. `account_list`'s scopes block is the compact profile∪granted report; the registered-tool universe is doctor's (B9).
 
 ## Adding a tool
 
