@@ -93,7 +93,7 @@ Reads are never gated. CUD is **deny-by-default**: `GOOGLE_PROFILE` (read-only /
 ## Versioning & releases (automated — CI controls it)
 
 - semantic-release on push to `dev` (alpha) / `staging` (beta) / `main` (stable). Never bump `package.json`, write a changelog, or tag by hand.
-- Conventional Commits: `fix:`=patch, `feat:`=minor, `feat!:`/`BREAKING CHANGE:`=major. A new `BASE_SCOPES` scope is breaking (`feat!:`).
+- Conventional Commits: `fix:`=patch, `feat:`=minor, a `BREAKING CHANGE:` footer=major. The analyzer's default (angular) preset does NOT parse a bare `feat!:` — a breaking commit MUST carry the footer or it releases nothing. A new `BASE_SCOPES` scope is breaking.
 - **Merge commits only** (squash/rebase disabled) — each branch's commits land individually, so keep them clean Conventional Commits.
 - After a stable release, `.github/workflows/backmerge.yml` resyncs `main → staging → dev`.
 
@@ -104,7 +104,7 @@ Reads are never gated. CUD is **deny-by-default**: `GOOGLE_PROFILE` (read-only /
 
 ## Don'ts
 
-- No `console.log` from handlers, and nothing may write to stdout at import time either — stdio is the MCP channel (the dotenv v17 banner corrupted it; `dotenv.config` must keep `quiet: true`, guarded by `tests/stdout-purity.test.ts`). `process.stderr.write` only.
+- No `console.log` from handlers, and nothing may write to stdout at import time either — stdio is the MCP channel (the dotenv v17 banner corrupted it, which is why env loading is the native `process.loadEnvFile` in `src/env-load.ts`; guarded by `tests/stdout-purity.test.ts`). `process.stderr.write` only.
 - Don't hardcode aliases — read `ACCOUNTS` / `ACCOUNT_CONFIG`.
 - Don't bypass `getClient`; don't write plaintext tokens or perms wider than `0o600`.
 - Don't re-implement error mapping or write gating — use the shared helpers.

@@ -1,6 +1,6 @@
 # Configuration reference
 
-Everything is configured through environment variables (a `.env` in the working directory is loaded automatically). Back to the [README](../README.md).
+Everything is configured through environment variables. `.env` files load automatically with this precedence (highest first): real environment, then `.env` in the working directory, then `.env` in the package root, then `${XDG_CONFIG_HOME:-~/.config}/mcp-google-multi/.env`. Set `MCP_GOOGLE_MULTI_ENV=/abs/path/.env` to load exactly that file instead of searching; a missing or unreadable pointed file is a fatal `E_ENV_NOT_FOUND`. Node.js 22+ is required; older runtimes exit with `E_NODE_TOO_OLD`. Back to the [README](../README.md).
 
 ## Environment variables
 
