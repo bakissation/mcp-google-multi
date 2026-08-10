@@ -1,0 +1,27 @@
+# Version updates are scoped to the @googleapis/* graph only (14 per-API
+# packages + googleapis-common move together); everything else stays on
+# security-alerts-only as before.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # fix(deps) so a merged grouped bump is a Conventional Commit and cuts a
+    # patch release; without it the bump only ships with the next fix:/feat:.
+    commit-message:
+      prefix: "fix(deps)"
+    allow:
+      - dependency-name: "@googleapis/*"
+      - dependency-name: "googleapis-common"
+    # The @googleapis/* packages pin googleapis-common@^N; a direct major bump
+    # ahead of the graph resolves two copies (cross-major auth mismatch). The
+    # direct pin follows the graph, never leads it.
+    ignore:
+      - dependency-name: "googleapis-common"
+        update-types: ["version-update:semver-major"]
+    groups:
+      googleapis:
+        patterns:
+          - "@googleapis/*"
+          - "googleapis-common"

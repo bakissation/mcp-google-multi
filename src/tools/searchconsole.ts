@@ -1,7 +1,8 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceJson } from './_coerce.js';
-import { google } from 'googleapis';
+import { searchconsole as searchconsoleClient } from '@googleapis/searchconsole';
+import { webmasters as webmastersClient } from '@googleapis/webmasters';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -23,7 +24,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     async ({ account }) => {
       try {
         const auth = await getClient(account as Account);
-        const wm = google.webmasters({ version: 'v3', auth });
+        const wm = webmastersClient({ version: 'v3', auth });
         const res = await wm.sites.list();
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data.siteEntry ?? [], null, 2) }],
@@ -46,7 +47,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     async ({ account, siteUrl }) => {
       try {
         const auth = await getClient(account as Account);
-        const wm = google.webmasters({ version: 'v3', auth });
+        const wm = webmastersClient({ version: 'v3', auth });
         const res = await wm.sites.get({ siteUrl });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -69,7 +70,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     async ({ account, siteUrl }) => {
       try {
         const auth = await getClient(account as Account);
-        const wm = google.webmasters({ version: 'v3', auth });
+        const wm = webmastersClient({ version: 'v3', auth });
         await wm.sites.add({ siteUrl });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ success: true, siteUrl }, null, 2) }],
@@ -92,7 +93,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     async ({ account, siteUrl }) => {
       try {
         const auth = await getClient(account as Account);
-        const wm = google.webmasters({ version: 'v3', auth });
+        const wm = webmastersClient({ version: 'v3', auth });
         await wm.sites.delete({ siteUrl });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ success: true, deleted: siteUrl }, null, 2) }],
@@ -117,7 +118,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     async ({ account, siteUrl }) => {
       try {
         const auth = await getClient(account as Account);
-        const wm = google.webmasters({ version: 'v3', auth });
+        const wm = webmastersClient({ version: 'v3', auth });
         const res = await wm.sitemaps.list({ siteUrl });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data.sitemap ?? [], null, 2) }],
@@ -141,7 +142,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     async ({ account, siteUrl, feedpath }) => {
       try {
         const auth = await getClient(account as Account);
-        const wm = google.webmasters({ version: 'v3', auth });
+        const wm = webmastersClient({ version: 'v3', auth });
         const res = await wm.sitemaps.get({ siteUrl, feedpath });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -165,7 +166,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     async ({ account, siteUrl, feedpath }) => {
       try {
         const auth = await getClient(account as Account);
-        const wm = google.webmasters({ version: 'v3', auth });
+        const wm = webmastersClient({ version: 'v3', auth });
         await wm.sitemaps.submit({ siteUrl, feedpath });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ success: true, siteUrl, feedpath }, null, 2) }],
@@ -189,7 +190,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     async ({ account, siteUrl, feedpath }) => {
       try {
         const auth = await getClient(account as Account);
-        const wm = google.webmasters({ version: 'v3', auth });
+        const wm = webmastersClient({ version: 'v3', auth });
         await wm.sitemaps.delete({ siteUrl, feedpath });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ success: true, deleted: feedpath }, null, 2) }],
@@ -237,7 +238,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     async ({ account, siteUrl, startDate, endDate, dimensions, type, dimensionFilterGroups, rowLimit, startRow, aggregationType, dataState }) => {
       try {
         const auth = await getClient(account as Account);
-        const wm = google.webmasters({ version: 'v3', auth });
+        const wm = webmastersClient({ version: 'v3', auth });
 
         const requestBody: any = { startDate, endDate };
         if (dimensions) requestBody.dimensions = dimensions;
@@ -281,7 +282,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     async ({ account, siteUrl, inspectionUrl, languageCode }) => {
       try {
         const auth = await getClient(account as Account);
-        const searchconsole = google.searchconsole({ version: 'v1', auth });
+        const searchconsole = searchconsoleClient({ version: 'v1', auth });
 
         const res = await searchconsole.urlInspection.index.inspect({
           requestBody: {

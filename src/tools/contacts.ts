@@ -1,6 +1,6 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
-import { google } from 'googleapis';
+import { people as peopleClient } from '@googleapis/people';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -52,7 +52,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     async ({ account, query, pageSize }) => {
       try {
         const auth = await getClient(account as Account);
-        const people = google.people({ version: 'v1', auth });
+        const people = peopleClient({ version: 'v1', auth });
 
         // Warmup request required by the People API
         await people.people.searchContacts({
@@ -88,7 +88,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     async ({ account, resourceName }) => {
       try {
         const auth = await getClient(account as Account);
-        const people = google.people({ version: 'v1', auth });
+        const people = peopleClient({ version: 'v1', auth });
         const res = await people.people.get({
           resourceName,
           personFields: PERSON_FIELDS,
@@ -123,7 +123,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     async ({ account, pageSize, pageToken, sortOrder }) => {
       try {
         const auth = await getClient(account as Account);
-        const people = google.people({ version: 'v1', auth });
+        const people = peopleClient({ version: 'v1', auth });
         const res = await people.people.connections.list({
           resourceName: 'people/me',
           personFields: PERSON_FIELDS,
@@ -166,7 +166,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     async ({ account, givenName, familyName, email, emailType, phone, phoneType, organization, jobTitle }) => {
       try {
         const auth = await getClient(account as Account);
-        const people = google.people({ version: 'v1', auth });
+        const people = peopleClient({ version: 'v1', auth });
 
         const requestBody: any = {
           names: [{ givenName, familyName: familyName ?? '' }],
@@ -219,7 +219,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     async ({ account, resourceName, givenName, familyName, email, emailType, phone, phoneType, organization, jobTitle }) => {
       try {
         const auth = await getClient(account as Account);
-        const people = google.people({ version: 'v1', auth });
+        const people = peopleClient({ version: 'v1', auth });
 
         // Fetch current contact to get etag
         const current = await people.people.get({
@@ -290,7 +290,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     async ({ account, resourceName }) => {
       try {
         const auth = await getClient(account as Account);
-        const people = google.people({ version: 'v1', auth });
+        const people = peopleClient({ version: 'v1', auth });
         await people.people.deleteContact({ resourceName });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
@@ -316,7 +316,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     async ({ account, pageSize }) => {
       try {
         const auth = await getClient(account as Account);
-        const people = google.people({ version: 'v1', auth });
+        const people = peopleClient({ version: 'v1', auth });
         const res = await people.contactGroups.list({
           pageSize: pageSize ?? 100,
           groupFields: 'name,groupType,memberCount',
@@ -350,7 +350,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     async ({ account, groupResourceName, maxMembers }) => {
       try {
         const auth = await getClient(account as Account);
-        const people = google.people({ version: 'v1', auth });
+        const people = peopleClient({ version: 'v1', auth });
         const groupRes = await people.contactGroups.get({
           resourceName: groupResourceName,
           maxMembers: maxMembers ?? 100,
@@ -398,7 +398,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     async ({ account, name }) => {
       try {
         const auth = await getClient(account as Account);
-        const people = google.people({ version: 'v1', auth });
+        const people = peopleClient({ version: 'v1', auth });
         const res = await people.contactGroups.create({
           requestBody: {
             contactGroup: { name },

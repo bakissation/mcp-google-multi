@@ -1,7 +1,7 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceBoolean } from './_coerce.js';
-import { google } from 'googleapis';
+import { tasks as tasksClient } from '@googleapis/tasks';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -25,7 +25,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, maxResults, pageToken }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasklists.list({
           maxResults: maxResults ?? 100,
           pageToken,
@@ -51,7 +51,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, tasklistId }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasklists.get({ tasklist: tasklistId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -74,7 +74,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, title }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasklists.insert({
           requestBody: { title },
         });
@@ -100,7 +100,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, tasklistId, title }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasklists.patch({
           tasklist: tasklistId,
           requestBody: { title },
@@ -126,7 +126,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, tasklistId }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         await tasks.tasklists.delete({ tasklist: tasklistId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, tasklistId }, null, 2) }],
@@ -162,7 +162,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, tasklistId, ...params }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasks.list({
           tasklist: tasklistId,
           ...params,
@@ -189,7 +189,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, tasklistId, taskId }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasks.get({ tasklist: tasklistId, task: taskId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -218,7 +218,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, tasklistId, title, notes, due, status, parent, previous }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         const requestBody: any = { title };
         if (notes !== undefined) requestBody.notes = notes;
         if (due !== undefined) requestBody.due = due;
@@ -256,7 +256,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, tasklistId, taskId, title, notes, due, status }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         const requestBody: any = {};
         if (title !== undefined) requestBody.title = title;
         if (notes !== undefined) requestBody.notes = notes;
@@ -294,7 +294,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, tasklistId, taskId }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         await tasks.tasks.delete({ tasklist: tasklistId, task: taskId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, taskId }, null, 2) }],
@@ -321,7 +321,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, tasklistId, taskId, parent, previous, destinationTasklist }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasks.move({
           tasklist: tasklistId,
           task: taskId,
@@ -350,7 +350,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     async ({ account, tasklistId }) => {
       try {
         const auth = await getClient(account as Account);
-        const tasks = google.tasks({ version: 'v1', auth });
+        const tasks = tasksClient({ version: 'v1', auth });
         await tasks.tasks.clear({ tasklist: tasklistId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ cleared: true, tasklistId }, null, 2) }],

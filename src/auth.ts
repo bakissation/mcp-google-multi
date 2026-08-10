@@ -1,20 +1,12 @@
-import { google } from 'googleapis';
+import { OAuth2Client } from 'googleapis-common';
 import http from 'node:http';
 import { URL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import open from 'open';
-import destroyer from 'server-destroy';
 import { ACCOUNTS, ACCOUNT_CONFIG } from './accounts.js';
 import { writeToken } from './token-store.js';
 
-// ─── Scope tiers ────────────────────────────────────────────────────────
-//
-// BASE: always granted. Existing v3 surface + Tasks + Meet (added in v4.0.0).
-// OPTIONAL: per-account opt-in via env GOOGLE_OPTIONAL_SCOPES="slides,forms,chat".
-// ADMIN: per-account opt-in via env GOOGLE_ADMIN_ACCOUNTS="alias1,alias2".
-//
-// Personal Gmail accounts will 403 on admin scopes — never grant by default.
-// ────────────────────────────────────────────────────────────────────────
+// Personal (non-Workspace) accounts 403 on admin scopes; ADMIN_SCOPES stays per-account opt-in, never granted by default.
 
 export const BASE_SCOPES = [
   'https://www.googleapis.com/auth/gmail.modify',
@@ -42,10 +34,8 @@ export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
     'https://www.googleapis.com/auth/chat.messages',
     'https://www.googleapis.com/auth/chat.messages.create',
   ],
-  // Unlike the service bundles these extend the always-on gmail service:
-  // users.settings.* writes only accept the settings scopes (reads already
-  // work via gmail.modify). sharing is separate — it governs delegation,
-  // auto-forwarding and send-as, a different risk profile from e.g. filters.
+  // These extend the always-on gmail service: users.settings.* writes require these
+  // scopes (reads already work via gmail.modify); sharing is split out as riskier.
   gmail_settings: [
     'https://www.googleapis.com/auth/gmail.settings.basic',
   ],
@@ -112,10 +102,7 @@ export function getAdminAccounts(): string[] {
   return parseCsvEnv('GOOGLE_ADMIN_ACCOUNTS');
 }
 
-/**
- * Compose the scope list for a single account at consent time.
- * Resolves env flags: GOOGLE_OPTIONAL_SCOPES (global) and GOOGLE_ADMIN_ACCOUNTS (per-account allowlist).
- */
+/** Scopes are fixed at consent time: changing GOOGLE_OPTIONAL_SCOPES or GOOGLE_ADMIN_ACCOUNTS requires re-running auth. */
 export function resolveScopesForAccount(alias: string): string[] {
   const scopes = [...BASE_SCOPES];
 
@@ -163,7 +150,7 @@ export async function runAuthFlow(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const oauth2Client = new google.auth.OAuth2(
+  const oauth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
     'http://localhost:4242/oauth2callback',
@@ -198,7 +185,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
             if (error) {
               res.writeHead(400, { 'Content-Type': 'text/plain' });
               res.end(`Authorization denied: ${error}`);
-              (server as any).destroy();
+              server.close();
+              server.closeAllConnections();
               reject(new Error(`Authorization denied: ${error}`));
               return;
             }
@@ -207,7 +195,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
             if (!code) {
               res.writeHead(400, { 'Content-Type': 'text/plain' });
               res.end('No authorization code received.');
-              (server as any).destroy();
+              server.close();
+              server.closeAllConnections();
               reject(new Error('No authorization code received'));
               return;
             }
@@ -216,7 +205,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
             if (returnedState !== expectedState) {
               res.writeHead(400, { 'Content-Type': 'text/plain' });
               res.end('State mismatch — possible CSRF attempt. Aborting.');
-              (server as any).destroy();
+              server.close();
+              server.closeAllConnections();
               reject(new Error('OAuth state token mismatch'));
               return;
             }
@@ -229,7 +219,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
             res.end(
               '<h2>Authentication successful!</h2><p>You can close this tab.</p>',
             );
-            (server as any).destroy();
+            server.close();
+            server.closeAllConnections();
 
             console.log(`Token saved (encrypted) for ${alias}.`);
             console.log('Next: authenticate your other aliases, then verify with: mcp-google-multi config check');
@@ -238,7 +229,8 @@ export async function runAuthFlow(args: string[]): Promise<void> {
         } catch (e) {
           res.writeHead(500, { 'Content-Type': 'text/plain' });
           res.end('Internal error during authentication.');
-          (server as any).destroy();
+          server.close();
+          server.closeAllConnections();
           reject(e);
         }
       })
@@ -249,7 +241,6 @@ export async function runAuthFlow(args: string[]): Promise<void> {
         open(authorizeUrl, { wait: false }).then((cp) => cp.unref());
       });
 
-    destroyer(server);
 
     server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
