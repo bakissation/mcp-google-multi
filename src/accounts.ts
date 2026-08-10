@@ -1,14 +1,8 @@
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { homedir } from 'node:os';
+import { loadEnvFiles } from './env-load.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// dotenv v17 prints a banner to stdout, corrupting the stdio JSON-RPC channel;
-// DOTENV_CONFIG_QUIET cannot help, it would be read from .env after config() ran.
-dotenv.config({ quiet: true });
-dotenv.config({ path: path.resolve(__dirname, '..', '.env'), quiet: true });
+const envLoad = loadEnvFiles();
 
 const defaultTokenDir = path.join(
   process.env.XDG_CONFIG_HOME || path.join(homedir(), '.config'),
@@ -29,9 +23,14 @@ export interface AccountConfig {
 function parseAccounts(): { aliases: [string, ...string[]]; configs: Record<string, AccountConfig> } {
   const raw = process.env.GOOGLE_ACCOUNTS;
   if (!raw || raw.trim() === '') {
+    const noEnvFile =
+      envLoad.loaded.length === 0
+        ? `\nE_ENV_NOT_FOUND: no readable .env file was found (searched: ${envLoad.searched.join(', ')}).`
+        : '';
     throw new Error(
       'GOOGLE_ACCOUNTS is not set. Define it in .env like:\n' +
-        'GOOGLE_ACCOUNTS=work:user@company.com,personal:user@gmail.com',
+        'GOOGLE_ACCOUNTS=work:user@company.com,personal:user@gmail.com' +
+        noEnvFile,
     );
   }
 
