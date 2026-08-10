@@ -6,7 +6,7 @@ Every OAuth-reachable Google Workspace API method is a named tool: **182 curated
 
 All operational tools are hidden until their `{service}_discover` tool reveals them, so the idle context cost stays at the eager meta-tools only. Writes are deny-by-default via write-control regardless of tier. Generated tools whose scope is not granted return a typed `insufficient_scope` hint at call time; add the relevant bundle and re-auth to use them.
 
-Not covered: Alert Center (service-account auth; planned for v6), Drive v2 (superseded by v3), and non-REST surfaces (Marketplace SDK, CalDAV).
+Not covered: Alert Center (requires service-account domain-wide delegation; this server is per-user OAuth consent by design), Drive v2 (superseded by v3), and non-REST surfaces (Marketplace SDK, CalDAV).
 
 | Service | Curated | Generated | Total | Enabled by |
 |---|---:|---:|---:|---|
@@ -40,7 +40,7 @@ Not covered: Alert Center (service-account auth; planned for v6), Drive v2 (supe
 | workspaceevents | 0 | 15 | 15 | default |
 | **Total** | **182** | **690** | **872** | |
 
-Optional scope bundles: `appsmarket`, `chat`, `classroom`, `cloudidentity`, `cloudsearch`, `driveactivity`, `drivelabels`, `forms`, `groupsmigration`, `groupssettings`, `keep`, `licensing`, `postmaster`, `reseller`, `script`, `slides`, `vault`.
+Optional scope bundles: `appsmarket`, `chat`, `classroom`, `cloudidentity`, `cloudsearch`, `driveactivity`, `drivelabels`, `forms`, `gmail_settings`, `gmail_settings_sharing`, `groupsmigration`, `groupssettings`, `keep`, `licensing`, `postmaster`, `reseller`, `script`, `slides`, `vault`.
 
 ## Tools by service
 
