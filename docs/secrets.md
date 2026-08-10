@@ -1,6 +1,6 @@
 # Keep secrets in a vault
 
-A plaintext `.env` is fine to try things out, but for a daily driver, **don't leave `GOOGLE_CLIENT_SECRET` + `MASTER_KEY` on disk** — inject them at launch from a secrets manager. The server just reads `process.env` (it has no idea where the values come from), so wrap it. Back to the [README](../README.md).
+A plaintext `.env` is fine to try things out, but for a daily driver, **don't leave `GOOGLE_CLIENT_SECRET` + `MASTER_KEY` on disk** — inject them at launch from a secrets manager. The server just reads `process.env` (it has no idea where the values come from), so wrap it. Since v6 `MASTER_KEY` auto-provisions when absent (OS keychain, else a 0600 `master.key` file, else generated on first run) — that protects tokens **at rest**, not against same-user malware, exactly like an `.env` did. Back to the [README](../README.md).
 
 Example with [Infisical](https://infisical.com):
 
