@@ -24,7 +24,7 @@ export function registerLicensingGeneratedTools(registry: ToolRegistry): void {
     name: "licensing_license_assignments_get",
     cud: "read",
     description: "Get a specific user's license by product SKU.",
-    method: { id: "licensing.licenseAssignments.get", httpMethod: "GET", path: "apps/licensing/v1/product/{productId}/sku/{skuId}/user/{userId}", baseUrl: "https://licensing.googleapis.com/", requiredParams: ["productId","userId","skuId"] },
+    method: { id: "licensing.licenseAssignments.get", httpMethod: "GET", path: "apps/licensing/v1/product/{productId}/sku/{skuId}/user/{userId}", baseUrl: "https://licensing.googleapis.com/", requiredParams: ["productId","skuId","userId"] },
     params: [{"field":"productId","api":"productId","location":"path"},{"field":"skuId","api":"skuId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -70,7 +70,7 @@ export function registerLicensingGeneratedTools(registry: ToolRegistry): void {
     name: "licensing_license_assignments_list_for_product_and_sku",
     cud: "read",
     description: "List all users assigned licenses for a specific product SKU.",
-    method: { id: "licensing.licenseAssignments.listForProductAndSku", httpMethod: "GET", path: "apps/licensing/v1/product/{productId}/sku/{skuId}/users", baseUrl: "https://licensing.googleapis.com/", requiredParams: ["customerId","productId","skuId"] },
+    method: { id: "licensing.licenseAssignments.listForProductAndSku", httpMethod: "GET", path: "apps/licensing/v1/product/{productId}/sku/{skuId}/users", baseUrl: "https://licensing.googleapis.com/", requiredParams: ["productId","skuId","customerId"] },
     params: [{"field":"productId","api":"productId","location":"path"},{"field":"skuId","api":"skuId","location":"path"},{"field":"customerId","api":"customerId","location":"query"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -87,7 +87,7 @@ export function registerLicensingGeneratedTools(registry: ToolRegistry): void {
     name: "licensing_license_assignments_patch",
     cud: "update",
     description: "Reassign a user's product SKU with a different SKU in the same product. This method supports patch semantics.",
-    method: { id: "licensing.licenseAssignments.patch", httpMethod: "PATCH", path: "apps/licensing/v1/product/{productId}/sku/{skuId}/user/{userId}", baseUrl: "https://licensing.googleapis.com/", requiredParams: ["productId","userId","skuId"] },
+    method: { id: "licensing.licenseAssignments.patch", httpMethod: "PATCH", path: "apps/licensing/v1/product/{productId}/sku/{skuId}/user/{userId}", baseUrl: "https://licensing.googleapis.com/", requiredParams: ["productId","skuId","userId"] },
     params: [{"field":"productId","api":"productId","location":"path"},{"field":"skuId","api":"skuId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -103,7 +103,7 @@ export function registerLicensingGeneratedTools(registry: ToolRegistry): void {
     name: "licensing_license_assignments_update",
     cud: "update",
     description: "Reassign a user's product SKU with a different SKU in the same product.",
-    method: { id: "licensing.licenseAssignments.update", httpMethod: "PUT", path: "apps/licensing/v1/product/{productId}/sku/{skuId}/user/{userId}", baseUrl: "https://licensing.googleapis.com/", requiredParams: ["skuId","userId","productId"] },
+    method: { id: "licensing.licenseAssignments.update", httpMethod: "PUT", path: "apps/licensing/v1/product/{productId}/sku/{skuId}/user/{userId}", baseUrl: "https://licensing.googleapis.com/", requiredParams: ["productId","skuId","userId"] },
     params: [{"field":"productId","api":"productId","location":"path"},{"field":"skuId","api":"skuId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

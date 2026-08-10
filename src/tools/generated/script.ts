@@ -124,7 +124,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_deployments_update",
     cud: "update",
     description: "Updates a deployment of an Apps Script project.",
-    method: { id: "script.projects.deployments.update", httpMethod: "PUT", path: "v1/projects/{scriptId}/deployments/{deploymentId}", baseUrl: "https://script.googleapis.com/", requiredParams: ["deploymentId","scriptId"] },
+    method: { id: "script.projects.deployments.update", httpMethod: "PUT", path: "v1/projects/{scriptId}/deployments/{deploymentId}", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId","deploymentId"] },
     params: [{"field":"deploymentId","api":"deploymentId","location":"path"},{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

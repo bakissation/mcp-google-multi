@@ -9,7 +9,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     name: "calendar_acl_delete",
     cud: "delete",
     description: "Deletes an access control rule.",
-    method: { id: "calendar.acl.delete", httpMethod: "DELETE", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["ruleId","calendarId"] },
+    method: { id: "calendar.acl.delete", httpMethod: "DELETE", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","ruleId"] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"ruleId","api":"ruleId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -23,7 +23,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     name: "calendar_acl_get",
     cud: "read",
     description: "Returns an access control rule.",
-    method: { id: "calendar.acl.get", httpMethod: "GET", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["ruleId","calendarId"] },
+    method: { id: "calendar.acl.get", httpMethod: "GET", path: "calendars/{calendarId}/acl/{ruleId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","ruleId"] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"ruleId","api":"ruleId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
