@@ -305,7 +305,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_delegates_delete",
     cud: "delete",
     description: "Removes the specified delegate (which can be of any verification status), and revokes any verification that may have been required for using it. For more inform",
-    method: { id: "gmail.users.settings.delegates.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/delegates/{delegateEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["delegateEmail","userId"] },
+    method: { id: "gmail.users.settings.delegates.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/delegates/{delegateEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","delegateEmail"] },
     params: [{"field":"delegateEmail","api":"delegateEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -429,7 +429,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_forwarding_addresses_get",
     cud: "read",
     description: "Gets the specified forwarding address. For more information, see [Manage email forwarding](https://developers.google.com/workspace/gmail/api/guides/forwarding_s",
-    method: { id: "gmail.users.settings.forwardingAddresses.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/forwardingAddresses/{forwardingEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["forwardingEmail","userId"] },
+    method: { id: "gmail.users.settings.forwardingAddresses.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/forwardingAddresses/{forwardingEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","forwardingEmail"] },
     params: [{"field":"forwardingEmail","api":"forwardingEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -578,7 +578,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_delete",
     cud: "delete",
     description: "Deletes the specified S/MIME config for the specified send-as alias. For more information, see [Manage S/MIME certificates with the Gmail API](https://developer",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["id","userId","sendAsEmail"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail","id"] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -637,7 +637,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_set_default",
     cud: "update",
     description: "Sets the default S/MIME config for the specified send-as alias. For more information, see [Manage S/MIME certificates with the Gmail API](https://developers.goo",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.setDefault", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}/setDefault", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["id","userId","sendAsEmail"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.setDefault", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}/setDefault", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail","id"] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {

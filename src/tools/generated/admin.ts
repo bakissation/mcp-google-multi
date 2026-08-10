@@ -108,7 +108,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_customer_devices_chromeos_commands_get",
     cud: "read",
     description: "Gets command data a specific command issued to the device.",
-    method: { id: "admin.customer.devices.chromeos.commands.get", httpMethod: "GET", path: "admin/directory/v1/customer/{customerId}/devices/chromeos/{deviceId}/commands/{commandId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["commandId","customerId","deviceId"] },
+    method: { id: "admin.customer.devices.chromeos.commands.get", httpMethod: "GET", path: "admin/directory/v1/customer/{customerId}/devices/chromeos/{deviceId}/commands/{commandId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customerId","deviceId","commandId"] },
     params: [{"field":"commandId","api":"commandId","location":"path"},{"field":"customerId","api":"customerId","location":"path"},{"field":"deviceId","api":"deviceId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -373,7 +373,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_asps_delete",
     cud: "delete",
     description: "Deletes an ASP issued by a user.",
-    method: { id: "directory.asps.delete", httpMethod: "DELETE", path: "admin/directory/v1/users/{userKey}/asps/{codeId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["codeId","userKey"] },
+    method: { id: "directory.asps.delete", httpMethod: "DELETE", path: "admin/directory/v1/users/{userKey}/asps/{codeId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["userKey","codeId"] },
     params: [{"field":"codeId","api":"codeId","location":"path"},{"field":"userKey","api":"userKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -465,7 +465,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_chromeosdevices_move_devices_to_ou",
     cud: "update",
     description: "Moves or inserts multiple Chrome OS devices to an organizational unit. You can move up to 50 devices at once.",
-    method: { id: "directory.chromeosdevices.moveDevicesToOu", httpMethod: "POST", path: "admin/directory/v1/customer/{customerId}/devices/chromeos/moveDevicesToOu", baseUrl: "https://admin.googleapis.com/", requiredParams: ["orgUnitPath","customerId"] },
+    method: { id: "directory.chromeosdevices.moveDevicesToOu", httpMethod: "POST", path: "admin/directory/v1/customer/{customerId}/devices/chromeos/moveDevicesToOu", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customerId","orgUnitPath"] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"orgUnitPath","api":"orgUnitPath","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -772,7 +772,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_members_delete",
     cud: "delete",
     description: "Removes a member from a group.",
-    method: { id: "directory.members.delete", httpMethod: "DELETE", path: "admin/directory/v1/groups/{groupKey}/members/{memberKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["memberKey","groupKey"] },
+    method: { id: "directory.members.delete", httpMethod: "DELETE", path: "admin/directory/v1/groups/{groupKey}/members/{memberKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["groupKey","memberKey"] },
     params: [{"field":"groupKey","api":"groupKey","location":"path"},{"field":"memberKey","api":"memberKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -786,7 +786,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_members_get",
     cud: "read",
     description: "Retrieves a group member's properties.",
-    method: { id: "directory.members.get", httpMethod: "GET", path: "admin/directory/v1/groups/{groupKey}/members/{memberKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["memberKey","groupKey"] },
+    method: { id: "directory.members.get", httpMethod: "GET", path: "admin/directory/v1/groups/{groupKey}/members/{memberKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["groupKey","memberKey"] },
     params: [{"field":"groupKey","api":"groupKey","location":"path"},{"field":"memberKey","api":"memberKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -800,7 +800,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_members_has_member",
     cud: "read",
     description: "Checks whether the given user is a member of the group. Membership can be direct or nested, but if nested, the `memberKey` and `groupKey` must be entities in th",
-    method: { id: "directory.members.hasMember", httpMethod: "GET", path: "admin/directory/v1/groups/{groupKey}/hasMember/{memberKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["memberKey","groupKey"] },
+    method: { id: "directory.members.hasMember", httpMethod: "GET", path: "admin/directory/v1/groups/{groupKey}/hasMember/{memberKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["groupKey","memberKey"] },
     params: [{"field":"groupKey","api":"groupKey","location":"path"},{"field":"memberKey","api":"memberKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -828,7 +828,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_members_patch",
     cud: "update",
     description: "Updates the membership properties of a user in the specified group. This method supports [patch semantics](https://developers.google.com/workspace/admin/directo",
-    method: { id: "directory.members.patch", httpMethod: "PATCH", path: "admin/directory/v1/groups/{groupKey}/members/{memberKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["memberKey","groupKey"] },
+    method: { id: "directory.members.patch", httpMethod: "PATCH", path: "admin/directory/v1/groups/{groupKey}/members/{memberKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["groupKey","memberKey"] },
     params: [{"field":"groupKey","api":"groupKey","location":"path"},{"field":"memberKey","api":"memberKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -843,7 +843,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_members_update",
     cud: "update",
     description: "Updates the membership of a user in the specified group.",
-    method: { id: "directory.members.update", httpMethod: "PUT", path: "admin/directory/v1/groups/{groupKey}/members/{memberKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["memberKey","groupKey"] },
+    method: { id: "directory.members.update", httpMethod: "PUT", path: "admin/directory/v1/groups/{groupKey}/members/{memberKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["groupKey","memberKey"] },
     params: [{"field":"groupKey","api":"groupKey","location":"path"},{"field":"memberKey","api":"memberKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -978,7 +978,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_orgunits_patch",
     cud: "update",
     description: "Updates an organizational unit. This method supports [patch semantics](https://developers.google.com/workspace/admin/directory/v1/guides/performance#patch)",
-    method: { id: "directory.orgunits.patch", httpMethod: "PATCH", path: "admin/directory/v1/customer/{customerId}/orgunits/{+orgUnitPath}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["orgUnitPath","customerId"] },
+    method: { id: "directory.orgunits.patch", httpMethod: "PATCH", path: "admin/directory/v1/customer/{customerId}/orgunits/{+orgUnitPath}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customerId","orgUnitPath"] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"orgUnitPath","api":"orgUnitPath","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -1021,7 +1021,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_resources_buildings_delete",
     cud: "delete",
     description: "Deletes a building.",
-    method: { id: "directory.resources.buildings.delete", httpMethod: "DELETE", path: "admin/directory/v1/customer/{customer}/resources/buildings/{buildingId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["buildingId","customer"] },
+    method: { id: "directory.resources.buildings.delete", httpMethod: "DELETE", path: "admin/directory/v1/customer/{customer}/resources/buildings/{buildingId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customer","buildingId"] },
     params: [{"field":"buildingId","api":"buildingId","location":"path"},{"field":"customer","api":"customer","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -1095,7 +1095,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_resources_buildings_update",
     cud: "update",
     description: "Updates a building.",
-    method: { id: "directory.resources.buildings.update", httpMethod: "PUT", path: "admin/directory/v1/customer/{customer}/resources/buildings/{buildingId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["buildingId","customer"] },
+    method: { id: "directory.resources.buildings.update", httpMethod: "PUT", path: "admin/directory/v1/customer/{customer}/resources/buildings/{buildingId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customer","buildingId"] },
     params: [{"field":"buildingId","api":"buildingId","location":"path"},{"field":"customer","api":"customer","location":"path"},{"field":"coordinatesSource","api":"coordinatesSource","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -1257,7 +1257,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_resources_features_patch",
     cud: "update",
     description: "Patches a feature.",
-    method: { id: "directory.resources.features.patch", httpMethod: "PATCH", path: "admin/directory/v1/customer/{customer}/resources/features/{featureKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["featureKey","customer"] },
+    method: { id: "directory.resources.features.patch", httpMethod: "PATCH", path: "admin/directory/v1/customer/{customer}/resources/features/{featureKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customer","featureKey"] },
     params: [{"field":"customer","api":"customer","location":"path"},{"field":"featureKey","api":"featureKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -1287,7 +1287,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_resources_features_update",
     cud: "update",
     description: "Updates a feature.",
-    method: { id: "directory.resources.features.update", httpMethod: "PUT", path: "admin/directory/v1/customer/{customer}/resources/features/{featureKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["featureKey","customer"] },
+    method: { id: "directory.resources.features.update", httpMethod: "PUT", path: "admin/directory/v1/customer/{customer}/resources/features/{featureKey}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customer","featureKey"] },
     params: [{"field":"customer","api":"customer","location":"path"},{"field":"featureKey","api":"featureKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -1362,7 +1362,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_roles_delete",
     cud: "delete",
     description: "Deletes a role.",
-    method: { id: "directory.roles.delete", httpMethod: "DELETE", path: "admin/directory/v1/customer/{customer}/roles/{roleId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["roleId","customer"] },
+    method: { id: "directory.roles.delete", httpMethod: "DELETE", path: "admin/directory/v1/customer/{customer}/roles/{roleId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customer","roleId"] },
     params: [{"field":"customer","api":"customer","location":"path"},{"field":"roleId","api":"roleId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -1376,7 +1376,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_roles_get",
     cud: "read",
     description: "Retrieves a role.",
-    method: { id: "directory.roles.get", httpMethod: "GET", path: "admin/directory/v1/customer/{customer}/roles/{roleId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["roleId","customer"] },
+    method: { id: "directory.roles.get", httpMethod: "GET", path: "admin/directory/v1/customer/{customer}/roles/{roleId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customer","roleId"] },
     params: [{"field":"customer","api":"customer","location":"path"},{"field":"roleId","api":"roleId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -1419,7 +1419,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_roles_patch",
     cud: "update",
     description: "Patches a role.",
-    method: { id: "directory.roles.patch", httpMethod: "PATCH", path: "admin/directory/v1/customer/{customer}/roles/{roleId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["roleId","customer"] },
+    method: { id: "directory.roles.patch", httpMethod: "PATCH", path: "admin/directory/v1/customer/{customer}/roles/{roleId}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customer","roleId"] },
     params: [{"field":"customer","api":"customer","location":"path"},{"field":"roleId","api":"roleId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -1858,7 +1858,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_activities_watch",
     cud: "create",
     description: "Start receiving notifications for account activities. For more information, see Receiving Push Notifications.",
-    method: { id: "reports.activities.watch", httpMethod: "POST", path: "admin/reports/v1/activity/users/{userKey}/applications/{applicationName}/watch", baseUrl: "https://admin.googleapis.com/", requiredParams: ["applicationName","userKey"] },
+    method: { id: "reports.activities.watch", httpMethod: "POST", path: "admin/reports/v1/activity/users/{userKey}/applications/{applicationName}/watch", baseUrl: "https://admin.googleapis.com/", requiredParams: ["userKey","applicationName"] },
     params: [{"field":"applicationName","api":"applicationName","location":"path"},{"field":"userKey","api":"userKey","location":"path"},{"field":"actorIpAddress","api":"actorIpAddress","location":"query"},{"field":"customerId","api":"customerId","location":"query"},{"field":"endTime","api":"endTime","location":"query"},{"field":"eventName","api":"eventName","location":"query"},{"field":"filters","api":"filters","location":"query"},{"field":"groupIdFilter","api":"groupIdFilter","location":"query"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"orgUnitID","api":"orgUnitID","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"startTime","api":"startTime","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -1899,7 +1899,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     name: "admin_entity_usage_reports_get",
     cud: "read",
     description: "Retrieves a report which is a collection of properties and statistics for entities used by users within the account. For more information, see the Entities Usag",
-    method: { id: "reports.entityUsageReports.get", httpMethod: "GET", path: "admin/reports/v1/usage/{entityType}/{entityKey}/dates/{date}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["entityKey","entityType","date"] },
+    method: { id: "reports.entityUsageReports.get", httpMethod: "GET", path: "admin/reports/v1/usage/{entityType}/{entityKey}/dates/{date}", baseUrl: "https://admin.googleapis.com/", requiredParams: ["entityType","entityKey","date"] },
     params: [{"field":"date","api":"date","location":"path"},{"field":"entityKey","api":"entityKey","location":"path"},{"field":"entityType","api":"entityType","location":"path"},{"field":"customerId","api":"customerId","location":"query"},{"field":"filters","api":"filters","location":"query"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"parameters","api":"parameters","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {

@@ -40,7 +40,7 @@ Not covered: Alert Center (service-account auth; planned for v6), Drive v2 (supe
 | workspaceevents | 0 | 15 | 15 | default |
 | **Total** | **182** | **690** | **872** | |
 
-Optional scope bundles: `appsmarket`, `chat`, `classroom`, `cloudidentity`, `cloudsearch`, `driveactivity`, `drivelabels`, `forms`, `groupsmigration`, `groupssettings`, `keep`, `licensing`, `postmaster`, `reseller`, `script`, `slides`, `vault`.
+Optional scope bundles: `appsmarket`, `chat`, `classroom`, `cloudidentity`, `cloudsearch`, `driveactivity`, `drivelabels`, `forms`, `gmail_settings`, `gmail_settings_sharing`, `groupsmigration`, `groupssettings`, `keep`, `licensing`, `postmaster`, `reseller`, `script`, `slides`, `vault`.
 
 ## Tools by service
 

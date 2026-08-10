@@ -426,7 +426,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_permissions_get",
     cud: "read",
     description: "Gets a permission by ID. For more information, see [Share files, folders, and drives](https://developers.google.com/workspace/drive/api/guides/manage-sharing).",
-    method: { id: "drive.permissions.get", httpMethod: "GET", path: "files/{fileId}/permissions/{permissionId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["permissionId","fileId"] },
+    method: { id: "drive.permissions.get", httpMethod: "GET", path: "files/{fileId}/permissions/{permissionId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","permissionId"] },
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"permissionId","api":"permissionId","location":"path"},{"field":"supportsAllDrives","api":"supportsAllDrives","location":"query"},{"field":"supportsTeamDrives","api":"supportsTeamDrives","location":"query"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -443,7 +443,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_replies_get",
     cud: "read",
     description: "Gets a reply by ID. For more information, see [Manage comments and replies](https://developers.google.com/workspace/drive/api/guides/manage-comments).",
-    method: { id: "drive.replies.get", httpMethod: "GET", path: "files/{fileId}/comments/{commentId}/replies/{replyId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["commentId","replyId","fileId"] },
+    method: { id: "drive.replies.get", httpMethod: "GET", path: "files/{fileId}/comments/{commentId}/replies/{replyId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","commentId","replyId"] },
     params: [{"field":"commentId","api":"commentId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"replyId","api":"replyId","location":"path"},{"field":"includeDeleted","api":"includeDeleted","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
