@@ -77,7 +77,6 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "googleapis-common": "^8.0.3",
     "mime-types": "^3.0.2",
-    "open": "^11.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
