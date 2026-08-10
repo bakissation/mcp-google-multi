@@ -12,7 +12,7 @@ The most complete **local Google Workspace MCP server**: Gmail, Drive, Calendar,
 
 You don't need to know anything about MCP or OAuth — five steps, all copy-paste:
 
-1. **Install [Node.js](https://nodejs.org) 20 or newer**, then install the server:
+1. **Install [Node.js](https://nodejs.org) 22 or newer**, then install the server:
 
    ```bash
    npm install -g mcp-google-multi
