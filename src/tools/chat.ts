@@ -1,7 +1,7 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceJson } from './_coerce.js';
-import { google } from 'googleapis';
+import { chat as chatClient } from '@googleapis/chat';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -24,7 +24,7 @@ export function registerChatTools(server: ToolRegistry): void {
     async ({ account, pageSize, pageToken, filter }) => {
       try {
         const auth = await getClient(account as Account);
-        const chat = google.chat({ version: 'v1', auth });
+        const chat = chatClient({ version: 'v1', auth });
         const res = await chat.spaces.list({
           pageSize: pageSize ?? 100,
           pageToken,
@@ -51,7 +51,7 @@ export function registerChatTools(server: ToolRegistry): void {
     async ({ account, name }) => {
       try {
         const auth = await getClient(account as Account);
-        const chat = google.chat({ version: 'v1', auth });
+        const chat = chatClient({ version: 'v1', auth });
         const res = await chat.spaces.get({ name });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -81,7 +81,7 @@ export function registerChatTools(server: ToolRegistry): void {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either text or cardsV2 must be provided' }) }], isError: true };
         }
         const auth = await getClient(account as Account);
-        const chat = google.chat({ version: 'v1', auth });
+        const chat = chatClient({ version: 'v1', auth });
         const requestBody: any = {};
         if (text) requestBody.text = text;
         if (cardsV2) requestBody.cardsV2 = cardsV2;
@@ -117,7 +117,7 @@ export function registerChatTools(server: ToolRegistry): void {
     async ({ account, parent, pageSize, pageToken, filter, orderBy }) => {
       try {
         const auth = await getClient(account as Account);
-        const chat = google.chat({ version: 'v1', auth });
+        const chat = chatClient({ version: 'v1', auth });
         const res = await chat.spaces.messages.list({
           parent,
           pageSize: pageSize ?? 100,

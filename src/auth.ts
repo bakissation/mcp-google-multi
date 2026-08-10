@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+import { OAuth2Client } from 'googleapis-common';
 import http from 'node:http';
 import { URL } from 'node:url';
 import { randomBytes } from 'node:crypto';
@@ -151,7 +151,7 @@ export async function runAuthFlow(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const oauth2Client = new google.auth.OAuth2(
+  const oauth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
     'http://localhost:4242/oauth2callback',

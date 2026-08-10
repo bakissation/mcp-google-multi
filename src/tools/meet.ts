@@ -1,6 +1,6 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
-import { google } from 'googleapis';
+import { meet as meetClient } from '@googleapis/meet';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -25,7 +25,7 @@ export function registerMeetTools(server: ToolRegistry): void {
     async ({ account, pageSize, pageToken, filter }) => {
       try {
         const auth = await getClient(account as Account);
-        const meet = google.meet({ version: 'v2', auth });
+        const meet = meetClient({ version: 'v2', auth });
         const res = await meet.conferenceRecords.list({
           pageSize: pageSize ?? 20,
           pageToken,
@@ -52,7 +52,7 @@ export function registerMeetTools(server: ToolRegistry): void {
     async ({ account, name }) => {
       try {
         const auth = await getClient(account as Account);
-        const meet = google.meet({ version: 'v2', auth });
+        const meet = meetClient({ version: 'v2', auth });
         const res = await meet.conferenceRecords.get({ name });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -79,7 +79,7 @@ export function registerMeetTools(server: ToolRegistry): void {
     async ({ account, parent, pageSize, pageToken }) => {
       try {
         const auth = await getClient(account as Account);
-        const meet = google.meet({ version: 'v2', auth });
+        const meet = meetClient({ version: 'v2', auth });
         const res = await meet.conferenceRecords.recordings.list({
           parent,
           pageSize: pageSize ?? 20,
@@ -110,7 +110,7 @@ export function registerMeetTools(server: ToolRegistry): void {
     async ({ account, parent, pageSize, pageToken }) => {
       try {
         const auth = await getClient(account as Account);
-        const meet = google.meet({ version: 'v2', auth });
+        const meet = meetClient({ version: 'v2', auth });
         const res = await meet.conferenceRecords.transcripts.list({
           parent,
           pageSize: pageSize ?? 20,
@@ -139,7 +139,7 @@ export function registerMeetTools(server: ToolRegistry): void {
     async ({ account, parent, pageSize, pageToken }) => {
       try {
         const auth = await getClient(account as Account);
-        const meet = google.meet({ version: 'v2', auth });
+        const meet = meetClient({ version: 'v2', auth });
         const res = await meet.conferenceRecords.transcripts.entries.list({
           parent,
           pageSize: pageSize ?? 200,

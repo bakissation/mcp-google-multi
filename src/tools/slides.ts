@@ -1,6 +1,6 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
-import { google } from 'googleapis';
+import { slides as slidesClient } from '@googleapis/slides';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -25,7 +25,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
     async ({ account, title }) => {
       try {
         const auth = await getClient(account as Account);
-        const slides = google.slides({ version: 'v1', auth });
+        const slides = slidesClient({ version: 'v1', auth });
         const res = await slides.presentations.create({ requestBody: { title } });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
@@ -54,7 +54,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
     async ({ account, presentationId, full }) => {
       try {
         const auth = await getClient(account as Account);
-        const slides = google.slides({ version: 'v1', auth });
+        const slides = slidesClient({ version: 'v1', auth });
         const res = await slides.presentations.get({ presentationId });
         const payload = full ? res.data : summarizePresentation(res.data as Record<string, any>);
         return {
@@ -79,7 +79,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
     async ({ account, presentationId, pageObjectId }) => {
       try {
         const auth = await getClient(account as Account);
-        const slides = google.slides({ version: 'v1', auth });
+        const slides = slidesClient({ version: 'v1', auth });
         const res = await slides.presentations.pages.get({ presentationId, pageObjectId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -106,7 +106,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
     async ({ account, presentationId, pageObjectId, mimeType, thumbnailSize }) => {
       try {
         const auth = await getClient(account as Account);
-        const slides = google.slides({ version: 'v1', auth });
+        const slides = slidesClient({ version: 'v1', auth });
         const res = await slides.presentations.pages.getThumbnail({
           presentationId,
           pageObjectId,
@@ -139,7 +139,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
     async ({ account, presentationId, requests, writeControl }) => {
       try {
         const auth = await getClient(account as Account);
-        const slides = google.slides({ version: 'v1', auth });
+        const slides = slidesClient({ version: 'v1', auth });
         const res = await slides.presentations.batchUpdate({
           presentationId,
           requestBody: {
