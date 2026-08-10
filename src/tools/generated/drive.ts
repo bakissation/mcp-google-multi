@@ -5,11 +5,27 @@ import { coerceBoolean, coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerDriveGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_drive_v3: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.metadata","https://www.googleapis.com/auth/drive.metadata.readonly","https://www.googleapis.com/auth/drive.readonly"],
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.metadata"],
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.appdata","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.metadata","https://www.googleapis.com/auth/drive.metadata.readonly","https://www.googleapis.com/auth/drive.readonly"],
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.appdata","https://www.googleapis.com/auth/drive.apps.readonly","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.metadata","https://www.googleapis.com/auth/drive.metadata.readonly","https://www.googleapis.com/auth/drive.readonly"],
+    ["https://www.googleapis.com/auth/drive.apps.readonly"],
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.appdata","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.meet.readonly","https://www.googleapis.com/auth/drive.metadata","https://www.googleapis.com/auth/drive.metadata.readonly","https://www.googleapis.com/auth/drive.photos.readonly","https://www.googleapis.com/auth/drive.readonly"],
+    ["https://www.googleapis.com/auth/drive"],
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.readonly"],
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.appdata","https://www.googleapis.com/auth/drive.file"],
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.meet.readonly","https://www.googleapis.com/auth/drive.metadata","https://www.googleapis.com/auth/drive.metadata.readonly","https://www.googleapis.com/auth/drive.readonly"],
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.meet.readonly","https://www.googleapis.com/auth/drive.readonly"],
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.meet.readonly","https://www.googleapis.com/auth/drive.metadata","https://www.googleapis.com/auth/drive.metadata.readonly","https://www.googleapis.com/auth/drive.photos.readonly","https://www.googleapis.com/auth/drive.readonly"],
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.readonly"],
+  ];
   registerGeneratedTool(registry, {
     name: "drive_accessproposals_get",
     cud: "read",
     description: "Retrieves an access proposal by ID. For more information, see [Manage pending access proposals](https://developers.google.com/workspace/drive/api/guides/pending",
-    method: { id: "drive.accessproposals.get", httpMethod: "GET", path: "files/{fileId}/accessproposals/{proposalId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","proposalId"] },
+    method: { id: "drive.accessproposals.get", httpMethod: "GET", path: "files/{fileId}/accessproposals/{proposalId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","proposalId"], scopes: S_drive_v3[0] },
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"proposalId","api":"proposalId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -23,7 +39,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_approvals_approve",
     cud: "create",
     description: "Approves an approval. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). This is used to update t",
-    method: { id: "drive.approvals.approve", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:approve", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"] },
+    method: { id: "drive.approvals.approve", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:approve", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"], scopes: S_drive_v3[1] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -38,7 +54,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_approvals_cancel",
     cud: "create",
     description: "Cancels an approval. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). Updates the approval Stat",
-    method: { id: "drive.approvals.cancel", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:cancel", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"] },
+    method: { id: "drive.approvals.cancel", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:cancel", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"], scopes: S_drive_v3[1] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -53,7 +69,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_approvals_comment",
     cud: "create",
     description: "Comments on an approval. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). This sends a notifica",
-    method: { id: "drive.approvals.comment", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:comment", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"] },
+    method: { id: "drive.approvals.comment", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:comment", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"], scopes: S_drive_v3[1] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -68,7 +84,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_approvals_decline",
     cud: "create",
     description: "Declines an approval. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). This is used to update t",
-    method: { id: "drive.approvals.decline", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:decline", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"] },
+    method: { id: "drive.approvals.decline", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:decline", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"], scopes: S_drive_v3[1] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -83,7 +99,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_approvals_get",
     cud: "read",
     description: "Gets an approval by ID. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals).",
-    method: { id: "drive.approvals.get", httpMethod: "GET", path: "files/{fileId}/approvals/{approvalId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"] },
+    method: { id: "drive.approvals.get", httpMethod: "GET", path: "files/{fileId}/approvals/{approvalId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"], scopes: S_drive_v3[2] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -97,7 +113,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_approvals_list",
     cud: "read",
     description: "Lists the approvals on a file. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals).",
-    method: { id: "drive.approvals.list", httpMethod: "GET", path: "files/{fileId}/approvals", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"] },
+    method: { id: "drive.approvals.list", httpMethod: "GET", path: "files/{fileId}/approvals", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"], scopes: S_drive_v3[2] },
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -112,7 +128,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_approvals_reassign",
     cud: "create",
     description: "Reassigns the reviewers on an approval. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). Adds o",
-    method: { id: "drive.approvals.reassign", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:reassign", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"] },
+    method: { id: "drive.approvals.reassign", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:reassign", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"], scopes: S_drive_v3[1] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -127,7 +143,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_approvals_start",
     cud: "create",
     description: "Starts an approval on a file. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals).",
-    method: { id: "drive.approvals.start", httpMethod: "POST", path: "files/{fileId}/approvals:start", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"] },
+    method: { id: "drive.approvals.start", httpMethod: "POST", path: "files/{fileId}/approvals:start", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"], scopes: S_drive_v3[1] },
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -141,7 +157,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_apps_get",
     cud: "read",
     description: "Gets a specific app. For more information, see [Return user info](https://developers.google.com/workspace/drive/api/guides/user-info).",
-    method: { id: "drive.apps.get", httpMethod: "GET", path: "apps/{appId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["appId"] },
+    method: { id: "drive.apps.get", httpMethod: "GET", path: "apps/{appId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["appId"], scopes: S_drive_v3[3] },
     params: [{"field":"appId","api":"appId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -154,7 +170,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_apps_list",
     cud: "read",
     description: "Lists a user's installed apps. For more information, see [Return user info](https://developers.google.com/workspace/drive/api/guides/user-info).",
-    method: { id: "drive.apps.list", httpMethod: "GET", path: "apps", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [] },
+    method: { id: "drive.apps.list", httpMethod: "GET", path: "apps", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [], scopes: S_drive_v3[4] },
     params: [{"field":"appFilterExtensions","api":"appFilterExtensions","location":"query"},{"field":"appFilterMimeTypes","api":"appFilterMimeTypes","location":"query"},{"field":"languageCode","api":"languageCode","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -169,7 +185,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_changes_get_start_page_token",
     cud: "read",
     description: "Gets the starting pageToken for listing future changes. For more information, see [Retrieve changes](https://developers.google.com/workspace/drive/api/guides/ma",
-    method: { id: "drive.changes.getStartPageToken", httpMethod: "GET", path: "changes/startPageToken", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [] },
+    method: { id: "drive.changes.getStartPageToken", httpMethod: "GET", path: "changes/startPageToken", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [], scopes: S_drive_v3[5] },
     params: [{"field":"driveId","api":"driveId","location":"query"},{"field":"supportsAllDrives","api":"supportsAllDrives","location":"query"},{"field":"supportsTeamDrives","api":"supportsTeamDrives","location":"query"},{"field":"teamDriveId","api":"teamDriveId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -185,7 +201,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_changes_list",
     cud: "read",
     description: "Lists the changes for a user or shared drive. For more information, see [Retrieve changes](https://developers.google.com/workspace/drive/api/guides/manage-chang",
-    method: { id: "drive.changes.list", httpMethod: "GET", path: "changes", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["pageToken"] },
+    method: { id: "drive.changes.list", httpMethod: "GET", path: "changes", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["pageToken"], scopes: S_drive_v3[5] },
     params: [{"field":"pageToken","api":"pageToken","location":"query"},{"field":"driveId","api":"driveId","location":"query"},{"field":"includeCorpusRemovals","api":"includeCorpusRemovals","location":"query"},{"field":"includeItemsFromAllDrives","api":"includeItemsFromAllDrives","location":"query"},{"field":"includeLabels","api":"includeLabels","location":"query"},{"field":"includePermissionsForView","api":"includePermissionsForView","location":"query"},{"field":"includeRemoved","api":"includeRemoved","location":"query"},{"field":"includeTeamDriveItems","api":"includeTeamDriveItems","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"restrictToMyDrive","api":"restrictToMyDrive","location":"query"},{"field":"spaces","api":"spaces","location":"query"},{"field":"supportsAllDrives","api":"supportsAllDrives","location":"query"},{"field":"supportsTeamDrives","api":"supportsTeamDrives","location":"query"},{"field":"teamDriveId","api":"teamDriveId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -211,7 +227,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_changes_watch",
     cud: "create",
     description: "Subscribes to changes for a user. For more information, see [Notifications for resource changes](https://developers.google.com/workspace/drive/api/guides/push).",
-    method: { id: "drive.changes.watch", httpMethod: "POST", path: "changes/watch", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["pageToken"] },
+    method: { id: "drive.changes.watch", httpMethod: "POST", path: "changes/watch", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["pageToken"], scopes: S_drive_v3[5] },
     params: [{"field":"pageToken","api":"pageToken","location":"query"},{"field":"driveId","api":"driveId","location":"query"},{"field":"includeCorpusRemovals","api":"includeCorpusRemovals","location":"query"},{"field":"includeItemsFromAllDrives","api":"includeItemsFromAllDrives","location":"query"},{"field":"includeLabels","api":"includeLabels","location":"query"},{"field":"includePermissionsForView","api":"includePermissionsForView","location":"query"},{"field":"includeRemoved","api":"includeRemoved","location":"query"},{"field":"includeTeamDriveItems","api":"includeTeamDriveItems","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"restrictToMyDrive","api":"restrictToMyDrive","location":"query"},{"field":"spaces","api":"spaces","location":"query"},{"field":"supportsAllDrives","api":"supportsAllDrives","location":"query"},{"field":"supportsTeamDrives","api":"supportsTeamDrives","location":"query"},{"field":"teamDriveId","api":"teamDriveId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -238,7 +254,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_channels_stop",
     cud: "create",
     description: "Stops watching resources through this channel. For more information, see [Notifications for resource changes](https://developers.google.com/workspace/drive/api/",
-    method: { id: "drive.channels.stop", httpMethod: "POST", path: "channels/stop", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [] },
+    method: { id: "drive.channels.stop", httpMethod: "POST", path: "channels/stop", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [], scopes: S_drive_v3[5] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -251,7 +267,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_drives_create",
     cud: "create",
     description: "Creates a shared drive. For more information, see [Manage shared drives](https://developers.google.com/workspace/drive/api/guides/manage-shareddrives).",
-    method: { id: "drive.drives.create", httpMethod: "POST", path: "drives", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["requestId"] },
+    method: { id: "drive.drives.create", httpMethod: "POST", path: "drives", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["requestId"], scopes: S_drive_v3[6] },
     params: [{"field":"requestId","api":"requestId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -265,7 +281,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_drives_delete",
     cud: "delete",
     description: "Permanently deletes a shared drive for which the user is an `organizer`. The shared drive cannot contain any untrashed items. For more information, see [Manage",
-    method: { id: "drive.drives.delete", httpMethod: "DELETE", path: "drives/{driveId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["driveId"] },
+    method: { id: "drive.drives.delete", httpMethod: "DELETE", path: "drives/{driveId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["driveId"], scopes: S_drive_v3[6] },
     params: [{"field":"driveId","api":"driveId","location":"path"},{"field":"allowItemDeletion","api":"allowItemDeletion","location":"query"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -280,7 +296,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_drives_hide",
     cud: "create",
     description: "Hides a shared drive from the default view. For more information, see [Manage shared drives](https://developers.google.com/workspace/drive/api/guides/manage-sha",
-    method: { id: "drive.drives.hide", httpMethod: "POST", path: "drives/{driveId}/hide", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["driveId"] },
+    method: { id: "drive.drives.hide", httpMethod: "POST", path: "drives/{driveId}/hide", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["driveId"], scopes: S_drive_v3[6] },
     params: [{"field":"driveId","api":"driveId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -293,7 +309,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_drives_unhide",
     cud: "create",
     description: "Restores a shared drive to the default view. For more information, see [Manage shared drives](https://developers.google.com/workspace/drive/api/guides/manage-sh",
-    method: { id: "drive.drives.unhide", httpMethod: "POST", path: "drives/{driveId}/unhide", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["driveId"] },
+    method: { id: "drive.drives.unhide", httpMethod: "POST", path: "drives/{driveId}/unhide", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["driveId"], scopes: S_drive_v3[6] },
     params: [{"field":"driveId","api":"driveId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -306,7 +322,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_drives_update",
     cud: "update",
     description: "Updates the metadata for a shared drive. For more information, see [Manage shared drives](https://developers.google.com/workspace/drive/api/guides/manage-shared",
-    method: { id: "drive.drives.update", httpMethod: "PATCH", path: "drives/{driveId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["driveId"] },
+    method: { id: "drive.drives.update", httpMethod: "PATCH", path: "drives/{driveId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["driveId"], scopes: S_drive_v3[6] },
     params: [{"field":"driveId","api":"driveId","location":"path"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -321,7 +337,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_files_download",
     cud: "read",
     description: "Downloads the content of a file. For more information, see [Download and export files](https://developers.google.com/workspace/drive/api/guides/manage-downloads",
-    method: { id: "drive.files.download", httpMethod: "POST", path: "files/{fileId}/download", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"] },
+    method: { id: "drive.files.download", httpMethod: "POST", path: "files/{fileId}/download", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"], scopes: S_drive_v3[7] },
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"mimeType","api":"mimeType","location":"query"},{"field":"revisionId","api":"revisionId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -336,7 +352,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_files_generate_cse_token",
     cud: "read",
     description: "Generates a CSE token which can be used to create or update CSE files.",
-    method: { id: "drive.files.generateCseToken", httpMethod: "GET", path: "files/generateCseToken", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [] },
+    method: { id: "drive.files.generateCseToken", httpMethod: "GET", path: "files/generateCseToken", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [], scopes: S_drive_v3[6] },
     params: [{"field":"fileId","api":"fileId","location":"query"},{"field":"parent","api":"parent","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -350,7 +366,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_files_generate_ids",
     cud: "read",
     description: "Generates a set of file IDs which can be provided in create or copy requests. For more information, see [Create and manage files](https://developers.google.com/",
-    method: { id: "drive.files.generateIds", httpMethod: "GET", path: "files/generateIds", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [] },
+    method: { id: "drive.files.generateIds", httpMethod: "GET", path: "files/generateIds", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [], scopes: S_drive_v3[8] },
     params: [{"field":"count","api":"count","location":"query"},{"field":"space","api":"space","location":"query"},{"field":"type","api":"type","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -365,7 +381,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_files_list_labels",
     cud: "read",
     description: "Lists the labels on a file. For more information, see [List labels on a file](https://developers.google.com/workspace/drive/api/guides/list-labels).",
-    method: { id: "drive.files.listLabels", httpMethod: "GET", path: "files/{fileId}/listLabels", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"] },
+    method: { id: "drive.files.listLabels", httpMethod: "GET", path: "files/{fileId}/listLabels", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"], scopes: S_drive_v3[9] },
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -380,7 +396,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_files_modify_labels",
     cud: "update",
     description: "Modifies the set of labels applied to a file. For more information, see [Set a label field on a file](https://developers.google.com/workspace/drive/api/guides/s",
-    method: { id: "drive.files.modifyLabels", httpMethod: "POST", path: "files/{fileId}/modifyLabels", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"] },
+    method: { id: "drive.files.modifyLabels", httpMethod: "POST", path: "files/{fileId}/modifyLabels", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"], scopes: S_drive_v3[1] },
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -394,7 +410,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_files_watch",
     cud: "create",
     description: "Subscribes to changes to a file. For more information, see [Notifications for resource changes](https://developers.google.com/workspace/drive/api/guides/push).",
-    method: { id: "drive.files.watch", httpMethod: "POST", path: "files/{fileId}/watch", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"] },
+    method: { id: "drive.files.watch", httpMethod: "POST", path: "files/{fileId}/watch", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"], scopes: S_drive_v3[5] },
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"acknowledgeAbuse","api":"acknowledgeAbuse","location":"query"},{"field":"includeLabels","api":"includeLabels","location":"query"},{"field":"includePermissionsForView","api":"includePermissionsForView","location":"query"},{"field":"supportsAllDrives","api":"supportsAllDrives","location":"query"},{"field":"supportsTeamDrives","api":"supportsTeamDrives","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -413,7 +429,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_operations_get",
     cud: "read",
     description: "Gets the latest state of a long-running operation. Clients can use this method to poll the operation result at intervals as recommended by the API service.",
-    method: { id: "drive.operations.get", httpMethod: "GET", path: "operations/{name}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["name"] },
+    method: { id: "drive.operations.get", httpMethod: "GET", path: "operations/{name}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["name"], scopes: S_drive_v3[10] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -426,7 +442,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_permissions_get",
     cud: "read",
     description: "Gets a permission by ID. For more information, see [Share files, folders, and drives](https://developers.google.com/workspace/drive/api/guides/manage-sharing).",
-    method: { id: "drive.permissions.get", httpMethod: "GET", path: "files/{fileId}/permissions/{permissionId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","permissionId"] },
+    method: { id: "drive.permissions.get", httpMethod: "GET", path: "files/{fileId}/permissions/{permissionId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","permissionId"], scopes: S_drive_v3[11] },
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"permissionId","api":"permissionId","location":"path"},{"field":"supportsAllDrives","api":"supportsAllDrives","location":"query"},{"field":"supportsTeamDrives","api":"supportsTeamDrives","location":"query"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -443,7 +459,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_replies_get",
     cud: "read",
     description: "Gets a reply by ID. For more information, see [Manage comments and replies](https://developers.google.com/workspace/drive/api/guides/manage-comments).",
-    method: { id: "drive.replies.get", httpMethod: "GET", path: "files/{fileId}/comments/{commentId}/replies/{replyId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","commentId","replyId"] },
+    method: { id: "drive.replies.get", httpMethod: "GET", path: "files/{fileId}/comments/{commentId}/replies/{replyId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","commentId","replyId"], scopes: S_drive_v3[10] },
     params: [{"field":"commentId","api":"commentId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"replyId","api":"replyId","location":"path"},{"field":"includeDeleted","api":"includeDeleted","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -459,7 +475,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_revisions_get",
     cud: "read",
     description: "Gets a revision's metadata or content by ID. For more information, see [Manage file revisions](https://developers.google.com/workspace/drive/api/guides/manage-r",
-    method: { id: "drive.revisions.get", httpMethod: "GET", path: "files/{fileId}/revisions/{revisionId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","revisionId"] },
+    method: { id: "drive.revisions.get", httpMethod: "GET", path: "files/{fileId}/revisions/{revisionId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","revisionId"], scopes: S_drive_v3[5] },
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"revisionId","api":"revisionId","location":"path"},{"field":"acknowledgeAbuse","api":"acknowledgeAbuse","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -474,7 +490,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_teamdrives_create",
     cud: "create",
     description: "Deprecated: Use `drives.create` instead.",
-    method: { id: "drive.teamdrives.create", httpMethod: "POST", path: "teamdrives", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["requestId"] },
+    method: { id: "drive.teamdrives.create", httpMethod: "POST", path: "teamdrives", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["requestId"], scopes: S_drive_v3[6] },
     params: [{"field":"requestId","api":"requestId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -488,7 +504,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_teamdrives_delete",
     cud: "delete",
     description: "Deprecated: Use `drives.delete` instead.",
-    method: { id: "drive.teamdrives.delete", httpMethod: "DELETE", path: "teamdrives/{teamDriveId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["teamDriveId"] },
+    method: { id: "drive.teamdrives.delete", httpMethod: "DELETE", path: "teamdrives/{teamDriveId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["teamDriveId"], scopes: S_drive_v3[6] },
     params: [{"field":"teamDriveId","api":"teamDriveId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -501,7 +517,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_teamdrives_get",
     cud: "read",
     description: "Deprecated: Use `drives.get` instead.",
-    method: { id: "drive.teamdrives.get", httpMethod: "GET", path: "teamdrives/{teamDriveId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["teamDriveId"] },
+    method: { id: "drive.teamdrives.get", httpMethod: "GET", path: "teamdrives/{teamDriveId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["teamDriveId"], scopes: S_drive_v3[12] },
     params: [{"field":"teamDriveId","api":"teamDriveId","location":"path"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -515,7 +531,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_teamdrives_list",
     cud: "read",
     description: "Deprecated: Use `drives.list` instead.",
-    method: { id: "drive.teamdrives.list", httpMethod: "GET", path: "teamdrives", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [] },
+    method: { id: "drive.teamdrives.list", httpMethod: "GET", path: "teamdrives", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [], scopes: S_drive_v3[12] },
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"q","api":"q","location":"query"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -531,7 +547,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     name: "drive_teamdrives_update",
     cud: "update",
     description: "Deprecated: Use `drives.update` instead.",
-    method: { id: "drive.teamdrives.update", httpMethod: "PATCH", path: "teamdrives/{teamDriveId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["teamDriveId"] },
+    method: { id: "drive.teamdrives.update", httpMethod: "PATCH", path: "teamdrives/{teamDriveId}", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["teamDriveId"], scopes: S_drive_v3[6] },
     params: [{"field":"teamDriveId","api":"teamDriveId","location":"path"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

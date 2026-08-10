@@ -5,11 +5,15 @@ import { coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerDriveactivityGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_driveactivity_v2: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/drive.activity","https://www.googleapis.com/auth/drive.activity.readonly"],
+  ];
   registerGeneratedTool(registry, {
     name: "driveactivity_activity_query",
     cud: "read",
     description: "Query past activity in Google Drive.",
-    method: { id: "driveactivity.activity.query", httpMethod: "POST", path: "v2/activity:query", baseUrl: "https://driveactivity.googleapis.com/", requiredParams: [] },
+    method: { id: "driveactivity.activity.query", httpMethod: "POST", path: "v2/activity:query", baseUrl: "https://driveactivity.googleapis.com/", requiredParams: [], scopes: S_driveactivity_v2[0] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

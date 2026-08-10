@@ -5,6 +5,11 @@ import { coerceBoolean, coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_workspaceevents_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/chat.bot","https://www.googleapis.com/auth/chat.memberships","https://www.googleapis.com/auth/chat.memberships.readonly","https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.reactions","https://www.googleapis.com/auth/chat.messages.reactions.readonly","https://www.googleapis.com/auth/chat.messages.readonly","https://www.googleapis.com/auth/chat.spaces","https://www.googleapis.com/auth/chat.spaces.readonly","https://www.googleapis.com/auth/chat.users.availability","https://www.googleapis.com/auth/chat.users.availability.readonly","https://www.googleapis.com/auth/chat.users.readstate","https://www.googleapis.com/auth/chat.users.readstate.readonly","https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.metadata","https://www.googleapis.com/auth/drive.metadata.readonly","https://www.googleapis.com/auth/drive.readonly","https://www.googleapis.com/auth/meetings.space.created","https://www.googleapis.com/auth/meetings.space.readonly"],
+    ["https://www.googleapis.com/auth/chat.app.all.memberships.readonly","https://www.googleapis.com/auth/chat.app.all.messages.readonly","https://www.googleapis.com/auth/chat.app.all.spaces.readonly","https://www.googleapis.com/auth/chat.app.all.users.readstate.readonly","https://www.googleapis.com/auth/chat.app.memberships","https://www.googleapis.com/auth/chat.app.memberships.readonly","https://www.googleapis.com/auth/chat.app.messages.readonly","https://www.googleapis.com/auth/chat.app.spaces","https://www.googleapis.com/auth/chat.app.spaces.readonly","https://www.googleapis.com/auth/chat.memberships","https://www.googleapis.com/auth/chat.memberships.readonly","https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.reactions","https://www.googleapis.com/auth/chat.messages.reactions.readonly","https://www.googleapis.com/auth/chat.messages.readonly","https://www.googleapis.com/auth/chat.spaces","https://www.googleapis.com/auth/chat.spaces.readonly","https://www.googleapis.com/auth/chat.users.availability","https://www.googleapis.com/auth/chat.users.availability.readonly","https://www.googleapis.com/auth/chat.users.readstate","https://www.googleapis.com/auth/chat.users.readstate.readonly","https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.metadata","https://www.googleapis.com/auth/drive.metadata.readonly","https://www.googleapis.com/auth/drive.readonly","https://www.googleapis.com/auth/meetings.space.created","https://www.googleapis.com/auth/meetings.space.readonly"],
+  ];
   registerGeneratedTool(registry, {
     name: "workspaceevents_message_stream",
     cud: "create",
@@ -22,7 +27,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     name: "workspaceevents_operations_get",
     cud: "read",
     description: "Gets the latest state of a long-running operation. Clients can use this method to poll the operation result at intervals as recommended by the API service.",
-    method: { id: "workspaceevents.operations.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "workspaceevents.operations.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"], scopes: S_workspaceevents_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -35,7 +40,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     name: "workspaceevents_subscriptions_create",
     cud: "create",
     description: "Creates a Google Workspace subscription. To learn how to use this method, see [Create a Google Workspace subscription](https://developers.google.com/workspace/e",
-    method: { id: "workspaceevents.subscriptions.create", httpMethod: "POST", path: "v1/subscriptions", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: [] },
+    method: { id: "workspaceevents.subscriptions.create", httpMethod: "POST", path: "v1/subscriptions", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: [], scopes: S_workspaceevents_v1[1] },
     params: [{"field":"validateOnly","api":"validateOnly","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -49,7 +54,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     name: "workspaceevents_subscriptions_delete",
     cud: "delete",
     description: "Deletes a Google Workspace subscription. To learn how to use this method, see [Delete a Google Workspace subscription](https://developers.google.com/workspace/e",
-    method: { id: "workspaceevents.subscriptions.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "workspaceevents.subscriptions.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"], scopes: S_workspaceevents_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"allowMissing","api":"allowMissing","location":"query"},{"field":"etag","api":"etag","location":"query"},{"field":"validateOnly","api":"validateOnly","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -65,7 +70,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     name: "workspaceevents_subscriptions_get",
     cud: "read",
     description: "Gets details about a Google Workspace subscription. To learn how to use this method, see [Get details about a Google Workspace subscription](https://developers.",
-    method: { id: "workspaceevents.subscriptions.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "workspaceevents.subscriptions.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"], scopes: S_workspaceevents_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -78,7 +83,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     name: "workspaceevents_subscriptions_list",
     cud: "read",
     description: "Lists Google Workspace subscriptions. To learn how to use this method, see [List Google Workspace subscriptions](https://developers.google.com/workspace/events/",
-    method: { id: "workspaceevents.subscriptions.list", httpMethod: "GET", path: "v1/subscriptions", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: [] },
+    method: { id: "workspaceevents.subscriptions.list", httpMethod: "GET", path: "v1/subscriptions", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: [], scopes: S_workspaceevents_v1[0] },
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -93,7 +98,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     name: "workspaceevents_subscriptions_patch",
     cud: "update",
     description: "Updates or renews a Google Workspace subscription. To learn how to use this method, see [Update or renew a Google Workspace subscription](https://developers.goo",
-    method: { id: "workspaceevents.subscriptions.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "workspaceevents.subscriptions.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"], scopes: S_workspaceevents_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"validateOnly","api":"validateOnly","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -109,7 +114,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     name: "workspaceevents_subscriptions_reactivate",
     cud: "create",
     description: "Reactivates a suspended Google Workspace subscription. This method resets your subscription's `State` field to `ACTIVE`. Before you use this method, you must fi",
-    method: { id: "workspaceevents.subscriptions.reactivate", httpMethod: "POST", path: "v1/{+name}:reactivate", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "workspaceevents.subscriptions.reactivate", httpMethod: "POST", path: "v1/{+name}:reactivate", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"], scopes: S_workspaceevents_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
