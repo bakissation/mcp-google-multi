@@ -301,7 +301,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       try {
         const auth = await getClient(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
-        const config = (await import('../accounts.js')).ACCOUNT_CONFIG[account as Account];
+        const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
 
         const headers = [
           `From: ${encodeAddressHeader(config.email)}`,
@@ -414,7 +414,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       try {
         const auth = await getClient(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
-        const config = (await import('../accounts.js')).ACCOUNT_CONFIG[account as Account];
+        const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
 
         const headers = [
           `From: ${encodeAddressHeader(config.email)}`,

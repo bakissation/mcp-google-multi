@@ -17,7 +17,10 @@ Conventions for AI assistants modifying this codebase. v5 is **local, stdio, use
 - `src/token-store.ts` — encrypted token store (AES-256-GCM, key from `MASTER_KEY`); `readToken`/`writeToken`/`updateToken`. The `migrate-tokens` CLI lives in `src/migrate-tokens.ts`.
 - `src/auth.ts` — OAuth flow + scope tiers (`BASE_SCOPES` always, `OPTIONAL_SCOPE_BUNDLES` env-gated, `ADMIN_SCOPES` per-account).
 - `src/client.ts` — `getClient(account)`: fresh OAuth2Client per call from the encrypted token; its `tokens` listener re-encrypts on refresh (`updateToken`).
-- `src/accounts.ts` — parses `GOOGLE_ACCOUNTS`; token dir defaults to `~/.config/mcp-google-multi/tokens` (override `TOKEN_STORE_PATH`).
+- `src/accounts.ts` — `resolveAccounts()` builds the `AccountSet` (registry): whole-registry env override via `GOOGLE_ACCOUNTS`, else `config.json`; `getAccountSet()` is the live accessor (dispatch-time readers use it, never a captured snapshot); `invalidateAccountSet()`/`isAccountSetStale()` back the reload path. Token dir defaults to `~/.config/mcp-google-multi/tokens` (override `TOKEN_STORE_PATH`).
+- `src/config-file.ts` — `config.json` zod-strict schema (secrets-shaped keys fail), version gate, `mutateConfigFile` read-latest-under-lock writer. `src/fs-atomic.ts` — path-keyed hardlink lock + atomic write (generalized from the token store; token writes delegate to it).
+- `src/identity.ts` — `buildIdentityContext()`: the frozen forward-compat seam `{subject:'owner', accounts, policy, getClient, tokenStore}`; `buildRegistry(server, ctx)` consumes it. Exactly one context in the free core.
+- `src/migrate-config.ts` — `migrate-config` CLI: env -> `config.json` accounts (idempotent, never edits env).
 - `src/tools/_errors.ts` — `mapGoogleError` typed taxonomy + `handleGoogleApiError` result wrapper; each service file defines its own `handle<Service>Error` shim over it (optionally with a service-specific 403 hint).
 - `src/tools/_coerce.ts` — `coerceArray`/`coerceJson`/`coerceBoolean` for string-encoded client args.
 

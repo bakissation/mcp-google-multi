@@ -1,12 +1,13 @@
 import fs from 'node:fs';
-import { ACCOUNTS, ACCOUNT_CONFIG } from './accounts.js';
+import { getAccountSet } from './accounts.js';
 import { writeToken, hasToken } from './token-store.js';
 
 export function runMigrateTokens(): void {
   let migrated = 0;
   let skipped = 0;
-  for (const alias of ACCOUNTS) {
-    const plain = ACCOUNT_CONFIG[alias].tokenPath;
+  const { aliases, configs } = getAccountSet();
+  for (const alias of aliases) {
+    const plain = configs[alias].tokenPath;
     if (!fs.existsSync(plain)) continue;
     if (hasToken(alias)) {
       console.log(`• ${alias}: encrypted token already exists, skipping`);

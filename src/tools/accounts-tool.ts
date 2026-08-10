@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import type { ToolRegistry } from '../registry.js';
-import { ACCOUNTS, ACCOUNT_CONFIG } from '../accounts.js';
+import { getAccountSet, refreshAccountSetIfStale } from '../accounts.js';
 import { getAdminAccounts, resolveScopesForAccount } from '../auth.js';
 import { hasToken, readToken } from '../token-store.js';
 
@@ -24,15 +24,27 @@ export interface AccountHealth {
   alias: string;
   email: string;
   admin: boolean;
+  source: 'config' | 'env';
+  sourceNote?: string;
   token: { status: TokenStatus; expiryDate?: string; hint?: string };
   scopes: { configured: number; granted: number; missing: string[] };
 }
 
 export function deriveAccountHealth(alias: string, deps: AccountHealthDeps = DEFAULT_DEPS): AccountHealth {
-  const config = ACCOUNT_CONFIG[alias];
+  const config = getAccountSet().configs[alias];
   const admin = getAdminAccounts().includes(alias);
   const configured = resolveScopesForAccount(alias);
-  const base = { alias, email: config.email, admin };
+  // BR-10: env-sourced accounts are not persisted in config.json, so the
+  // account wizard cannot edit them — the deployer edits env instead.
+  const base = {
+    alias,
+    email: config.email,
+    admin,
+    source: config.source,
+    ...(config.source === 'env'
+      ? { sourceNote: 'Defined by GOOGLE_ACCOUNTS env (not editable via config.json)' }
+      : {}),
+  };
   const noScopes = { configured: configured.length, granted: 0, missing: configured };
 
   if (!deps.hasToken(alias)) {
@@ -96,13 +108,16 @@ export function registerAccountTools(registry: ToolRegistry, deps: AccountHealth
         'Use this to see which account aliases are available and healthy.',
       inputSchema: {},
     },
-    async () => ({
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify({ accounts: ACCOUNTS.map((alias) => deriveAccountHealth(alias, deps)) }),
-        },
-      ],
-    }),
+    async () => {
+      refreshAccountSetIfStale();
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({ accounts: getAccountSet().aliases.map((alias) => deriveAccountHealth(alias, deps)) }),
+          },
+        ],
+      };
+    },
   );
 }

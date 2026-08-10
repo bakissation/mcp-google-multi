@@ -2,7 +2,7 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean } from './_coerce.js';
 import { drive as driveClient, type drive_v3 } from '@googleapis/drive';
-import { ACCOUNTS, ACCOUNT_CONFIG } from '../accounts.js';
+import { ACCOUNTS, getAccountSet } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
@@ -1340,7 +1340,7 @@ export function registerDriveTools(server: ToolRegistry): void {
           };
         }
         const intendedName = newName ?? meta.data.name ?? 'transferred-file';
-        const targetEmail = ACCOUNT_CONFIG[toAccount as Account].email;
+        const targetEmail = getAccountSet().configs[toAccount as Account].email;
 
         const finish = async (
           data: drive_v3.Schema$File,

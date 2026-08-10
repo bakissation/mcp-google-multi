@@ -1,15 +1,11 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
-import path from 'node:path';
-import { ACCOUNT_CONFIG } from './accounts.js';
+import { getAccountSet } from './accounts.js';
+import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 import type { TokenData } from './types.js';
 
 const ENC_VERSION = 1;
 const ALGO = 'aes-256-gcm';
-const LOCK_TIMEOUT_MS = 5_000;
-const LOCK_RETRY_MS = 10;
-const RENAME_ATTEMPTS = 5;
-const RENAME_RETRY_MS = 20;
 
 interface EncFile {
   v: number;
@@ -65,135 +61,44 @@ function masterKey(): string {
   return process.env.MASTER_KEY ?? '';
 }
 
+function encPath(alias: string): string {
+  return getAccountSet().configs[alias].encPath;
+}
+
 export function readToken(alias: string): TokenData | null {
   let contents: string;
   try {
-    contents = fs.readFileSync(ACCOUNT_CONFIG[alias].encPath, 'utf8');
+    contents = fs.readFileSync(encPath(alias), 'utf8');
   } catch {
     return null;
   }
   return decryptToken(contents, masterKey());
 }
 
-function sleep(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
-function withTokenLock<T>(alias: string, fn: () => T): T {
-  const p = ACCOUNT_CONFIG[alias].encPath;
-  const dir = path.dirname(p);
-  const lock = path.join(dir, `.${path.basename(p)}.lock`);
-  const ownerFile = `${lock}.${process.pid}.${randomBytes(6).toString('hex')}.owner`;
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(ownerFile, String(process.pid), { mode: 0o600, flag: 'wx' });
-  const deadline = Date.now() + LOCK_TIMEOUT_MS;
-
-  try {
-    while (true) {
-      try {
-        fs.linkSync(ownerFile, lock);
-        break;
-      } catch (error) {
-        const err = error as NodeJS.ErrnoException;
-        if (err.code !== 'EEXIST') throw error;
-        try {
-          const observedOwner = fs.readFileSync(lock, 'utf8');
-          const owner = Number(observedOwner);
-          // Non-PID content can only come from a corrupt or interrupted lock
-          // write — recover it like a dead owner instead of spinning to timeout.
-          let ownerDead = !(Number.isSafeInteger(owner) && owner > 0);
-          if (!ownerDead) {
-            try {
-              process.kill(owner, 0);
-            } catch (ownerError) {
-              const code = (ownerError as NodeJS.ErrnoException).code;
-              // EPERM: PID exists but is not signalable (recycled by another user);
-              // treat as alive, never break a lock we cannot verify.
-              if (code === 'ESRCH') ownerDead = true;
-              else if (code !== 'EPERM') throw ownerError;
-            }
-          }
-          if (ownerDead) {
-            if (fs.readFileSync(lock, 'utf8') === observedOwner) fs.rmSync(lock, { force: true });
-            continue;
-          }
-        } catch (readError) {
-          if ((readError as NodeJS.ErrnoException).code === 'ENOENT') {
-            continue;
-          }
-          throw readError;
-        }
-        if (Date.now() >= deadline) {
-          throw new Error(`Timed out waiting for token lock: ${alias}`, { cause: error });
-        }
-        sleep(LOCK_RETRY_MS);
-      }
-    }
-  } finally {
-    fs.rmSync(ownerFile, { force: true });
-  }
-
-  try {
-    return fn();
-  } finally {
-    fs.rmSync(lock, { force: true });
-  }
+// Lock + atomic-write mechanics live in fs-atomic.ts (generalized path-keyed
+// from this file's original alias-keyed implementation; behavior unchanged).
+export function writeToken(alias: string, data: object): void {
+  withFileLock(encPath(alias), () => writeTokenAtomic(alias, data), `token lock: ${alias}`);
 }
 
 function writeTokenAtomic(alias: string, data: object): void {
-  const p = ACCOUNT_CONFIG[alias].encPath;
-  const dir = path.dirname(p);
-  const tmp = path.join(dir, `.${path.basename(p)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`);
-  try {
-    fs.writeFileSync(tmp, encryptToken(data, masterKey()), { mode: 0o600, flag: 'wx' });
-    // Open read-write, not read-only: on Windows fsync maps to FlushFileBuffers,
-    // which returns EPERM on a read-only handle.
-    const fd = fs.openSync(tmp, 'r+');
-    try {
-      fs.fsyncSync(fd);
-    } finally {
-      fs.closeSync(fd);
-    }
-    renameWithRetry(tmp, p);
-  } finally {
-    try {
-      fs.rmSync(tmp, { force: true });
-    } catch {
-      // force only suppresses ENOENT; a Windows handle-holder can make this
-      // throw and mask the real write error. The orphan tmp is harmless.
-    }
-  }
-}
-
-// Windows only: renaming over a momentarily-open file throws transient EPERM/EACCES/EBUSY (reads take no lock); see docs/internals.md.
-function renameWithRetry(from: string, to: string): void {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      fs.renameSync(from, to);
-      return;
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      const transient = code === 'EPERM' || code === 'EACCES' || code === 'EBUSY';
-      if (!transient || attempt >= RENAME_ATTEMPTS) throw error;
-      sleep(RENAME_RETRY_MS * attempt);
-    }
-  }
-}
-
-export function writeToken(alias: string, data: object): void {
-  withTokenLock(alias, () => writeTokenAtomic(alias, data));
+  atomicWriteFileSync(encPath(alias), encryptToken(data, masterKey()), 0o600);
 }
 
 export function updateToken(alias: string, updates: object): void {
-  withTokenLock(alias, () => {
-    const existing = readToken(alias) ?? {};
-    const definedUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([, value]) => value !== null && value !== undefined),
-    );
-    writeTokenAtomic(alias, { ...existing, ...definedUpdates });
-  });
+  withFileLock(
+    encPath(alias),
+    () => {
+      const existing = readToken(alias) ?? {};
+      const definedUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([, value]) => value !== null && value !== undefined),
+      );
+      writeTokenAtomic(alias, { ...existing, ...definedUpdates });
+    },
+    `token lock: ${alias}`,
+  );
 }
 
 export function hasToken(alias: string): boolean {
-  return fs.existsSync(ACCOUNT_CONFIG[alias].encPath);
+  return fs.existsSync(encPath(alias));
 }
