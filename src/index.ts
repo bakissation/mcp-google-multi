@@ -35,7 +35,7 @@ function buildRegistry(server: McpServer, ctx: IdentityContext): ToolRegistry {
     if (!toolsetEnabled(toolsets, svc.name)) continue;
     if (svc.enabled && !svc.enabled()) {
       if (toolsets !== 'all') {
-        const hint = svc.name === 'admin' ? 'set GOOGLE_ADMIN_ACCOUNTS' : `add "${svc.name}" to GOOGLE_OPTIONAL_SCOPES`;
+        const hint = svc.name === 'admin' ? 'set admin on an account/profile (or GOOGLE_ADMIN_ACCOUNTS)' : `add "${svc.name}" to an account's scope profile (or legacy GOOGLE_OPTIONAL_SCOPES)`;
         process.stderr.write(`GOOGLE_TOOLSETS: "${svc.name}" requested but not enabled — ${hint}\n`);
       }
       continue;
@@ -59,7 +59,7 @@ function buildRegistry(server: McpServer, ctx: IdentityContext): ToolRegistry {
     throw new Error(
       `GOOGLE_TOOLSETS="${process.env.GOOGLE_TOOLSETS ?? ''}" selected no enabled services. ` +
         `Known services: ${known.join(', ')}. ` +
-        `Note: optional services require their bundle in GOOGLE_OPTIONAL_SCOPES, admin requires GOOGLE_ADMIN_ACCOUNTS.`,
+        `Note: optional services need their bundle in an account's scope profile (or legacy GOOGLE_OPTIONAL_SCOPES); admin needs an admin account/profile.`,
     );
   }
   registerDiscoverTools(registry, policy);

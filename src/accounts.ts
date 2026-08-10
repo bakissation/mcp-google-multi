@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import { loadEnvFiles } from './env-load.js';
 import { CONFIG_VERSION, configDir, configFilePath, failStartup, loadConfigFile, mutateConfigFile } from './config-file.js';
 import type { ConfigFile } from './config-file.js';
+import { BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from './scope-catalog.js';
+import type { ScopeProfile } from './scope-catalog.js';
 
 const envLoad = loadEnvFiles();
 
@@ -23,6 +25,7 @@ export interface AccountConfig {
 export interface AccountSet {
   aliases: [string, ...string[]];
   configs: Record<string, AccountConfig>;
+  scopeProfiles: Record<string, ScopeProfile>;
   source: 'env' | 'file' | 'merged';
   stamp: string;
 }
@@ -111,6 +114,8 @@ function noAccountsMessage(): string {
  * overrides per-account admin flags from the file (env var > config field);
  * empty behaves as unset, mirroring GOOGLE_ACCOUNTS semantics.
  */
+let warnedLegacy = false;
+
 export function resolveAccounts(
   env: NodeJS.ProcessEnv = process.env,
   filePath = configFilePath(),
@@ -119,12 +124,48 @@ export function resolveAccounts(
   const adminEnv = parseCsv(env.GOOGLE_ADMIN_ACCOUNTS);
   const rawEnv = env.GOOGLE_ACCOUNTS;
 
+  const fail = (slug: string, message: string): never => {
+    if (onInvalid === 'throw') throw new Error(`${slug}: ${message}`);
+    failStartup(slug, message);
+  };
+
+  // Validate the legacy global override AT BOOT, whatever GOOGLE_TOOLSETS
+  // selects — otherwise a typo only surfaces at dispatch time inside
+  // account_list instead of the promised startup error (BR3).
+  const legacyNames = parseCsv(env.GOOGLE_OPTIONAL_SCOPES);
+  if (legacyNames.length > 0) {
+    for (const bundle of resolveBundleAliases(legacyNames)) {
+      if (bundle === 'admin') {
+        fail(
+          'E_UNKNOWN_BUNDLE',
+          '"admin" is not a global bundle: grant it per account via GOOGLE_ADMIN_ACCOUNTS or an "admin: true" scope profile.',
+        );
+      }
+      if (!(bundle in BUNDLE_CATALOG)) {
+        const hint = closestBundle(bundle);
+        fail(
+          'E_UNKNOWN_BUNDLE',
+          `unknown bundle "${bundle}" in GOOGLE_OPTIONAL_SCOPES${hint ? ` — did you mean "${hint}"?` : ''}`,
+        );
+      }
+    }
+    if (!warnedLegacy) {
+      warnedLegacy = true;
+      process.stderr.write(
+        'E_LEGACY_GLOBAL_SCOPES: GOOGLE_OPTIONAL_SCOPES applies one global scope set to every account; migrate to per-account scopeProfiles (mcp-google-multi migrate-config).\n',
+      );
+    }
+  }
+
   if (rawEnv && rawEnv.trim() !== '') {
     const { aliases, configs } = parseEnvAccounts(rawEnv, adminEnv);
     materializeFirstRun(aliases, configs, filePath);
     return {
       aliases: aliases as [string, ...string[]],
       configs,
+      // Env-sourced accounts cannot reference file profiles; the legacy
+      // GOOGLE_OPTIONAL_SCOPES override is applied live in auth.ts.
+      scopeProfiles: { base: { bundles: [] } },
       source: 'env',
       stamp: 'env:0',
     };
@@ -143,9 +184,40 @@ export function resolveAccounts(
     failStartup('E_NO_ACCOUNTS_CONFIGURED', noAccountsMessage());
   }
 
+  // BR3: unknown bundle names fail loudly (a mis-scoped token is worse than a
+  // clear error); v5 silently filtered them. Null prototype: profile names are
+  // user input and must never collide with Object.prototype members.
+  const scopeProfiles: Record<string, ScopeProfile> = Object.create(null);
+  scopeProfiles.base = { bundles: [] };
+  for (const [name, profile] of Object.entries(config?.scopeProfiles ?? {})) {
+    const bundles = resolveBundleAliases(profile.bundles);
+    for (const bundle of bundles) {
+      if (!(bundle in BUNDLE_CATALOG)) {
+        const hint = closestBundle(bundle);
+        fail(
+          'E_UNKNOWN_BUNDLE',
+          `unknown bundle "${bundle}" in scope profile "${name}"${hint ? ` — did you mean "${hint}"?` : ''}`,
+        );
+      }
+    }
+    if (profile.includesBase === false && bundles.length === 0 && profile.admin !== true) {
+      fail(
+        'E_CONFIG_INVALID',
+        `scope profile "${name}" resolves to zero scopes (includesBase: false with no bundles); Google rejects an empty consent request.`,
+      );
+    }
+    scopeProfiles[name] = { ...profile, bundles };
+  }
+
   const configs: Record<string, AccountConfig> = {};
   const aliases: string[] = [];
   for (const [alias, entry] of entries) {
+    if (entry.scopeProfile && !Object.hasOwn(scopeProfiles, entry.scopeProfile)) {
+      fail(
+        'E_CONFIG_INVALID',
+        `account "${alias}" references scope profile "${entry.scopeProfile}", which is not defined in scopeProfiles.`,
+      );
+    }
     aliases.push(alias);
     configs[alias] = {
       email: entry.email,
@@ -159,6 +231,7 @@ export function resolveAccounts(
   return {
     aliases: aliases as [string, ...string[]],
     configs,
+    scopeProfiles,
     source: 'file',
     stamp: `${config?.version ?? CONFIG_VERSION}:${preStamp.split(':')[1]}`,
   };

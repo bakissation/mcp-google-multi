@@ -34,7 +34,14 @@ const configSchema = z.strictObject({
   version: z.number().int(),
   accounts: z.record(z.string().regex(ALIAS_RE), accountEntrySchema).optional(),
   scopeProfiles: z
-    .record(z.string(), z.strictObject({ bundles: z.array(z.string()), admin: z.boolean().optional() }))
+    .record(
+      z.string().regex(ALIAS_RE),
+      z.strictObject({
+        bundles: z.array(z.string()),
+        admin: z.boolean().optional(),
+        includesBase: z.boolean().optional(),
+      }),
+    )
     .optional(),
   defaultAccount: z.string().optional(),
   discovery: z.enum(['lazy', 'curated', 'eager']).optional(),
@@ -44,7 +51,7 @@ const configSchema = z.strictObject({
 export interface ConfigFile {
   version: number;
   accounts?: Record<string, { email: string; scopeProfile?: string; admin?: boolean }>;
-  scopeProfiles?: Record<string, { bundles: string[]; admin?: boolean }>;
+  scopeProfiles?: Record<string, { bundles: string[]; admin?: boolean; includesBase?: boolean }>;
   defaultAccount?: string;
   discovery?: 'lazy' | 'curated' | 'eager';
   toolsets?: string;
@@ -107,11 +114,17 @@ export function loadConfigFile(
     );
   }
   // Post-schema because zod's key regex passes these; a __proto__ record key
-  // is a prototype-pollution foothold, not an account.
+  // is a prototype-pollution foothold, and Object.prototype member names break
+  // plain-object lookups downstream.
   const data = result.data as ConfigFile;
-  const reserved = Object.keys(data.accounts ?? {}).find((k) => RESERVED_ALIASES.includes(k));
-  if (reserved) {
-    fail('E_CONFIG_INVALID', `${filePath}: accounts: reserved alias name "${reserved}".`);
+  for (const [section, keys] of [
+    ['accounts', Object.keys(data.accounts ?? {})],
+    ['scopeProfiles', Object.keys(data.scopeProfiles ?? {})],
+  ] as const) {
+    const reserved = keys.find((k) => RESERVED_ALIASES.includes(k));
+    if (reserved) {
+      fail('E_CONFIG_INVALID', `${filePath}: ${section}: reserved name "${reserved}".`);
+    }
   }
   return data;
 }

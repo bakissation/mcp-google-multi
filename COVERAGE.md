@@ -11,32 +11,32 @@ Not covered: Alert Center (requires service-account domain-wide delegation; this
 | Service | Curated | Generated | Total | Enabled by |
 |---|---:|---:|---:|---|
 | admin | 6 | 132 | 138 | `GOOGLE_ADMIN_ACCOUNTS` |
-| appsmarket | 0 | 2 | 2 | `GOOGLE_OPTIONAL_SCOPES=appsmarket` |
+| appsmarket | 0 | 2 | 2 | scope profile bundle `appsmarket` |
 | calendar | 11 | 27 | 38 | default |
-| chat | 4 | 47 | 51 | `GOOGLE_OPTIONAL_SCOPES=chat` |
-| classroom | 0 | 104 | 104 | `GOOGLE_OPTIONAL_SCOPES=classroom` |
-| cloudidentity | 0 | 66 | 66 | `GOOGLE_OPTIONAL_SCOPES=cloudidentity` |
-| cloudsearch | 0 | 49 | 49 | `GOOGLE_OPTIONAL_SCOPES=cloudsearch` |
+| chat | 4 | 47 | 51 | scope profile bundle `chat` |
+| classroom | 0 | 104 | 104 | scope profile bundle `classroom` |
+| cloudidentity | 0 | 66 | 66 | scope profile bundle `cloudidentity` |
+| cloudsearch | 0 | 49 | 49 | scope profile bundle `cloudsearch` |
 | contacts | 9 | 14 | 23 | default |
 | docs | 27 | 0 | 27 | default |
 | drive | 36 | 35 | 71 | default |
-| driveactivity | 0 | 1 | 1 | `GOOGLE_OPTIONAL_SCOPES=driveactivity` |
-| drivelabels | 0 | 26 | 26 | `GOOGLE_OPTIONAL_SCOPES=drivelabels` |
-| forms | 7 | 3 | 10 | `GOOGLE_OPTIONAL_SCOPES=forms` |
+| driveactivity | 0 | 1 | 1 | scope profile bundle `driveactivity` |
+| drivelabels | 0 | 26 | 26 | scope profile bundle `drivelabels` |
+| forms | 7 | 3 | 10 | scope profile bundle `forms` |
 | gmail | 21 | 58 | 79 | default |
-| groupsmigration | 0 | 1 | 1 | `GOOGLE_OPTIONAL_SCOPES=groupsmigration` |
-| groupssettings | 0 | 3 | 3 | `GOOGLE_OPTIONAL_SCOPES=groupssettings` |
-| keep | 0 | 7 | 7 | `GOOGLE_OPTIONAL_SCOPES=keep` |
-| licensing | 0 | 7 | 7 | `GOOGLE_OPTIONAL_SCOPES=licensing` |
+| groupsmigration | 0 | 1 | 1 | scope profile bundle `groupsmigration` |
+| groupssettings | 0 | 3 | 3 | scope profile bundle `groupssettings` |
+| keep | 0 | 7 | 7 | scope profile bundle `keep` |
+| licensing | 0 | 7 | 7 | scope profile bundle `licensing` |
 | meet | 5 | 13 | 18 | default |
-| postmaster | 0 | 4 | 4 | `GOOGLE_OPTIONAL_SCOPES=postmaster` |
-| reseller | 0 | 17 | 17 | `GOOGLE_OPTIONAL_SCOPES=reseller` |
-| script | 0 | 16 | 16 | `GOOGLE_OPTIONAL_SCOPES=script` |
+| postmaster | 0 | 4 | 4 | scope profile bundle `postmaster` |
+| reseller | 0 | 17 | 17 | scope profile bundle `reseller` |
+| script | 0 | 16 | 16 | scope profile bundle `script` |
 | searchconsole | 10 | 1 | 11 | default |
 | sheets | 29 | 7 | 36 | default |
-| slides | 5 | 0 | 5 | `GOOGLE_OPTIONAL_SCOPES=slides` |
+| slides | 5 | 0 | 5 | scope profile bundle `slides` |
 | tasks | 12 | 2 | 14 | default |
-| vault | 0 | 33 | 33 | `GOOGLE_OPTIONAL_SCOPES=vault` |
+| vault | 0 | 33 | 33 | scope profile bundle `vault` |
 | workspaceevents | 0 | 15 | 15 | default |
 | **Total** | **182** | **690** | **872** | |
 
