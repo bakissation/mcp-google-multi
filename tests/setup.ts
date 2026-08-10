@@ -23,3 +23,6 @@ __setKeychainFactoryForTest((account) => ({
 // ToolRegistry reads GOOGLE_TRIM at construction — pin it so an ambient
 // GOOGLE_TRIM=off in a developer shell can't redden the compaction tests.
 process.env.GOOGLE_TRIM = '';
+// ToolRegistry also reads GOOGLE_DISCOVERY at construction — pin to the lazy
+// default so an ambient mode in a dev shell can't redden visibility tests.
+process.env.GOOGLE_DISCOVERY = '';

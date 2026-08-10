@@ -7,6 +7,20 @@ import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFan
 
 export type Cud = 'read' | 'create' | 'update' | 'delete';
 
+export type DiscoveryMode = 'lazy' | 'curated' | 'eager';
+
+const DISCOVERY_MODES: DiscoveryMode[] = ['lazy', 'curated', 'eager'];
+
+export function resolveDiscoveryMode(env: NodeJS.ProcessEnv = process.env): DiscoveryMode {
+  const raw = (env.GOOGLE_DISCOVERY ?? 'lazy').trim() as DiscoveryMode;
+  if (raw && !DISCOVERY_MODES.includes(raw)) {
+    // Fail-open to the lean default, but say so — a typo'd mode otherwise
+    // looks like tools silently missing (or silently flooding the context).
+    process.stderr.write(`GOOGLE_DISCOVERY="${raw}" is not valid (${DISCOVERY_MODES.join(' | ')}); using lazy\n`);
+  }
+  return DISCOVERY_MODES.includes(raw) ? raw : 'lazy';
+}
+
 export interface ToolEntry {
   name: string;
   service: string;
@@ -15,6 +29,8 @@ export interface ToolEntry {
   inputShape: z.ZodRawShape;
   annotations: Record<string, unknown>;
   meta: boolean;
+  /** Discovery-codegen provenance (the only tools passing an explicit cud). */
+  generated: boolean;
   /** Baked per-method scopes (generated tools); curated tools authorize at
    * service/bundle grain and leave this undefined. */
   requiredScopes?: readonly string[];
@@ -74,12 +90,19 @@ export class ToolRegistry {
   private readonly jsonSchemaCache = new Map<string, unknown>();
   private readonly compactOutput = trimEnabled();
   private registeringMeta = false;
+  /** Configured visibility mode (GOOGLE_DISCOVERY); default lazy = v5 exact. */
+  readonly mode: DiscoveryMode;
+  /** Agent-toggled runtime overlay (discover_all / discover_reset): lifts a
+   * lazy surface to curated without touching the configured mode. */
+  private expanded = false;
 
   constructor(
     private readonly server: McpServer,
     policy: Policy,
+    mode: DiscoveryMode = resolveDiscoveryMode(),
   ) {
     this.policy = policy;
+    this.mode = mode;
     this.registerTool = ((name: string, config: ToolConfig, handler: (...a: unknown[]) => unknown) => {
       const service =
         SERVICE_OVERRIDES[name] ?? (name.includes('_') ? name.slice(0, name.indexOf('_')) : name);
@@ -114,6 +137,7 @@ export class ToolRegistry {
         inputShape,
         annotations,
         meta: this.registeringMeta,
+        generated: config.cud !== undefined,
         requiredScopes: config.requiredScopes,
       });
       const guarded =
@@ -164,8 +188,39 @@ export class ToolRegistry {
     return true;
   }
 
+  /** discover_all: advertise the full curated set at once. Idempotent. */
+  expand(): boolean {
+    if (this.expanded || this.effectiveMode() !== 'lazy') return false;
+    this.expanded = true;
+    this.server.sendToolListChanged();
+    return true;
+  }
+
+  /** discover_reset: back to the lean meta-only surface. Clears reveals too.
+   * BV-8: if a client mishandles a SHRINKING tools/list, this degrades to a
+   * no-op for that session — tools stay callable regardless (graceful
+   * dispatch), zero correctness impact. */
+  collapse(): boolean {
+    if (!this.expanded && this.revealed.size === 0) return false;
+    this.expanded = false;
+    this.revealed.clear();
+    this.server.sendToolListChanged();
+    return true;
+  }
+
+  private effectiveMode(): DiscoveryMode {
+    if (this.mode !== 'lazy') return this.mode;
+    return this.expanded ? 'curated' : 'lazy';
+  }
+
   isVisible(tool: ToolEntry): boolean {
-    return tool.meta || this.revealed.has(tool.service);
+    const mode = this.effectiveMode();
+    return (
+      tool.meta ||
+      mode === 'eager' ||
+      this.revealed.has(tool.service) ||
+      (mode === 'curated' && !tool.generated)
+    );
   }
 
   visibleCount(): { eager: number; revealed: number; hidden: number } {
