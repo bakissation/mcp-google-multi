@@ -2,7 +2,7 @@ import { OAuth2Client } from 'googleapis-common';
 import http from 'node:http';
 import { URL } from 'node:url';
 import { randomBytes } from 'node:crypto';
-import open from 'open';
+import { openUrl } from './open-url.js';
 import { ACCOUNTS, ACCOUNT_CONFIG } from './accounts.js';
 import { writeToken } from './token-store.js';
 
@@ -236,9 +236,10 @@ export async function runAuthFlow(args: string[]): Promise<void> {
       })
       // Bind to loopback only — never expose the OAuth callback to the local network.
       .listen(4242, '127.0.0.1', () => {
-        // Always print the URL: `open` silently no-ops on headless/SSH sessions.
+        // Always print the URL first: the browser launch is best-effort and
+        // silently does nothing on headless/SSH sessions.
         console.log(`Opening your browser to authorize "${alias}". If nothing opens, visit:\n${authorizeUrl}`);
-        open(authorizeUrl, { wait: false }).then((cp) => cp.unref());
+        openUrl(authorizeUrl);
       });
 
 
