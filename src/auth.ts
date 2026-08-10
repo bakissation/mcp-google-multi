@@ -3,7 +3,7 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { openUrl } from './open-url.js';
-import { ACCOUNTS, ACCOUNT_CONFIG } from './accounts.js';
+import { ACCOUNTS, getAccountSet } from './accounts.js';
 import { writeToken } from './token-store.js';
 
 // Personal (non-Workspace) accounts 403 on admin scopes; ADMIN_SCOPES stays per-account opt-in, never granted by default.
@@ -97,9 +97,11 @@ export function getOptionalBundles(): string[] {
   return parseCsvEnv('GOOGLE_OPTIONAL_SCOPES').filter(b => b in OPTIONAL_SCOPE_BUNDLES);
 }
 
-/** Account aliases granted ADMIN_SCOPES via GOOGLE_ADMIN_ACCOUNTS. */
+/** Aliases granted ADMIN_SCOPES: admin flags on the AccountSet (env
+ * GOOGLE_ADMIN_ACCOUNTS overrides config.json per-account admin at resolve). */
 export function getAdminAccounts(): string[] {
-  return parseCsvEnv('GOOGLE_ADMIN_ACCOUNTS');
+  const { aliases, configs } = getAccountSet();
+  return aliases.filter((a) => configs[a].admin === true);
 }
 
 /** Scopes are fixed at consent time: changing GOOGLE_OPTIONAL_SCOPES or GOOGLE_ADMIN_ACCOUNTS requires re-running auth. */
@@ -140,7 +142,7 @@ export async function runAuthFlow(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const config = ACCOUNT_CONFIG[alias];
+  const config = getAccountSet().configs[alias];
   const scopes = resolveScopesForAccount(alias);
 
   if (!process.env.MASTER_KEY) {

@@ -13,12 +13,14 @@ import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
 import { registerAccountTools } from './tools/accounts-tool.js';
 import { getToolsets, toolsetEnabled } from './toolsets.js';
-import { resolvePolicy, isAllowed, describePolicy, type Policy } from './write-control.js';
+import { isAllowed, describePolicy } from './write-control.js';
+import { buildIdentityContext, type IdentityContext } from './identity.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
 
-function buildRegistry(server: McpServer, policy: Policy): ToolRegistry {
+function buildRegistry(server: McpServer, ctx: IdentityContext): ToolRegistry {
+  const policy = ctx.policy;
   const registry = new ToolRegistry(server, policy);
   const toolsets = getToolsets();
   if (toolsets !== 'all') {
@@ -79,11 +81,18 @@ async function main() {
     return;
   }
 
+  if (process.argv.includes('migrate-config')) {
+    const { runMigrateConfig } = await import('./migrate-config.js');
+    runMigrateConfig();
+    return;
+  }
+
   if (process.argv.includes('config') && process.argv.includes('check')) {
-    const policy = resolvePolicy();
+    const ctx = buildIdentityContext();
+    const policy = ctx.policy;
     const registry = buildRegistry(
       new McpServer({ name: 'mcp-google-multi', version: pkg.version }),
-      policy,
+      ctx,
     );
     const cud = registry.tools.filter((t) => t.cud !== 'read');
     const disabled = cud.filter((t) => !isAllowed(t, policy));
@@ -108,12 +117,12 @@ async function main() {
     return;
   }
 
-  const policy = resolvePolicy();
+  const ctx = buildIdentityContext();
   const server = new McpServer({
     name: 'mcp-google-multi',
     version: pkg.version,
   });
-  const registry = buildRegistry(server, policy);
+  const registry = buildRegistry(server, ctx);
   registry.installListHandler();
 
   const transport = new StdioServerTransport();

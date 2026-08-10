@@ -1,10 +1,18 @@
 import { OAuth2Client } from 'googleapis-common';
-import { ACCOUNT_CONFIG } from './accounts.js';
+import { getAccountSet, refreshAccountSetIfStale } from './accounts.js';
 import type { Account } from './accounts.js';
 import { readToken, updateToken } from './token-store.js';
 
 export async function getClient(account: Account) {
-  const config = ACCOUNT_CONFIG[account];
+  // BR-7: lazy cross-process reload — one stat per dispatch, no watcher;
+  // reload failures keep the last-good registry, never kill the server.
+  refreshAccountSetIfStale();
+  const config = getAccountSet().configs[account];
+  if (!config) {
+    throw new Error(
+      `Unknown account "${account}". Valid aliases: ${getAccountSet().aliases.join(', ')}`,
+    );
+  }
 
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     throw new Error(

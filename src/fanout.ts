@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ACCOUNTS } from './accounts.js';
+import { ACCOUNTS, getAccountSet } from './accounts.js';
 
 export const CSV_RE = /^[a-zA-Z0-9_-]+(\s*,\s*[a-zA-Z0-9_-]+)+$/;
 
@@ -16,7 +16,7 @@ export type AccountSelector =
   | { ok: true; fanout: boolean; aliases: string[] }
   | { ok: false; invalid: string[] };
 
-export function parseAccountSelector(value: string, accounts: readonly string[] = ACCOUNTS): AccountSelector {
+export function parseAccountSelector(value: string, accounts: readonly string[] = getAccountSet().aliases): AccountSelector {
   if (value === '*') return { ok: true, fanout: true, aliases: [...accounts] };
   if (!value.includes(',')) return { ok: true, fanout: false, aliases: [value] };
   const seen = new Set<string>();
@@ -34,7 +34,7 @@ export function parseAccountSelector(value: string, accounts: readonly string[] 
   return { ok: true, fanout: aliases.length > 1, aliases };
 }
 
-export function invalidAccountsResult(invalid: string[], accounts: readonly string[] = ACCOUNTS) {
+export function invalidAccountsResult(invalid: string[], accounts: readonly string[] = getAccountSet().aliases) {
   return {
     content: [
       {
