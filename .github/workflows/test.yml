@@ -1,12 +1,13 @@
 name: ci
 
-# v6 + v6/** are the long-lived integration branch and its stacked slices:
+# v6 + v6-** are the long-lived integration branch and its stacked slices
+# (a git ref cannot nest under an existing branch, so slices use v6-NN-name):
 # they get ci but stay OUT of release.yml, so pushes there publish nothing.
 on:
   push:
-    branches: [main, staging, dev, v6, 'v6/**']
+    branches: [main, staging, dev, v6, 'v6-**']
   pull_request:
-    branches: [main, staging, dev, v6, 'v6/**']
+    branches: [main, staging, dev, v6, 'v6-**']
 
 # Least privilege: CI only checks out code + runs npm. (CodeQL: actions/missing-workflow-permissions)
 permissions:
@@ -32,6 +33,29 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+  # Separate job on purpose: branch protection requires the check literally named
+  # "ci" — a version matrix would rename it to "ci (...)". This is the only leg
+  # exercising the declared engines floor (BV-7); the main job stays on 24.
+  ci-node22:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Build
         run: npm run build
