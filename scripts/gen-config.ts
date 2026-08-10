@@ -8,8 +8,8 @@ export interface GenApi {
   service: string;
 }
 
-// alertcenter (service-account-only auth) and drive v2 (superseded by v3)
-// are deliberately not generated.
+// drive v2 is deliberately not generated (superseded by v3). alertcenter is
+// not even fetched: it needs service-account DWD, which this server declines.
 export const GEN_APIS: GenApi[] = [
   { file: 'admin.datatransfer_v1.json', service: 'admin' },
   { file: 'admin.directory_v1.json', service: 'admin' },
