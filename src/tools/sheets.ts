@@ -1,7 +1,7 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
-import { google } from 'googleapis';
+import { sheets as sheetsClient } from '@googleapis/sheets';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -24,7 +24,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, title, sheetTitles }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
 
         const requestBody: any = {
           properties: { title },
@@ -63,7 +63,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.get({
           spreadsheetId,
           fields: 'spreadsheetId,properties,sheets.properties,namedRanges,spreadsheetUrl',
@@ -104,7 +104,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, range, valueRenderOption }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.get({
           spreadsheetId,
           range,
@@ -138,7 +138,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, range, values, valueInputOption }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.update({
           spreadsheetId,
           range,
@@ -175,7 +175,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, range, values, valueInputOption }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.append({
           spreadsheetId,
           range,
@@ -210,7 +210,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, range }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.clear({
           spreadsheetId,
           range,
@@ -243,7 +243,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, ranges, valueRenderOption }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.batchGet({
           spreadsheetId,
           ranges,
@@ -280,7 +280,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, data, valueInputOption }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.batchUpdate({
           spreadsheetId,
           requestBody: {
@@ -321,7 +321,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, title, rowCount, columnCount }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: {
@@ -366,7 +366,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, sheetId }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: { requests: [{ deleteSheet: { sheetId } }] },
@@ -395,7 +395,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, sourceSheetId, newSheetName, insertSheetIndex }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: {
@@ -439,7 +439,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, sheetId, title, index, hidden, tabColor, frozenRowCount, frozenColumnCount, rowCount, columnCount }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const properties: any = { sheetId };
         const fields: string[] = [];
         if (title !== undefined) { properties.title = title; fields.push('title'); }
@@ -518,7 +518,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, range, ...format }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const built = buildCellFormat(format);
         if (built.fields.length === 0) {
           return {
@@ -566,7 +566,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, range, top, bottom, left, right, innerHorizontal, innerVertical }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const borders: any = { range };
         if (top) borders.top = toBorder(top);
         if (bottom) borders.bottom = toBorder(bottom);
@@ -607,7 +607,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, range, mergeType }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: {
@@ -636,7 +636,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, range }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: { requests: [{ unmergeCells: { range } }] },
@@ -691,7 +691,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
           };
         }
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
 
         const rule: any = { ranges };
         if (booleanRule) {
@@ -756,7 +756,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, range, sortSpecs }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: {
@@ -792,7 +792,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, range, sortSpecs, filterSpecs }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const filter: any = { range };
         if (sortSpecs) filter.sortSpecs = sortSpecs;
         if (filterSpecs) {
@@ -836,7 +836,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, sheetId }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: { requests: [{ clearBasicFilter: { sheetId } }] },
@@ -871,7 +871,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, find, replacement, scope, sheetId, range, matchCase, matchEntireCell, searchByRegex, includeFormulas }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const findReplace: any = {
           find,
           replacement,
@@ -930,7 +930,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, sheetId, dimension, startIndex, endIndex }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const dimensions: any = { sheetId, dimension };
         if (startIndex !== undefined) dimensions.startIndex = startIndex;
         if (endIndex !== undefined) dimensions.endIndex = endIndex;
@@ -964,7 +964,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, sheetId, dimension, startIndex, endIndex, inheritFromBefore }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: {
@@ -1001,7 +1001,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, sheetId, dimension, startIndex, endIndex }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: {
@@ -1041,7 +1041,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, range, conditionType, conditionValues, inputMessage, strict, showCustomUi }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const rule: any = {
           condition: {
             type: conditionType,
@@ -1083,7 +1083,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, name, range }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: {
@@ -1113,7 +1113,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, namedRangeId }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: { requests: [{ deleteNamedRange: { namedRangeId } }] },
@@ -1142,7 +1142,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, ranges }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.batchClear({
           spreadsheetId,
           requestBody: { ranges },
@@ -1174,7 +1174,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, requests, includeSpreadsheetInResponse, responseRanges, responseIncludeGridData }) => {
       try {
         const auth = await getClient(account as Account);
-        const sheets = google.sheets({ version: 'v4', auth });
+        const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: {

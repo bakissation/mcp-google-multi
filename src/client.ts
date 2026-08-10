@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+import { OAuth2Client } from 'googleapis-common';
 import { ACCOUNT_CONFIG } from './accounts.js';
 import type { Account } from './accounts.js';
 import { readToken, updateToken } from './token-store.js';
@@ -13,7 +13,7 @@ export async function getClient(account: Account) {
     );
   }
 
-  const oauth2Client = new google.auth.OAuth2(
+  const oauth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
     'http://localhost:4242/oauth2callback',

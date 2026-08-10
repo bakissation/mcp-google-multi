@@ -24,6 +24,8 @@ Conventions for AI assistants modifying this codebase. v5 is **local, stdio, use
 ## Adding a tool
 
 ```ts
+import { <service> as <service>Client } from '@googleapis/<service>';
+
 server.registerTool(
   'service_action_name',                 // snake_case, service-prefixed; cud inferred from the verb
   {
@@ -36,7 +38,7 @@ server.registerTool(
   async ({ account, /* … */ }) => {
     try {
       const auth = await getClient(account as Account);
-      const svc = google.<service>({ version: '<v>', auth });
+      const svc = <service>Client({ version: '<v>', auth });
       const res = await svc.<resource>.<method>({ /* … */ });
       return { content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }] };
     } catch (error: any) {
@@ -98,7 +100,7 @@ Reads are never gated. CUD is **deny-by-default**: `GOOGLE_PROFILE` (read-only /
 ## Testing
 
 - `npm run typecheck && npm run lint && npm run test && npm run build` before any PR.
-- Unit-test pure logic (write-control verdict, coercion, error mapper, token-store crypto, `inferCud`, field-mask builders). Don't mock `googleapis` — smoke-test handlers against real accounts.
+- Unit-test pure logic (write-control verdict, coercion, error mapper, token-store crypto, `inferCud`, field-mask builders). Don't mock the `@googleapis/*` clients — smoke-test handlers against real accounts.
 
 ## Don'ts
 

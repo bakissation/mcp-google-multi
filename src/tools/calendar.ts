@@ -1,7 +1,7 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean } from './_coerce.js';
-import { google } from 'googleapis';
+import { calendar as calendarClient } from '@googleapis/calendar';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -22,7 +22,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     async ({ account }) => {
       try {
         const auth = await getClient(account as Account);
-        const cal = google.calendar({ version: 'v3', auth });
+        const cal = calendarClient({ version: 'v3', auth });
 
         const res = await cal.calendarList.list();
         const calendars = (res.data.items ?? []).map((c) => ({
@@ -63,7 +63,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     async ({ account, calendarId, query, timeMin, timeMax, maxResults }) => {
       try {
         const auth = await getClient(account as Account);
-        const cal = google.calendar({ version: 'v3', auth });
+        const cal = calendarClient({ version: 'v3', auth });
 
         const params: any = {
           calendarId: calendarId ?? 'primary',
@@ -105,7 +105,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     async ({ account, eventId, calendarId }) => {
       try {
         const auth = await getClient(account as Account);
-        const cal = google.calendar({ version: 'v3', auth });
+        const cal = calendarClient({ version: 'v3', auth });
 
         const res = await cal.events.get({
           calendarId: calendarId ?? 'primary',
@@ -143,7 +143,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     async ({ account, summary, start, end, description, location, attendees, calendarId, allDay }) => {
       try {
         const auth = await getClient(account as Account);
-        const cal = google.calendar({ version: 'v3', auth });
+        const cal = calendarClient({ version: 'v3', auth });
 
         const event: any = { summary };
 
@@ -199,7 +199,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     async ({ account, eventId, summary, start, end, description, location, attendees, calendarId }) => {
       try {
         const auth = await getClient(account as Account);
-        const cal = google.calendar({ version: 'v3', auth });
+        const cal = calendarClient({ version: 'v3', auth });
 
         // Fetch the event first so a 404 surfaces before we attempt the patch.
         await cal.events.get({
@@ -257,7 +257,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     async ({ account, eventId, calendarId }) => {
       try {
         const auth = await getClient(account as Account);
-        const cal = google.calendar({ version: 'v3', auth });
+        const cal = calendarClient({ version: 'v3', auth });
 
         await cal.events.delete({
           calendarId: calendarId ?? 'primary',
@@ -288,7 +288,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     async ({ account, calendarId, text, sendNotifications }) => {
       try {
         const auth = await getClient(account as Account);
-        const cal = google.calendar({ version: 'v3', auth });
+        const cal = calendarClient({ version: 'v3', auth });
         const res = await cal.events.quickAdd({
           calendarId: calendarId ?? 'primary',
           text,
@@ -318,7 +318,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     async ({ account, calendarId, eventId, destinationCalendarId, sendNotifications }) => {
       try {
         const auth = await getClient(account as Account);
-        const cal = google.calendar({ version: 'v3', auth });
+        const cal = calendarClient({ version: 'v3', auth });
         const res = await cal.events.move({
           calendarId,
           eventId,
@@ -352,7 +352,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     async ({ account, calendarId, eventId, timeMin, timeMax, maxResults }) => {
       try {
         const auth = await getClient(account as Account);
-        const cal = google.calendar({ version: 'v3', auth });
+        const cal = calendarClient({ version: 'v3', auth });
         const res = await cal.events.instances({
           calendarId: calendarId ?? 'primary',
           eventId,
@@ -385,7 +385,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     async ({ account, calendarIds, timeMin, timeMax, timeZone }) => {
       try {
         const auth = await getClient(account as Account);
-        const cal = google.calendar({ version: 'v3', auth });
+        const cal = calendarClient({ version: 'v3', auth });
         const res = await cal.freebusy.query({
           requestBody: {
             timeMin,
@@ -417,7 +417,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     async ({ account, summary, description, timeZone }) => {
       try {
         const auth = await getClient(account as Account);
-        const cal = google.calendar({ version: 'v3', auth });
+        const cal = calendarClient({ version: 'v3', auth });
         const res = await cal.calendars.insert({
           requestBody: {
             summary,

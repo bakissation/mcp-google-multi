@@ -1,7 +1,7 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceBoolean, coerceJson } from './_coerce.js';
-import { google } from 'googleapis';
+import { docs as docsClient } from '@googleapis/docs';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -149,7 +149,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, title }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.create({
           requestBody: { title },
         });
@@ -185,7 +185,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, includeTabsContent, suggestionsViewMode }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.get({
           documentId,
           includeTabsContent: includeTabsContent ?? false,
@@ -237,7 +237,7 @@ export function registerDocsTools(server: ToolRegistry): void {
           };
         }
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.get({
           documentId,
           ...(tabId !== undefined ? { includeTabsContent: true } : {}),
@@ -331,7 +331,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, text, index }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
 
         const request: any = { insertText: { text } };
         if (index !== undefined) {
@@ -372,7 +372,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, findText, replaceText, matchCase }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.batchUpdate({
           documentId,
           requestBody: {
@@ -411,7 +411,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, startIndex, endIndex }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.batchUpdate({
           documentId,
           requestBody: {
@@ -453,7 +453,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, startIndex, endIndex, bold, italic, underline, fontSize, fontFamily }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
 
         const textStyle: any = {};
         const fields: string[] = [];
@@ -520,7 +520,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, rows, columns, index }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
 
         const request: any = { insertTable: { rows, columns } };
         if (index !== undefined) {
@@ -562,7 +562,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, name, startIndex, endIndex }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.batchUpdate({
           documentId,
           requestBody: {
@@ -601,7 +601,7 @@ export function registerDocsTools(server: ToolRegistry): void {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either namedRangeId or name must be supplied' }) }], isError: true };
         }
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const req: any = {};
         if (namedRangeId) req.namedRangeId = namedRangeId;
         else req.name = name;
@@ -637,7 +637,7 @@ export function registerDocsTools(server: ToolRegistry): void {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either namedRangeId or namedRangeName must be supplied' }) }], isError: true };
         }
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const req: any = { text };
         if (namedRangeId) req.namedRangeId = namedRangeId;
         else req.namedRangeName = namedRangeName;
@@ -686,7 +686,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, startIndex, endIndex, ...style }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const built = buildParagraphStyle(style);
         if (built.fields.length === 0) {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'No paragraph style properties supplied' }) }], isError: true };
@@ -736,7 +736,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, ...style }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const built = buildDocumentStyle(style);
         if (built.fields.length === 0) {
           return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'No document style properties supplied' }) }], isError: true };
@@ -794,7 +794,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, startIndex, endIndex, bulletPreset }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         await docs.documents.batchUpdate({
           documentId,
           requestBody: {
@@ -829,7 +829,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, startIndex, endIndex }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         await docs.documents.batchUpdate({
           documentId,
           requestBody: {
@@ -867,7 +867,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, uri, index, width, height }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const request: any = { uri };
         if (index !== undefined) request.location = { index };
         else request.endOfSegmentLocation = { segmentId: '' };
@@ -904,7 +904,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, index }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const request: any = {};
         if (index !== undefined) request.location = { index };
         else request.endOfSegmentLocation = { segmentId: '' };
@@ -935,7 +935,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, index, sectionType }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const request: any = { sectionType: sectionType ?? 'NEXT_PAGE' };
         if (index !== undefined) request.location = { index };
         else request.endOfSegmentLocation = { segmentId: '' };
@@ -967,7 +967,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, sectionBreakIndex }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const request: any = { type: 'DEFAULT' };
         if (sectionBreakIndex !== undefined) request.sectionBreakLocation = { index: sectionBreakIndex };
         const res = await docs.documents.batchUpdate({
@@ -997,7 +997,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, headerId }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         await docs.documents.batchUpdate({
           documentId,
           requestBody: { requests: [{ deleteHeader: { headerId } }] },
@@ -1024,7 +1024,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, sectionBreakIndex }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const request: any = { type: 'DEFAULT' };
         if (sectionBreakIndex !== undefined) request.sectionBreakLocation = { index: sectionBreakIndex };
         const res = await docs.documents.batchUpdate({
@@ -1054,7 +1054,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, footerId }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         await docs.documents.batchUpdate({
           documentId,
           requestBody: { requests: [{ deleteFooter: { footerId } }] },
@@ -1090,7 +1090,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, operation, tableStartIndex, rowIndex, columnIndex, insertBelow, insertRight, rowSpan, columnSpan }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const cellLoc = {
           tableStartLocation: { index: tableStartIndex },
           rowIndex,
@@ -1163,7 +1163,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, title, parentTabId, index }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const tabProperties: any = { title };
         if (parentTabId) tabProperties.parentTabId = parentTabId;
         if (index !== undefined) tabProperties.index = index;
@@ -1194,7 +1194,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, tabId }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         await docs.documents.batchUpdate({
           documentId,
           requestBody: { requests: [{ deleteTab: { tabId } }] },
@@ -1224,7 +1224,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, tabId, title, index, parentTabId }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const tabProperties: any = { tabId };
         const fields: string[] = [];
         if (title !== undefined) { tabProperties.title = title; fields.push('title'); }
@@ -1272,7 +1272,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, requests, writeControl }) => {
       try {
         const auth = await getClient(account as Account);
-        const docs = google.docs({ version: 'v1', auth });
+        const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.batchUpdate({
           documentId,
           requestBody: {

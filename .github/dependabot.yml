@@ -1,0 +1,21 @@
+# Version updates are scoped to the @googleapis/* graph only (14 per-API
+# packages + googleapis-common move together); everything else stays on
+# security-alerts-only as before.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # fix(deps) so a merged grouped bump is a Conventional Commit and cuts a
+    # patch release; without it the bump only ships with the next fix:/feat:.
+    commit-message:
+      prefix: "fix(deps)"
+    allow:
+      - dependency-name: "@googleapis/*"
+      - dependency-name: "googleapis-common"
+    groups:
+      googleapis:
+        patterns:
+          - "@googleapis/*"
+          - "googleapis-common"
