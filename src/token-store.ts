@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import { getAccountSet } from './accounts.js';
+import { noteSuccessfulDecrypt, resolveMasterKeyForDispatch } from './master-key.js';
 import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 import type { TokenData } from './types.js';
 
@@ -14,6 +15,10 @@ interface EncFile {
   data: string;
 }
 
+// KDF is COMPAT-FROZEN: generated keys are randomBytes(32) base64 and take the
+// raw path; only human-passphrase keys hit the bare-sha256 branch (v5 legacy —
+// changing it would brick every existing token). HKDF + ENC_VERSION=2 is the
+// sanctioned post-6.0 hardening route.
 export function deriveKey(masterKey: string): Buffer {
   if (!masterKey) {
     throw new Error(
@@ -58,7 +63,7 @@ export function decryptToken(fileContents: string, masterKey: string): TokenData
 }
 
 function masterKey(): string {
-  return process.env.MASTER_KEY ?? '';
+  return resolveMasterKeyForDispatch().key;
 }
 
 function encPath(alias: string): string {
@@ -72,7 +77,9 @@ export function readToken(alias: string): TokenData | null {
   } catch {
     return null;
   }
-  return decryptToken(contents, masterKey());
+  const data = decryptToken(contents, masterKey());
+  noteSuccessfulDecrypt();
+  return data;
 }
 
 // Lock + atomic-write mechanics live in fs-atomic.ts (generalized path-keyed

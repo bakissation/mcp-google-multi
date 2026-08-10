@@ -1,9 +1,13 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { getAccountSet } from '../src/accounts.js';
+import { clearKeyCacheForTest } from '../src/master-key.js';
 const ACCOUNT_CONFIG = getAccountSet().configs;
+// masterKey() caches process-lifetime; without this, per-test env mutations
+// would be inert and the suite green only by shared-constant luck.
+beforeEach(() => clearKeyCacheForTest());
 import { deriveKey, encryptToken, decryptToken, readToken, writeToken, updateToken } from '../src/token-store.js';
 
 const KEY = 'test-master-key';

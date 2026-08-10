@@ -13,6 +13,10 @@ const tokenDir = process.env.TOKEN_STORE_PATH
   ? path.resolve(process.env.TOKEN_STORE_PATH)
   : defaultTokenDir;
 
+export function getTokenDir(): string {
+  return tokenDir;
+}
+
 export interface AccountConfig {
   email: string;
   tokenPath: string;

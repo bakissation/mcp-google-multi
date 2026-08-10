@@ -114,10 +114,17 @@ async function main() {
     console.log(`Services: ${registry.services().join(', ')}`);
     console.log(`Tool surface: ${counts.eager} eager (discover + escape hatch), ${counts.hidden} deferred until discovery`);
     console.log(`Escape hatch: google_api_call CUD verdicts follow profile=${policy.profile} and your allow/deny globs`);
+    const { peekMasterKeyProvenance } = await import('./master-key.js');
+    const prov = peekMasterKeyProvenance();
+    console.log(`MASTER_KEY: ${prov === 'unprovisioned' ? 'unprovisioned (will be generated on first use)' : prov}`);
     return;
   }
 
   const ctx = buildIdentityContext();
+  // Resolve (or provision) the master key BEFORE serving: the hard guard is
+  // specced "fatal at startup", never mid-dispatch.
+  const { resolveMasterKey } = await import('./master-key.js');
+  resolveMasterKey();
   const server = new McpServer({
     name: 'mcp-google-multi',
     version: pkg.version,

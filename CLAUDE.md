@@ -75,7 +75,7 @@ server.registerTool(
 
 ## Auth / tokens
 
-- Tokens are **encrypted at rest** — never write plaintext. `MASTER_KEY` is required; it lives only in env (never in the store, never logged).
+- Tokens are **encrypted at rest** — never write plaintext. `MASTER_KEY` resolves ONLY through `resolveMasterKey()` in `src/master-key.ts` (env > keychain > 0600 file > generate; hard guard: never generate while `<alias>.enc` exist). Never read the env var directly, never log key bytes (provenance label only).
 - Always go through `getClient(account)` (handles refresh + re-encrypt). Token files are `0600`.
 - Secret-injection patterns (why `MASTER_KEY` shouldn't live in `.env` long-term): `docs/secrets.md`.
 

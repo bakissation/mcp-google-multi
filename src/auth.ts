@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { openUrl } from './open-url.js';
 import { ACCOUNTS, getAccountSet } from './accounts.js';
 import { ADMIN_SCOPES, BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from './scope-catalog.js';
+import { resolveMasterKey } from './master-key.js';
 import type { ScopeProfile } from './scope-catalog.js';
 import { writeToken } from './token-store.js';
 
@@ -152,12 +153,9 @@ export async function runAuthFlow(args: string[]): Promise<void> {
   const config = getAccountSet().configs[alias];
   const scopes = resolveScopesForAccount(alias);
 
-  if (!process.env.MASTER_KEY) {
-    console.error(
-      'MASTER_KEY is not set. Generate one (openssl rand -base64 32) and add it to .env before authenticating.',
-    );
-    process.exit(1);
-  }
+  // Auto-provisions on a fresh install (env > keychain > file > generate);
+  // resolves eagerly so a provisioning failure surfaces before the browser opens.
+  resolveMasterKey();
 
   const oauth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
