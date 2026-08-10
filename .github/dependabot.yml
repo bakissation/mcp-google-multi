@@ -14,6 +14,12 @@ updates:
     allow:
       - dependency-name: "@googleapis/*"
       - dependency-name: "googleapis-common"
+    # The @googleapis/* packages pin googleapis-common@^N; a direct major bump
+    # ahead of the graph resolves two copies (cross-major auth mismatch). The
+    # direct pin follows the graph, never leads it.
+    ignore:
+      - dependency-name: "googleapis-common"
+        update-types: ["version-update:semver-major"]
     groups:
       googleapis:
         patterns:
