@@ -55,7 +55,7 @@ The full spec lives in [`CLAUDE.md`](./CLAUDE.md). The essentials:
 - **Errors:** wrap handlers in `try/catch` and delegate to the per-service `handle<Service>Error` shim (which calls `handleGoogleApiError`). Set `isError: true` on error responses.
 - **Scopes** are tiered in `src/auth.ts`: `BASE_SCOPES` (always), `OPTIONAL_SCOPE_BUNDLES` (env opt-in), `ADMIN_SCOPES` (per-account opt-in). Any new scope must be documented and noted as requiring re-auth.
 - **No `console.log`** in tool handlers — stdio is the MCP channel; use `process.stderr.write` if needed.
-- **Tests:** pure-logic helpers get unit tests (`vitest`). Handlers are verified by manual smoke testing — we do not mock `googleapis`.
+- **Tests:** pure-logic helpers get unit tests (`vitest`). Handlers are verified by manual smoke testing — we do not mock the `@googleapis/*` clients.
 
 ## Commits & versioning
 

@@ -1,13 +1,8 @@
 import { randomBytes } from 'node:crypto';
 
-/**
- * RFC 2047 encoded-word (`=?utf-8?B?...?=`) for non-ASCII header text.
- * Long values are split into multiple <=75-char encoded-words separated
- * by `\r\n ` (CRLF SPACE) per the RFC's folding rule.
- */
+/** RFC 2047 encoded-word (`=?utf-8?B?...?=`) for non-ASCII header text; long values fold into <=75-char chunks joined by CRLF SPACE per the RFC. */
 export function encodeHeaderValue(value: string): string {
-  // Span includes control chars on purpose — testing for "is this entire
-  // string ASCII?", not "is it printable?".
+  // Control chars in the span are intentional: testing "entirely ASCII", not "printable".
   // eslint-disable-next-line no-control-regex
   if (value === '' || /^[\x00-\x7F]*$/.test(value)) return value;
   const prefix = '=?utf-8?B?';
@@ -17,9 +12,7 @@ export function encodeHeaderValue(value: string): string {
   // multiple of 4). Round maxInner DOWN to a multiple of 4 first.
   const maxBytesPerChunk = Math.floor(maxInner / 4) * 3;
 
-  // Iterate by codepoint so each chunk's bytes form a complete UTF-8
-  // sequence — many MUAs decode encoded-words individually before joining,
-  // so a mid-byte split would surface as U+FFFD in those clients.
+  // Chunk on codepoint boundaries: many MUAs decode each encoded-word separately, so a mid-UTF-8-sequence split renders U+FFFD.
   const chunks: string[] = [];
   let buffered: number[] = [];
   for (const char of value) {
@@ -36,10 +29,7 @@ export function encodeHeaderValue(value: string): string {
   return chunks.join('\r\n ');
 }
 
-/**
- * Encode an address-list header (To/Cc/Bcc/From). RFC 2047 forbids
- * encoded-words inside the addr-spec, so only the display name is encoded.
- */
+/** Address-list headers (To/Cc/Bcc/From): RFC 2047 forbids encoded-words in the addr-spec, so only display names are encoded. */
 export function encodeAddressHeader(value: string): string {
   if (value === '') return '';
   return value.split(',').map((part) => {
@@ -56,10 +46,7 @@ export function encodeAddressHeader(value: string): string {
   }).filter(Boolean).join(', ');
 }
 
-/**
- * RFC 5322 §2.3: CR and LF MUST only occur together as CRLF in bodies.
- * Normalize bare `\n` or `\r` to CRLF.
- */
+/** RFC 5322 §2.3 forbids bare CR or LF in bodies; normalize everything to CRLF. */
 export function normalizeBodyLineEndings(body: string): string {
   return body.replace(/\r\n|\r|\n/g, '\r\n');
 }
@@ -100,10 +87,7 @@ function stripTags(input: string, replacement = ''): string {
   return out;
 }
 
-/**
- * Best-effort HTML→plain-text for reading HTML-only emails. Regex-based on
- * purpose — no HTML parser dependency, and mail HTML is flat enough for it.
- */
+/** Best-effort HTML→plain-text for HTML-only emails; regex on purpose (avoids an HTML-parser dep, mail HTML is flat enough). */
 export function htmlToText(html: string): string {
   // Repeat until stable: single-pass removal can leave behind sequences
   // reassembled from the removed span's edges (<scr<script>ipt>).
@@ -150,11 +134,8 @@ export function htmlToText(html: string): string {
     .trim();
 }
 
-/**
- * RFC 5322 threading: In-Reply-To/References must carry the parent's real
- * Message-ID header, not the Gmail API id. Falls back to the API id when the
- * header is missing so replies still thread inside Gmail.
- */
+/** In-Reply-To/References need the parent's real RFC 5322 Message-ID header, not the Gmail API id;
+ * falls back to the API id so replies still thread inside Gmail. */
 export function buildReplyHeaders(
   fallbackId: string,
   parentMessageIdHeader: string,
@@ -169,20 +150,13 @@ export function buildReplyHeaders(
   };
 }
 
-/**
- * RFC 2046 §5.1.1 boundary token: 1-70 chars from a restricted set, no trailing space.
- * randomBytes hex output is only [0-9a-f], all of which are bcharsnospace.
- */
+/** RFC 2046 §5.1.1 boundary token: hex output is all bcharsnospace, length well under the 70-char cap. */
 function generateMimeBoundary(): string {
   // 5-char prefix + 32 hex chars = 37 chars, well under the 70-char limit.
   return `=_gm_${randomBytes(16).toString('hex')}`;
 }
 
-/**
- * Build a multipart/alternative body so HTML-capable clients render the rich
- * version and plain clients fall back. Returns the header value AND the body.
- * Caller composes the full message: headers (including this Content-Type) + CRLF + body.
- */
+/** multipart/alternative (plain fallback + HTML); caller composes the message: headers (incl. returned Content-Type) + CRLF + body. */
 export function buildMultipartAlternative(
   plainBody: string,
   htmlBody: string,

@@ -1,7 +1,7 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean } from './_coerce.js';
-import { google } from 'googleapis';
+import { gmail as gmailClient } from '@googleapis/gmail';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -147,7 +147,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, query, maxResults }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
 
         const listRes = await gmail.users.messages.list({
           userId: 'me',
@@ -207,7 +207,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, messageId, full, rawHtml }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
 
         const res = await gmail.users.messages.get({
           userId: 'me',
@@ -241,7 +241,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, threadId, full, rawHtml, mode }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
 
         if (mode === 'summary') {
           const res = await gmail.users.threads.get({
@@ -300,7 +300,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, to, subject, body, htmlBody, cc, replyToMessageId, replyToThreadId }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const config = (await import('../accounts.js')).ACCOUNT_CONFIG[account as Account];
 
         const headers = [
@@ -368,7 +368,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, messageId, attachmentId, filename, savePath }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
 
         const res = await gmail.users.messages.attachments.get({
           userId: 'me',
@@ -413,7 +413,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, to, subject, body, htmlBody, cc, replyToMessageId, replyToThreadId }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const config = (await import('../accounts.js')).ACCOUNT_CONFIG[account as Account];
 
         const headers = [
@@ -487,7 +487,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, messageId, addLabelIds, removeLabelIds }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.messages.modify({
           userId: 'me',
           id: messageId,
@@ -517,7 +517,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, messageId }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.messages.trash({ userId: 'me', id: messageId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -540,7 +540,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, messageId }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         await gmail.users.messages.delete({ userId: 'me', id: messageId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, messageId }, null, 2) }],
@@ -565,7 +565,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, messageIds, addLabelIds, removeLabelIds }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         await gmail.users.messages.batchModify({
           userId: 'me',
           requestBody: {
@@ -595,7 +595,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, messageIds }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         await gmail.users.messages.batchDelete({
           userId: 'me',
           requestBody: { ids: messageIds },
@@ -623,7 +623,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, maxResults, query }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.drafts.list({
           userId: 'me',
           maxResults: maxResults ?? 20,
@@ -650,7 +650,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, draftId }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.drafts.get({
           userId: 'me',
           id: draftId,
@@ -677,7 +677,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, draftId }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.drafts.send({
           userId: 'me',
           requestBody: { id: draftId },
@@ -702,7 +702,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.labels.list({ userId: 'me' });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data.labels ?? [], null, 2) }],
@@ -729,7 +729,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, name, messageListVisibility, labelListVisibility }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.labels.create({
           userId: 'me',
           requestBody: {
@@ -759,7 +759,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, labelId }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         await gmail.users.labels.delete({ userId: 'me', id: labelId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, labelId }, null, 2) }],
@@ -781,7 +781,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.getProfile({ userId: 'me' });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -808,7 +808,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, startHistoryId, maxResults, historyTypes }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.history.list({
           userId: 'me',
           startHistoryId,
@@ -835,7 +835,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.settings.getVacation({ userId: 'me' });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -864,7 +864,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     async ({ account, enableAutoReply, responseSubject, responseBodyPlainText, startTime, endTime, restrictToContacts, restrictToDomain }) => {
       try {
         const auth = await getClient(account as Account);
-        const gmail = google.gmail({ version: 'v1', auth });
+        const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.settings.updateVacation({
           userId: 'me',
           requestBody: {

@@ -1,7 +1,7 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceBoolean } from './_coerce.js';
-import { google } from 'googleapis';
+import { admin as adminClient } from '@googleapis/admin';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -9,12 +9,7 @@ import { handleGoogleApiError } from './_errors.js';
 
 const accountEnum = z.enum(ACCOUNTS);
 
-/**
- * Admin SDK tools require Workspace super-admin (or delegated admin) privileges on the target account.
- * Personal `@gmail.com` accounts will 403 on every endpoint.
- *
- * Writes (e.g. admin_users_update) are gated by write-control like any CUD tool.
- */
+// Admin SDK requires Workspace super-admin (or delegated admin) on the account — personal @gmail.com accounts 403 on every endpoint.
 export function registerAdminTools(server: ToolRegistry): void {
   // ─── Reports / audit log ───────────────────────────────────────────────
 
@@ -48,7 +43,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     async ({ account, applicationName, userKey, startTime, endTime, eventName, actorIpAddress, filters, orgUnitID, groupIdFilter, customerId, maxResults, pageToken }) => {
       try {
         const auth = await getClient(account as Account);
-        const reports = google.admin({ version: 'reports_v1', auth });
+        const reports = adminClient({ version: 'reports_v1', auth });
         const res = await reports.activities.list({
           applicationName,
           userKey: userKey ?? 'all',
@@ -93,7 +88,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     async ({ account, customer, domain, query, maxResults, pageToken, orderBy, showDeleted, projection }) => {
       try {
         const auth = await getClient(account as Account);
-        const directory = google.admin({ version: 'directory_v1', auth });
+        const directory = adminClient({ version: 'directory_v1', auth });
         const res = await directory.users.list({
           customer: customer ?? 'my_customer',
           domain,
@@ -126,7 +121,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     async ({ account, userKey, projection }) => {
       try {
         const auth = await getClient(account as Account);
-        const directory = google.admin({ version: 'directory_v1', auth });
+        const directory = adminClient({ version: 'directory_v1', auth });
         const res = await directory.users.get({
           userKey,
           projection: projection ?? 'basic',
@@ -158,7 +153,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     async ({ account, userKey, givenName, familyName, suspended, password, changePasswordAtNextLogin, orgUnitPath }) => {
       try {
         const auth = await getClient(account as Account);
-        const directory = google.admin({ version: 'directory_v1', auth });
+        const directory = adminClient({ version: 'directory_v1', auth });
         const requestBody: any = {};
         if (givenName !== undefined || familyName !== undefined) {
           requestBody.name = {};
@@ -203,7 +198,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     async ({ account, customer, domain, userKey, query, maxResults, pageToken }) => {
       try {
         const auth = await getClient(account as Account);
-        const directory = google.admin({ version: 'directory_v1', auth });
+        const directory = adminClient({ version: 'directory_v1', auth });
         const res = await directory.groups.list({
           customer: customer ?? 'my_customer',
           domain,
@@ -237,7 +232,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     async ({ account, groupKey, roles, includeDerivedMembership, maxResults, pageToken }) => {
       try {
         const auth = await getClient(account as Account);
-        const directory = google.admin({ version: 'directory_v1', auth });
+        const directory = adminClient({ version: 'directory_v1', auth });
         const res = await directory.members.list({
           groupKey,
           roles,

@@ -36,10 +36,8 @@ export const SERVICES: ServiceEntry[] = [
   { name: 'admin', register: registerAdminTools, enabled: () => getAdminAccounts().length > 0 },
 ];
 
-// Opt-in gates for generated-only services whose scopes are not granted by
-// default; shared services (admin, forms, chat) reuse their curated gate in
-// buildRegistry. workspaceevents has no dedicated scope (subscriptions use the
-// underlying resource scopes), so it registers ungated.
+// Generated-only services with opt-in scopes; admin/forms/chat reuse their curated gate in buildRegistry,
+// and workspaceevents is deliberately absent — no dedicated scope (subscriptions use resource scopes).
 const bundleGate = (name: string) => ({
   enabled: () => new Set(getOptionalBundles()).has(name),
   hint: `add "${name}" to GOOGLE_OPTIONAL_SCOPES`,

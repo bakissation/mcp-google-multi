@@ -1,6 +1,6 @@
 # Features tour
 
-How the server keeps 871 tools usable, fast, and safe. Back to the [README](../README.md).
+How the server keeps 872 tools usable, fast, and safe. Back to the [README](../README.md).
 
 ## Discover-first tools (tiny idle context)
 
@@ -30,7 +30,7 @@ Fan-out is **read-only by design** (write tools take exactly one account), and t
 
 ## Escape hatch: any Workspace REST method
 
-Two eager tools cover anything outside the snapshot: `google_api_search` finds any method in Google's API Discovery index, and `google_api_call` invokes a method by its Discovery id (`drive.revisions.list`, `slides.presentations.create`, …) with path/query params and a JSON body. Calls run through your account's OAuth client and the **same write-control policy** as named tools: the read/create/update/delete class is derived from the method's HTTP verb and name (POST deletes like `batchDelete`/`clear` count as deletes), and policy globs/`GOOGLE_TOOLSETS` match the same service names as named tools (`people` counts as `contacts`, `admin_*` as `admin`).
+Two eager tools cover anything outside the snapshot: `google_api_search` finds any method of the 28 supported Workspace APIs in Google's API Discovery index, and `google_api_call` invokes a method by its Discovery id (`drive.revisions.list`, `slides.presentations.create`, …) with path/query params and a JSON body. Calls run through your account's OAuth client and the **same write-control policy** as named tools: the read/create/update/delete class is derived from the method's HTTP verb and name (POST deletes like `batchDelete`/`clear` count as deletes), and policy globs/`GOOGLE_TOOLSETS` match the same service names as named tools (`people` counts as `contacts`, `admin_*` as `admin`). Responses are JSON only: binary media (`alt=media` downloads, `drive.files.export`) is refused up front with a typed `binary_unsupported` error pointing to `drive_download` / `drive_export`, and a JSON response over 100k characters comes back as `{truncated, totalChars, head}` plus a hint to narrow the request (fields mask, `pageSize`). Generated tools run through the same executor, so the same cap and binary refusal apply to them.
 
 Discovery documents are fetched from Google on first use and cached on disk for 7 days (`DISCOVERY_CACHE_PATH`); a stale cache is used when offline.
 

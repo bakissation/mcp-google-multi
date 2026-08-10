@@ -107,9 +107,8 @@ function withTokenLock<T>(alias: string, fn: () => T): T {
               process.kill(owner, 0);
             } catch (ownerError) {
               const code = (ownerError as NodeJS.ErrnoException).code;
-              // EPERM: the PID exists but is not signalable (recycled by another
-              // user) — treat as alive and wait out the timeout rather than
-              // break a lock we cannot verify.
+              // EPERM: PID exists but is not signalable (recycled by another user);
+              // treat as alive, never break a lock we cannot verify.
               if (code === 'ESRCH') ownerDead = true;
               else if (code !== 'EPERM') throw ownerError;
             }
@@ -166,11 +165,7 @@ function writeTokenAtomic(alias: string, data: object): void {
   }
 }
 
-// Windows uses classic rename semantics (MoveFileExW without POSIX semantics),
-// so replacing a token file that another process momentarily holds open — a
-// concurrent readToken, antivirus, an indexer — fails with a transient
-// EPERM/EACCES/EBUSY. Reads take no lock, so the token lock cannot prevent
-// this; a short bounded retry absorbs it. POSIX rename never fails this way.
+// Windows only: renaming over a momentarily-open file throws transient EPERM/EACCES/EBUSY (reads take no lock); see docs/internals.md.
 function renameWithRetry(from: string, to: string): void {
   for (let attempt = 1; ; attempt++) {
     try {

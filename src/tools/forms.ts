@@ -1,6 +1,6 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
-import { google } from 'googleapis';
+import { forms as formsClient } from '@googleapis/forms';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
@@ -22,7 +22,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     async ({ account, formId }) => {
       try {
         const auth = await getClient(account as Account);
-        const forms = google.forms({ version: 'v1', auth });
+        const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.get({ formId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -48,7 +48,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     async ({ account, formId, pageSize, pageToken, filter }) => {
       try {
         const auth = await getClient(account as Account);
-        const forms = google.forms({ version: 'v1', auth });
+        const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.responses.list({
           formId,
           pageSize: pageSize ?? 100,
@@ -77,7 +77,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     async ({ account, formId, responseId }) => {
       try {
         const auth = await getClient(account as Account);
-        const forms = google.forms({ version: 'v1', auth });
+        const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.responses.get({ formId, responseId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -100,7 +100,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     async ({ account, formId }) => {
       try {
         const auth = await getClient(account as Account);
-        const forms = google.forms({ version: 'v1', auth });
+        const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.watches.list({ formId });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
@@ -124,7 +124,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     async ({ account, title, documentTitle }) => {
       try {
         const auth = await getClient(account as Account);
-        const forms = google.forms({ version: 'v1', auth });
+        const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.create({
           requestBody: { info: { title, documentTitle } },
         });
@@ -161,7 +161,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     async ({ account, formId, requests, includeFormInResponse, writeControl }) => {
       try {
         const auth = await getClient(account as Account);
-        const forms = google.forms({ version: 'v1', auth });
+        const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.batchUpdate({
           formId,
           requestBody: {
@@ -193,7 +193,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     async ({ account, formId, isPublished, isAcceptingResponses }) => {
       try {
         const auth = await getClient(account as Account);
-        const forms = google.forms({ version: 'v1', auth });
+        const forms = formsClient({ version: 'v1', auth });
         const updateMask = ['publishState.isPublished'];
         if (isAcceptingResponses !== undefined) updateMask.push('publishState.isAcceptingResponses');
         const res = await forms.forms.setPublishSettings({
