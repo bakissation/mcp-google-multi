@@ -1,5 +1,17 @@
 import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 import type Mail from 'nodemailer/lib/mailer/index.js';
+import MarkdownIt from 'markdown-it';
+
+// D6 send: one symmetric text format. body is Markdown; text/plain = the
+// source verbatim, text/html = this render. html:false ESCAPES raw HTML in
+// the body (the XSS-safe default); allowRawHtml swaps to the html:true
+// instance so an audited caller can pass literal HTML (e.g. inline color).
+const mdSafe = new MarkdownIt({ html: false, linkify: true });
+const mdRaw = new MarkdownIt({ html: true, linkify: true });
+
+export function renderMarkdown(body: string, allowRawHtml = false): string {
+  return (allowRawHtml ? mdRaw : mdSafe).render(body);
+}
 
 /** RFC 5322 §2.3 forbids bare CR or LF in bodies; normalize everything to CRLF. */
 export function normalizeBodyLineEndings(body: string): string {

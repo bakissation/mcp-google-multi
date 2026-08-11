@@ -46,3 +46,8 @@ Tool responses are serialized compactly (no pretty-print token tax; set `GOOGLE_
 ### Email attachments & safe compose
 
 `gmail_send` and `gmail_create_draft` share one MIME builder (nodemailer MailComposer) and accept `attachments: [{ path, filename?, contentType? }]` — the server reads each absolute path itself (MailComposer never touches the filesystem or network), caps the total at ~35 MB, and derives the MIME filename by basename. Address/subject headers containing CR/LF are rejected up front (`E_HEADER_INJECTION`), closing the old header-injection hole; bodies are CRLF-normalized and base64-encoded so Gmail's raw upload can't be corrupted by a bare LF.
+
+
+### Markdown email (send)
+
+`gmail_send` / `gmail_create_draft` take `body` as **Markdown**: the server renders it to HTML once and sends `multipart/alternative` where the Markdown source is the `text/plain` part and the rendered HTML is the `text/html` part. Raw HTML in `body` is escaped by default (XSS-safe); pass `allowRawHtml: true` for literal HTML such as inline color. `htmlBody` is removed — passing it errors (`E_HTMLBODY_REMOVED`) with the rewrite. Note: plain prose containing Markdown metacharacters (`#`, `*`, `_`, `>`, backticks, `[..]()`) now renders as Markdown.
