@@ -1,0 +1,51 @@
+name: docker
+
+# Builds and smoke-checks the distroless image (B16). Scoped to Docker changes
+# so it does not run on every slice. Non-required check (only `ci` gates merges).
+on:
+  push:
+    branches: [main, staging, dev, v6, 'v6-**']
+    paths: [Dockerfile, .dockerignore, .github/workflows/docker.yml]
+  pull_request:
+    branches: [main, staging, dev, v6, 'v6-**']
+    paths: [Dockerfile, .dockerignore, .github/workflows/docker.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build image
+        run: docker build -t mcp-google-multi:ci .
+
+      - name: Runtime user is non-root
+        run: |
+          uid=$(docker run --rm --entrypoint /nodejs/bin/node mcp-google-multi:ci -e 'process.stdout.write(String(process.getuid()))')
+          echo "runtime uid: $uid"
+          test "$uid" != "0"
+
+      - name: No secret files baked into any layer
+        run: |
+          docker create --name gmci mcp-google-multi:ci
+          docker export gmci -o image.tar
+          docker rm gmci
+          if tar -tf image.tar | grep -Eq '(\.enc$|/master\.key$|/\.env$|/config\.json$)'; then
+            echo "::error::secret file present in image layers"; exit 1
+          fi
+          echo "no secret files in image layers"
+
+      - name: Clean SIGTERM shutdown via --init
+        run: |
+          key=$(openssl rand -base64 32)
+          docker run -d --init --name gmrun \
+            -e GOOGLE_ACCOUNTS=p:x@example.com -e MASTER_KEY="$key" -e MCP_OWNER_EMAILS=x@example.com \
+            mcp-google-multi:ci
+          sleep 3
+          t0=$(date +%s); docker stop -t 10 gmrun; t1=$(date +%s)
+          docker rm -f gmrun || true
+          echo "stop took $((t1 - t0))s"
+          test $((t1 - t0)) -lt 10

@@ -106,6 +106,22 @@ By default the server speaks **stdio** (`MCP_TRANSPORT=stdio`), the zero-network
 
 > **HTTP is currently loopback-only.** Until the built-in OAuth authorization server ships, the server refuses to start any exposed HTTP shape (a non-loopback bind, or a non-loopback `MCP_PUBLIC_URL` — i.e. a tunnel/reverse proxy in front). Loopback callers are trusted as the owner, the same trust model as stdio, so do not run HTTP mode on a shared host. Register the local URL with your client using `mcp-google-multi write-client-config --url http://127.0.0.1:4243/mcp`.
 
+### Docker
+
+A distroless, non-root image is provided (`Dockerfile`). Build and run it, passing secrets at runtime (never baked into the image):
+
+```sh
+docker build -t mcp-google-multi .
+docker run --init --rm \
+  -e GOOGLE_ACCOUNTS="work:me@company.example,personal:me@gmail.example" \
+  -e MASTER_KEY="$(openssl rand -base64 32)" \
+  -e MCP_OWNER_EMAILS="me@company.example" \
+  -v mcp-config:/home/nonroot/.config/mcp-google-multi \
+  mcp-google-multi
+```
+
+`--init` forwards SIGTERM for a clean shutdown. Persist the config volume across restarts — the OS keychain is unavailable in distroless, so `MASTER_KEY` falls back to a `0600` file there and a regenerated key would brick existing tokens. The image defaults to `MCP_TRANSPORT=http` bound to loopback; the full tunnel/remote recipe lands with the authorization server.
+
 ## Write-control (deny-by-default)
 
 Reads are never gated. **Every create/update/delete is off until you opt in** — pick a profile:
