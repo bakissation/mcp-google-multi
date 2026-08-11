@@ -16,6 +16,7 @@ import { registerDiagnoseTool } from './doctor.js';
 import { getToolsets, toolsetEnabled } from './toolsets.js';
 import { isAllowed, describePolicy } from './write-control.js';
 import { buildIdentityContext, type IdentityContext } from './identity.js';
+import { registerSetupPrompt } from './setup-prompt.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
@@ -143,6 +144,7 @@ async function main() {
   });
   const registry = buildRegistry(server, ctx);
   registry.installListHandler();
+  registerSetupPrompt(server);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
