@@ -10,6 +10,10 @@ import { openUrl } from '../open-url.js';
 import {
   buildConsentClient, awaitLoopbackConsent, hasClientCredentials,
 } from '../oauth-consent.js';
+import {
+  detectClients, buildServerEntry, renderInstruction, applyFileEntry, resolveMode,
+  DEFAULT_SERVER_NAME, type ClientId, type Mode,
+} from '../client-config.js';
 
 // B7: the elicitation-driven account_add / account_reauth wizard. It rebuilds
 // interactive account management on the mutable config.json registry so a
@@ -220,7 +224,10 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
         // S3 + S4: consent + validate.
         const consent = await runConsent(server, validated.alias);
         if (!consent.ok) return textResult(consent.text, true);
-        return textResult(s4Text(validated.alias, consent.missing));
+        // B15: offer to register the server with another MCP client.
+        return textResult(
+          `${s4Text(validated.alias, consent.missing)}\nTip: run account_write_config to register this server with another MCP client (Claude Desktop / Cursor / Claude Code).`,
+        );
       } catch (e: unknown) {
         return textResult(`account_add failed: ${(e as Error).message}`, true);
       }
@@ -253,6 +260,74 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
         return textResult(s4Text(alias, consent.missing));
       } catch (e: unknown) {
         return textResult(`account_reauth failed: ${(e as Error).message}`, true);
+      }
+    },
+  );
+
+  registerMeta(
+    'account_write_config',
+    {
+      _meta: REQUIRES_INTERACTION,
+      annotations: { openWorldHint: true },
+      description:
+        "Register this server with your MCP client (Claude Code / Claude Desktop / Cursor) so you don't hand-edit JSON. Default: returns the exact snippet/command to add. Pass write:true to write detected file-based configs in place (backs up first, never clobbers a malformed file). Secrets are never inlined.",
+      inputSchema: {
+        client: z.enum(['claude-code', 'claude-desktop', 'cursor']).optional().describe('Target one client; default = all detected'),
+        name: z.string().optional().describe('Server name in the client config (default mcp-google-multi)'),
+        write: z.boolean().optional().describe('Write file-based configs in place (default false = show the snippet only)'),
+      },
+    },
+    async (args: unknown) => {
+      try {
+        const a = (args ?? {}) as { client?: ClientId; name?: string; write?: boolean };
+        const name = a.name?.trim() || DEFAULT_SERVER_NAME;
+        let mode: Mode = 'stdio';
+        let resourceUri: string | undefined;
+        try {
+          const { resolveHttpConfig } = await import('../http-config.js');
+          const m = resolveMode(resolveHttpConfig());
+          mode = m.mode;
+          resourceUri = m.resourceUri;
+        } catch {
+          // stdio fallback on any config error
+        }
+        let entry;
+        try {
+          entry = buildServerEntry({ name, mode, resourceUri });
+        } catch (e) {
+          return textResult((e as Error).message, true);
+        }
+        let clients = detectClients();
+        if (a.client) clients = clients.filter((c) => c.id === a.client);
+        const present = clients.filter((c) => c.present);
+        const targets = a.client ? clients : present.length ? present : clients;
+
+        const blocks: string[] = [];
+        for (const client of targets) {
+          const instr = renderInstruction(client, name, entry);
+          if (client.managed === 'cli') {
+            blocks.push(`${client.label} — run:\n  ${instr.text}`);
+          } else if (a.write) {
+            const res = applyFileEntry(client, name, entry);
+            blocks.push(
+              res.ok
+                ? `${client.label} — ${res.action} "${name}" in ${res.path}${res.backup ? ` (backup ${res.backup})` : ''}`
+                : `${client.label} — ${res.message}\n${res.snippet ?? ''}`,
+            );
+          } else {
+            blocks.push(`${client.label} — add to ${instr.path}:\n${instr.text}`);
+          }
+        }
+        if (targets.length === 0) {
+          blocks.push(`No known MCP client detected. Add this under "mcpServers":\n${JSON.stringify({ [name]: entry }, null, 2)}`);
+        }
+        const note =
+          mode === 'http'
+            ? `Remote HTTP (${resourceUri}); authentication is via the OAuth flow, so no secrets are stored in the client config.`
+            : 'stdio: secrets stay in ~/.config/mcp-google-multi/.env; the client entry carries none.';
+        return textResult(`${blocks.join('\n\n')}\n\n${note}`);
+      } catch (e: unknown) {
+        return textResult(`account_write_config failed: ${(e as Error).message}`, true);
       }
     },
   );

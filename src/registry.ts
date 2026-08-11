@@ -71,6 +71,9 @@ const CUD_OVERRIDES: Record<string, Cud> = {
   // works under any profile. cud=read also keeps them off the fan-out path.
   account_add: 'read',
   account_reauth: 'read',
+  // Writes a LOCAL MCP-client config, not Google data; gated by
+  // requiresUserInteraction. "write" verb would otherwise infer update.
+  account_write_config: 'read',
 };
 
 const SERVICE_OVERRIDES: Record<string, string> = {
