@@ -125,6 +125,8 @@ export function registerSlidesTools(server: ToolRegistry): void {
   server.registerTool(
     'slides_batch_update',
     {
+      // Insert/append-capable or non-convergent: a retry duplicates content.
+      annotations: { idempotentHint: false },
       description: 'Generic presentations.batchUpdate pass-through. Accepts the full Request union (create/move/delete slides, insert text/shapes/images/tables, styling, replaceAllText, …). See https://developers.google.com/workspace/slides/api/reference/rest/v1/presentations/request',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),

@@ -359,6 +359,8 @@ export function registerDocsTools(server: ToolRegistry): void {
   server.registerTool(
     'docs_replace_text',
     {
+      // Insert/append-capable or non-convergent: a retry duplicates content.
+      annotations: { idempotentHint: false },
       description: 'Find and replace all occurrences of text in a document',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
@@ -1073,6 +1075,8 @@ export function registerDocsTools(server: ToolRegistry): void {
   server.registerTool(
     'docs_modify_table',
     {
+      // Insert/append-capable or non-convergent: a retry duplicates content.
+      annotations: { idempotentHint: false },
       description: 'Mutate a table by operation: insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, unmergeCells. Locate the cell with tableStartIndex (the table\'s start index in the doc) plus rowIndex/columnIndex (0-based).',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
@@ -1258,6 +1262,8 @@ export function registerDocsTools(server: ToolRegistry): void {
   server.registerTool(
     'docs_batch_update',
     {
+      // Insert/append-capable or non-convergent: a retry duplicates content.
+      annotations: { idempotentHint: false },
       description: 'Generic documents.batchUpdate pass-through. Accepts the full Request union (40 types). See https://developers.google.com/workspace/docs/api/reference/rest/v1/documents/request',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),

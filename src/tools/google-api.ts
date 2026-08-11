@@ -146,7 +146,10 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         ).describe('Query-string parameters; use an array for repeated params (e.g. resourceNames)'),
         body: coerceJson(z.record(z.string(), z.unknown()).optional()).describe('JSON request body'),
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+      // idempotentHint:false is load-bearing: the computed default (cud=read)
+      // would invite retries that duplicate sends through the escape hatch.
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+      _meta: { 'anthropic/maxResultSizeChars': 100_000 },
     },
     async ({ account, api, methodId, pathParams, queryParams, body }) => {
       if (!WORKSPACE_APIS[api as string]) {
