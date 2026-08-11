@@ -66,6 +66,11 @@ const CUD_OVERRIDES: Record<string, Cud> = {
   drive_transfer: 'create',
   // read-only resolver; the name's "resolve" verb would otherwise infer update.
   contacts_resolve: 'read',
+  // Account management is gated by anthropic/requiresUserInteraction (forced
+  // human approval), NOT the Google-data write-control profile — so onboarding
+  // works under any profile. cud=read also keeps them off the fan-out path.
+  account_add: 'read',
+  account_reauth: 'read',
 };
 
 const SERVICE_OVERRIDES: Record<string, string> = {

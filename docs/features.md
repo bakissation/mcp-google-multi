@@ -89,3 +89,13 @@ Any value you pass explicitly wins over the derived one (`to`, `cc`, `subject` a
 The same engine is exposed to agents as the read-only **`diagnose`** tool, returning the structured report so an agent can self-diagnose an auth/config failure and surface the fix. (HTTP-transport checks and the live per-service API-enablement probe land with the OAuth authorization server.)
 
 `mcp-google-multi reset` recovers a bricked or stale install: it wipes encrypted token files (all accounts, or `--account <alias>`) — **config.json is always kept** — and with `--regenerate-key` also drops the generated `MASTER_KEY` (refused while any account still holds a token, since a fresh key would brick it). It is confirmation-gated (`--yes` for non-interactive) and, after a wipe, prints the exact re-auth command per account.
+
+
+## Interactive account management: `account_add` / `account_reauth`
+
+Two always-visible, human-approved tools (`anthropic/requiresUserInteraction`) manage accounts on a running server — no file editing, no restart:
+
+- **`account_add`** collects the account (alias, email, scope-bundle checkboxes incl. an "all optional scopes" option, and a Workspace-admin toggle) via an elicitation **form**, writes the registry through the atomic path, then runs Google consent in the browser (URL-mode elicitation, or a printed link as a fallback). The new alias is callable immediately. When the server can't reach the granted scopes you asked for (granular consent), it reports `E_SCOPE_NOT_GRANTED` naming what to re-grant. If accounts are pinned via the legacy `GOOGLE_ACCOUNTS` env, `account_add` refuses with `E_ENV_ACCOUNTS_MODE` (config.json is ignored while that env is set) — migrate with `mcp-google-multi migrate-config` to use it.
+- **`account_reauth <alias>`** re-runs consent for an existing account: recover a dead refresh token (the 7-day-trap fix) or grant scopes after a profile change. It works regardless of how the account was defined.
+
+Both reuse the loopback consent flow (your own OAuth client), so tokens never leave your machine. (HTTP-transport consent lands with the OAuth authorization server.)
