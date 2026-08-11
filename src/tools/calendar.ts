@@ -8,7 +8,7 @@ import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 import { sliceClean } from '../trim.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = z.enum(ACCOUNTS).optional();
 
 export function registerCalendarTools(server: ToolRegistry): void {
   server.registerTool(

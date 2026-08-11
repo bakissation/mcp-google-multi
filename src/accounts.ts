@@ -32,6 +32,8 @@ export interface AccountSet {
   scopeProfiles: Record<string, ScopeProfile>;
   source: 'env' | 'file' | 'merged';
   stamp: string;
+  defaultAccount?: string;
+  defaultAccountSource?: 'env' | 'config';
 }
 
 function parseCsv(value: string | undefined): string[] {
@@ -164,6 +166,7 @@ export function resolveAccounts(
   if (rawEnv && rawEnv.trim() !== '') {
     const { aliases, configs } = parseEnvAccounts(rawEnv, adminEnv);
     materializeFirstRun(aliases, configs, filePath);
+    const def = resolveDefaultAccount(env, null, aliases, fail);
     return {
       aliases: aliases as [string, ...string[]],
       configs,
@@ -172,6 +175,7 @@ export function resolveAccounts(
       scopeProfiles: { base: { bundles: [] } },
       source: 'env',
       stamp: 'env:0',
+      ...def,
     };
   }
 
@@ -232,13 +236,36 @@ export function resolveAccounts(
     };
   }
 
+  const def = resolveDefaultAccount(env, config?.defaultAccount ?? null, aliases, fail);
   return {
     aliases: aliases as [string, ...string[]],
     configs,
     scopeProfiles,
     source: 'file',
     stamp: `${config?.version ?? CONFIG_VERSION}:${preStamp.split(':')[1]}`,
+    ...def,
   };
+}
+
+/** A2: env GOOGLE_DEFAULT_ACCOUNT > config.defaultAccount > unset. A configured
+ * default naming an unknown alias refuses to start (E_DEFAULT_ACCOUNT_UNKNOWN —
+ * deliberately NOT E_CONFIG_INVALID: the config is schema-valid). */
+function resolveDefaultAccount(
+  env: NodeJS.ProcessEnv,
+  fromConfig: string | null,
+  aliases: string[],
+  fail: (slug: string, message: string) => never,
+): { defaultAccount?: string; defaultAccountSource?: 'env' | 'config' } {
+  const fromEnv = env.GOOGLE_DEFAULT_ACCOUNT?.trim();
+  const value = fromEnv || fromConfig || undefined;
+  if (!value) return {};
+  if (!aliases.includes(value)) {
+    fail(
+      'E_DEFAULT_ACCOUNT_UNKNOWN',
+      `default account "${value}" (from ${fromEnv ? 'GOOGLE_DEFAULT_ACCOUNT' : 'config.json defaultAccount'}) is not a configured alias. Valid: ${aliases.join(', ')}.`,
+    );
+  }
+  return { defaultAccount: value, defaultAccountSource: fromEnv ? 'env' : 'config' };
 }
 
 function fileStamp(filePath: string, version: number): string {

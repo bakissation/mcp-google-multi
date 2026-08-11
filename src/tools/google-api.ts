@@ -15,7 +15,7 @@ import {
   searchMethods,
 } from '../discovery-client.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = z.enum(ACCOUNTS).optional();
 
 // Policy/toolset namespace for each API alias must match the NAMED tools' service
 // names, or user deny globs and GOOGLE_TOOLSETS silently miss escape-hatch calls.
@@ -126,7 +126,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         'policy as named tools. Returns JSON only — for binary/file content (media downloads, ' +
         'drive.files.export) use drive_download / drive_export instead.',
       inputSchema: {
-        account: accountEnum.describe('Google account alias'),
+        account: accountEnum.describe('Google account alias (omit for the default account)'),
         api: z.string().describe(`API alias: ${apiList}`),
         methodId: z.string().describe('Discovery method id, e.g. "drive.revisions.list"'),
         pathParams: coerceJson(z.record(z.string(), z.union([z.string(), z.number()])).optional())

@@ -12,7 +12,7 @@ import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../t
 import * as path from 'path';
 import * as fs from 'fs';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = z.enum(ACCOUNTS).optional();
 
 function getHeader(
   headers: { name?: string | null; value?: string | null }[] | undefined,
