@@ -1,12 +1,24 @@
 import type { Cud } from './registry.js';
 
 export type Profile = 'read-only' | 'safe-writes' | 'full-writes';
+export type Transport = 'stdio' | 'http';
 
 export interface Policy {
   profile: Profile;
   readOnly: boolean;
   allow: string[];
   deny: string[];
+  /**
+   * B14 reserved seam (cc-write-control "HTTP posture", LOCKED to OQ-5
+   * "annotations only"): the dispatch transport is threaded into the resolved
+   * policy for the EE/future seam, but in v6 alpha it does NOT stiffen the
+   * profile or alter any `isAllowed` verdict. "Stricter on HTTP" is achieved
+   * entirely by the `anthropic/requiresUserInteraction` annotation on the
+   * irreversible set (A12), emitted identically on both transports.
+   * Optional so existing Policy literals (codegen/tests) need no change;
+   * resolvePolicy always populates it.
+   */
+  transport?: Transport;
 }
 
 interface ToolRef {
@@ -45,7 +57,10 @@ function parseGlobs(value: string | undefined): string[] {
   return (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-export function resolvePolicy(env: NodeJS.ProcessEnv = process.env): Policy {
+export function resolvePolicy(
+  env: NodeJS.ProcessEnv = process.env,
+  opts: { transport?: Transport } = {},
+): Policy {
   const raw = (env.GOOGLE_PROFILE ?? 'read-only').trim() as Profile;
   if (raw && !PROFILES.includes(raw)) {
     // Fail-closed to read-only, but say so — a typo'd profile otherwise looks
@@ -57,6 +72,8 @@ export function resolvePolicy(env: NodeJS.ProcessEnv = process.env): Policy {
     readOnly: /^(1|true|yes)$/i.test(env.GOOGLE_READ_ONLY ?? ''),
     allow: parseGlobs(env.GOOGLE_WRITE_ALLOW),
     deny: parseGlobs(env.GOOGLE_WRITE_DENY),
+    // Reserved seam only (see Policy.transport): does not affect the verdict.
+    transport: opts.transport ?? 'stdio',
   };
 }
 
