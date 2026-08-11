@@ -70,9 +70,16 @@ async function defaultResolveAll(host: string): Promise<string[]> {
 
 /**
  * Assert a URL is safe to fetch server-side: HTTPS scheme, and every address
- * the host resolves to is public (resolve-then-check defeats DNS-rebind to a
- * private IP). Throws SsrfBlockedError otherwise. Returns the resolved IPs so
- * the caller can pin them for the actual connection if desired.
+ * the host resolves to is public. Throws SsrfBlockedError otherwise, and
+ * returns the resolved IPs.
+ *
+ * NOTE: this checks the host's addresses but does NOT pin them — the caller
+ * fetches by hostname, so undici re-resolves at connect time (a check-time vs
+ * connect-time TOCTOU / short-TTL rebind window). We deliberately do not pin
+ * (CDN IPs rotate). The real anti-SSRF control is the caller-side issuer
+ * allowlist (oauth-as validateClient rejects any non-allowlisted host BEFORE
+ * fetching), so an attacker can't steer the fetch at an arbitrary hostname;
+ * this public-range check is defense-in-depth on top of that.
  */
 export async function assertPublicHttpsUrl(rawUrl: string, deps: SsrfDeps = {}): Promise<{ url: URL; addresses: string[] }> {
   let url: URL;

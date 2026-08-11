@@ -52,12 +52,23 @@ function makeServer(): McpServer {
     await new Promise((r) => setTimeout(r, 300));
     return { content: [{ type: 'text' as const, text: 'done' }] };
   });
+  s.registerTool('hang', { description: 'never settles within a test', inputSchema: {} }, async () => {
+    // unref so the pending timer can't keep the process alive after the test.
+    await new Promise((r) => {
+      const t = setTimeout(r, 5000);
+      t.unref?.();
+    });
+    return { content: [{ type: 'text' as const, text: 'unreachable' }] };
+  });
   return s;
 }
 
-async function startHost(authenticate: Authenticator = () => ({ ok: true })): Promise<number> {
+async function startHost(
+  authenticate: Authenticator = () => ({ ok: true }),
+  extra: { dispatchTimeoutMs?: number } = {},
+): Promise<number> {
   const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
-  const host = new HttpTransportHost({ server: makeServer(), config, version: '9.9.9', ownerConfigured: true, authenticate });
+  const host = new HttpTransportHost({ server: makeServer(), config, version: '9.9.9', ownerConfigured: true, authenticate, ...extra });
   await host.start();
   hosts.push(host);
   return host.address()!.port;
@@ -210,6 +221,25 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
     const after = await request(port, 'POST', '/mcp', {
       headers: { accept: MCP_ACCEPT },
       body: { jsonrpc: '2.0', id: 6, method: 'tools/list', params: {} },
+    });
+    expect(after.status).toBe(200);
+    expect(JSON.parse(after.text).result.tools).toBeDefined();
+  });
+
+  it('releases the lock when a handler exceeds the dispatch deadline (504, not wedged)', async () => {
+    const port = await startHost(() => ({ ok: true }), { dispatchTimeoutMs: 80 });
+    await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: initBody });
+    // A handler that hangs while the client keeps the connection open — this is
+    // the case the res-'close' race does NOT cover.
+    const hung = await request(port, 'POST', '/mcp', {
+      headers: { accept: MCP_ACCEPT },
+      body: { jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'hang', arguments: {} } },
+    });
+    expect(hung.status).toBe(504);
+    // The global lock must have released — a subsequent request returns promptly.
+    const after = await request(port, 'POST', '/mcp', {
+      headers: { accept: MCP_ACCEPT },
+      body: { jsonrpc: '2.0', id: 8, method: 'tools/list', params: {} },
     });
     expect(after.status).toBe(200);
     expect(JSON.parse(after.text).result.tools).toBeDefined();

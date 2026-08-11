@@ -20,6 +20,14 @@ import { fetchCimdDocument, SsrfBlockedError } from './ssrf-guard.js';
 
 const CLAUDE_AI_FIXED_CALLBACK = 'https://claude.ai/api/mcp/auth_callback';
 
+// DCR (/register) is public + unauthenticated, so its in-memory store must be
+// bounded like every sibling store (ReplayGuard cap, RefreshStore SPENT_CAP) or
+// a request loop OOMs the process. Cap client count (FIFO-evict the oldest) and
+// the per-request redirect_uris shape so one entry can't be arbitrarily large.
+export const DCR_MAX_CLIENTS = 1000;
+export const DCR_MAX_REDIRECT_URIS = 10;
+const DCR_MAX_URI_LEN = 2048;
+
 export interface GoogleExchangeResult {
   tokens: Record<string, unknown>;
   email?: string;
@@ -452,6 +460,16 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     }
     const redirectUris = Array.isArray(parsed.redirect_uris) ? parsed.redirect_uris.map(String) : [];
     if (redirectUris.length === 0) return json(res, 400, { error: 'invalid_client_metadata', message: 'redirect_uris required' });
+    if (redirectUris.length > DCR_MAX_REDIRECT_URIS || redirectUris.some((u) => u.length > DCR_MAX_URI_LEN)) {
+      return json(res, 400, { error: 'invalid_client_metadata', message: 'too many or oversized redirect_uris' });
+    }
+    // Bound the store: FIFO-evict the oldest registration once at capacity (Map
+    // preserves insertion order) so a /register flood can't grow RSS unbounded.
+    while (registered.size >= DCR_MAX_CLIENTS) {
+      const oldest = registered.keys().next().value;
+      if (oldest === undefined) break;
+      registered.delete(oldest);
+    }
     const clientId = `mcpb-${randomBytes(16).toString('hex')}`;
     registered.set(clientId, { redirect_uris: redirectUris });
     return json(res, 201, { client_id: clientId, redirect_uris: redirectUris, token_endpoint_auth_method: 'none' });

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { resolveHttpConfig } from '../src/http-config.js';
 import { HttpTransportHost } from '../src/http-transport.js';
-import { buildAuthServer, redirectAllowed, type AuthServerDeps } from '../src/oauth-as.js';
+import { buildAuthServer, redirectAllowed, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServerDeps } from '../src/oauth-as.js';
 import { jwtSecretFrom } from '../src/mcp-token.js';
 import { SsrfBlockedError } from '../src/ssrf-guard.js';
 
@@ -314,5 +314,33 @@ describe('negative paths (one per §5.12 MUST)', () => {
     const port = await start();
     const r = await req(port, 'GET', '/.well-known/oauth-authorization-server', { headers: { origin: 'https://evil.example' } });
     expect(r.status).toBe(403);
+  });
+});
+
+describe('DCR /register bounds (unbounded-store DoS guard)', () => {
+  it('rejects too many redirect_uris', async () => {
+    const port = await start();
+    const uris = Array.from({ length: DCR_MAX_REDIRECT_URIS + 1 }, (_, i) => `https://c.example/cb${i}`);
+    const r = await req(port, 'POST', '/register', { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ redirect_uris: uris }) });
+    expect(r.status).toBe(400);
+  });
+
+  it('rejects an oversized redirect_uri', async () => {
+    const port = await start();
+    const big = `https://c.example/${'a'.repeat(3000)}`;
+    const r = await req(port, 'POST', '/register', { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ redirect_uris: [big] }) });
+    expect(r.status).toBe(400);
+  });
+
+  it('FIFO-evicts the oldest registration once at capacity (store stays bounded)', async () => {
+    const registeredClients = new Map<string, { redirect_uris: string[] }>();
+    for (let i = 0; i < DCR_MAX_CLIENTS; i++) registeredClients.set(`seed-${i}`, { redirect_uris: ['https://s.example/cb'] });
+    const port = await start({ registeredClients });
+    const reg = await req(port, 'POST', '/register', { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ redirect_uris: ['https://new.example/cb'] }) });
+    expect(reg.status).toBe(201);
+    const newId = JSON.parse(reg.text).client_id as string;
+    expect(registeredClients.size).toBe(DCR_MAX_CLIENTS); // did not grow past the cap
+    expect(registeredClients.has('seed-0')).toBe(false); // oldest evicted
+    expect(registeredClients.has(newId)).toBe(true); // newest present
   });
 });

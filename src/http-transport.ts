@@ -31,7 +31,15 @@ export interface HttpHostOptions {
   log?: (line: string) => void;
   /** Max /mcp JSON body bytes (DoS guard). */
   maxBodyBytes?: number;
+  /** Deadline for a single /mcp dispatch; a hung handler past this releases the
+   * shared lock instead of wedging the transport (default 120s). */
+  dispatchTimeoutMs?: number;
 }
+
+// A hung handler that keeps the connection open would otherwise hold the global
+// serialize() lock forever. Generous by default so slow-but-valid calls (large
+// Drive exports, fan-out) still finish; the point is only to guarantee release.
+const DISPATCH_TIMEOUT_DEFAULT = 120_000;
 
 export function parseOwnerEmails(env: NodeJS.ProcessEnv = process.env): string[] {
   return (env.MCP_OWNER_EMAILS ?? '')
@@ -194,17 +202,46 @@ export class HttpTransportHost {
     });
     // The shared McpServer holds exactly one connected transport at a time, so
     // connect + dispatch + DISCONNECT all run inside the mutex: the next request
-    // can never hit "Already connected", and a client disconnect can't wedge the
-    // lock — dispatch is raced against res 'close' so it always settles, and the
-    // transport is closed in a finally (which resets server._transport) before
-    // the lock releases. (A shared initialized-state persists across stateless
-    // requests; benign for the single-owner design.)
+    // can never hit "Already connected". The serialized section is guaranteed to
+    // settle three ways — the handler finishes, the client disconnects (res
+    // 'close'), or a dispatch deadline fires — so neither a client that holds the
+    // connection open nor a hung upstream can wedge the lock. The transport is
+    // closed in a finally (which resets server._transport) before the lock
+    // releases. (A shared initialized-state persists across stateless requests;
+    // benign for the single-owner design.)
+    const deadlineMs = this.opts.dispatchTimeoutMs ?? DISPATCH_TIMEOUT_DEFAULT;
     await this.serialize(async () => {
-      const disconnected = new Promise<void>((resolve) => res.once('close', resolve));
+      const disconnected = new Promise<'closed'>((resolve) => res.once('close', () => resolve('closed')));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timedOut = new Promise<'timeout'>((resolve) => {
+        timer = setTimeout(() => resolve('timeout'), deadlineMs);
+        timer.unref?.();
+      });
       await this.opts.server.connect(transport);
+      // Reflect the dispatch into a non-rejecting arm: if the deadline wins the
+      // race, an orphaned handler settling later must not surface as an unhandled
+      // rejection — but a genuine dispatch error still propagates (rethrown below).
+      let dispatchErr: unknown;
+      const dispatchArm = transport
+        .handleRequest(req, res, body)
+        .then(() => 'done' as const, (e) => {
+          dispatchErr = e;
+          return 'error' as const;
+        });
       try {
-        await Promise.race([transport.handleRequest(req, res, body), disconnected]);
+        const outcome = await Promise.race([dispatchArm, disconnected, timedOut]);
+        if (outcome === 'error') throw dispatchErr;
+        if (outcome === 'timeout') {
+          this.log('504 dispatch_timeout path=/mcp');
+          if (!res.headersSent) {
+            res.writeHead(504, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'dispatch_timeout', message: 'the handler exceeded the dispatch deadline' }));
+          } else {
+            res.destroy();
+          }
+        }
       } finally {
+        if (timer) clearTimeout(timer);
         await transport.close().catch(() => undefined);
       }
     });
