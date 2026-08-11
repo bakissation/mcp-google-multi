@@ -1,0 +1,25 @@
+# Never enter an image layer.
+node_modules
+dist
+coverage
+
+# Secrets / local state — MUST never be copied into a layer.
+.env
+.env.*
+*.enc
+master.key
+mcp-tokens.enc
+config.json
+
+# Build/test/dev cruft not needed to compile dist/.
+.git
+.github
+.gitignore
+tests
+discovery
+*.log
+*.mcpb
+.claude
+.vscode
+.idea
+npm-debug.log*
