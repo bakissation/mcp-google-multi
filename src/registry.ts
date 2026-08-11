@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { type Policy, isAllowed, writeDisabledResult } from './write-control.js';
+import { type Policy, isAllowed, writeDisabledResult, IRREVERSIBLE_TOOLS } from './write-control.js';
 import { getAccountSet, refreshAccountSetIfStale } from './accounts.js';
 import { compactResult, trimEnabled } from './trim.js';
 import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFanout } from './fanout.js';
@@ -36,6 +36,8 @@ export interface ToolEntry {
   meta: boolean;
   /** Discovery-codegen provenance (the only tools passing an explicit cud). */
   generated: boolean;
+  /** Member of the frozen irreversible set (real send / permanent delete). */
+  irreversible: boolean;
   /** Baked per-method scopes (generated tools); curated tools authorize at
    * service/bundle grain and leave this undefined. */
   requiredScopes?: readonly string[];
@@ -127,6 +129,12 @@ export class ToolRegistry {
         idempotentHint: cud !== 'create',
         ...config.annotations,
       };
+      // A12: forced per-call human approval on the irreversible set, even in
+      // bypass mode. Client-enforced via the wire _meta (Claude Code reads
+      // anthropic/* ONLY there); the server verdict stays separate.
+      const clientMeta = IRREVERSIBLE_TOOLS.has(name)
+        ? { ...config._meta, 'anthropic/requiresUserInteraction': true }
+        : config._meta;
 
       // never fan out meta tools: google_api_call infers cud=read but executes writes
       let inputShape = config.inputSchema ?? {};
@@ -151,9 +159,10 @@ export class ToolRegistry {
         description: config.description ?? '',
         inputShape,
         annotations,
-        clientMeta: config._meta,
+        clientMeta,
         meta: this.registeringMeta,
         generated: config.cud !== undefined,
+        irreversible: IRREVERSIBLE_TOOLS.has(name),
         requiredScopes: config.requiredScopes,
       });
       const guarded =

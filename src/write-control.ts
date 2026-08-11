@@ -17,6 +17,30 @@ interface ToolRef {
 
 const PROFILES: Profile[] = ['read-only', 'safe-writes', 'full-writes'];
 
+/** The irreversible set (frozen, cc-write-control): real sends leave the
+ * user's (or org's) identity unrecallably; permanent deletes bypass Trash.
+ * Includes the callable GENERATED twins of the curated ops — the surface is
+ * always callable by name, so a prompt-free twin would defeat the layer.
+ * Reversible mutations (trash/untrash, draft create/update, labels, calendar
+ * edits) are deliberately excluded so the approval prompt never nags. The
+ * escape hatch is documented as outside this layer (server write-control
+ * still gates it). */
+export const IRREVERSIBLE_TOOLS = new Set([
+  // curated
+  'gmail_send',
+  'gmail_send_draft',
+  'gmail_delete',
+  'gmail_batch_delete',
+  'drive_delete',
+  'drive_empty_trash',
+  // generated twins (permanent deletes / real sends)
+  'gmail_users_threads_delete',
+  'gmail_users_drafts_delete',
+  'chat_spaces_messages_delete',
+  'cloudidentity_customers_userinvitations_send',
+  'vault_matters_holds_delete',
+]);
+
 function parseGlobs(value: string | undefined): string[] {
   return (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 }

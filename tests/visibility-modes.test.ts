@@ -142,3 +142,22 @@ describe('expand/collapse runtime overlay', () => {
     expect(names).toContain('discover_reset');
   });
 });
+
+describe('A12: irreversible set carries requiresUserInteraction', () => {
+  it('gmail_send gets the annotation; reversible mutations never do', () => {
+    const server = { registerTool: () => 'ok', sendToolListChanged: vi.fn(), server: { setRequestHandler: () => {} } };
+    const registry = new ToolRegistry(server as never, POLICY, 'lazy');
+    registry.registerTool('gmail_send', { description: 'x', inputSchema: { account: z.string().optional() } }, () => {});
+    registry.registerTool('gmail_trash', { description: 'x', inputSchema: { account: z.string().optional() } }, () => {});
+    registry.registerTool('drive_empty_trash', { description: 'x', inputSchema: { account: z.string().optional() } }, () => {});
+    registry.registerTool('gmail_users_threads_delete', { description: 'x', inputSchema: { account: z.string().optional() }, cud: 'delete' } as never, () => {});
+    const byName = Object.fromEntries(registry.tools.map((t) => [t.name, t]));
+    // The flag rides the wire _meta (SDK clients strip unknown annotation keys).
+    expect(byName.gmail_send.clientMeta?.['anthropic/requiresUserInteraction']).toBe(true);
+    expect(byName.gmail_send.irreversible).toBe(true);
+    expect(byName.drive_empty_trash.clientMeta?.['anthropic/requiresUserInteraction']).toBe(true);
+    expect(byName.gmail_users_threads_delete.clientMeta?.['anthropic/requiresUserInteraction']).toBe(true);
+    expect(byName.gmail_trash.clientMeta?.['anthropic/requiresUserInteraction']).toBeUndefined();
+    expect(byName.gmail_trash.irreversible).toBe(false);
+  });
+});
