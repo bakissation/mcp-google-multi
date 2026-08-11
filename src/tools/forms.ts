@@ -7,7 +7,7 @@ import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = z.enum(ACCOUNTS).optional();
 
 export function registerFormsTools(server: ToolRegistry): void {
   server.registerTool(

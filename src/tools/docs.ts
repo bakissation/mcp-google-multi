@@ -8,7 +8,7 @@ import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 import { capText } from '../trim.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = z.enum(ACCOUNTS).optional();
 
 function extractPlainText(body: any): string {
   return extractPlainTextInRange(body, 0, Infinity);

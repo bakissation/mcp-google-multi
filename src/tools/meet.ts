@@ -6,7 +6,7 @@ import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = z.enum(ACCOUNTS).optional();
 
 export function registerMeetTools(server: ToolRegistry): void {
   // ─── Conference records (past meetings) ────────────────────────────────

@@ -9,7 +9,8 @@ export function fanoutAccountField(description: string): z.ZodType {
   const csvExample = ACCOUNTS.length > 1 ? `; or a CSV subset like "${ACCOUNTS.slice(0, 2).join(',')}"` : '';
   return z
     .union([z.enum([...ACCOUNTS, '*'] as [string, ...string[]]), z.string().regex(CSV_RE)])
-    .describe(`${description}; "*" = all accounts${csvExample}`);
+    .optional()
+    .describe(`${description}; "*" = all accounts${csvExample}; omit for the default account`);
 }
 
 export type AccountSelector =

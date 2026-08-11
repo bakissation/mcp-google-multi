@@ -122,7 +122,11 @@ export function registerAccountTools(registry: ToolRegistry, deps: AccountHealth
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify({ accounts: getAccountSet().aliases.map((alias) => deriveAccountHealth(alias, deps)) }),
+            text: JSON.stringify({
+              defaultAccount: getAccountSet().defaultAccount ?? null,
+              defaultAccountSource: getAccountSet().defaultAccountSource ?? null,
+              accounts: getAccountSet().aliases.map((alias) => deriveAccountHealth(alias, deps)),
+            }),
           },
         ],
       };

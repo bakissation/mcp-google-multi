@@ -6,7 +6,7 @@ import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = z.enum(ACCOUNTS).optional();
 
 const PERSON_FIELDS = 'names,emailAddresses,phoneNumbers,organizations,addresses,photos,memberships';
 

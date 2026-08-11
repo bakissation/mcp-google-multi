@@ -22,7 +22,7 @@ export interface GeneratedToolDef {
 }
 
 export function accountField() {
-  return z.enum(ACCOUNTS).describe('Google account alias');
+  return z.enum(ACCOUNTS).optional().describe('Google account alias (omit for the default account)');
 }
 
 interface GeneratedToolConfig {

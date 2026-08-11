@@ -2,6 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { type Policy, isAllowed, writeDisabledResult } from './write-control.js';
+import { getAccountSet, refreshAccountSetIfStale } from './accounts.js';
 import { compactResult, trimEnabled } from './trim.js';
 import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFanout } from './fanout.js';
 
@@ -66,7 +67,12 @@ const SERVICE_OVERRIDES: Record<string, string> = {
 const FANOUT_EXCLUDE = new Set(['gmail_download_attachment', 'drive_download', 'drive_export']);
 
 function isAccountEnum(field: unknown): boolean {
-  return (field as { _zod?: { def?: { type?: string } } } | undefined)?._zod?.def?.type === 'enum';
+  type Def = { type?: string; innerType?: { _zod?: { def?: Def } } };
+  const def = (field as { _zod?: { def?: Def } } | undefined)?._zod?.def;
+  if (!def) return false;
+  // A2 made account enums .optional(); unwrap it or fan-out silently dies.
+  if (def.type === 'optional') return def.innerType?._zod?.def?.type === 'enum';
+  return def.type === 'enum';
 }
 
 const DELETE_VERB = /(^|_)(delete|remove|trash|clear|empty)(_|$)/;
@@ -117,6 +123,7 @@ export class ToolRegistry {
       // never fan out meta tools: google_api_call infers cud=read but executes writes
       let inputShape = config.inputSchema ?? {};
       let baseHandler = handler;
+      const hasAccountField = 'account' in inputShape;
       if (cud === 'read' && !this.registeringMeta && !FANOUT_EXCLUDE.has(name) && isAccountEnum(inputShape.account)) {
         const description = (inputShape.account as z.ZodType).description ?? 'Google account alias';
         inputShape = { ...inputShape, account: fanoutAccountField(description) };
@@ -147,9 +154,42 @@ export class ToolRegistry {
               isAllowed({ name, service, cud }, policy)
                 ? baseHandler(...args)
                 : writeDisabledResult({ name, service, cud }, policy);
+      // A2: the ONE default-account injection site — outside the CUD gate and
+      // the fan-out parse so both observe a concrete alias; NOT meta-skipped
+      // (that is what covers google_api_call with zero bespoke code). Explicit
+      // aliases, "*" and CSV pass through untouched.
+      const withDefault = !hasAccountField
+        ? guarded
+        : (...args: unknown[]) => {
+            const first = args[0] as { account?: unknown } | undefined;
+            const value = first?.account;
+            if (value != null && value !== '') return guarded(...args);
+            // Refresh here or the unset->configured default transition never
+            // heals for a client that always omits account (this branch never
+            // reaches getClient's probe). One stat, only on omission.
+            refreshAccountSetIfStale();
+            const def = getAccountSet().defaultAccount;
+            if (!def) {
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                      error: 'E_NO_DEFAULT_ACCOUNT',
+                      message: 'No "account" given and no default account is configured.',
+                      hint: `Pass account explicitly (valid: ${getAccountSet().aliases.join(', ')}), or set GOOGLE_DEFAULT_ACCOUNT / "defaultAccount" in config.json.`,
+                      retriable: false,
+                    }),
+                  },
+                ],
+                isError: true,
+              };
+            }
+            return guarded({ ...(first ?? {}), account: def }, ...args.slice(1));
+          };
       const finalHandler = this.compactOutput
-        ? async (...args: unknown[]) => compactResult(await (guarded(...args) as Promise<Parameters<typeof compactResult>[0]>))
-        : guarded;
+        ? async (...args: unknown[]) => compactResult(await (withDefault(...args) as Promise<Parameters<typeof compactResult>[0]>))
+        : withDefault;
       const { cud: _cud, ...sdkConfig } = config;
       return (server.registerTool as (...a: unknown[]) => unknown)(name, { ...sdkConfig, inputSchema: inputShape, annotations }, finalHandler);
     }) as McpServer['registerTool'];

@@ -15,7 +15,10 @@ import * as crypto from 'crypto';
 import { pipeline } from 'node:stream/promises';
 import mime from 'mime-types';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = z.enum(ACCOUNTS).optional();
+// drive_transfer's two-account form is the sanctioned schema exception and
+// stays REQUIRED: omission must fail at the schema, not as a runtime riddle.
+const requiredAccountEnum = z.enum(ACCOUNTS);
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const FALLBACK_MAX_BYTES = 1024 * 1024 * 1024; // 1GB
@@ -1283,8 +1286,8 @@ export function registerDriveTools(server: ToolRegistry): void {
         'revision history, and permissions do not transfer. move=true trashes the source after a ' +
         'successful copy and requires deletes to be allowed by write-control.',
       inputSchema: {
-        fromAccount: accountEnum.describe('Source account alias'),
-        toAccount: accountEnum.describe('Target account alias'),
+        fromAccount: requiredAccountEnum.describe('Source account alias'),
+        toAccount: requiredAccountEnum.describe('Target account alias'),
         fileId: z.string().describe('File ID in the source account (folders are not supported)'),
         parentFolderId: z.string().optional().describe('Target folder ID (default: target My Drive root)'),
         newName: z.string().optional().describe('Rename the copy (default: keep the source name)'),
