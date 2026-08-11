@@ -6,7 +6,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
-import { buildMultipartAlternative, buildReplyHeaders, encodeAddressHeader, encodeHeaderValue, htmlToText, normalizeBodyLineEndings } from './gmail-mime.js';
+import { buildReplyHeaders, composeRaw, htmlToText } from './gmail-mime.js';
 import { sliceClean } from '../trim.js';
 import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../types.js';
 import * as path from 'path';
@@ -305,33 +305,17 @@ export function registerGmailTools(server: ToolRegistry): void {
         const gmail = gmailClient({ version: 'v1', auth });
         const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
 
-        const headers = [
-          `From: ${encodeAddressHeader(config.email)}`,
-          `To: ${encodeAddressHeader(to)}`,
-          `Subject: ${encodeHeaderValue(subject)}`,
-          'MIME-Version: 1.0',
-        ];
-
-        let bodyText: string;
-        if (htmlBody) {
-          const { contentType, body: mp } = buildMultipartAlternative(body, htmlBody);
-          headers.push(`Content-Type: ${contentType}`);
-          bodyText = mp;
-        } else {
-          headers.push('Content-Type: text/plain; charset="UTF-8"');
-          headers.push('Content-Transfer-Encoding: 8bit');
-          bodyText = normalizeBodyLineEndings(body);
-        }
-
-        if (cc) headers.push(`Cc: ${encodeAddressHeader(cc)}`);
-        if (replyToMessageId) {
-          const { inReplyTo, references } = await resolveReplyHeaders(gmail, replyToMessageId);
-          headers.push(`In-Reply-To: ${inReplyTo}`);
-          headers.push(`References: ${references}`);
-        }
-
-        const rawMessage = [...headers, '', bodyText].join('\r\n');
-        const encoded = Buffer.from(rawMessage, 'utf-8').toString('base64url');
+        const reply = replyToMessageId ? await resolveReplyHeaders(gmail, replyToMessageId) : undefined;
+        const encoded = composeRaw({
+          from: config.email,
+          to,
+          subject,
+          text: body,
+          html: htmlBody,
+          cc,
+          inReplyTo: reply?.inReplyTo,
+          references: reply?.references,
+        });
 
         const sendParams: any = {
           userId: 'me',
@@ -418,33 +402,17 @@ export function registerGmailTools(server: ToolRegistry): void {
         const gmail = gmailClient({ version: 'v1', auth });
         const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
 
-        const headers = [
-          `From: ${encodeAddressHeader(config.email)}`,
-          `To: ${encodeAddressHeader(to)}`,
-          `Subject: ${encodeHeaderValue(subject)}`,
-          'MIME-Version: 1.0',
-        ];
-
-        let bodyText: string;
-        if (htmlBody) {
-          const { contentType, body: mp } = buildMultipartAlternative(body, htmlBody);
-          headers.push(`Content-Type: ${contentType}`);
-          bodyText = mp;
-        } else {
-          headers.push('Content-Type: text/plain; charset="UTF-8"');
-          headers.push('Content-Transfer-Encoding: 8bit');
-          bodyText = normalizeBodyLineEndings(body);
-        }
-
-        if (cc) headers.push(`Cc: ${encodeAddressHeader(cc)}`);
-        if (replyToMessageId) {
-          const { inReplyTo, references } = await resolveReplyHeaders(gmail, replyToMessageId);
-          headers.push(`In-Reply-To: ${inReplyTo}`);
-          headers.push(`References: ${references}`);
-        }
-
-        const rawMessage = [...headers, '', bodyText].join('\r\n');
-        const encoded = Buffer.from(rawMessage, 'utf-8').toString('base64url');
+        const reply = replyToMessageId ? await resolveReplyHeaders(gmail, replyToMessageId) : undefined;
+        const encoded = composeRaw({
+          from: config.email,
+          to,
+          subject,
+          text: body,
+          html: htmlBody,
+          cc,
+          inReplyTo: reply?.inReplyTo,
+          references: reply?.references,
+        });
 
         const draftParams: any = {
           userId: 'me',
