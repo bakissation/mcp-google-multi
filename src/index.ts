@@ -138,6 +138,19 @@ async function main() {
     const { peekMasterKeyProvenance } = await import('./master-key.js');
     const prov = peekMasterKeyProvenance();
     console.log(`MASTER_KEY: ${prov === 'unprovisioned' ? 'unprovisioned (will be generated on first use)' : prov}`);
+    try {
+      const { resolveHttpConfig, transportIncludesHttp } = await import('./http-config.js');
+      const http = resolveHttpConfig();
+      console.log(`Transport: ${http.transport}`);
+      if (transportIncludesHttp(http.transport)) {
+        console.log(`  HTTP bind: ${http.host}:${http.port}`);
+        console.log(`  Public URL: ${http.publicUrl} (resource ${http.resourceUri})`);
+        console.log(`  Allowed hosts: ${http.allowedHosts.join(', ')}`);
+        console.log(`  Allowed origins: ${http.allowedOrigins.join(', ')}`);
+      }
+    } catch (e) {
+      console.log(`Transport: (config error) ${(e as Error).message}`);
+    }
     return;
   }
 
