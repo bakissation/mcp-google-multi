@@ -245,6 +245,36 @@ export function noteSuccessfulDecrypt(): void {
   }
 }
 
+/** B6 reset: drop the generated MASTER_KEY material (0600 file + keychain
+ * entry) so the next run re-provisions. Never removes an env-provided key (the
+ * deployer owns that; `env:true` flags it so reset can warn). The caller MUST
+ * have wiped every .enc token first — regenerating with tokens present would
+ * brick them (enforced by the reset planner). */
+export function deleteMasterKeyMaterial(deps?: { dir?: string; keychain?: (a: string) => KeychainEntry | null }): { file: boolean; keychain: boolean; env: boolean } {
+  const dir = deps?.dir ?? configDir();
+  const keychain = deps?.keychain ?? keychainFactory;
+  const env = Boolean(process.env.MASTER_KEY?.trim());
+  let file = false;
+  let kc = false;
+  try {
+    fs.unlinkSync(path.join(dir, 'master.key'));
+    file = true;
+  } catch {
+    // already absent
+  }
+  try {
+    const entry = keychain('MASTER_KEY');
+    if (entry && entry.get()) {
+      entry.del();
+      kc = true;
+    }
+  } catch {
+    // keychain unavailable
+  }
+  cachedMaster = null;
+  return { file, keychain: kc, env };
+}
+
 /** Test hook: the production cache is process-lifetime by design. */
 export function clearKeyCacheForTest(): void {
   cachedMaster = null;

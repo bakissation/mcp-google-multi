@@ -1,9 +1,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as readline from 'node:readline';
 import type { ToolRegistry } from './registry.js';
 import { getAccountSet } from './accounts.js';
 import { deriveAccountHealth, type AccountHealth } from './tools/accounts-tool.js';
-import { peekMasterKeyProvenance } from './master-key.js';
+import { peekMasterKeyProvenance, deleteMasterKeyMaterial } from './master-key.js';
 import { hasToken } from './token-store.js';
 import { configDir } from './config-file.js';
 
@@ -339,6 +340,117 @@ export function registerDiagnoseTool(registry: ToolRegistry): void {
       }
     },
   );
+}
+
+// --- B6 reset ---------------------------------------------------------------
+
+export interface ResetOptions {
+  account?: string;
+  regenerateKey: boolean;
+  yes: boolean;
+}
+export interface ResetPlan {
+  wipeAliases: string[];
+  regenerateKey: boolean;
+}
+export type ResetPlanResult =
+  | { ok: true; plan: ResetPlan; reauth: string[] }
+  | { ok: false; slug: string; message: string };
+
+/** Pure planner (unit-testable): decide which token files to wipe and whether
+ * key regeneration is safe. Refuses --regenerate-key while any account outside
+ * the wipe set still holds an encrypted token (a fresh key would brick it). */
+export function planReset(opts: ResetOptions, state: { aliases: string[]; tokenPresent: (a: string) => boolean }): ResetPlanResult {
+  if (opts.account && !state.aliases.includes(opts.account)) {
+    return { ok: false, slug: 'E_VALIDATION', message: `Unknown account "${opts.account}". Known: ${state.aliases.join(', ') || '(none)'}.` };
+  }
+  const wipeAliases = opts.account ? [opts.account] : [...state.aliases];
+  if (opts.regenerateKey) {
+    const remaining = state.aliases.filter((a) => !wipeAliases.includes(a) && state.tokenPresent(a));
+    if (remaining.length > 0) {
+      return {
+        ok: false,
+        slug: 'E_KEY_REGEN_BLOCKED',
+        message: `Refusing --regenerate-key: ${remaining.length} account(s) still hold encrypted tokens (${remaining.join(', ')}). Wipe all accounts (omit --account) or drop --regenerate-key.`,
+      };
+    }
+  }
+  const reauth = wipeAliases.filter((a) => state.tokenPresent(a));
+  return { ok: true, plan: { wipeAliases, regenerateKey: opts.regenerateKey }, reauth };
+}
+
+function parseResetOptions(argv: string[]): ResetOptions {
+  const at = argv.indexOf('--account');
+  return {
+    account: at >= 0 ? argv[at + 1] : undefined,
+    regenerateKey: argv.includes('--regenerate-key'),
+    yes: argv.includes('--yes'),
+  };
+}
+
+async function confirmTty(prompt: string): Promise<boolean> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer: string = await new Promise((resolve) => rl.question(prompt, resolve));
+    return answer.trim().toLowerCase() === 'yes';
+  } finally {
+    rl.close();
+  }
+}
+
+/** CLI entry for `mcp-google-multi reset` (flags: --account, --regenerate-key,
+ * --yes). Confirmation-gated; config.json is always kept. */
+export async function runResetCli(argv: string[]): Promise<number> {
+  const opts = parseResetOptions(argv);
+  const set = (() => { try { return getAccountSet(); } catch { return null; } })();
+  const aliases = set?.aliases ?? [];
+  const planned = planReset(opts, { aliases, tokenPresent: (a) => hasToken(a) });
+  if (!planned.ok) {
+    console.error(`${planned.slug}: ${planned.message}`);
+    return 1;
+  }
+  const { plan, reauth } = planned;
+
+  const summary = `About to wipe tokens for: ${plan.wipeAliases.join(', ') || '(no accounts)'}` +
+    (plan.regenerateKey ? ' AND regenerate the MASTER_KEY' : '') + '. config.json is kept.';
+
+  if (!opts.yes) {
+    if (!process.stdin.isTTY) {
+      console.error(`E_INPUT_REQUIRED: ${summary}\nRe-run with --yes to confirm (non-interactive).`);
+      return 1;
+    }
+    const ok = await confirmTty(`${summary}\nType 'yes' to confirm: `);
+    if (!ok) {
+      console.error('confirmation_declined: nothing was changed.');
+      return 1;
+    }
+  }
+
+  // Execute: delete each alias's encrypted token file (config.json untouched).
+  let wiped = 0;
+  for (const alias of plan.wipeAliases) {
+    const encPath = set?.configs[alias]?.encPath;
+    if (!encPath) continue;
+    try {
+      fs.unlinkSync(encPath);
+      wiped++;
+    } catch {
+      // already gone
+    }
+  }
+  console.log(`Wiped ${wiped} token file(s).`);
+
+  if (plan.regenerateKey) {
+    const res = deleteMasterKeyMaterial();
+    console.log(`MASTER_KEY material removed (file: ${res.file}, keychain: ${res.keychain}).`);
+    if (res.env) console.log('Note: MASTER_KEY is still set in the environment; unset it to let a fresh key generate.');
+  }
+
+  if (reauth.length > 0) {
+    console.log('\nNext, re-authenticate each wiped account:');
+    for (const alias of reauth) console.log(`  npx mcp-google-multi auth --account ${alias}`);
+  }
+  return 0;
 }
 
 /** CLI entry for `mcp-google-multi doctor` (flags: --json, --strict, --report). */

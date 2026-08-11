@@ -96,6 +96,12 @@ async function main() {
     return;
   }
 
+  if (process.argv.includes('reset')) {
+    const { runResetCli } = await import('./doctor.js');
+    process.exitCode = await runResetCli(process.argv);
+    return;
+  }
+
   if (process.argv.includes('config') && process.argv.includes('check')) {
     const ctx = buildIdentityContext();
     const policy = ctx.policy;
