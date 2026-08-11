@@ -6,7 +6,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
-import { buildReplyHeaders, composeRaw, htmlToText, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
+import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToText, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
 import { lookup as lookupMime } from 'mime-types';
 import { configDir } from '../config-file.js';
 import { getTokenDir } from '../accounts.js';
@@ -418,9 +418,11 @@ export function registerGmailTools(server: ToolRegistry): void {
         account: accountEnum.describe('Google account alias'),
         to: z.string().describe('Recipient(s), comma-separated'),
         subject: z.string().describe('Email subject'),
-        body: z.string().describe('Plain text body (always required; also used as fallback when htmlBody is set)'),
+        body: z.string().describe('Email body as Markdown (headings, links, lists, tables, blockquotes). Rendered to HTML for the rich part; the Markdown source is the plain-text part.'),
         htmlBody: z.string().optional()
-          .describe('Optional HTML body. When set, sends multipart/alternative so HTML-capable clients render the rich version. Use bare tags only: <p>, <a>, <br>, <strong>, <em>, <ul><li>.'),
+          .describe('REMOVED in v6: author Markdown in `body` instead; for literal HTML (e.g. inline color) pass `allowRawHtml: true`. Passing htmlBody now errors.'),
+        allowRawHtml: z.boolean().optional()
+          .describe('When true, raw HTML in `body` passes through into the HTML part instead of being escaped. Default false (HTML is shown literally).'),
         cc: z.string().optional().describe('CC recipients, comma-separated'),
         replyToMessageId: z.string().optional()
           .describe('Message ID to reply to (sets In-Reply-To and References headers)'),
@@ -429,23 +431,27 @@ export function registerGmailTools(server: ToolRegistry): void {
         attachments: coerceJson(attachmentSchema),
       },
     },
-    async ({ account, to, subject, body, htmlBody, cc, replyToMessageId, replyToThreadId, attachments }) => {
+    async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyToThreadId, attachments }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
 
+        if (htmlBody !== undefined) {
+          throw new GmailComposeError('E_HTMLBODY_REMOVED', 'htmlBody was removed in v6: author Markdown in `body`; for literal HTML pass `allowRawHtml: true`.');
+        }
         const reply = replyToMessageId ? await resolveReplyHeaders(gmail, replyToMessageId) : undefined;
+        const html = renderMarkdown(body, allowRawHtml === true);
         const files = await readAttachments(
           attachments as Array<{ path: string; filename?: string; contentType?: string }> | undefined,
-          Buffer.byteLength(body ?? '') + Buffer.byteLength(htmlBody ?? ''),
+          Buffer.byteLength(body ?? '') + Buffer.byteLength(html),
         );
         const encoded = await composeRaw({
           from: config.email,
           to,
           subject,
           text: body,
-          html: htmlBody,
+          html,
           cc,
           inReplyTo: reply?.inReplyTo,
           references: reply?.references,
@@ -523,9 +529,11 @@ export function registerGmailTools(server: ToolRegistry): void {
         account: accountEnum.describe('Google account alias'),
         to: z.string().describe('Recipient(s), comma-separated'),
         subject: z.string().describe('Email subject'),
-        body: z.string().describe('Plain text body (always required; also used as fallback when htmlBody is set)'),
+        body: z.string().describe('Email body as Markdown (headings, links, lists, tables, blockquotes). Rendered to HTML for the rich part; the Markdown source is the plain-text part.'),
         htmlBody: z.string().optional()
-          .describe('Optional HTML body. When set, drafts as multipart/alternative so HTML-capable clients render the rich version. Use bare tags only: <p>, <a>, <br>, <strong>, <em>, <ul><li>.'),
+          .describe('REMOVED in v6: author Markdown in `body` instead; for literal HTML (e.g. inline color) pass `allowRawHtml: true`. Passing htmlBody now errors.'),
+        allowRawHtml: z.boolean().optional()
+          .describe('When true, raw HTML in `body` passes through into the HTML part instead of being escaped. Default false (HTML is shown literally).'),
         cc: z.string().optional().describe('CC recipients, comma-separated'),
         replyToMessageId: z.string().optional()
           .describe('Message ID to reply to (sets In-Reply-To and References headers)'),
@@ -534,23 +542,27 @@ export function registerGmailTools(server: ToolRegistry): void {
         attachments: coerceJson(attachmentSchema),
       },
     },
-    async ({ account, to, subject, body, htmlBody, cc, replyToMessageId, replyToThreadId, attachments }) => {
+    async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyToThreadId, attachments }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
 
+        if (htmlBody !== undefined) {
+          throw new GmailComposeError('E_HTMLBODY_REMOVED', 'htmlBody was removed in v6: author Markdown in `body`; for literal HTML pass `allowRawHtml: true`.');
+        }
         const reply = replyToMessageId ? await resolveReplyHeaders(gmail, replyToMessageId) : undefined;
+        const html = renderMarkdown(body, allowRawHtml === true);
         const files = await readAttachments(
           attachments as Array<{ path: string; filename?: string; contentType?: string }> | undefined,
-          Buffer.byteLength(body ?? '') + Buffer.byteLength(htmlBody ?? ''),
+          Buffer.byteLength(body ?? '') + Buffer.byteLength(html),
         );
         const encoded = await composeRaw({
           from: config.email,
           to,
           subject,
           text: body,
-          html: htmlBody,
+          html,
           cc,
           inReplyTo: reply?.inReplyTo,
           references: reply?.references,
