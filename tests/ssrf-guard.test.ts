@@ -84,4 +84,71 @@ describe('fetchCimdDocument', () => {
   it('rejects a non-JSON body', async () => {
     await expect(fetchCimdDocument('https://claude.ai/x', { ssrf, fetchImpl: async () => okResp('<html>') })).rejects.toThrow(/not valid JSON/);
   });
+
+  const transient = () => Object.assign(new TypeError('fetch failed'), { cause: { code: 'ETIMEDOUT' } });
+
+  it('retries a transient connection error then succeeds (flaky IPv6 egress)', async () => {
+    let calls = 0;
+    const doc = await fetchCimdDocument('https://claude.ai/x', {
+      ssrf,
+      retryBackoffMs: 0,
+      sleepImpl: async () => {},
+      fetchImpl: async () => {
+        calls++;
+        if (calls < 3) throw transient();
+        return okResp(JSON.stringify({ client_id: 'https://claude.ai/x' }));
+      },
+    });
+    expect(calls).toBe(3);
+    expect(doc.client_id).toBe('https://claude.ai/x');
+  });
+
+  it('exhausts retries and rethrows the transient error', async () => {
+    let calls = 0;
+    await expect(
+      fetchCimdDocument('https://claude.ai/x', {
+        ssrf,
+        retries: 2,
+        retryBackoffMs: 0,
+        sleepImpl: async () => {},
+        fetchImpl: async () => {
+          calls++;
+          throw transient();
+        },
+      }),
+    ).rejects.toThrow(/fetch failed/);
+    expect(calls).toBe(3); // 1 + 2 retries
+  });
+
+  it('does NOT retry a deterministic HTTP error', async () => {
+    let calls = 0;
+    await expect(
+      fetchCimdDocument('https://claude.ai/x', {
+        ssrf,
+        retryBackoffMs: 0,
+        sleepImpl: async () => {},
+        fetchImpl: async () => {
+          calls++;
+          return okResp('nope', 404);
+        },
+      }),
+    ).rejects.toThrow(SsrfBlockedError);
+    expect(calls).toBe(1);
+  });
+
+  it('does NOT retry an SSRF block (private-IP rebind)', async () => {
+    let calls = 0;
+    await expect(
+      fetchCimdDocument('https://claude.ai/x', {
+        ssrf: { resolveAll: async () => ['169.254.169.254'] },
+        retryBackoffMs: 0,
+        sleepImpl: async () => {},
+        fetchImpl: async () => {
+          calls++;
+          return okResp('{}');
+        },
+      }),
+    ).rejects.toThrow(SsrfBlockedError);
+    expect(calls).toBe(0); // blocked before any fetch, and not retried
+  });
 });

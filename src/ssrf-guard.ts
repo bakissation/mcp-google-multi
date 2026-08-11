@@ -104,8 +104,43 @@ export interface CimdFetchOptions {
   maxBytes?: number;
   timeoutMs?: number;
   maxRedirects?: number;
+  /** Transient-network-error retries per hop (default 2 → up to 3 attempts). */
+  retries?: number;
+  /** Base backoff between retries in ms; grows linearly per attempt (default 200). */
+  retryBackoffMs?: number;
   fetchImpl?: typeof fetch;
+  /** Injectable sleep for tests (default real setTimeout). */
+  sleepImpl?: (ms: number) => Promise<void>;
   ssrf?: SsrfDeps;
+}
+
+// Connection-level failures that a retry can legitimately recover from. A dead
+// IPv6 route (broken egress with Happy-Eyeballs falling through), a reset, or a
+// DNS blip are transient; an SSRF block, a bad HTTP status, or malformed JSON
+// are deterministic and must NOT be retried.
+const TRANSIENT_CODES = new Set([
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'EAI_AGAIN',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'EPIPE',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_SOCKET',
+]);
+
+function isTransientFetchError(e: unknown): boolean {
+  if (e instanceof SsrfBlockedError) return false; // deterministic security/shape reject
+  const name = (e as { name?: string } | null)?.name;
+  if (name === 'AbortError' || name === 'TimeoutError') return true; // our per-attempt timeout: dead/slow peer
+  const cause = (e as { cause?: { code?: string } } | null)?.cause;
+  const code = cause?.code ?? (e as { code?: string } | null)?.code;
+  if (code && TRANSIENT_CODES.has(code)) return true;
+  // undici surfaces connection failures as TypeError('fetch failed') with the
+  // real reason in .cause; retry even when the cause carries no useful code.
+  if (e instanceof TypeError && /fetch failed/i.test(e.message)) return true;
+  return false;
 }
 
 /**
@@ -117,38 +152,58 @@ export async function fetchCimdDocument(rawUrl: string, opts: CimdFetchOptions =
   const maxBytes = opts.maxBytes ?? 64 * 1024;
   const timeoutMs = opts.timeoutMs ?? 5000;
   const maxRedirects = opts.maxRedirects ?? 3;
+  const retries = opts.retries ?? 2;
+  const backoffMs = opts.retryBackoffMs ?? 200;
   const doFetch = opts.fetchImpl ?? fetch;
+  const sleep = opts.sleepImpl ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
   let current = rawUrl;
   for (let hop = 0; hop <= maxRedirects; hop++) {
-    await assertPublicHttpsUrl(current, opts.ssrf);
-    // Timer stays armed across the WHOLE hop, including the body read (#10), so
-    // a slow-drip body can't hang past timeoutMs.
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await doFetch(current, { redirect: 'manual', signal: controller.signal, headers: { accept: 'application/json' } });
-      if (res.status >= 300 && res.status < 400) {
-        const loc = res.headers.get('location');
-        if (!loc) throw new SsrfBlockedError('redirect without a Location header');
-        current = new URL(loc, current).toString();
-        continue;
-      }
-      if (!res.ok) throw new SsrfBlockedError(`CIMD fetch failed: HTTP ${res.status}`);
-      const text = await readCapped(res, maxBytes, controller);
-      let doc: unknown;
+    let redirectTo: string | null = null;
+    let doc: Record<string, unknown> | null = null;
+    // Retry transient connection failures IN PLACE. Each attempt re-runs the
+    // resolve-then-check so a retry can never skip the anti-rebind guard, and
+    // the timer is per-attempt (armed across the body read, #10).
+    for (let attempt = 0; ; attempt++) {
+      await assertPublicHttpsUrl(current, opts.ssrf);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        doc = JSON.parse(text);
-      } catch {
-        throw new SsrfBlockedError('CIMD document is not valid JSON');
+        const res = await doFetch(current, { redirect: 'manual', signal: controller.signal, headers: { accept: 'application/json' } });
+        if (res.status >= 300 && res.status < 400) {
+          const loc = res.headers.get('location');
+          if (!loc) throw new SsrfBlockedError('redirect without a Location header');
+          redirectTo = loc;
+          break;
+        }
+        if (!res.ok) throw new SsrfBlockedError(`CIMD fetch failed: HTTP ${res.status}`);
+        const text = await readCapped(res, maxBytes, controller);
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          throw new SsrfBlockedError('CIMD document is not valid JSON');
+        }
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          throw new SsrfBlockedError('CIMD document is not a JSON object');
+        }
+        doc = parsed as Record<string, unknown>;
+        break;
+      } catch (e) {
+        if (attempt < retries && isTransientFetchError(e)) {
+          await sleep(backoffMs * (attempt + 1));
+          continue;
+        }
+        throw e;
+      } finally {
+        clearTimeout(timer);
       }
-      if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) {
-        throw new SsrfBlockedError('CIMD document is not a JSON object');
-      }
-      return doc as Record<string, unknown>;
-    } finally {
-      clearTimeout(timer);
     }
+    if (redirectTo !== null) {
+      current = new URL(redirectTo, current).toString();
+      continue;
+    }
+    return doc as Record<string, unknown>;
   }
   throw new SsrfBlockedError(`too many redirects (> ${maxRedirects})`);
 }
