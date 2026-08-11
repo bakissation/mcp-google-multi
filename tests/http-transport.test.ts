@@ -4,28 +4,15 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { resolveHttpConfig } from '../src/http-config.js';
 import {
   HttpTransportHost,
-  isLoopbackAddress,
-  isLoopbackHost,
-  remoteHttpRefusal,
   parseOwnerEmails,
   originAllowed,
   hostAllowed,
-  loopbackOwnerAuthenticator,
   type Authenticator,
 } from '../src/http-transport.js';
 
 // ---- pure helpers -----------------------------------------------------------
 
 describe('http-transport pure helpers', () => {
-  it('isLoopbackAddress', () => {
-    for (const a of ['127.0.0.1', '::1', '::ffff:127.0.0.1', '127.0.0.5', 'localhost']) {
-      expect(isLoopbackAddress(a)).toBe(true);
-    }
-    for (const a of ['10.0.0.1', '203.0.113.4', '', undefined, null]) {
-      expect(isLoopbackAddress(a)).toBe(false);
-    }
-  });
-
   it('parseOwnerEmails: CSV, trims, lowercases, drops blanks', () => {
     expect(parseOwnerEmails({ MCP_OWNER_EMAILS: ' Me@Ex.com , you@ex.com , ' })).toEqual(['me@ex.com', 'you@ex.com']);
     expect(parseOwnerEmails({})).toEqual([]);
@@ -47,25 +34,6 @@ describe('http-transport pure helpers', () => {
     expect(hostAllowed('anything', [])).toBe(true); // no allowlist configured
   });
 
-  it('isLoopbackHost: loopback literals only; 0.0.0.0 / :: / public are NOT', () => {
-    for (const h of ['127.0.0.1', 'localhost', '::1', '127.5.5.5', '[::1]']) expect(isLoopbackHost(h)).toBe(true);
-    for (const h of ['0.0.0.0', '::', 'mcp.example.com', '10.0.0.1']) expect(isLoopbackHost(h)).toBe(false);
-  });
-
-  it('remoteHttpRefusal: null for loopback, error for any exposed shape', () => {
-    expect(remoteHttpRefusal({ host: '127.0.0.1', publicUrl: 'http://127.0.0.1:4243' })).toBeNull();
-    expect(remoteHttpRefusal({ host: '0.0.0.0', publicUrl: 'http://127.0.0.1:4243' })).toContain('E_HTTP_REMOTE_UNSUPPORTED');
-    expect(remoteHttpRefusal({ host: '127.0.0.1', publicUrl: 'https://mcp.example.com' })).toContain('E_HTTP_REMOTE_UNSUPPORTED');
-  });
-
-  it('loopbackOwnerAuthenticator: loopback ok, remote 401 with WWW-Authenticate', () => {
-    const auth = loopbackOwnerAuthenticator('https://mcp.example.com');
-    expect(auth({ socket: { remoteAddress: '127.0.0.1' } } as never)).toEqual({ ok: true });
-    const remote = auth({ socket: { remoteAddress: '203.0.113.5' } } as never) as { ok: false; status: number; headers: Record<string, string> };
-    expect(remote.ok).toBe(false);
-    expect(remote.status).toBe(401);
-    expect(remote.headers['WWW-Authenticate']).toContain('oauth-protected-resource');
-  });
 });
 
 // ---- integration: real McpServer over the host (BV-3) ------------------------
@@ -84,12 +52,23 @@ function makeServer(): McpServer {
     await new Promise((r) => setTimeout(r, 300));
     return { content: [{ type: 'text' as const, text: 'done' }] };
   });
+  s.registerTool('hang', { description: 'never settles within a test', inputSchema: {} }, async () => {
+    // unref so the pending timer can't keep the process alive after the test.
+    await new Promise((r) => {
+      const t = setTimeout(r, 5000);
+      t.unref?.();
+    });
+    return { content: [{ type: 'text' as const, text: 'unreachable' }] };
+  });
   return s;
 }
 
-async function startHost(authenticate: Authenticator = () => ({ ok: true })): Promise<number> {
+async function startHost(
+  authenticate: Authenticator = () => ({ ok: true }),
+  extra: { dispatchTimeoutMs?: number } = {},
+): Promise<number> {
   const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
-  const host = new HttpTransportHost({ server: makeServer(), config, version: '9.9.9', ownerConfigured: true, authenticate });
+  const host = new HttpTransportHost({ server: makeServer(), config, version: '9.9.9', ownerConfigured: true, authenticate, ...extra });
   await host.start();
   hosts.push(host);
   return host.address()!.port;
@@ -242,6 +221,25 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
     const after = await request(port, 'POST', '/mcp', {
       headers: { accept: MCP_ACCEPT },
       body: { jsonrpc: '2.0', id: 6, method: 'tools/list', params: {} },
+    });
+    expect(after.status).toBe(200);
+    expect(JSON.parse(after.text).result.tools).toBeDefined();
+  });
+
+  it('releases the lock when a handler exceeds the dispatch deadline (504, not wedged)', async () => {
+    const port = await startHost(() => ({ ok: true }), { dispatchTimeoutMs: 80 });
+    await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: initBody });
+    // A handler that hangs while the client keeps the connection open — this is
+    // the case the res-'close' race does NOT cover.
+    const hung = await request(port, 'POST', '/mcp', {
+      headers: { accept: MCP_ACCEPT },
+      body: { jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'hang', arguments: {} } },
+    });
+    expect(hung.status).toBe(504);
+    // The global lock must have released — a subsequent request returns promptly.
+    const after = await request(port, 'POST', '/mcp', {
+      headers: { accept: MCP_ACCEPT },
+      body: { jsonrpc: '2.0', id: 8, method: 'tools/list', params: {} },
     });
     expect(after.status).toBe(200);
     expect(JSON.parse(after.text).result.tools).toBeDefined();

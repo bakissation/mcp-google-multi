@@ -1,4 +1,5 @@
 import type { Account } from '../accounts.js';
+import { reauthHint } from '../reauth-hint.js';
 
 export interface ErrorEnvelope {
   error: string;
@@ -66,7 +67,7 @@ export function mapGoogleError(
       hint:
         `Refresh token for "${account}" is dead (often the 7-day Testing-mode trap). ` +
         'Set Publishing status to In production at https://console.cloud.google.com/auth/audience, ' +
-        `then re-auth: npx mcp-google-multi auth --account ${account}`,
+        `then ${reauthHint(account)}`,
       retriable: false,
       account,
     };
@@ -75,7 +76,7 @@ export function mapGoogleError(
     return {
       error: 'auth_required',
       message: `Authentication failed for account "${account}".`,
-      hint: `Run: npx mcp-google-multi auth --account ${account}`,
+      hint: reauthHint(account),
       retriable: false,
       account,
     };

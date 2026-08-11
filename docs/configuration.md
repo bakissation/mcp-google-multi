@@ -101,10 +101,12 @@ By default the server speaks **stdio** (`MCP_TRANSPORT=stdio`), the zero-network
 | `MCP_HTTP_HOST` | `127.0.0.1` | bind address (loopback) |
 | `MCP_HTTP_PORT` | `4243` | bind port |
 | `MCP_PUBLIC_URL` | `http://<host>:<port>` | the canonical public base URL; `${MCP_PUBLIC_URL}/mcp` is the endpoint clients connect to |
-| `MCP_OWNER_EMAILS` | — | required for `http`: the Google email(s) allowed to authenticate |
+| `MCP_OWNER_EMAILS` | *(required for http)* | CSV of Google emails allowed to authenticate; the server refuses to start HTTP without it |
 | `MCP_ALLOWED_ORIGINS` | — | extra Origins to allow beyond `MCP_PUBLIC_URL` and `https://claude.ai` |
+| `MCP_CIMD_ALLOWED_ISSUERS` | `claude.ai` | CSV host allowlist for OAuth client-metadata documents |
+| `MCP_ACCESS_TTL` | `600` | MCP access-token lifetime (seconds) |
 
-> **HTTP is currently loopback-only.** Until the built-in OAuth authorization server ships, the server refuses to start any exposed HTTP shape (a non-loopback bind, or a non-loopback `MCP_PUBLIC_URL` — i.e. a tunnel/reverse proxy in front). Loopback callers are trusted as the owner, the same trust model as stdio, so do not run HTTP mode on a shared host. Register the local URL with your client using `mcp-google-multi write-client-config --url http://127.0.0.1:4243/mcp`.
+Over HTTP the server is its own **OAuth 2.1 authorization server**: Claude Code and the claude.ai connector authenticate with zero custom UI. A client that connects to `${MCP_PUBLIC_URL}/mcp` is sent through Google login; only an email in `MCP_OWNER_EMAILS` is admitted (the owner gate), and the server then mints its own audience-bound token for the client — your Google tokens are never handed to the client, and the client's token is never sent to Google. Behind a Cloudflare named tunnel, keep the bind on loopback and set `MCP_PUBLIC_URL` to the public HTTPS host; add `${MCP_PUBLIC_URL}/callback` as an authorized redirect URI in your Google Cloud console. Register the URL with a local client via `mcp-google-multi write-client-config --url ${MCP_PUBLIC_URL}/mcp`.
 
 ### Docker
 

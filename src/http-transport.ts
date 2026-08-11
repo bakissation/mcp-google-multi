@@ -31,44 +31,15 @@ export interface HttpHostOptions {
   log?: (line: string) => void;
   /** Max /mcp JSON body bytes (DoS guard). */
   maxBodyBytes?: number;
+  /** Deadline for a single /mcp dispatch; a hung handler past this releases the
+   * shared lock instead of wedging the transport (default 120s). */
+  dispatchTimeoutMs?: number;
 }
 
-const LOOPBACK_LITERALS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', 'localhost']);
-
-export function isLoopbackAddress(addr: string | undefined | null): boolean {
-  if (!addr) return false;
-  return LOOPBACK_LITERALS.has(addr) || addr.startsWith('127.') || addr.startsWith('::ffff:127.');
-}
-
-/** True for a loopback bind/host literal. `0.0.0.0` / `::` (all interfaces) are
- * deliberately NOT loopback — exposing them needs real auth (B13). */
-export function isLoopbackHost(host: string): boolean {
-  const h = host.replace(/^\[/, '').replace(/\]$/, '').toLowerCase();
-  return h === 'localhost' || h === '::1' || h === '::ffff:127.0.0.1' || /^127\./.test(h);
-}
-
-/**
- * B12 has no real MCP-client authentication yet (that is B13's OAuth AS), so it
- * may only serve a purely-LOCAL loopback deployment where the trust model is the
- * same as stdio: local processes on this machine are the owner. Any exposed
- * shape — a non-loopback bind, or a non-loopback public URL (i.e. a tunnel /
- * reverse proxy in front) — would let forwarded internet traffic arrive from
- * 127.0.0.1 and be trusted as the owner, so it is refused until the AS lands.
- * Returns an actionable error string, or null if the deployment is local-safe.
- */
-export function remoteHttpRefusal(config: { host: string; publicUrl: string }): string | null {
-  let publicHost: string;
-  try {
-    publicHost = new URL(config.publicUrl).hostname;
-  } catch {
-    publicHost = config.publicUrl;
-  }
-  if (isLoopbackHost(config.host) && isLoopbackHost(publicHost)) return null;
-  return (
-    `E_HTTP_REMOTE_UNSUPPORTED: exposed HTTP (bind "${config.host}", public "${config.publicUrl}") is refused because this build has no MCP-client authentication yet — that is the OAuth authorization server (a later slice). ` +
-    'Serve loopback-only (MCP_HTTP_HOST=127.0.0.1 with a loopback MCP_PUBLIC_URL) and do NOT place a tunnel/reverse proxy in front until the AS is enabled.'
-  );
-}
+// A hung handler that keeps the connection open would otherwise hold the global
+// serialize() lock forever. Generous by default so slow-but-valid calls (large
+// Drive exports, fan-out) still finish; the point is only to guarantee release.
+const DISPATCH_TIMEOUT_DEFAULT = 120_000;
 
 export function parseOwnerEmails(env: NodeJS.ProcessEnv = process.env): string[] {
   return (env.MCP_OWNER_EMAILS ?? '')
@@ -94,34 +65,6 @@ export function hostAllowed(host: string | undefined, allowed: string[]): boolea
   return allowed.includes(host) || allowed.includes(bare);
 }
 
-/**
- * B12 default authenticator (no OAuth AS yet): trust loopback callers as the
- * owner — the DM1/DM2 local model where the local process IS the owner — and
- * reject remote callers with a 401 pointing at the not-yet-enabled AS. B13
- * replaces this with HS256 Bearer verification for the remote (tunnel) path.
- *
- * This is only ever wired for a loopback-only deployment (remoteHttpRefusal
- * guards the bootstrap), so every caller is local. Like stdio, loopback binding
- * does NOT isolate between local users: any process on this host that can reach
- * 127.0.0.1:PORT is treated as the owner. That is the accepted single-user
- * trust model; a shared host should not run this in HTTP mode.
- */
-export function loopbackOwnerAuthenticator(base: string): Authenticator {
-  return (req) => {
-    if (isLoopbackAddress(req.socket.remoteAddress)) return { ok: true };
-    return {
-      ok: false,
-      status: 401,
-      headers: {
-        'WWW-Authenticate': `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource", scope="mcp:use"`,
-      },
-      body: JSON.stringify({
-        error: 'unauthorized',
-        message: 'Remote access requires the OAuth authorization server, which is not enabled in this build.',
-      }),
-    };
-  };
-}
 
 export class HttpTransportHost {
   private httpServer?: Server;
@@ -259,17 +202,46 @@ export class HttpTransportHost {
     });
     // The shared McpServer holds exactly one connected transport at a time, so
     // connect + dispatch + DISCONNECT all run inside the mutex: the next request
-    // can never hit "Already connected", and a client disconnect can't wedge the
-    // lock — dispatch is raced against res 'close' so it always settles, and the
-    // transport is closed in a finally (which resets server._transport) before
-    // the lock releases. (A shared initialized-state persists across stateless
-    // requests; benign for the single-owner design.)
+    // can never hit "Already connected". The serialized section is guaranteed to
+    // settle three ways — the handler finishes, the client disconnects (res
+    // 'close'), or a dispatch deadline fires — so neither a client that holds the
+    // connection open nor a hung upstream can wedge the lock. The transport is
+    // closed in a finally (which resets server._transport) before the lock
+    // releases. (A shared initialized-state persists across stateless requests;
+    // benign for the single-owner design.)
+    const deadlineMs = this.opts.dispatchTimeoutMs ?? DISPATCH_TIMEOUT_DEFAULT;
     await this.serialize(async () => {
-      const disconnected = new Promise<void>((resolve) => res.once('close', resolve));
+      const disconnected = new Promise<'closed'>((resolve) => res.once('close', () => resolve('closed')));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timedOut = new Promise<'timeout'>((resolve) => {
+        timer = setTimeout(() => resolve('timeout'), deadlineMs);
+        timer.unref?.();
+      });
       await this.opts.server.connect(transport);
+      // Reflect the dispatch into a non-rejecting arm: if the deadline wins the
+      // race, an orphaned handler settling later must not surface as an unhandled
+      // rejection — but a genuine dispatch error still propagates (rethrown below).
+      let dispatchErr: unknown;
+      const dispatchArm = transport
+        .handleRequest(req, res, body)
+        .then(() => 'done' as const, (e) => {
+          dispatchErr = e;
+          return 'error' as const;
+        });
       try {
-        await Promise.race([transport.handleRequest(req, res, body), disconnected]);
+        const outcome = await Promise.race([dispatchArm, disconnected, timedOut]);
+        if (outcome === 'error') throw dispatchErr;
+        if (outcome === 'timeout') {
+          this.log('504 dispatch_timeout path=/mcp');
+          if (!res.headersSent) {
+            res.writeHead(504, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'dispatch_timeout', message: 'the handler exceeded the dispatch deadline' }));
+          } else {
+            res.destroy();
+          }
+        }
       } finally {
+        if (timer) clearTimeout(timer);
         await transport.close().catch(() => undefined);
       }
     });

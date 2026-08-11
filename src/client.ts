@@ -2,6 +2,7 @@ import { OAuth2Client } from 'googleapis-common';
 import { getAccountSet, refreshAccountSetIfStale } from './accounts.js';
 import type { Account } from './accounts.js';
 import { readToken, updateToken } from './token-store.js';
+import { reauthHint } from './reauth-hint.js';
 
 export async function getClient(account: Account) {
   // BR-7: lazy cross-process reload — one stat per dispatch, no watcher;
@@ -29,10 +30,7 @@ export async function getClient(account: Account) {
 
   const tokenData = readToken(account);
   if (!tokenData) {
-    throw new Error(
-      `No token found for account "${account}" (${config.email}). ` +
-        `Run: npx mcp-google-multi auth --account ${account}`,
-    );
+    throw new Error(`No token found for account "${account}" (${config.email}). ${reauthHint(account)}`);
   }
 
   oauth2Client.setCredentials(tokenData);

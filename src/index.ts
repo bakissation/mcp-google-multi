@@ -199,18 +199,9 @@ async function main() {
   }
 
   if (wantHttp) {
-    const { HttpTransportHost, loopbackOwnerAuthenticator, parseOwnerEmails, remoteHttpRefusal } = await import(
-      './http-transport.js'
-    );
-    // Until the OAuth AS (B13) lands there is no MCP-client authentication, so
-    // refuse any exposed/tunnelled HTTP shape and serve loopback-only.
-    const refusal = remoteHttpRefusal(httpCfg);
-    if (refusal) {
-      process.stderr.write(`${refusal}\n`);
-      process.exit(1);
-    }
-    // BR3: the owner allowlist is the entire multi-tenant collapse; refuse to
-    // open an ungated HTTP endpoint.
+    const { HttpTransportHost, parseOwnerEmails } = await import('./http-transport.js');
+    // BR3 / C13: the owner allowlist is the entire multi-tenant collapse; refuse
+    // to open an ungated HTTP endpoint.
     const owners = parseOwnerEmails(process.env);
     if (owners.length === 0) {
       process.stderr.write(
@@ -227,12 +218,80 @@ async function main() {
     const registry = buildRegistry(httpServer, buildIdentityContext(process.env, { transport: 'http' }), 'curated');
     registry.installListHandler();
     registerSetupPrompt(httpServer);
+
+    // B13: mount the OAuth 2.1 AS (legs A + B) + the Bearer authenticator.
+    const { buildAuthServer } = await import('./oauth-as.js');
+    const { jwtSecretFrom } = await import('./mcp-token.js');
+    const { resolveJwtKey, resolveMasterKeyForDispatch } = await import('./master-key.js');
+    const { OAuth2Client } = await import('googleapis-common');
+    const { writeToken } = await import('./token-store.js');
+    const { resolveScopesForAccount } = await import('./auth.js');
+    const { configDir } = await import('./config-file.js');
+    const { getAccountSet } = await import('./accounts.js');
+    const googleClient = () =>
+      new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, `${httpCfg.publicUrl}/callback`);
+    // Only trust the id_token email when Google marks it verified (#8).
+    const verifiedEmailFromIdToken = (idToken?: string): string | undefined => {
+      if (!idToken) return undefined;
+      try {
+        const [, payload] = idToken.split('.');
+        const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8')) as { email?: string; email_verified?: boolean | string };
+        const verified = claims.email_verified === true || claims.email_verified === 'true';
+        return verified ? claims.email : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    const authServer = buildAuthServer(
+      {
+        base: httpCfg.publicUrl,
+        resourceUri: httpCfg.resourceUri,
+        secret: jwtSecretFrom(resolveJwtKey().key),
+        ownerEmails: owners,
+        cimdIssuers: (process.env.MCP_CIMD_ALLOWED_ISSUERS ?? 'claude.ai').split(',').map((s) => s.trim()).filter(Boolean),
+        accessTtlSec: Number(process.env.MCP_ACCESS_TTL) || undefined,
+        masterKey: resolveMasterKeyForDispatch().key,
+        refreshStorePath: path.join(configDir(), 'mcp-tokens.enc'),
+      },
+      {
+        buildGoogleAuthUrl: ({ flow, alias, state }) => {
+          if (flow === 'alias_reauth' && alias) {
+            const cfg = getAccountSet().configs[alias];
+            // openid+email so /callback can bind the returned identity to the alias.
+            return googleClient().generateAuthUrl({
+              access_type: 'offline',
+              prompt: 'consent',
+              scope: [...new Set([...resolveScopesForAccount(alias), 'openid', 'email'])],
+              login_hint: cfg?.email,
+              state,
+            });
+          }
+          return googleClient().generateAuthUrl({ scope: ['openid', 'email'], prompt: 'select_account', state });
+        },
+        exchangeCode: async (code, flow) => {
+          const { tokens } = await googleClient().getToken(code);
+          const email = verifiedEmailFromIdToken(tokens.id_token ?? undefined);
+          // owner_gate discards Google tokens (identity proof only); alias_reauth
+          // keeps them but still needs the email for the identity binding.
+          return { tokens: flow === 'owner_gate' ? {} : (tokens as Record<string, unknown>), email };
+        },
+        writeToken: (alias, tokens) => writeToken(alias, tokens),
+        aliasEmail: (alias) => getAccountSet().configs[alias]?.email,
+        log: (l) => process.stderr.write(`[as] ${l}\n`),
+      },
+    );
+    // BV-1: over HTTP, a dead/missing per-account token surfaces a clickable
+    // re-auth link into the AS's alias_reauth flow instead of a stdio CLI hint.
+    const { setHttpReauthBase } = await import('./reauth-hint.js');
+    setHttpReauthBase(httpCfg.publicUrl);
+
     const host = new HttpTransportHost({
       server: httpServer,
       config: httpCfg,
       version: pkg.version,
       ownerConfigured: owners.length > 0,
-      authenticate: loopbackOwnerAuthenticator(httpCfg.publicUrl),
+      authenticate: authServer.authenticate,
+      routes: authServer.routes,
       log: (l) => process.stderr.write(`[http] ${l}\n`),
     });
     await host.start();
