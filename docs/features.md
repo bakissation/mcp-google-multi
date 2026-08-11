@@ -40,6 +40,7 @@ Tool responses are serialized compactly (no pretty-print token tax; set `GOOGLE_
 
 - `drive_read` returns up to `maxChars` characters (default 100k) with `truncated`/`totalChars`/`offset` for paging — this also bounds Google Doc exports, which can reach 10MB. (Non-Google-native files over 2MB are still rejected with `too_large`, not paged.)
 - `gmail_read` / `gmail_read_thread` cap each message body at 50k chars (`bodyTruncated` + `bodyTotalChars` flags); pass `full: true` for the whole body.
+- `gmail_read_batch` reads up to 100 message ids in one call (collapsing the search→read triage loop): one ordered entry per id (`{ id, ...message }` or `{ id, error }`) plus a trailing `{ counts: { ok, failed }, truncated? }` summary. A single failed id does not fail the batch (auth/scope failures do); per-message bodies are capped at 50k (unless `full: true`) and the aggregate output is bounded so a large batch never blows the context window.
 - `calendar_list_events` / `calendar_list_instances` trim descriptions to ~300 chars and drop empty/audit fields in list view; `calendar_get_event` always returns the full event.
 
 

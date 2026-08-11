@@ -5,7 +5,7 @@ import { gmail as gmailClient } from '@googleapis/gmail';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import { handleGoogleApiError } from './_errors.js';
+import { handleGoogleApiError, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
 import addressparser from 'nodemailer/lib/addressparser/index.js';
 import { lookup as lookupMime } from 'mime-types';
@@ -213,6 +213,11 @@ export async function resolveReply(
 }
 
 const BODY_CAP_CHARS = 50_000;
+// gmail_read_batch aggregate ceiling: a batch of up to 100 messages must never
+// blow the context window, so the summed serialized output is bounded here
+// (matches the tool's anthropic/maxResultSizeChars hint). Per-message bodies are
+// still individually capped at BODY_CAP_CHARS first.
+const BATCH_MAX_RESULT_CHARS = 100_000;
 // Gmail's messages.send raw/JSON path rejects messages near ~25 MB (the wire
 // message is base64-encoded, ~+33% over the raw bytes), so cap the ESTIMATED
 // ENCODED total there rather than the spec's nominal 35 MB raw (spike/live
@@ -371,6 +376,102 @@ export function parseMessage(
   };
 }
 
+/**
+ * A9 gmail_read_batch core: fetch N ids with bounded parallelism, parse each,
+ * and bound the aggregate output. Order is preserved by input index. A per-id
+ * failure becomes a `{ id, error }` entry; an account-wide auth/scope failure
+ * is rethrown so the caller maps it to a whole-call isError. Returns the
+ * ordered per-id entries followed by a trailing counts summary.
+ */
+export async function readBatch(
+  gmail: any,
+  account: Account,
+  ids: string[],
+  full: boolean,
+  rawHtml: boolean,
+): Promise<any[]> {
+  if (ids.length === 0) {
+    throw new GmailComposeError('validation_error', '`ids` must be a non-empty array of 1..100 message IDs.');
+  }
+  if (ids.length > 100) {
+    throw new GmailComposeError('validation_error', `\`ids\` accepts at most 100 message IDs per call (got ${ids.length}).`);
+  }
+
+  const cap = full ? undefined : BODY_CAP_CHARS;
+  const CHUNK_SIZE = 10;
+  const entries: any[] = new Array(ids.length);
+  let ok = 0;
+  let failed = 0;
+
+  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+    const slice = ids.slice(i, i + CHUNK_SIZE);
+    const settled = await Promise.all(slice.map(async (id, j) => {
+      try {
+        const res = await gmail.users.messages.get({ userId: 'me', id, format: 'full' });
+        return { idx: i + j, id, ok: true as const, data: res.data };
+      } catch (err: any) {
+        return { idx: i + j, id, ok: false as const, err };
+      }
+    }));
+    for (const s of settled) {
+      if (s.ok) {
+        entries[s.idx] = parseMessage(s.data, cap, { rawHtml });
+        ok++;
+      } else {
+        const env = mapGoogleError(s.err, account);
+        // Auth/scope problems are account-wide, not id-specific: fail the whole
+        // batch rather than emit N identical per-item errors.
+        if (env.error === 'auth_required' || env.error === 'insufficient_scope' || env.error === 'invalid_scope') {
+          throw s.err;
+        }
+        const { account: _dropped, ...itemError } = env;
+        entries[s.idx] = { id: s.id, error: itemError };
+        failed++;
+      }
+    }
+  }
+
+  // Aggregate guard: walk in order, accumulating serialized size. Once the
+  // running total would exceed the maxResultSizeChars budget, cap this and every
+  // later success body so a big batch never blows the context window.
+  let running = 0;
+  let truncatedAny = false;
+  let exhausted = false;
+  for (const e of entries) {
+    if (!e || e.error) {
+      running += JSON.stringify(e ?? {}).length;
+      continue;
+    }
+    const body: string = e.body ?? '';
+    if (exhausted) {
+      if (body.length > 0) {
+        if (!e.bodyTruncated) e.bodyTotalChars = body.length;
+        e.body = '';
+        e.bodyTruncated = true;
+        truncatedAny = true;
+      }
+      running += JSON.stringify(e).length;
+      continue;
+    }
+    const serialized = JSON.stringify(e).length;
+    if (running + serialized > BATCH_MAX_RESULT_CHARS) {
+      const envelope = serialized - body.length; // non-body overhead of this entry
+      const remaining = Math.max(0, BATCH_MAX_RESULT_CHARS - running - envelope);
+      if (!e.bodyTruncated) e.bodyTotalChars = body.length;
+      e.body = sliceClean(body, Math.min(body.length, remaining));
+      e.bodyTruncated = true;
+      truncatedAny = true;
+      exhausted = true;
+      running += JSON.stringify(e).length;
+    } else {
+      running += serialized;
+    }
+  }
+
+  const summary = { counts: { ok, failed }, ...(truncatedAny ? { truncated: true } : {}) };
+  return [...entries, summary];
+}
+
 export function registerGmailTools(server: ToolRegistry): void {
   server.registerTool(
     'gmail_search',
@@ -516,6 +617,34 @@ export function registerGmailTools(server: ToolRegistry): void {
         const messages = (res.data.messages ?? []).map((m) => parseMessage(m, full ? undefined : BODY_CAP_CHARS, { rawHtml }));
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(messages, null, 2) }],
+        };
+      } catch (error: any) {
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
+      }
+    },
+  );
+  server.registerTool(
+    'gmail_read_batch',
+    {
+      _meta: { 'anthropic/maxResultSizeChars': BATCH_MAX_RESULT_CHARS },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+      description: 'Read many Gmail messages by ID in one call, collapsing the search→read triage loop. Bodies are capped at 50k chars each (unless full=true) and the aggregate output is bounded. Returns one ordered entry per id plus a trailing counts summary; a single failed id does NOT fail the batch.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        ids: coerceArray(z.string()).describe('Gmail message IDs to read (1..100). Comma-separated string or JSON array.'),
+        full: coerceBoolean.optional().describe('Return entire bodies without the per-message 50k character cap'),
+        rawHtml: coerceBoolean.optional()
+          .describe('Return HTML bodies unconverted instead of the plain-text rendering (HTML-only messages)'),
+      },
+    },
+    async ({ account, ids, full, rawHtml }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const gmail = gmailClient({ version: 'v1', auth });
+        const result = await readBatch(gmail, account as Account, (ids as string[]) ?? [], full === true, rawHtml === true);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         };
       } catch (error: any) {
         const mapped = composeErrorResult(error, account as Account);
