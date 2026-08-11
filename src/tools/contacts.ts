@@ -4,6 +4,7 @@ import { people as peopleClient } from '@googleapis/people';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
+import { coerceBoolean } from './_coerce.js';
 import { handleGoogleApiError } from './_errors.js';
 
 const accountEnum = z.enum(ACCOUNTS).optional();
@@ -35,6 +36,111 @@ function formatContact(person: any) {
     })),
     photo: person.photos?.[0]?.url ?? '',
   };
+}
+
+// --- A10 contacts_resolve: name -> one canonical email ---------------------
+
+export interface ResolveCandidate {
+  resourceName: string;
+  displayName: string;
+  source: 'contacts' | 'otherContacts';
+  emails: { value: string; type?: string; primary?: boolean }[];
+  hasOrg: boolean;
+}
+
+/** Accent-fold + lowercase for name comparison ("Rym" == "Rÿm"). */
+const foldName = (s: string): string =>
+  s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+
+/** Canonical-address preference within one contact: explicit primary, then
+ * People type order work > home > other. */
+function emailRank(e: { type?: string; primary?: boolean }): number {
+  if (e.primary) return 3;
+  const t = (e.type ?? '').toLowerCase();
+  if (t === 'work') return 2;
+  if (t === 'home') return 1;
+  return 0;
+}
+
+function pickEmail(c: ResolveCandidate): { value: string; type?: string; primary?: boolean } {
+  return [...c.emails].sort((a, b) => emailRank(b) - emailRank(a))[0];
+}
+
+/** Deterministic rank tuple; higher wins, compared lexicographically so the
+ * first discriminating rule decides (A10 tie-break table). */
+function scoreTuple(c: ResolveCandidate, foldedQuery: string): number[] {
+  const exact = foldName(c.displayName) === foldedQuery ? 1 : 0;   // 1. exact over prefix
+  const saved = c.source === 'contacts' ? 1 : 0;                    // 2. saved over other-contact
+  const bestEmail = c.emails.length ? Math.max(...c.emails.map(emailRank)) : 0; // 3. canonical address
+  const complete = c.hasOrg ? 1 : 0;                               // 4. fuller record
+  return [exact, saved, bestEmail, complete];
+}
+
+function cmpTuple(a: number[], b: number[]): number {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return b[i] - a[i];
+  }
+  return 0;
+}
+
+const projectCandidate = (c: ResolveCandidate) => ({
+  name: c.displayName,
+  email: pickEmail(c).value,
+  resourceName: c.resourceName,
+  source: c.source,
+});
+
+/** Rank candidates and return one confident match, an explicit ambiguous list,
+ * or null. Candidates without any email are dropped first. Pure (no I/O) so the
+ * tie-break is unit-testable. */
+export function resolveContacts(candidates: ResolveCandidate[], name: string, maxCandidates: number) {
+  const withEmail = candidates.filter((c) => c.emails.some((e) => e.value));
+  if (withEmail.length === 0) return { query: name, resolved: null };
+
+  const folded = foldName(name);
+  const ranked = withEmail
+    .map((c) => ({ c, t: scoreTuple(c, folded) }))
+    .sort((a, b) => cmpTuple(a.t, b.t));
+
+  const top = ranked[0];
+  const tiedTop = ranked.filter((r) => cmpTuple(r.t, top.t) === 0);
+  if (tiedTop.length === 1) {
+    return { query: name, resolved: projectCandidate(top.c) };
+  }
+  return {
+    query: name,
+    ambiguous: true as const,
+    candidates: tiedTop.slice(0, maxCandidates).map((r) => projectCandidate(r.c)),
+  };
+}
+
+/** People person -> ResolveCandidate projection. */
+function toCandidate(person: any, source: 'contacts' | 'otherContacts'): ResolveCandidate {
+  return {
+    resourceName: person?.resourceName ?? '',
+    displayName: person?.names?.[0]?.displayName ?? '',
+    source,
+    emails: (person?.emailAddresses ?? []).map((e: any) => ({
+      value: e.value ?? '',
+      type: e.type ?? '',
+      primary: e.metadata?.primary === true,
+    })),
+    hasOrg: (person?.organizations?.length ?? 0) > 0,
+  };
+}
+
+/** Merge saved + other contacts, deduped by resourceName (a saved match wins
+ * over the same person surfaced as an other-contact). */
+function dedupeCandidates(list: ResolveCandidate[]): ResolveCandidate[] {
+  const byResource = new Map<string, ResolveCandidate>();
+  for (const c of list) {
+    const key = c.resourceName || `${c.source}:${c.displayName}:${c.emails[0]?.value ?? ''}`;
+    const existing = byResource.get(key);
+    if (!existing || (existing.source === 'otherContacts' && c.source === 'contacts')) {
+      byResource.set(key, c);
+    }
+  }
+  return [...byResource.values()];
 }
 
 export function registerContactsTools(server: ToolRegistry): void {
@@ -69,6 +175,57 @@ export function registerContactsTools(server: ToolRegistry): void {
         const contacts = (res.data.results ?? []).map((r: any) => formatContact(r.person));
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(contacts, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleContactsError(error, account as Account);
+      }
+    },
+  );
+
+  server.registerTool(
+    'contacts_resolve',
+    {
+      annotations: { openWorldHint: true },
+      description: 'Resolve a free-text name/alias to ONE canonical email address (ranked + tie-broken), so you need not hand-expand transliteration OR-queries. Returns a single confident match, an explicit ambiguous candidate list, or null when nothing matches. For picking a recipient before gmail_send.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        name: z.string().min(1).describe('Free-text name or alias to resolve (e.g. "Rym")'),
+        maxCandidates: z.number().min(1).max(10).default(5).optional()
+          .describe('Max candidates to return when ambiguous (1-10, default: 5)'),
+        includeOtherContacts: coerceBoolean.optional()
+          .describe('Also search auto-saved "other contacts" (people you have emailed but not saved). Default true.'),
+      },
+    },
+    async ({ account, name, maxCandidates, includeOtherContacts }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const people = peopleClient({ version: 'v1', auth });
+
+        // Warmup request required by the People API before searchContacts returns hits.
+        await people.people.searchContacts({ query: '', readMask: 'names' });
+
+        const saved = await people.people.searchContacts({
+          query: name,
+          readMask: 'names,emailAddresses,organizations',
+        });
+        const candidates: ResolveCandidate[] = (saved.data.results ?? [])
+          .map((r: any) => toCandidate(r.person, 'contacts'));
+
+        if (includeOtherContacts !== false) {
+          try {
+            const other = await people.otherContacts.search({
+              query: name,
+              readMask: 'names,emailAddresses',
+            });
+            candidates.push(...(other.data.results ?? []).map((r: any) => toCandidate(r.person, 'otherContacts')));
+          } catch {
+            // otherContacts unavailable (scope/5xx): degrade to saved-contacts only.
+          }
+        }
+
+        const result = resolveContacts(dedupeCandidates(candidates), name, maxCandidates ?? 5);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         };
       } catch (error: any) {
         return handleContactsError(error, account as Account);

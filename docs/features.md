@@ -75,3 +75,8 @@ Set `replyToMessageId` on `gmail_send` / `gmail_create_draft` and the server der
 - `In-Reply-To` / `References` threading headers as before.
 
 Any value you pass explicitly wins over the derived one (`to`, `cc`, `subject` are now optional when `replyToMessageId` is set). If the source can't be fetched: with a caller `to`, the send proceeds with threading degraded to the message id; without a `to`, the call fails `not_found` rather than sending to nobody. A failed send-as lookup degrades the own-address set to your primary and never blocks the send.
+
+
+### Contact resolver
+
+`contacts_resolve` turns a free-text name into **one canonical email**, so an agent stops hand-expanding transliterations (`Rym OR Rim OR Reem`) into `contacts_search` OR-queries. It searches saved contacts (and, by default, auto-saved "other contacts" you've emailed) and applies a deterministic tie-break: exact name (accent-folded) over prefix, saved over other-contact, primary/`work` email over the rest, fuller record over bare. It returns one confident `{ resolved: { name, email, resourceName, source } }`, an explicit `{ ambiguous: true, candidates: [...] }` when a real tie survives, or `{ resolved: null }` for no match (never an error). A missing "other contacts" scope degrades to saved contacts only.

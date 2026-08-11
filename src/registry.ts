@@ -64,6 +64,8 @@ interface ToolConfig {
 const CUD_OVERRIDES: Record<string, Cud> = {
   drive_untrash: 'update',
   drive_transfer: 'create',
+  // read-only resolver; the name's "resolve" verb would otherwise infer update.
+  contacts_resolve: 'read',
 };
 
 const SERVICE_OVERRIDES: Record<string, string> = {
