@@ -8,7 +8,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { GENERATED_SERVICES } from './tools/generated/index.js';
 import { GENERATED_GATES, SERVICES } from './services.js';
-import { ToolRegistry } from './registry.js';
+import { ToolRegistry, type DiscoveryMode } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
 import { registerAccountTools } from './tools/accounts-tool.js';
@@ -22,9 +22,9 @@ import { registerSetupPrompt } from './setup-prompt.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
 
-function buildRegistry(server: McpServer, ctx: IdentityContext): ToolRegistry {
+function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: DiscoveryMode): ToolRegistry {
   const policy = ctx.policy;
-  const registry = new ToolRegistry(server, policy);
+  const registry = new ToolRegistry(server, policy, mode);
   const toolsets = getToolsets();
   if (toolsets !== 'all') {
     const known = new Set([...SERVICES.map((s) => s.name), ...GENERATED_SERVICES.map((s) => s.name)]);
@@ -165,16 +165,74 @@ async function main() {
   // specced "fatal at startup", never mid-dispatch.
   const { resolveMasterKey } = await import('./master-key.js');
   resolveMasterKey();
-  const server = new McpServer({
-    name: 'mcp-google-multi',
-    version: pkg.version,
-  });
-  const registry = buildRegistry(server, ctx);
-  registry.installListHandler();
-  registerSetupPrompt(server);
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  const { resolveHttpConfig, transportIncludesHttp } = await import('./http-config.js');
+  let httpCfg;
+  try {
+    httpCfg = resolveHttpConfig();
+  } catch (e) {
+    process.stderr.write(`Fatal: ${(e as Error).message}\n`);
+    process.exit(1);
+  }
+  const wantStdio = httpCfg.transport === 'stdio' || httpCfg.transport === 'both';
+  const wantHttp = transportIncludesHttp(httpCfg.transport);
+
+  // Build one McpServer + registry per transport at boot (P1 / BV gap #4:
+  // never rebuilt per request); `both` runs the two concurrently.
+  if (wantStdio) {
+    const server = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
+    const registry = buildRegistry(server, ctx);
+    registry.installListHandler();
+    registerSetupPrompt(server);
+    await server.connect(new StdioServerTransport());
+  }
+
+  if (wantHttp) {
+    const { HttpTransportHost, loopbackOwnerAuthenticator, parseOwnerEmails, remoteHttpRefusal } = await import(
+      './http-transport.js'
+    );
+    // Until the OAuth AS (B13) lands there is no MCP-client authentication, so
+    // refuse any exposed/tunnelled HTTP shape and serve loopback-only.
+    const refusal = remoteHttpRefusal(httpCfg);
+    if (refusal) {
+      process.stderr.write(`${refusal}\n`);
+      process.exit(1);
+    }
+    // BR3: the owner allowlist is the entire multi-tenant collapse; refuse to
+    // open an ungated HTTP endpoint.
+    const owners = parseOwnerEmails(process.env);
+    if (owners.length === 0) {
+      process.stderr.write(
+        'E_OWNER_EMAILS_REQUIRED: MCP_TRANSPORT includes http but MCP_OWNER_EMAILS is empty. Set MCP_OWNER_EMAILS to the Google email(s) allowed to authenticate.\n',
+      );
+      process.exit(1);
+    }
+    // BR7: stateless HTTP cannot push tools/list_changed, so it forces curated.
+    const configuredMode = (process.env.GOOGLE_DISCOVERY ?? '').trim().toLowerCase();
+    if (configuredMode && configuredMode !== 'curated') {
+      process.stderr.write(`GOOGLE_DISCOVERY="${configuredMode}" is ignored over HTTP; the stateless transport forces "curated".\n`);
+    }
+    const httpServer = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
+    const registry = buildRegistry(httpServer, ctx, 'curated');
+    registry.installListHandler();
+    registerSetupPrompt(httpServer);
+    const host = new HttpTransportHost({
+      server: httpServer,
+      config: httpCfg,
+      version: pkg.version,
+      ownerConfigured: owners.length > 0,
+      authenticate: loopbackOwnerAuthenticator(httpCfg.publicUrl),
+      log: (l) => process.stderr.write(`[http] ${l}\n`),
+    });
+    await host.start();
+    process.stderr.write(`HTTP transport listening on http://${httpCfg.host}:${httpCfg.port} (public ${httpCfg.publicUrl})\n`);
+    // Graceful shutdown so `docker run --init` (B16) forwards SIGTERM cleanly.
+    const shutdown = () => {
+      host.close().finally(() => process.exit(0));
+    };
+    process.once('SIGTERM', shutdown);
+    process.once('SIGINT', shutdown);
+  }
 }
 
 main().catch((err) => {
