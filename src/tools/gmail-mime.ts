@@ -150,6 +150,52 @@ export function buildReplyHeaders(
   };
 }
 
+export interface ComposeInput {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+  cc?: string;
+  inReplyTo?: string;
+  references?: string;
+}
+
+/**
+ * The single MIME-assembly seam for gmail_send and gmail_create_draft (A3).
+ * Extracted byte-for-byte from the previously-duplicated inline assembly;
+ * header order and encoders are unchanged so output is identical. A4 swaps
+ * the internals to MailComposer.
+ */
+export function composeRaw(input: ComposeInput): string {
+  const headers = [
+    `From: ${encodeAddressHeader(input.from)}`,
+    `To: ${encodeAddressHeader(input.to)}`,
+    `Subject: ${encodeHeaderValue(input.subject)}`,
+    'MIME-Version: 1.0',
+  ];
+
+  let bodyText: string;
+  if (input.html) {
+    const { contentType, body: mp } = buildMultipartAlternative(input.text, input.html);
+    headers.push(`Content-Type: ${contentType}`);
+    bodyText = mp;
+  } else {
+    headers.push('Content-Type: text/plain; charset="UTF-8"');
+    headers.push('Content-Transfer-Encoding: 8bit');
+    bodyText = normalizeBodyLineEndings(input.text);
+  }
+
+  if (input.cc) headers.push(`Cc: ${encodeAddressHeader(input.cc)}`);
+  if (input.inReplyTo !== undefined && input.references !== undefined) {
+    headers.push(`In-Reply-To: ${input.inReplyTo}`);
+    headers.push(`References: ${input.references}`);
+  }
+
+  const rawMessage = [...headers, '', bodyText].join('\r\n');
+  return Buffer.from(rawMessage, 'utf-8').toString('base64url');
+}
+
 /** RFC 2046 §5.1.1 boundary token: hex output is all bcharsnospace, length well under the 70-char cap. */
 function generateMimeBoundary(): string {
   // 5-char prefix + 32 hex chars = 37 chars, well under the 70-char limit.
