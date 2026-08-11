@@ -7,6 +7,7 @@ import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
+import addressparser from 'nodemailer/lib/addressparser/index.js';
 import { lookup as lookupMime } from 'mime-types';
 import { configDir } from '../config-file.js';
 import { getTokenDir } from '../accounts.js';
@@ -83,27 +84,132 @@ function getAttachments(payload: any): GmailAttachment[] {
   return attachments;
 }
 
-async function resolveReplyHeaders(
+// A8 reply auto-fill: parse an RFC 5322 address header into lowercased
+// addr-specs (+ display names) using nodemailer's bundled addressparser, which
+// already rides the A4 compose dep. Groups are flattened; entries without an
+// address are dropped.
+interface ParsedAddress { address: string; name: string }
+function parseAddresses(headerValue: string): ParsedAddress[] {
+  if (!headerValue) return [];
+  const out: ParsedAddress[] = [];
+  const walk = (entries: any[]): void => {
+    for (const e of entries) {
+      if (e?.group) walk(e.group);
+      else if (e?.address) out.push({ address: String(e.address).trim(), name: String(e.name ?? '').trim() });
+    }
+  };
+  walk(addressparser(headerValue));
+  return out;
+}
+const normAddr = (a: string): string => a.trim().toLowerCase();
+/** Rebuild a comma-separated address header; composeRaw/MailComposer re-encodes
+ * names (RFC 2047) and the A4 CRLF pre-check applies, so derived recipients get
+ * the same header-injection guard as caller-supplied ones. */
+function formatAddresses(list: ParsedAddress[]): string {
+  return list.map((a) => (a.name ? `${a.name} <${a.address}>` : a.address)).join(', ');
+}
+
+/** Re: prefix unless the subject already carries one (case-insensitive, after
+ * trimming); never double-prefix. */
+export function deriveReplySubject(sourceSubject: string): string {
+  const s = sourceSubject.trim();
+  return /^re:/i.test(s) ? s : `Re: ${s}`;
+}
+
+// The account's own-address set (primary + Gmail send-as aliases) used to
+// exclude the caller from reply-all. Send-as rarely changes, so memoize per
+// process; a stale miss only costs one extra self-copy, never a wrong send.
+const ownAddressCache = new Map<string, Promise<Set<string>>>();
+function getOwnAddresses(gmail: any, account: string, primaryEmail: string): Promise<Set<string>> {
+  let cached = ownAddressCache.get(account);
+  if (!cached) {
+    cached = (async () => {
+      const set = new Set<string>([normAddr(primaryEmail)]);
+      try {
+        const res = await gmail.users.settings.sendAs.list({ userId: 'me' });
+        for (const entry of res.data.sendAs ?? []) {
+          if (entry.sendAsEmail) set.add(normAddr(entry.sendAsEmail));
+        }
+      } catch {
+        // insufficient_scope / 5xx: degrade to the primary alone, never block the send.
+      }
+      return set;
+    })();
+    ownAddressCache.set(account, cached);
+  }
+  return cached;
+}
+
+interface ReplyDerivation {
+  inReplyTo: string;
+  references: string;
+  sourceFound: boolean;
+  to?: string;
+  cc?: string;
+  subject?: string;
+}
+
+/** Fetch the reply source once and derive threading headers plus (auto-fill)
+ * to/cc/subject. On any fetch failure, degrade to the API id for threading and
+ * report sourceFound:false so the caller can decide (per A8 error dispositions). */
+export async function resolveReply(
   gmail: any,
+  account: string,
+  primaryEmail: string,
   replyToMessageId: string,
-): Promise<{ inReplyTo: string; references: string }> {
+  replyAll: boolean,
+): Promise<ReplyDerivation> {
+  let headers: any[] | undefined;
   try {
     const meta = await gmail.users.messages.get({
       userId: 'me',
       id: replyToMessageId,
       format: 'metadata',
-      metadataHeaders: ['Message-ID', 'References'],
+      metadataHeaders: ['From', 'To', 'Cc', 'Subject', 'Message-ID', 'References'],
     });
-    const headers = meta.data.payload?.headers;
-    return buildReplyHeaders(
-      replyToMessageId,
-      getHeader(headers, 'Message-ID'),
-      getHeader(headers, 'References'),
-    );
+    headers = meta.data.payload?.headers;
   } catch {
     // Degrade to the API id (pre-lookup behavior) rather than blocking the send.
-    return { inReplyTo: replyToMessageId, references: replyToMessageId };
+    return { inReplyTo: replyToMessageId, references: replyToMessageId, sourceFound: false };
   }
+
+  const threading = buildReplyHeaders(
+    replyToMessageId,
+    getHeader(headers, 'Message-ID'),
+    getHeader(headers, 'References'),
+  );
+
+  const own = await getOwnAddresses(gmail, account, primaryEmail);
+  const fromList = parseAddresses(getHeader(headers, 'From'));
+  const toList = parseAddresses(getHeader(headers, 'To'));
+  const ccList = parseAddresses(getHeader(headers, 'Cc'));
+
+  // Replying to your own sent mail: From is self, so reply to the original To.
+  const fromIsSelf = fromList.length > 0 && fromList.every((a) => own.has(normAddr(a.address)));
+  const derivedToList = fromIsSelf ? toList : fromList;
+  const derivedTo = formatAddresses(derivedToList);
+
+  let derivedCc: string | undefined;
+  if (replyAll) {
+    const toAddrs = new Set(derivedToList.map((a) => normAddr(a.address)));
+    const seen = new Set<string>();
+    const ccOut: ParsedAddress[] = [];
+    for (const a of [...toList, ...ccList]) {
+      const key = normAddr(a.address);
+      if (own.has(key) || toAddrs.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      ccOut.push(a);
+    }
+    if (ccOut.length > 0) derivedCc = formatAddresses(ccOut);
+  }
+
+  return {
+    ...threading,
+    sourceFound: true,
+    to: derivedTo || undefined,
+    cc: derivedCc,
+    subject: deriveReplySubject(getHeader(headers, 'Subject')),
+  };
 }
 
 const BODY_CAP_CHARS = 50_000;
@@ -207,14 +313,16 @@ export async function readAttachments(
   return out;
 }
 
-/** Tagged compose-time failure; the handlers map it to an isError envelope. */
+/** Tagged compose-time failure; the handlers map it to an isError envelope.
+ * `category` is the taxonomy error field (default validation_error); reply
+ * auto-fill raises it as not_found when a source message can't be fetched. */
 class GmailComposeError extends Error {
-  constructor(public slug: string, message: string) {
+  constructor(public slug: string, message: string, public category: string = 'validation_error') {
     super(message);
   }
 }
 
-/** Maps compose-time (non-Google) failures to a validation_error envelope;
+/** Maps compose-time (non-Google) failures to an isError envelope;
  * returns null for anything else so the Google error mapper handles it. */
 function composeErrorResult(error: unknown, account: Account) {
   const slug =
@@ -222,10 +330,11 @@ function composeErrorResult(error: unknown, account: Account) {
     : error instanceof GmailComposeError ? error.slug
     : null;
   if (!slug) return null;
+  const category = error instanceof GmailComposeError ? error.category : 'validation_error';
   return {
     content: [{
       type: 'text' as const,
-      text: JSON.stringify({ error: 'validation_error', slug, message: (error as Error).message, retriable: false, account }),
+      text: JSON.stringify({ error: category, slug, message: (error as Error).message, retriable: false, account }),
     }],
     isError: true,
   };
@@ -420,22 +529,24 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Send an email from a Gmail account',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        to: z.string().describe('Recipient(s), comma-separated'),
-        subject: z.string().describe('Email subject'),
+        to: z.string().optional().describe('Recipient(s), comma-separated. Optional when replyToMessageId is set (derived from the source); a supplied value wins.'),
+        subject: z.string().optional().describe('Email subject. Optional when replyToMessageId is set (derived as "Re: ..."); a supplied value wins.'),
         body: z.string().describe('Email body as Markdown (headings, links, lists, tables, blockquotes). Rendered to HTML for the rich part; the Markdown source is the plain-text part.'),
         htmlBody: z.string().optional()
           .describe('REMOVED in v6: author Markdown in `body` instead; for literal HTML (e.g. inline color) pass `allowRawHtml: true`. Passing htmlBody now errors.'),
         allowRawHtml: z.boolean().optional()
           .describe('When true, raw HTML in `body` passes through into the HTML part instead of being escaped. Default false (HTML is shown literally).'),
-        cc: z.string().optional().describe('CC recipients, comma-separated'),
+        cc: z.string().optional().describe('CC recipients, comma-separated. With replyToMessageId + replyAll, derived from the source minus your own addresses; a supplied value wins.'),
         replyToMessageId: z.string().optional()
-          .describe('Message ID to reply to (sets In-Reply-To and References headers)'),
+          .describe('Message ID to reply to. Sets In-Reply-To/References and, unless overridden, derives to/subject (and cc when replyAll) from the source, so you need not read it first.'),
+        replyAll: coerceBoolean.optional()
+          .describe('With replyToMessageId: include the source To+Cc (minus your own addresses) in cc. Default false (reply to sender only).'),
         replyToThreadId: z.string().optional()
           .describe('Thread ID to send the message in'),
         attachments: coerceJson(attachmentSchema),
       },
     },
-    async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyToThreadId, attachments }) => {
+    async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, replyToThreadId, attachments }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
@@ -444,7 +555,23 @@ export function registerGmailTools(server: ToolRegistry): void {
         if (htmlBody !== undefined) {
           throw new GmailComposeError('E_HTMLBODY_REMOVED', 'htmlBody was removed in v6: author Markdown in `body`; for literal HTML pass `allowRawHtml: true`.');
         }
-        const reply = replyToMessageId ? await resolveReplyHeaders(gmail, replyToMessageId) : undefined;
+        const reply = replyToMessageId
+          ? await resolveReply(gmail, account as Account, config.email, replyToMessageId, replyAll === true)
+          : undefined;
+        // Caller value > derived value. A missing source with no caller `to`
+        // means we cannot address the reply: fail rather than silently drop it.
+        if (reply && !reply.sourceFound && to === undefined) {
+          throw new GmailComposeError('E_REPLY_SOURCE_NOT_FOUND', `reply source message ${replyToMessageId} not found; recipients could not be derived and no \`to\` was provided.`, 'not_found');
+        }
+        const finalTo = to ?? reply?.to;
+        const finalSubject = subject ?? reply?.subject;
+        const finalCc = cc ?? reply?.cc;
+        if (finalTo === undefined || finalTo === '') {
+          throw new GmailComposeError('E_MISSING_RECIPIENT', '`to` is required (or set replyToMessageId to derive it from the source).');
+        }
+        if (finalSubject === undefined) {
+          throw new GmailComposeError('E_MISSING_SUBJECT', '`subject` is required (or set replyToMessageId to derive it from the source).');
+        }
         const html = renderMarkdown(body, allowRawHtml === true);
         const files = await readAttachments(
           attachments as Array<{ path: string; filename?: string; contentType?: string }> | undefined,
@@ -452,11 +579,11 @@ export function registerGmailTools(server: ToolRegistry): void {
         );
         const encoded = await composeRaw({
           from: config.email,
-          to,
-          subject,
+          to: finalTo,
+          subject: finalSubject,
           text: body,
           html,
-          cc,
+          cc: finalCc,
           inReplyTo: reply?.inReplyTo,
           references: reply?.references,
           attachments: files,
@@ -531,22 +658,24 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Create a Gmail draft without sending',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        to: z.string().describe('Recipient(s), comma-separated'),
-        subject: z.string().describe('Email subject'),
+        to: z.string().optional().describe('Recipient(s), comma-separated. Optional when replyToMessageId is set (derived from the source); a supplied value wins.'),
+        subject: z.string().optional().describe('Email subject. Optional when replyToMessageId is set (derived as "Re: ..."); a supplied value wins.'),
         body: z.string().describe('Email body as Markdown (headings, links, lists, tables, blockquotes). Rendered to HTML for the rich part; the Markdown source is the plain-text part.'),
         htmlBody: z.string().optional()
           .describe('REMOVED in v6: author Markdown in `body` instead; for literal HTML (e.g. inline color) pass `allowRawHtml: true`. Passing htmlBody now errors.'),
         allowRawHtml: z.boolean().optional()
           .describe('When true, raw HTML in `body` passes through into the HTML part instead of being escaped. Default false (HTML is shown literally).'),
-        cc: z.string().optional().describe('CC recipients, comma-separated'),
+        cc: z.string().optional().describe('CC recipients, comma-separated. With replyToMessageId + replyAll, derived from the source minus your own addresses; a supplied value wins.'),
         replyToMessageId: z.string().optional()
-          .describe('Message ID to reply to (sets In-Reply-To and References headers)'),
+          .describe('Message ID to reply to. Sets In-Reply-To/References and, unless overridden, derives to/subject (and cc when replyAll) from the source, so you need not read it first.'),
+        replyAll: coerceBoolean.optional()
+          .describe('With replyToMessageId: include the source To+Cc (minus your own addresses) in cc. Default false (reply to sender only).'),
         replyToThreadId: z.string().optional()
           .describe('Thread ID to associate the draft with'),
         attachments: coerceJson(attachmentSchema),
       },
     },
-    async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyToThreadId, attachments }) => {
+    async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, replyToThreadId, attachments }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
@@ -555,7 +684,21 @@ export function registerGmailTools(server: ToolRegistry): void {
         if (htmlBody !== undefined) {
           throw new GmailComposeError('E_HTMLBODY_REMOVED', 'htmlBody was removed in v6: author Markdown in `body`; for literal HTML pass `allowRawHtml: true`.');
         }
-        const reply = replyToMessageId ? await resolveReplyHeaders(gmail, replyToMessageId) : undefined;
+        const reply = replyToMessageId
+          ? await resolveReply(gmail, account as Account, config.email, replyToMessageId, replyAll === true)
+          : undefined;
+        if (reply && !reply.sourceFound && to === undefined) {
+          throw new GmailComposeError('E_REPLY_SOURCE_NOT_FOUND', `reply source message ${replyToMessageId} not found; recipients could not be derived and no \`to\` was provided.`, 'not_found');
+        }
+        const finalTo = to ?? reply?.to;
+        const finalSubject = subject ?? reply?.subject;
+        const finalCc = cc ?? reply?.cc;
+        if (finalTo === undefined || finalTo === '') {
+          throw new GmailComposeError('E_MISSING_RECIPIENT', '`to` is required (or set replyToMessageId to derive it from the source).');
+        }
+        if (finalSubject === undefined) {
+          throw new GmailComposeError('E_MISSING_SUBJECT', '`subject` is required (or set replyToMessageId to derive it from the source).');
+        }
         const html = renderMarkdown(body, allowRawHtml === true);
         const files = await readAttachments(
           attachments as Array<{ path: string; filename?: string; contentType?: string }> | undefined,
@@ -563,11 +706,11 @@ export function registerGmailTools(server: ToolRegistry): void {
         );
         const encoded = await composeRaw({
           from: config.email,
-          to,
-          subject,
+          to: finalTo,
+          subject: finalSubject,
           text: body,
           html,
-          cc,
+          cc: finalCc,
           inReplyTo: reply?.inReplyTo,
           references: reply?.references,
           attachments: files,

@@ -62,3 +62,15 @@ Tool responses are serialized compactly (no pretty-print token tax; set `GOOGLE_
 - `html` — you passed `rawHtml: true` and the message was HTML-only; `body` is the unconverted source HTML.
 
 Script/style/head content is dropped during conversion (never leaked into `body`); if conversion fails the server falls back to plain-text extraction and reports `bodyFormat: 'plain'`.
+
+
+### Reply auto-fill
+
+Set `replyToMessageId` on `gmail_send` / `gmail_create_draft` and the server derives the reply for you from the source message in a single fetch — no separate `gmail_read` first:
+
+- `to` ← the source `From` (or the source `To` when you're replying to your own sent mail).
+- `subject` ← the source `Subject`, prefixed `Re: ` unless it already carries one (never double-prefixed).
+- `cc` ← only with `replyAll: true`: the source `To` + `Cc` minus your own addresses (primary + Gmail send-as aliases) minus the `to` recipient.
+- `In-Reply-To` / `References` threading headers as before.
+
+Any value you pass explicitly wins over the derived one (`to`, `cc`, `subject` are now optional when `replyToMessageId` is set). If the source can't be fetched: with a caller `to`, the send proceeds with threading degraded to the message id; without a `to`, the call fails `not_found` rather than sending to nobody. A failed send-as lookup degrades the own-address set to your primary and never blocks the send.
