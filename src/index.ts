@@ -104,6 +104,12 @@ async function main() {
     return;
   }
 
+  if (process.argv.includes('write-client-config')) {
+    const { runWriteClientConfigCli } = await import('./client-config.js');
+    process.exitCode = await runWriteClientConfigCli(process.argv);
+    return;
+  }
+
   if (process.argv.includes('config') && process.argv.includes('check')) {
     const ctx = buildIdentityContext();
     const policy = ctx.policy;
