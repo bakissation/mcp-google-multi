@@ -1,6 +1,10 @@
 import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 import type Mail from 'nodemailer/lib/mailer/index.js';
 import MarkdownIt from 'markdown-it';
+import TurndownService from 'turndown';
+// @ts-expect-error turndown-plugin-gfm ships no type declarations
+import { gfm } from 'turndown-plugin-gfm';
+import type { Plugin } from 'turndown';
 
 // D6 send: one symmetric text format. body is Markdown; text/plain = the
 // source verbatim, text/html = this render. html:false ESCAPES raw HTML in
@@ -99,6 +103,24 @@ export function htmlToText(html: string): string {
     .replace(/[ \t]*\n[ \t]*/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+// D6 read: HTML-only bodies convert to Markdown so the model reads structure
+// (headings, links, lists, GFM tables), not a flat text dump. turndown's
+// bundled @mixmark-io/domino fork does NOT execute scripts; remove() drops
+// script/style/head entirely (turndown otherwise leaks their text content).
+const turndownService = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced', bulletListMarker: '-' });
+turndownService.use(gfm as Plugin);
+turndownService.remove(['script', 'style', 'head']);
+
+/** Convert HTML to Markdown; on any turndown failure fall back to the
+ * plain-text extractor (caller then reports bodyFormat 'plain', not 'markdown'). */
+export function htmlToMarkdown(html: string): { text: string; ok: boolean } {
+  try {
+    return { text: turndownService.turndown(html), ok: true };
+  } catch {
+    return { text: htmlToText(html), ok: false };
+  }
 }
 
 /** In-Reply-To/References need the parent's real RFC 5322 Message-ID header, not the Gmail API id;

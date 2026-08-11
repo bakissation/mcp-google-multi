@@ -51,3 +51,14 @@ Tool responses are serialized compactly (no pretty-print token tax; set `GOOGLE_
 ### Markdown email (send)
 
 `gmail_send` / `gmail_create_draft` take `body` as **Markdown**: the server renders it to HTML once and sends `multipart/alternative` where the Markdown source is the `text/plain` part and the rendered HTML is the `text/html` part. Raw HTML in `body` is escaped by default (XSS-safe); pass `allowRawHtml: true` for literal HTML such as inline color. `htmlBody` is removed — passing it errors (`E_HTMLBODY_REMOVED`) with the rewrite. Note: plain prose containing Markdown metacharacters (`#`, `*`, `_`, `>`, backticks, `[..]()`) now renders as Markdown.
+
+
+### Markdown email (read)
+
+`gmail_read` / `gmail_read_thread` return a `bodyFormat` discriminator on every message so the model knows how to read `body`:
+
+- `plain` — a `text/plain` part existed (or the message had no body). `body` is that part verbatim, byte-identical to v5. Plain parts always win over an HTML alternative.
+- `markdown` — the message was **HTML-only**; the server converts it to Markdown (headings, links, lists, GFM tables/strikethrough) so structure survives instead of collapsing to a flat text dump. The 50k body cap applies to the converted Markdown, not the source HTML.
+- `html` — you passed `rawHtml: true` and the message was HTML-only; `body` is the unconverted source HTML.
+
+Script/style/head content is dropped during conversion (never leaked into `body`); if conversion fails the server falls back to plain-text extraction and reports `bodyFormat: 'plain'`.

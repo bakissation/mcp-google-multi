@@ -30,7 +30,7 @@ describe('parseMessage body selection', () => {
     };
     const out = parseMessage(msg(payload));
     expect(out.body).toBe('plain version');
-    expect(out.bodyOrigin).toBe('text/plain');
+    expect(out.bodyFormat).toBe('plain');
   });
 
   it('prefers text/plain in a classic multipart/alternative', () => {
@@ -43,7 +43,7 @@ describe('parseMessage body selection', () => {
     };
     const out = parseMessage(msg(payload));
     expect(out.body).toBe('plain');
-    expect(out.bodyOrigin).toBe('text/plain');
+    expect(out.bodyFormat).toBe('plain');
   });
 
   it('concatenates sequential text/plain parts of the same container', () => {
@@ -56,13 +56,13 @@ describe('parseMessage body selection', () => {
     };
     const out = parseMessage(msg(payload));
     expect(out.body).toBe('intro\n\nforwarded body');
-    expect(out.bodyOrigin).toBe('text/plain');
+    expect(out.bodyFormat).toBe('plain');
   });
 
-  it('converts an HTML-only message to plain text', () => {
+  it('converts an HTML-only message to Markdown (D6)', () => {
     const out = parseMessage(msg(textPart('text/html', '<p>Hello <strong>world</strong></p>')));
-    expect(out.body).toBe('Hello world');
-    expect(out.bodyOrigin).toBe('text/html');
+    expect(out.body).toBe('Hello **world**');
+    expect(out.bodyFormat).toBe('markdown');
   });
 
   it('concatenates multiple HTML parts before converting', () => {
@@ -75,13 +75,13 @@ describe('parseMessage body selection', () => {
     };
     const out = parseMessage(msg(payload));
     expect(out.body).toBe('one\n\ntwo');
-    expect(out.bodyOrigin).toBe('text/html');
+    expect(out.bodyFormat).toBe('markdown');
   });
 
   it('returns the raw HTML body when rawHtml is set', () => {
     const out = parseMessage(msg(textPart('text/html', '<p>Hi</p>')), undefined, { rawHtml: true });
     expect(out.body).toBe('<p>Hi</p>');
-    expect(out.bodyOrigin).toBe('text/html');
+    expect(out.bodyFormat).toBe('html');
   });
 
   it('still prefers text/plain when rawHtml is set', () => {
@@ -94,10 +94,10 @@ describe('parseMessage body selection', () => {
     };
     const out = parseMessage(msg(payload), undefined, { rawHtml: true });
     expect(out.body).toBe('plain');
-    expect(out.bodyOrigin).toBe('text/plain');
+    expect(out.bodyFormat).toBe('plain');
   });
 
-  it('applies the body cap to the converted text, not the raw HTML', () => {
+  it('applies the body cap to the converted Markdown, not the raw HTML', () => {
     const html = `<p>${'a'.repeat(40)}</p>`.repeat(3);
     const converted = [`${'a'.repeat(40)}`, `${'a'.repeat(40)}`, `${'a'.repeat(40)}`].join('\n\n');
     expect(html.length).toBeGreaterThan(130);
@@ -112,10 +112,10 @@ describe('parseMessage body selection', () => {
     expect(capped.bodyTotalChars).toBe(converted.length);
   });
 
-  it('omits bodyOrigin when the message has no body', () => {
+  it("reports bodyFormat 'plain' for a message with no body (total discriminator)", () => {
     const out = parseMessage(msg({ mimeType: 'multipart/mixed', parts: [] }));
     expect(out.body).toBe('');
-    expect(out.bodyOrigin).toBeUndefined();
+    expect(out.bodyFormat).toBe('plain');
   });
 });
 

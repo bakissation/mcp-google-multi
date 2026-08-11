@@ -6,7 +6,7 @@ import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
-import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToText, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
+import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
 import { lookup as lookupMime } from 'mime-types';
 import { configDir } from '../config-file.js';
 import { getTokenDir } from '../accounts.js';
@@ -42,18 +42,22 @@ function collectTextParts(part: any, plain: string[], html: string[], topLevel =
 function decodeBody(
   payload: any,
   rawHtml = false,
-): { body: string; bodyOrigin?: 'text/plain' | 'text/html' } {
+): { body: string; bodyFormat: 'plain' | 'markdown' | 'html' } {
   const plain: string[] = [];
   const html: string[] = [];
   collectTextParts(payload, plain, html, true);
   // Concatenating every plain leaf keeps forwarded/mixed messages whole;
   // any plain content beats HTML because alternatives duplicate the same body.
-  if (plain.length > 0) return { body: plain.join('\n\n'), bodyOrigin: 'text/plain' };
+  // A plain leaf is returned verbatim (byte-identical to v5).
+  if (plain.length > 0) return { body: plain.join('\n\n'), bodyFormat: 'plain' };
   if (html.length > 0) {
     const joined = html.join('\n\n');
-    return { body: rawHtml ? joined : htmlToText(joined), bodyOrigin: 'text/html' };
+    if (rawHtml) return { body: joined, bodyFormat: 'html' };
+    // HTML-only -> Markdown (D6). turndown failure degrades to plain text.
+    const { text, ok } = htmlToMarkdown(joined);
+    return { body: text, bodyFormat: ok ? 'markdown' : 'plain' };
   }
-  return { body: '' };
+  return { body: '', bodyFormat: 'plain' };
 }
 
 function getAttachments(payload: any): GmailAttachment[] {
@@ -233,7 +237,7 @@ export function parseMessage(
   opts?: { rawHtml?: boolean },
 ): GmailMessageFull {
   const headers = msg.payload?.headers ?? [];
-  const { body, bodyOrigin } = decodeBody(msg.payload, opts?.rawHtml === true);
+  const { body, bodyFormat } = decodeBody(msg.payload, opts?.rawHtml === true);
   const capped = bodyCap !== undefined && body.length > bodyCap;
   const messageIdHeader = getHeader(headers, 'Message-ID');
   const inReplyTo = getHeader(headers, 'In-Reply-To');
@@ -247,7 +251,7 @@ export function parseMessage(
     cc: getHeader(headers, 'Cc'),
     date: getHeader(headers, 'Date'),
     body: capped ? sliceClean(body, bodyCap) : body,
-    ...(bodyOrigin ? { bodyOrigin } : {}),
+    bodyFormat,
     ...(capped ? { bodyTruncated: true, bodyTotalChars: body.length } : {}),
     ...(messageIdHeader ? { messageIdHeader } : {}),
     ...(inReplyTo ? { inReplyTo } : {}),
