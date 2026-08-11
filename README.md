@@ -1,5 +1,7 @@
 # mcp-google-multi
 
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2Fbakissation%2Fmcp-google-multi.svg)](https://mcptoplist.com/server/glama%2Fbakissation%2Fmcp-google-multi)
+
 The most complete **local Google Workspace MCP server**: Gmail, Drive, Calendar, Sheets, Docs, Slides, Forms, Contacts, Tasks, Chat, Meet, Classroom, Vault, Admin and more — **every OAuth-reachable Workspace API method** as a tool, across **multiple Google accounts** at once, from Claude Code or any MCP client.
 
 [![npm](https://img.shields.io/npm/v/mcp-google-multi?label=npm&color=cb3837)](https://www.npmjs.com/package/mcp-google-multi)
