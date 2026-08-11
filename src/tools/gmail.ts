@@ -1,12 +1,15 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
-import { coerceArray, coerceBoolean } from './_coerce.js';
+import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 import { gmail as gmailClient } from '@googleapis/gmail';
 import { ACCOUNTS } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
-import { buildReplyHeaders, composeRaw, htmlToText } from './gmail-mime.js';
+import { buildReplyHeaders, composeRaw, htmlToText, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
+import { lookup as lookupMime } from 'mime-types';
+import { configDir } from '../config-file.js';
+import { getTokenDir } from '../accounts.js';
 import { sliceClean } from '../trim.js';
 import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../types.js';
 import * as path from 'path';
@@ -100,6 +103,129 @@ async function resolveReplyHeaders(
 }
 
 const BODY_CAP_CHARS = 50_000;
+// Gmail's messages.send raw/JSON path rejects messages near ~25 MB (the wire
+// message is base64-encoded, ~+33% over the raw bytes), so cap the ESTIMATED
+// ENCODED total there rather than the spec's nominal 35 MB raw (spike/live
+// correction — a 35 MB raw payload is ~47 MB on the wire and Gmail 400s it).
+const GMAIL_MAX_MESSAGE_BYTES = 25 * 1024 * 1024;
+const estimateEncoded = (rawBytes: number) => Math.ceil((rawBytes * 4) / 3);
+
+const attachmentSchema = z
+  .array(
+    z.object({
+      path: z.string().describe('Absolute local path to the file to attach'),
+      filename: z.string().optional().describe('MIME filename; defaults to the path basename'),
+      contentType: z.string().optional().describe('MIME type; defaults to a lookup on the filename'),
+    }),
+  )
+  .optional()
+  .describe('Files to attach (each { path, filename?, contentType? }); path must be absolute');
+
+/** Reads attachment files into buffers (THIS server reads them, never
+ * MailComposer), enforces absolute-path + total-size guards, and derives the
+ * MIME filename via basename so a caller name can't inject path separators. */
+// Deny reading anything inside the server's own secret dirs — mailing out
+// master.key / <alias>.enc / mcp-jwt.key would be a full-account-takeover
+// exfil channel (this same server also reads untrusted mail/drive content, so
+// a prompt-injected attach path is a real confused-deputy vector).
+function isInside(dir: string, target: string): boolean {
+  let d = path.resolve(dir);
+  let t = path.resolve(target);
+  // Windows path comparison is case-insensitive; without folding, a
+  // drive-letter/casing difference makes path.relative report "outside".
+  if (process.platform === 'win32') {
+    d = d.toLowerCase();
+    t = t.toLowerCase();
+  }
+  const rel = path.relative(d, t);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+/** Deny if realTarget resolves inside `dir` (both realpath'd so a symlinked
+ * dir or 8.3/extended-prefix form can't slip past). */
+async function isInsideRealDir(dir: string, realTarget: string): Promise<boolean> {
+  let realDir: string;
+  try {
+    realDir = await fs.promises.realpath(dir);
+  } catch {
+    return false; // dir does not exist → target cannot be inside it
+  }
+  return isInside(realDir, realTarget);
+}
+
+export async function readAttachments(
+  raw: Array<{ path: string; filename?: string; contentType?: string }> | undefined,
+  bodyBytes: number,
+): Promise<ComposeAttachment[] | undefined> {
+  if (!raw || raw.length === 0) return undefined;
+  const denied = [configDir(), getTokenDir()];
+  const out: ComposeAttachment[] = [];
+  let total = bodyBytes;
+  for (const a of raw) {
+    if (!path.isAbsolute(a.path)) {
+      throw new GmailComposeError('validation_error', `attachment path must be absolute: ${path.basename(a.path)}`);
+    }
+    // Resolve symlinks BEFORE any confinement check, or a symlink defeats it.
+    let real: string;
+    try {
+      real = await fs.promises.realpath(a.path);
+    } catch {
+      throw new GmailComposeError('E_ATTACHMENT_NOT_FOUND', `attachment not found or unreadable: ${path.basename(a.path)}`);
+    }
+    for (const d of denied) {
+      if (await isInsideRealDir(d, real)) {
+        throw new GmailComposeError('E_ATTACHMENT_FORBIDDEN', `refusing to attach a file inside the server's config/token directory: ${path.basename(a.path)}`);
+      }
+    }
+    // stat BEFORE read: reject non-regular files (a FIFO would block readFile
+    // forever) and over-cap files without buffering them.
+    let stat: fs.Stats;
+    try {
+      stat = await fs.promises.stat(real);
+    } catch {
+      throw new GmailComposeError('E_ATTACHMENT_NOT_FOUND', `attachment not found or unreadable: ${path.basename(a.path)}`);
+    }
+    if (!stat.isFile()) {
+      throw new GmailComposeError('validation_error', `attachment is not a regular file: ${path.basename(a.path)}`);
+    }
+    total += stat.size;
+    if (estimateEncoded(total) > GMAIL_MAX_MESSAGE_BYTES) {
+      throw new GmailComposeError('E_ATTACHMENT_TOO_LARGE', `attachments + body exceed Gmail's ~${Math.round(GMAIL_MAX_MESSAGE_BYTES / 1024 / 1024)}MB message limit once encoded (estimated ${Math.round(estimateEncoded(total) / 1024 / 1024)}MB)`);
+    }
+    const content = await fs.promises.readFile(real);
+    const filename = path.basename(a.filename ?? a.path);
+    out.push({
+      filename,
+      content,
+      contentType: a.contentType || lookupMime(filename) || 'application/octet-stream',
+    });
+  }
+  return out;
+}
+
+/** Tagged compose-time failure; the handlers map it to an isError envelope. */
+class GmailComposeError extends Error {
+  constructor(public slug: string, message: string) {
+    super(message);
+  }
+}
+
+/** Maps compose-time (non-Google) failures to a validation_error envelope;
+ * returns null for anything else so the Google error mapper handles it. */
+function composeErrorResult(error: unknown, account: Account) {
+  const slug =
+    error instanceof HeaderInjectionError ? 'E_HEADER_INJECTION'
+    : error instanceof GmailComposeError ? error.slug
+    : null;
+  if (!slug) return null;
+  return {
+    content: [{
+      type: 'text' as const,
+      text: JSON.stringify({ error: 'validation_error', slug, message: (error as Error).message, retriable: false, account }),
+    }],
+    isError: true,
+  };
+}
 
 export function parseMessage(
   msg: any,
@@ -188,7 +314,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -221,7 +348,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -277,7 +405,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(messages, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -297,16 +426,21 @@ export function registerGmailTools(server: ToolRegistry): void {
           .describe('Message ID to reply to (sets In-Reply-To and References headers)'),
         replyToThreadId: z.string().optional()
           .describe('Thread ID to send the message in'),
+        attachments: coerceJson(attachmentSchema),
       },
     },
-    async ({ account, to, subject, body, htmlBody, cc, replyToMessageId, replyToThreadId }) => {
+    async ({ account, to, subject, body, htmlBody, cc, replyToMessageId, replyToThreadId, attachments }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
 
         const reply = replyToMessageId ? await resolveReplyHeaders(gmail, replyToMessageId) : undefined;
-        const encoded = composeRaw({
+        const files = await readAttachments(
+          attachments as Array<{ path: string; filename?: string; contentType?: string }> | undefined,
+          Buffer.byteLength(body ?? '') + Buffer.byteLength(htmlBody ?? ''),
+        );
+        const encoded = await composeRaw({
           from: config.email,
           to,
           subject,
@@ -315,6 +449,7 @@ export function registerGmailTools(server: ToolRegistry): void {
           cc,
           inReplyTo: reply?.inReplyTo,
           references: reply?.references,
+          attachments: files,
         });
 
         const sendParams: any = {
@@ -335,7 +470,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -374,7 +510,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: `Saved to ${fullPath} (${buffer.length} bytes)` }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -394,16 +531,21 @@ export function registerGmailTools(server: ToolRegistry): void {
           .describe('Message ID to reply to (sets In-Reply-To and References headers)'),
         replyToThreadId: z.string().optional()
           .describe('Thread ID to associate the draft with'),
+        attachments: coerceJson(attachmentSchema),
       },
     },
-    async ({ account, to, subject, body, htmlBody, cc, replyToMessageId, replyToThreadId }) => {
+    async ({ account, to, subject, body, htmlBody, cc, replyToMessageId, replyToThreadId, attachments }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
 
         const reply = replyToMessageId ? await resolveReplyHeaders(gmail, replyToMessageId) : undefined;
-        const encoded = composeRaw({
+        const files = await readAttachments(
+          attachments as Array<{ path: string; filename?: string; contentType?: string }> | undefined,
+          Buffer.byteLength(body ?? '') + Buffer.byteLength(htmlBody ?? ''),
+        );
+        const encoded = await composeRaw({
           from: config.email,
           to,
           subject,
@@ -412,6 +554,7 @@ export function registerGmailTools(server: ToolRegistry): void {
           cc,
           inReplyTo: reply?.inReplyTo,
           references: reply?.references,
+          attachments: files,
         });
 
         const draftParams: any = {
@@ -438,7 +581,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -470,7 +614,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -493,7 +638,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -516,7 +662,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, messageId }, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -548,7 +695,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify({ modified: messageIds.length }, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -574,7 +722,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: messageIds.length }, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -603,7 +752,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data.drafts ?? [], null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -630,7 +780,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -656,7 +807,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -678,7 +830,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data.labels ?? [], null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -712,7 +865,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -735,7 +889,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, labelId }, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -757,7 +912,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -789,7 +945,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -811,7 +968,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );
@@ -851,7 +1009,8 @@ export function registerGmailTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
-        return handleGmailError(error, account as Account);
+        const mapped = composeErrorResult(error, account as Account);
+        return mapped ?? handleGmailError(error, account as Account);
       }
     },
   );

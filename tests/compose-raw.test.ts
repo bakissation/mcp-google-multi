@@ -1,72 +1,61 @@
 import { describe, it, expect } from 'vitest';
-import {
-  composeRaw,
-  encodeAddressHeader,
-  encodeHeaderValue,
-  buildMultipartAlternative,
-  normalizeBodyLineEndings,
-} from '../src/tools/gmail-mime.js';
+import { composeRaw, HeaderInjectionError } from '../src/tools/gmail-mime.js';
 
-// Oracle: the EXACT pre-A3 inline assembly (copied verbatim from gmail.ts
-// gmail_send/gmail_create_draft before the composeRaw extraction). A3 must be
-// byte-identical to this.
-function legacyCompose(o: {
-  from: string; to: string; subject: string; text: string;
-  html?: string; cc?: string; inReplyTo?: string; references?: string;
-}): string {
-  const headers = [
-    `From: ${encodeAddressHeader(o.from)}`,
-    `To: ${encodeAddressHeader(o.to)}`,
-    `Subject: ${encodeHeaderValue(o.subject)}`,
-    'MIME-Version: 1.0',
-  ];
-  let bodyText: string;
-  if (o.html) {
-    const { contentType, body: mp } = buildMultipartAlternative(o.text, o.html);
-    headers.push(`Content-Type: ${contentType}`);
-    bodyText = mp;
-  } else {
-    headers.push('Content-Type: text/plain; charset="UTF-8"');
-    headers.push('Content-Transfer-Encoding: 8bit');
-    bodyText = normalizeBodyLineEndings(o.text);
-  }
-  if (o.cc) headers.push(`Cc: ${encodeAddressHeader(o.cc)}`);
-  if (o.inReplyTo !== undefined && o.references !== undefined) {
-    headers.push(`In-Reply-To: ${o.inReplyTo}`);
-    headers.push(`References: ${o.references}`);
-  }
-  return Buffer.from([...headers, '', bodyText].join('\r\n'), 'utf-8').toString('base64url');
+function decode(b64: string): string {
+  return Buffer.from(b64, 'base64url').toString('utf-8');
 }
 
-// buildMultipartAlternative uses a random boundary, so for the html cases we
-// compare the DECODED structure minus the boundary token rather than base64.
-function decodeStable(b64: string): string {
-  return Buffer.from(b64, 'base64url').toString('utf-8').replace(/=_gm_[0-9a-f]{32}/g, '=_gm_BOUNDARY');
-}
-
-const CASES = [
-  { name: 'plain only', from: 'me@x.com', to: 'a@y.com', subject: 'Hello', text: 'Line1\nLine2' },
-  { name: 'non-ascii subject', from: 'me@x.com', to: 'a@y.com', subject: 'Réunion café ☕', text: 'body' },
-  { name: 'with cc', from: 'me@x.com', to: 'a@y.com', subject: 'S', text: 'b', cc: 'c@z.com, d@z.com' },
-  { name: 'reply headers', from: 'me@x.com', to: 'a@y.com', subject: 'Re: x', text: 'b', inReplyTo: '<abc@mail>', references: '<r1@mail> <abc@mail>' },
-  { name: 'display-name address', from: '"Me Myself" <me@x.com>', to: 'Aya <a@y.com>', subject: 'S', text: 'b' },
-  { name: 'crlf-mixed body', from: 'me@x.com', to: 'a@y.com', subject: 'S', text: 'a\nb\r\nc\rd' },
-];
-
-describe('composeRaw golden matrix (A3 byte-identical to legacy)', () => {
-  for (const c of CASES) {
-    it(c.name, () => {
-      expect(composeRaw(c)).toBe(legacyCompose(c));
-    });
-  }
-
-  it('plain+htmlBody: identical modulo the random MIME boundary', () => {
-    const c = { from: 'me@x.com', to: 'a@y.com', subject: 'S', text: 'plain', html: '<p>rich</p>' };
-    expect(decodeStable(composeRaw(c))).toBe(decodeStable(legacyCompose(c)));
+describe('composeRaw (A4 MailComposer)', () => {
+  it('plain body: text/plain, CRLF-only, From/To/Subject present', async () => {
+    const msg = decode(await composeRaw({ from: 'me@x.com', to: 'a@y.com', subject: 'Hi', text: 'l1\nl2' }));
+    expect(msg).toMatch(/^From: me@x\.com/m);
+    expect(msg).toMatch(/^To: a@y\.com/m);
+    expect(msg).toMatch(/^Subject: Hi/m);
+    expect(msg).toContain('text/plain');
+    expect(msg).not.toMatch(/[^\r]\n/); // no bare LF anywhere
   });
 
-  it('reply headers only apply when BOTH inReplyTo and references are present', () => {
-    const c = { from: 'm@x', to: 'a@y', subject: 'S', text: 'b', inReplyTo: '<only@id>' };
-    expect(Buffer.from(composeRaw(c), 'base64url').toString()).not.toContain('In-Reply-To');
+  it('non-ASCII subject is RFC 2047 encoded', async () => {
+    const msg = decode(await composeRaw({ from: 'me@x.com', to: 'a@y.com', subject: 'Réunion café ☕', text: 'b' }));
+    expect(msg).toMatch(/Subject:\s*=\?UTF-8\?B\?/i);
+  });
+
+  it('html body produces multipart/alternative with both parts', async () => {
+    const msg = decode(await composeRaw({ from: 'me@x.com', to: 'a@y.com', subject: 'S', text: 'plain', html: '<p>rich</p>' }));
+    expect(msg).toContain('multipart/alternative');
+    expect(msg).toContain('text/plain');
+    expect(msg).toContain('text/html');
+  });
+
+  it('attachment yields multipart/mixed with the filename and content-type', async () => {
+    const msg = decode(await composeRaw({
+      from: 'me@x.com', to: 'a@y.com', subject: 'S', text: 'b',
+      attachments: [{ filename: 'report.pdf', content: Buffer.from('%PDF-1.4 test'), contentType: 'application/pdf' }],
+    }));
+    expect(msg).toContain('multipart/mixed');
+    expect(msg).toMatch(/application\/pdf/);
+    expect(msg).toMatch(/report\.pdf/);
+  });
+
+  it('reply headers appear when provided', async () => {
+    const msg = decode(await composeRaw({ from: 'm@x', to: 'a@y', subject: 'Re', text: 'b', inReplyTo: '<abc@mail>', references: '<r1@mail> <abc@mail>' }));
+    expect(msg).toMatch(/In-Reply-To:\s*<abc@mail>/i);
+    expect(msg).toMatch(/References:.*<abc@mail>/i);
+  });
+
+  it('CRLF in a header field is rejected (E_HEADER_INJECTION), never composed', async () => {
+    for (const bad of [
+      { from: 'me@x.com', to: 'a@y.com\r\nBcc: evil@z.com', subject: 'S', text: 'b' },
+      { from: 'me@x.com', to: 'a@y.com', subject: 'S\r\nBcc: evil@z.com', text: 'b' },
+      { from: 'me@x.com', to: 'a@y.com', subject: 'S', cc: 'c@z\ninjected', text: 'b' },
+    ]) {
+      await expect(composeRaw(bad)).rejects.toBeInstanceOf(HeaderInjectionError);
+    }
+  });
+
+  it('CRLF inside the BODY is allowed (normalized), not an injection', async () => {
+    const msg = decode(await composeRaw({ from: 'm@x', to: 'a@y', subject: 'S', text: 'line1\nline2\r\nline3' }));
+    expect(msg).toContain('line1');
+    expect(msg).not.toMatch(/[^\r]\n/);
   });
 });

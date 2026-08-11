@@ -41,3 +41,8 @@ Tool responses are serialized compactly (no pretty-print token tax; set `GOOGLE_
 - `drive_read` returns up to `maxChars` characters (default 100k) with `truncated`/`totalChars`/`offset` for paging — this also bounds Google Doc exports, which can reach 10MB. (Non-Google-native files over 2MB are still rejected with `too_large`, not paged.)
 - `gmail_read` / `gmail_read_thread` cap each message body at 50k chars (`bodyTruncated` + `bodyTotalChars` flags); pass `full: true` for the whole body.
 - `calendar_list_events` / `calendar_list_instances` trim descriptions to ~300 chars and drop empty/audit fields in list view; `calendar_get_event` always returns the full event.
+
+
+### Email attachments & safe compose
+
+`gmail_send` and `gmail_create_draft` share one MIME builder (nodemailer MailComposer) and accept `attachments: [{ path, filename?, contentType? }]` — the server reads each absolute path itself (MailComposer never touches the filesystem or network), caps the total at ~35 MB, and derives the MIME filename by basename. Address/subject headers containing CR/LF are rejected up front (`E_HEADER_INJECTION`), closing the old header-injection hole; bodies are CRLF-normalized and base64-encoded so Gmail's raw upload can't be corrupted by a bare LF.

@@ -1,50 +1,5 @@
-import { randomBytes } from 'node:crypto';
-
-/** RFC 2047 encoded-word (`=?utf-8?B?...?=`) for non-ASCII header text; long values fold into <=75-char chunks joined by CRLF SPACE per the RFC. */
-export function encodeHeaderValue(value: string): string {
-  // Control chars in the span are intentional: testing "entirely ASCII", not "printable".
-  // eslint-disable-next-line no-control-regex
-  if (value === '' || /^[\x00-\x7F]*$/.test(value)) return value;
-  const prefix = '=?utf-8?B?';
-  const suffix = '?=';
-  const maxInner = 75 - prefix.length - suffix.length;
-  // base64 emits 4 output chars per 3 input bytes (always padded to a
-  // multiple of 4). Round maxInner DOWN to a multiple of 4 first.
-  const maxBytesPerChunk = Math.floor(maxInner / 4) * 3;
-
-  // Chunk on codepoint boundaries: many MUAs decode each encoded-word separately, so a mid-UTF-8-sequence split renders U+FFFD.
-  const chunks: string[] = [];
-  let buffered: number[] = [];
-  for (const char of value) {
-    const charBytes = Array.from(Buffer.from(char, 'utf-8'));
-    if (buffered.length + charBytes.length > maxBytesPerChunk && buffered.length > 0) {
-      chunks.push(`${prefix}${Buffer.from(buffered).toString('base64')}${suffix}`);
-      buffered = [];
-    }
-    buffered.push(...charBytes);
-  }
-  if (buffered.length > 0) {
-    chunks.push(`${prefix}${Buffer.from(buffered).toString('base64')}${suffix}`);
-  }
-  return chunks.join('\r\n ');
-}
-
-/** Address-list headers (To/Cc/Bcc/From): RFC 2047 forbids encoded-words in the addr-spec, so only display names are encoded. */
-export function encodeAddressHeader(value: string): string {
-  if (value === '') return '';
-  return value.split(',').map((part) => {
-    const trimmed = part.trim();
-    if (trimmed === '') return '';
-    const m = trimmed.match(/^(.*?)<([^>]+)>$/);
-    if (m) {
-      const rawName = m[1].trim().replace(/^"(.*)"$/, '$1').trim();
-      const addr = m[2].trim();
-      if (rawName === '') return `<${addr}>`;
-      return `${encodeHeaderValue(rawName)} <${addr}>`;
-    }
-    return trimmed;
-  }).filter(Boolean).join(', ');
-}
+import MailComposer from 'nodemailer/lib/mail-composer/index.js';
+import type Mail from 'nodemailer/lib/mailer/index.js';
 
 /** RFC 5322 §2.3 forbids bare CR or LF in bodies; normalize everything to CRLF. */
 export function normalizeBodyLineEndings(body: string): string {
@@ -150,6 +105,12 @@ export function buildReplyHeaders(
   };
 }
 
+export interface ComposeAttachment {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+}
+
 export interface ComposeInput {
   from: string;
   to: string;
@@ -159,71 +120,54 @@ export interface ComposeInput {
   cc?: string;
   inReplyTo?: string;
   references?: string;
+  attachments?: ComposeAttachment[];
+}
+
+/** Header-injection guard slug; caller maps to a validation_error envelope. */
+export class HeaderInjectionError extends Error {
+  constructor(public field: string) {
+    super(`E_HEADER_INJECTION: "${field}" must not contain CR or LF (header injection).`);
+  }
 }
 
 /**
- * The single MIME-assembly seam for gmail_send and gmail_create_draft (A3).
- * Extracted byte-for-byte from the previously-duplicated inline assembly;
- * header order and encoders are unchanged so output is identical. A4 swaps
- * the internals to MailComposer.
+ * The single MIME-assembly seam for gmail_send and gmail_create_draft (A4).
+ * MailComposer owns header/RFC-2047/address encoding and boundary generation,
+ * which closes the CRLF header-injection hole in the old hand-rolled encoders.
+ * A deterministic pre-check rejects CR/LF in address/subject headers with a
+ * named error (belt-and-suspenders over MailComposer's own stripping).
+ *
+ * Bare-LF defense (Gmail's raw upload skips SMTP line-ending normalization):
+ * normalize text/html to CRLF, build with newline:"\r\n" and base64 CTE.
  */
-export function composeRaw(input: ComposeInput): string {
-  const headers = [
-    `From: ${encodeAddressHeader(input.from)}`,
-    `To: ${encodeAddressHeader(input.to)}`,
-    `Subject: ${encodeHeaderValue(input.subject)}`,
-    'MIME-Version: 1.0',
-  ];
-
-  let bodyText: string;
-  if (input.html) {
-    const { contentType, body: mp } = buildMultipartAlternative(input.text, input.html);
-    headers.push(`Content-Type: ${contentType}`);
-    bodyText = mp;
-  } else {
-    headers.push('Content-Type: text/plain; charset="UTF-8"');
-    headers.push('Content-Transfer-Encoding: 8bit');
-    bodyText = normalizeBodyLineEndings(input.text);
+export async function composeRaw(input: ComposeInput): Promise<string> {
+  for (const field of ['from', 'to', 'cc', 'subject'] as const) {
+    const v = input[field];
+    if (typeof v === 'string' && /[\r\n]/.test(v)) throw new HeaderInjectionError(field);
   }
 
-  if (input.cc) headers.push(`Cc: ${encodeAddressHeader(input.cc)}`);
-  if (input.inReplyTo !== undefined && input.references !== undefined) {
-    headers.push(`In-Reply-To: ${input.inReplyTo}`);
-    headers.push(`References: ${input.references}`);
-  }
-
-  const rawMessage = [...headers, '', bodyText].join('\r\n');
-  return Buffer.from(rawMessage, 'utf-8').toString('base64url');
-}
-
-/** RFC 2046 §5.1.1 boundary token: hex output is all bcharsnospace, length well under the 70-char cap. */
-function generateMimeBoundary(): string {
-  // 5-char prefix + 32 hex chars = 37 chars, well under the 70-char limit.
-  return `=_gm_${randomBytes(16).toString('hex')}`;
-}
-
-/** multipart/alternative (plain fallback + HTML); caller composes the message: headers (incl. returned Content-Type) + CRLF + body. */
-export function buildMultipartAlternative(
-  plainBody: string,
-  htmlBody: string,
-): { contentType: string; body: string } {
-  const boundary = generateMimeBoundary();
-  const parts = [
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    'Content-Transfer-Encoding: 8bit',
-    '',
-    normalizeBodyLineEndings(plainBody),
-    `--${boundary}`,
-    'Content-Type: text/html; charset="UTF-8"',
-    'Content-Transfer-Encoding: 8bit',
-    '',
-    normalizeBodyLineEndings(htmlBody),
-    `--${boundary}--`,
-    '',
-  ];
-  return {
-    contentType: `multipart/alternative; boundary="${boundary}"`,
-    body: parts.join('\r\n'),
+  const options: Mail.Options & { newline?: string; textEncoding?: 'base64' | 'quoted-printable' } = {
+    from: input.from,
+    to: input.to,
+    cc: input.cc || undefined,
+    subject: input.subject,
+    text: normalizeBodyLineEndings(input.text),
+    html: input.html ? normalizeBodyLineEndings(input.html) : undefined,
+    inReplyTo: input.inReplyTo,
+    references: input.references,
+    attachments: input.attachments,
+    newline: '\r\n',
+    textEncoding: 'base64',
+    // This server reads any attachment file itself and passes a Buffer;
+    // MailComposer must never touch the filesystem or network (SSRF / local
+    // file-read defense-in-depth).
+    disableFileAccess: true,
+    disableUrlAccess: true,
   };
+  const mail = new MailComposer(options);
+
+  const built: Buffer = await new Promise((resolve, reject) => {
+    mail.compile().build((err, message) => (err ? reject(err) : resolve(message)));
+  });
+  return built.toString('base64url');
 }

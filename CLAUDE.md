@@ -84,6 +84,10 @@ server.registerTool(
 
 Reads are never gated. CUD is **deny-by-default**: `GOOGLE_PROFILE` (read-only / safe-writes / full-writes) + `GOOGLE_READ_ONLY` + `GOOGLE_WRITE_ALLOW`/`DENY` globs. Verdict + precedence in `write-control.ts`, tested in `tests/write-control.test.ts`. User-facing env reference: `docs/configuration.md`.
 
+## Email compose (gmail_send / gmail_create_draft)
+
+Both route through `composeRaw()` in `gmail-mime.ts` (nodemailer MailComposer): header/RFC-2047/address encoding and boundaries are the library's job. A pre-check rejects CR/LF in `from`/`to`/`cc`/`subject` (`E_HEADER_INJECTION`). `attachments` are read by THIS server into buffers (`disableFileAccess`/`disableUrlAccess` on MailComposer), absolute-path-only, basename-guarded, ~35 MB total cap. Do NOT reintroduce hand-rolled header encoders (they were the injection surface, removed in A4).
+
 ## Drive specifics
 
 - Every `fileId` call: `supportsAllDrives: true`; lists: `includeItemsFromAllDrives: true`.
