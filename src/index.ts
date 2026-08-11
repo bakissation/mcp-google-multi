@@ -110,6 +110,18 @@ async function main() {
     return;
   }
 
+  if (process.argv.includes('account') && process.argv.includes('export')) {
+    const { runExportCli } = await import('./registry-transfer.js');
+    process.exitCode = await runExportCli(process.argv);
+    return;
+  }
+
+  if (process.argv.includes('account') && process.argv.includes('import')) {
+    const { runImportCli } = await import('./registry-transfer.js');
+    process.exitCode = await runImportCli(process.argv);
+    return;
+  }
+
   if (process.argv.includes('config') && process.argv.includes('check')) {
     const ctx = buildIdentityContext();
     const policy = ctx.policy;
