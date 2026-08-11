@@ -1,0 +1,29 @@
+# Render Blueprint (B17) — one-click remote HTTP deploy.
+# New → Blueprint → point at your fork. Render builds the repo Dockerfile and
+# prompts for the `sync: false` values; nothing secret is committed here.
+# Walkthrough: docs/http-setup.md#render
+services:
+  - type: web
+    name: mcp-google-multi
+    runtime: docker           # reuses the distroless Dockerfile (B16)
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    autoDeploy: false         # never redeploy on upstream push without you asking
+    healthCheckPath: /health
+    envVars:
+      - key: MCP_TRANSPORT
+        value: http
+      - key: MCP_PUBLIC_URL
+        sync: false           # paste the service's public URL after the first deploy
+      - key: MCP_OWNER_EMAILS
+        sync: false           # your Google email(s); empty ⇒ startup refuses (by design)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_ACCOUNTS
+        sync: false           # alias:email pairs, e.g. work:you@company.com,personal:you@gmail.com
+      - key: MASTER_KEY
+        generateValue: true   # Render mints it once and PERSISTS it across redeploys —
+                              # a per-deploy regeneration would brick existing tokens.
