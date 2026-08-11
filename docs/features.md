@@ -100,4 +100,12 @@ Two always-visible, human-approved tools (`anthropic/requiresUserInteraction`) m
 
 Both reuse the loopback consent flow (your own OAuth client), so tokens never leave your machine. (HTTP-transport consent lands with the OAuth authorization server.)
 
+### Move a setup to another machine: `account export` / `account import`
+
+`mcp-google-multi account export --out bundle.enc` packs your registry (`config.json` accounts + scope profiles) and every encrypted `<alias>.enc` token file into a single bundle, encrypted under a **passphrase** you choose (set `MCP_TRANSFER_PASSPHRASE` or you'll be prompted). Secrets like `MASTER_KEY` and your client secret are never in the bundle.
+
+`mcp-google-multi account import bundle.enc` decrypts it and **merges** the accounts into the target's registry — new aliases are added, and an alias that already exists is skipped (never clobbering local tokens) unless you pass `--replace`. It backs the choice on collision, then points you at `doctor` to check token health.
+
+Two caveats: the bundled token files stay encrypted under the **source** machine's `MASTER_KEY`, so set the same `MASTER_KEY` on the target to use them (otherwise re-authenticate with `account_reauth`); and the target must already have at least one account configured (the server won't start with an empty registry), so configure the target first, then import to bring the rest.
+
 - **`account_write_config`** registers this server with your MCP client so you don't hand-edit JSON. It detects Claude Code, Claude Desktop, and Cursor, then returns the exact entry to add — a `claude mcp add …` command for Claude Code, or an `mcpServers` JSON snippet for the file-based clients. Pass `write:true` to write the detected file configs in place; it backs the file up first, updates any existing entry rather than duplicating, and refuses to clobber a malformed config (it prints the snippet instead). Secrets are never inlined — the server loads its own `.env`, so the entry carries none. The same flow is available on the CLI: `mcp-google-multi write-client-config [--client claude-code|claude-desktop|cursor] [--url <https://…/mcp>] [--print] [--yes]` (prints instead of writing when non-interactive or `--print`).
