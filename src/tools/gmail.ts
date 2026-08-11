@@ -195,6 +195,7 @@ export function registerGmailTools(server: ToolRegistry): void {
   server.registerTool(
     'gmail_read',
     {
+      _meta: { 'anthropic/maxResultSizeChars': 50_000 },
       description: 'Read a full Gmail message by ID (body capped at 50k chars unless full=true)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
@@ -227,6 +228,7 @@ export function registerGmailTools(server: ToolRegistry): void {
   server.registerTool(
     'gmail_read_thread',
     {
+      _meta: { 'anthropic/maxResultSizeChars': 50_000 },
       description: 'Read all messages in a Gmail thread (bodies capped at 50k chars each unless full=true). mode=summary returns headers + snippets only.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),

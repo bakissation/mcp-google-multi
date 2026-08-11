@@ -107,7 +107,12 @@ export function deriveAccountHealth(alias: string, deps: AccountHealthDeps = DEF
 }
 
 export function registerAccountTools(registry: ToolRegistry, deps: AccountHealthDeps = DEFAULT_DEPS): void {
-  registry.registerMeta(
+  const registerMeta = registry.registerMeta as unknown as (
+    name: string,
+    config: { description: string; inputSchema: Record<string, unknown>; _meta?: Record<string, unknown> },
+    handler: () => unknown,
+  ) => void;
+  registerMeta(
     'account_list',
     {
       description:
@@ -115,6 +120,7 @@ export function registerAccountTools(registry: ToolRegistry, deps: AccountHealth
         '(ok / expired_refreshable / needs_reauth / missing / decrypt_error), and granted vs configured scopes. ' +
         'Use this to see which account aliases are available and healthy.',
       inputSchema: {},
+      _meta: { 'anthropic/alwaysLoad': true },
     },
     async () => {
       refreshAccountSetIfStale();

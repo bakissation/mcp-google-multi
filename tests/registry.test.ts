@@ -94,7 +94,7 @@ describe('ToolRegistry', () => {
     reg.registerTool('gmail_modify_labels', { description: 'x' }, () => {});
     reg.registerTool('gmail_delete', { description: 'x' }, () => {});
     const expected: Record<string, { readOnlyHint: boolean; destructiveHint: boolean }> = {
-      gmail_search: { readOnlyHint: true, destructiveHint: false },
+      gmail_search: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       gmail_create_draft: { readOnlyHint: false, destructiveHint: false },
       gmail_modify_labels: { readOnlyHint: false, destructiveHint: true },
       gmail_delete: { readOnlyHint: false, destructiveHint: true },
@@ -192,7 +192,7 @@ describe('ToolRegistry', () => {
     expect(search.inputSchema.type).toBe('object');
     expect(Object.keys(search.inputSchema.properties)).toEqual(['account']);
     expect(search.inputSchema.required).toEqual(['account']);
-    expect(search.annotations).toEqual({ readOnlyHint: true, destructiveHint: false });
+    expect(search.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
 
     const schemaOf = (r: { tools: unknown[] }, name: string) =>
       (r.tools.find((t) => (t as { name: string }).name === name) as { inputSchema: unknown }).inputSchema;

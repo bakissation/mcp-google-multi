@@ -145,6 +145,8 @@ export function registerFormsTools(server: ToolRegistry): void {
   server.registerTool(
     'forms_batch_update',
     {
+      // Insert/append-capable or non-convergent: a retry duplicates content.
+      annotations: { idempotentHint: false },
       description: 'Generic forms.batchUpdate pass-through: add/edit/delete questions, update form info and settings. See https://developers.google.com/workspace/forms/api/reference/rest/v1/forms/request',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),

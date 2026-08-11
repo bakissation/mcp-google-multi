@@ -29,6 +29,10 @@ export interface ToolEntry {
   description: string;
   inputShape: z.ZodRawShape;
   annotations: Record<string, unknown>;
+  /** anthropic/* client extension keys: honoring clients (Claude Code) read
+   * these from the wire Tool's _meta — SDK clients STRIP unknown keys from
+   * annotations (closed ToolAnnotationsSchema), so they must never live there. */
+  clientMeta?: Record<string, unknown>;
   meta: boolean;
   /** Discovery-codegen provenance (the only tools passing an explicit cud). */
   generated: boolean;
@@ -52,6 +56,7 @@ interface ToolConfig {
   // Discovery verbs (undeploy, wipeout, …) would slip past name-based write-control.
   cud?: Cud;
   requiredScopes?: readonly string[];
+  _meta?: Record<string, unknown>;
 }
 
 const CUD_OVERRIDES: Record<string, Cud> = {
@@ -114,9 +119,12 @@ export class ToolRegistry {
         SERVICE_OVERRIDES[name] ?? (name.includes('_') ? name.slice(0, name.indexOf('_')) : name);
       const cud = config.cud ?? inferCud(name);
       // destructiveHint=false claims "additive only" (MCP spec) — updates overwrite, so they stay true.
+      // idempotent: reads trivially, deletes (already-gone = same), updates
+      // (overwrite converges); creates are not (send twice = two emails).
       const annotations = {
         readOnlyHint: cud === 'read',
         destructiveHint: cud === 'delete' || cud === 'update',
+        idempotentHint: cud !== 'create',
         ...config.annotations,
       };
 
@@ -143,6 +151,7 @@ export class ToolRegistry {
         description: config.description ?? '',
         inputShape,
         annotations,
+        clientMeta: config._meta,
         meta: this.registeringMeta,
         generated: config.cud !== undefined,
         requiredScopes: config.requiredScopes,
@@ -280,7 +289,7 @@ export class ToolRegistry {
     }));
   }
 
-  private toToolJson(tool: ToolEntry): { name: string; description: string; inputSchema: unknown; annotations: Record<string, unknown> } {
+  private toToolJson(tool: ToolEntry): { name: string; description: string; inputSchema: unknown; annotations: Record<string, unknown>; _meta?: Record<string, unknown> } {
     let inputSchema = this.jsonSchemaCache.get(tool.name);
     if (!inputSchema) {
       inputSchema = z.toJSONSchema(z.object(tool.inputShape), { target: 'draft-7', io: 'input' });
@@ -291,6 +300,7 @@ export class ToolRegistry {
       description: tool.description,
       inputSchema,
       annotations: tool.annotations,
+      ...(tool.clientMeta ? { _meta: tool.clientMeta } : {}),
     };
   }
 }

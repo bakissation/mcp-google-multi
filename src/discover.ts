@@ -9,12 +9,22 @@ function opVocabulary(registry: ToolRegistry, service: string): string {
   return [...new Set(ops)].join(', ');
 }
 
+// SDK ToolAnnotations is a closed type; anthropic/* client hints ride through
+// our custom tools/list handler, so widen the register signature locally
+// (same idiom as generated/_shared.ts).
+type WideRegister = (
+  name: string,
+  config: { description: string; inputSchema: z.ZodRawShape; _meta?: Record<string, unknown> },
+  handler: (args: Record<string, unknown>) => unknown,
+) => void;
+
 export function registerDiscoverTools(registry: ToolRegistry, policy: Policy): void {
+  const registerMeta = registry.registerMeta as unknown as WideRegister;
   // Agent-controllable runtime expansion (D3 refinement): reveal the whole
   // curated quality layer for heavy Google work, collapse to reclaim the
   // name/schema context budget after. stdio-only semantics — over stateless
   // HTTP the mode is forced curated and these are no-ops.
-  registry.registerMeta(
+  registerMeta(
     'discover_all',
     {
       description:
@@ -22,6 +32,7 @@ export function registerDiscoverTools(registry: ToolRegistry, policy: Policy): v
         'Use when starting substantial Google work so the shaped, high-quality tools are ' +
         'directly callable; prefer them over google_api_call. Pair with discover_reset when done.',
       inputSchema: {},
+      _meta: { 'anthropic/alwaysLoad': true },
     },
     async () => {
       const changed = registry.expand();
@@ -43,7 +54,7 @@ export function registerDiscoverTools(registry: ToolRegistry, policy: Policy): v
     },
   );
 
-  registry.registerMeta(
+  registerMeta(
     'discover_reset',
     {
       description:
@@ -51,6 +62,7 @@ export function registerDiscoverTools(registry: ToolRegistry, policy: Policy): v
         'default lazy mode), reclaiming context budget after heavy Google work. All tools remain ' +
         'callable by name after collapsing.',
       inputSchema: {},
+      _meta: { 'anthropic/alwaysLoad': true },
     },
     async () => {
       const changed = registry.collapse();
@@ -71,7 +83,7 @@ export function registerDiscoverTools(registry: ToolRegistry, policy: Policy): v
   );
 
   for (const service of registry.services()) {
-    registry.registerMeta(
+    registerMeta(
       `${service}_discover`,
       {
         description:
@@ -83,6 +95,7 @@ export function registerDiscoverTools(registry: ToolRegistry, policy: Policy): v
         inputSchema: {
           query: z.string().optional().describe('Keyword to filter the returned operations'),
         },
+        _meta: { 'anthropic/alwaysLoad': true },
       },
       async ({ query }) => {
         const operations = registry.catalog(service, query as string | undefined);

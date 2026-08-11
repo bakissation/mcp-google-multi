@@ -853,6 +853,8 @@ export function registerSheetsTools(server: ToolRegistry): void {
   server.registerTool(
     'sheets_find_replace',
     {
+      // Insert/append-capable or non-convergent: a retry duplicates content.
+      annotations: { idempotentHint: false },
       description: 'Find and replace text across a range, a sheet, or all sheets. Supports case sensitivity, full-cell match, regex, and formula scope.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
@@ -1161,6 +1163,8 @@ export function registerSheetsTools(server: ToolRegistry): void {
   server.registerTool(
     'sheets_batch_update',
     {
+      // Insert/append-capable or non-convergent: a retry duplicates content.
+      annotations: { idempotentHint: false },
       description: 'Generic spreadsheets.batchUpdate pass-through. Accepts the full Request union (~70 types). Use this for advanced operations not covered by a dedicated tool. See https://developers.google.com/workspace/sheets/api/reference/rest/v4/spreadsheets/request',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
