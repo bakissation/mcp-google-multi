@@ -12,6 +12,7 @@ import { ToolRegistry } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
 import { registerAccountTools } from './tools/accounts-tool.js';
+import { registerDiagnoseTool } from './doctor.js';
 import { getToolsets, toolsetEnabled } from './toolsets.js';
 import { isAllowed, describePolicy } from './write-control.js';
 import { buildIdentityContext, type IdentityContext } from './identity.js';
@@ -65,6 +66,7 @@ function buildRegistry(server: McpServer, ctx: IdentityContext): ToolRegistry {
   registerDiscoverTools(registry, policy);
   registerEscapeTools(registry, policy);
   registerAccountTools(registry);
+  registerDiagnoseTool(registry);
   return registry;
 }
 
@@ -84,6 +86,12 @@ async function main() {
   if (process.argv.includes('migrate-config')) {
     const { runMigrateConfig } = await import('./migrate-config.js');
     runMigrateConfig();
+    return;
+  }
+
+  if (process.argv.includes('doctor')) {
+    const { runDoctorCli } = await import('./doctor.js');
+    process.exitCode = await runDoctorCli(process.argv, pkg.version);
     return;
   }
 

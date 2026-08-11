@@ -80,3 +80,10 @@ Any value you pass explicitly wins over the derived one (`to`, `cc`, `subject` a
 ### Contact resolver
 
 `contacts_resolve` turns a free-text name into **one canonical email**, so an agent stops hand-expanding transliterations (`Rym OR Rim OR Reem`) into `contacts_search` OR-queries. It searches saved contacts (and, by default, auto-saved "other contacts" you've emailed) and applies a deterministic tie-break: exact name (accent-folded) over prefix, saved over other-contact, primary/`work` email over the rest, fuller record over bare. It returns one confident `{ resolved: { name, email, resourceName, source } }`, an explicit `{ ambiguous: true, candidates: [...] }` when a real tie survives, or `{ resolved: null }` for no match (never an error). A missing "other contacts" scope degrades to saved contacts only.
+
+
+## Health check: `doctor` & `diagnose`
+
+`mcp-google-multi doctor` gives a sectioned, exit-coded health report (models `brew doctor`): **Runtime** (Node ≥ 22), **Config** (config.json + legacy env/`.env` detection with the exact `migrate-config`/`mv` fix), **Keys** (`MASTER_KEY` provenance; a brick — unprovisioned key with encrypted tokens present — is a hard fail pointing at `reset`), **Tokens** (per-account status), **Scopes** (three-state granted-vs-profile), and **API enablement**. Every warn/fail carries a copy-pasteable remediation; it is strictly read-only (no mutation). Exit is non-zero on any FAIL (`--strict` also fails on WARN), so `doctor` can gate CI and migration scripts. Flags: `--json` (machine-readable on stdout), `--strict`, `--report` (a redacted, paste-ready bug report that masks email local-parts and never includes token values or keys).
+
+The same engine is exposed to agents as the read-only **`diagnose`** tool, returning the structured report so an agent can self-diagnose an auth/config failure and surface the fix. (HTTP-transport checks and the live per-service API-enablement probe land with the OAuth authorization server.)
