@@ -172,7 +172,6 @@ async function main() {
     return;
   }
 
-  const ctx = buildIdentityContext();
   // Resolve (or provision) the master key BEFORE serving: the hard guard is
   // specced "fatal at startup", never mid-dispatch.
   const { resolveMasterKey } = await import('./master-key.js');
@@ -193,7 +192,7 @@ async function main() {
   // never rebuilt per request); `both` runs the two concurrently.
   if (wantStdio) {
     const server = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
-    const registry = buildRegistry(server, ctx);
+    const registry = buildRegistry(server, buildIdentityContext(process.env, { transport: 'stdio' }));
     registry.installListHandler();
     registerSetupPrompt(server);
     await server.connect(new StdioServerTransport());
@@ -225,7 +224,7 @@ async function main() {
       process.stderr.write(`GOOGLE_DISCOVERY="${configuredMode}" is ignored over HTTP; the stateless transport forces "curated".\n`);
     }
     const httpServer = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
-    const registry = buildRegistry(httpServer, ctx, 'curated');
+    const registry = buildRegistry(httpServer, buildIdentityContext(process.env, { transport: 'http' }), 'curated');
     registry.installListHandler();
     registerSetupPrompt(httpServer);
     const host = new HttpTransportHost({
