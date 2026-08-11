@@ -91,6 +91,21 @@ Each account can point at a named **scope profile** so consent is exactly what t
 
 Inspect the resolved setup any time: `mcp-google-multi config check`.
 
+## Transport
+
+By default the server speaks **stdio** (`MCP_TRANSPORT=stdio`), the zero-network local transport every example uses. It can also serve **Streamable HTTP** for MCP clients that connect over a URL.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `MCP_TRANSPORT` | `stdio` | `stdio`, `http`, or `both` |
+| `MCP_HTTP_HOST` | `127.0.0.1` | bind address (loopback) |
+| `MCP_HTTP_PORT` | `4243` | bind port |
+| `MCP_PUBLIC_URL` | `http://<host>:<port>` | the canonical public base URL; `${MCP_PUBLIC_URL}/mcp` is the endpoint clients connect to |
+| `MCP_OWNER_EMAILS` | — | required for `http`: the Google email(s) allowed to authenticate |
+| `MCP_ALLOWED_ORIGINS` | — | extra Origins to allow beyond `MCP_PUBLIC_URL` and `https://claude.ai` |
+
+> **HTTP is currently loopback-only.** Until the built-in OAuth authorization server ships, the server refuses to start any exposed HTTP shape (a non-loopback bind, or a non-loopback `MCP_PUBLIC_URL` — i.e. a tunnel/reverse proxy in front). Loopback callers are trusted as the owner, the same trust model as stdio, so do not run HTTP mode on a shared host. Register the local URL with your client using `mcp-google-multi write-client-config --url http://127.0.0.1:4243/mcp`.
+
 ## Write-control (deny-by-default)
 
 Reads are never gated. **Every create/update/delete is off until you opt in** — pick a profile:
