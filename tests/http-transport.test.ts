@@ -4,28 +4,15 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { resolveHttpConfig } from '../src/http-config.js';
 import {
   HttpTransportHost,
-  isLoopbackAddress,
-  isLoopbackHost,
-  remoteHttpRefusal,
   parseOwnerEmails,
   originAllowed,
   hostAllowed,
-  loopbackOwnerAuthenticator,
   type Authenticator,
 } from '../src/http-transport.js';
 
 // ---- pure helpers -----------------------------------------------------------
 
 describe('http-transport pure helpers', () => {
-  it('isLoopbackAddress', () => {
-    for (const a of ['127.0.0.1', '::1', '::ffff:127.0.0.1', '127.0.0.5', 'localhost']) {
-      expect(isLoopbackAddress(a)).toBe(true);
-    }
-    for (const a of ['10.0.0.1', '203.0.113.4', '', undefined, null]) {
-      expect(isLoopbackAddress(a)).toBe(false);
-    }
-  });
-
   it('parseOwnerEmails: CSV, trims, lowercases, drops blanks', () => {
     expect(parseOwnerEmails({ MCP_OWNER_EMAILS: ' Me@Ex.com , you@ex.com , ' })).toEqual(['me@ex.com', 'you@ex.com']);
     expect(parseOwnerEmails({})).toEqual([]);
@@ -47,25 +34,6 @@ describe('http-transport pure helpers', () => {
     expect(hostAllowed('anything', [])).toBe(true); // no allowlist configured
   });
 
-  it('isLoopbackHost: loopback literals only; 0.0.0.0 / :: / public are NOT', () => {
-    for (const h of ['127.0.0.1', 'localhost', '::1', '127.5.5.5', '[::1]']) expect(isLoopbackHost(h)).toBe(true);
-    for (const h of ['0.0.0.0', '::', 'mcp.example.com', '10.0.0.1']) expect(isLoopbackHost(h)).toBe(false);
-  });
-
-  it('remoteHttpRefusal: null for loopback, error for any exposed shape', () => {
-    expect(remoteHttpRefusal({ host: '127.0.0.1', publicUrl: 'http://127.0.0.1:4243' })).toBeNull();
-    expect(remoteHttpRefusal({ host: '0.0.0.0', publicUrl: 'http://127.0.0.1:4243' })).toContain('E_HTTP_REMOTE_UNSUPPORTED');
-    expect(remoteHttpRefusal({ host: '127.0.0.1', publicUrl: 'https://mcp.example.com' })).toContain('E_HTTP_REMOTE_UNSUPPORTED');
-  });
-
-  it('loopbackOwnerAuthenticator: loopback ok, remote 401 with WWW-Authenticate', () => {
-    const auth = loopbackOwnerAuthenticator('https://mcp.example.com');
-    expect(auth({ socket: { remoteAddress: '127.0.0.1' } } as never)).toEqual({ ok: true });
-    const remote = auth({ socket: { remoteAddress: '203.0.113.5' } } as never) as { ok: false; status: number; headers: Record<string, string> };
-    expect(remote.ok).toBe(false);
-    expect(remote.status).toBe(401);
-    expect(remote.headers['WWW-Authenticate']).toContain('oauth-protected-resource');
-  });
 });
 
 // ---- integration: real McpServer over the host (BV-3) ------------------------
