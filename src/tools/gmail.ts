@@ -719,7 +719,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Create a new custom Gmail label',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        name: z.string().describe('Label name, e.g. "Ideacrafters/ComptaLegal"'),
+        name: z.string().describe('Label name, e.g. "Work/Projects" (nested labels use "/")'),
         messageListVisibility: z.enum(['show', 'hide']).optional()
           .describe('Whether messages with this label show in message list (default: show)'),
         labelListVisibility: z.enum(['labelShow', 'labelShowIfUnread', 'labelHide']).optional()
