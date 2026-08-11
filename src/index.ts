@@ -13,6 +13,7 @@ import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
 import { registerAccountTools } from './tools/accounts-tool.js';
 import { registerDiagnoseTool } from './doctor.js';
+import { registerAccountWizardTools } from './tools/account-wizard.js';
 import { getToolsets, toolsetEnabled } from './toolsets.js';
 import { isAllowed, describePolicy } from './write-control.js';
 import { buildIdentityContext, type IdentityContext } from './identity.js';
@@ -68,6 +69,7 @@ function buildRegistry(server: McpServer, ctx: IdentityContext): ToolRegistry {
   registerEscapeTools(registry, policy);
   registerAccountTools(registry);
   registerDiagnoseTool(registry);
+  registerAccountWizardTools(registry, server);
   return registry;
 }
 
