@@ -1,6 +1,6 @@
 # Features tour
 
-How the server keeps 872 tools usable, fast, and safe. Back to the [README](../README.md).
+How the server keeps 874 tools usable, fast, and safe. Back to the [README](../README.md).
 
 ## Discover-first tools (tiny idle context)
 
@@ -112,4 +112,4 @@ Two caveats: the bundled token files stay encrypted under the **source** machine
 
 ## Remote access over HTTP (built-in OAuth)
 
-Set `MCP_TRANSPORT=http` and the server becomes its own **OAuth 2.1 authorization server**, so Claude Code's native `/mcp` authenticate flow and the claude.ai custom connector work with zero custom UI. A connecting client is sent through Google login; only an email in `MCP_OWNER_EMAILS` (the owner gate) is admitted, and the server then mints its own short-lived, audience-bound token for the client. The two credential families never cross: your per-account Google tokens are never handed to the client, and a client token is never presented to Google (federate-and-hold). It advertises PRM + AS metadata (`S256` PKCE, no JWKS — the server is its own resource server), federates via CIMD (`MCP_CIMD_ALLOWED_ISSUERS`, default `claude.ai`) with a minimal DCR fallback, SSRF-guards every metadata fetch, and rotates refresh tokens. Behind a Cloudflare named tunnel keep the bind on loopback and set `MCP_PUBLIC_URL` to the public HTTPS host. See [configuration.md](./configuration.md#transport).
+Set `MCP_TRANSPORT=http` and the server becomes its own **OAuth 2.1 authorization server**, so Claude Code's native `/mcp` authenticate flow and the claude.ai custom connector work with zero custom UI. A connecting client is sent through Google login; only an email in `MCP_OWNER_EMAILS` (the owner gate) is admitted, and the server then mints its own short-lived, audience-bound token for the client. The two credential families never cross: your per-account Google tokens are never handed to the client, and a client token is never presented to Google (federate-and-hold). It advertises PRM + AS metadata (`S256` PKCE, no JWKS — the server is its own resource server), federates via CIMD (`MCP_CIMD_ALLOWED_ISSUERS`, default `claude.ai`) with a minimal DCR fallback, SSRF-guards every metadata fetch, and rotates refresh tokens. Behind a Cloudflare named tunnel keep the bind on loopback and set `MCP_PUBLIC_URL` to the public HTTPS host. See [configuration.md](./configuration.md#transport) for the keys, or [http-setup.md](./http-setup.md) for the full named-tunnel, Docker, and one-click Render/Railway walkthrough.
