@@ -8,7 +8,9 @@ const FANOUT_CONCURRENCY = 5;
 export function fanoutAccountField(description: string): z.ZodType {
   const csvExample = ACCOUNTS.length > 1 ? `; or a CSV subset like "${ACCOUNTS.slice(0, 2).join(',')}"` : '';
   return z
-    .union([z.enum([...ACCOUNTS, '*'] as [string, ...string[]]), z.string().regex(CSV_RE)])
+    // '*' first so the tuple is statically non-empty even when ACCOUNTS is empty
+    // (a fresh install): z.enum requires [string, ...string[]].
+    .union([z.enum(['*', ...ACCOUNTS]), z.string().regex(CSV_RE)])
     .optional()
     .describe(`${description}; "*" = all accounts${csvExample}; omit for the default account`);
 }

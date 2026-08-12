@@ -2,7 +2,7 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean } from './_coerce.js';
 import { drive as driveClient, type drive_v3 } from '@googleapis/drive';
-import { ACCOUNTS, getAccountSet } from '../accounts.js';
+import { accountAliasSchema, getAccountSet } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
@@ -15,10 +15,10 @@ import * as crypto from 'crypto';
 import { pipeline } from 'node:stream/promises';
 import mime from 'mime-types';
 
-const accountEnum = z.enum(ACCOUNTS).optional();
+const accountEnum = accountAliasSchema.optional();
 // drive_transfer's two-account form is the sanctioned schema exception and
 // stays REQUIRED: omission must fail at the schema, not as a runtime riddle.
-const requiredAccountEnum = z.enum(ACCOUNTS);
+const requiredAccountEnum = accountAliasSchema;
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const FALLBACK_MAX_BYTES = 1024 * 1024 * 1024; // 1GB

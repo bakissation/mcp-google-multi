@@ -2,12 +2,12 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 import { sheets as sheetsClient } from '@googleapis/sheets';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 
-const accountEnum = z.enum(ACCOUNTS).optional();
+const accountEnum = accountAliasSchema.optional();
 
 export function registerSheetsTools(server: ToolRegistry): void {
   server.registerTool(

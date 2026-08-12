@@ -3,12 +3,12 @@ import { z } from 'zod';
 import { coerceArray, coerceJson } from './_coerce.js';
 import { searchconsole as searchconsoleClient } from '@googleapis/searchconsole';
 import { webmasters as webmastersClient } from '@googleapis/webmasters';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 
-const accountEnum = z.enum(ACCOUNTS).optional();
+const accountEnum = accountAliasSchema.optional();
 
 export function registerSearchConsoleTools(server: ToolRegistry): void {
   // ─── Sites ───────────────────────────────────────────────

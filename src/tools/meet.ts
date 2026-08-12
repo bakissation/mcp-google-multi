@@ -1,12 +1,12 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { meet as meetClient } from '@googleapis/meet';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 
-const accountEnum = z.enum(ACCOUNTS).optional();
+const accountEnum = accountAliasSchema.optional();
 
 export function registerMeetTools(server: ToolRegistry): void {
   // ─── Conference records (past meetings) ────────────────────────────────

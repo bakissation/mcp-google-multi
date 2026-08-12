@@ -2,7 +2,7 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 import { gmail as gmailClient } from '@googleapis/gmail';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError, mapGoogleError } from './_errors.js';
@@ -16,7 +16,7 @@ import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../t
 import * as path from 'path';
 import * as fs from 'fs';
 
-const accountEnum = z.enum(ACCOUNTS).optional();
+const accountEnum = accountAliasSchema.optional();
 
 function getHeader(
   headers: { name?: string | null; value?: string | null }[] | undefined,

@@ -69,11 +69,17 @@ describe('resolveAccounts', () => {
     expect(set.configs.b.admin).toBe(true);
   });
 
-  it('E_NO_ACCOUNTS_CONFIGURED: neither env nor file refuses to start', () => {
-    const { stderr } = spyExit();
-    expect(() => resolveAccounts({} as NodeJS.ProcessEnv, cfgPath)).toThrow('exit-called');
-    expect(String(stderr.mock.calls[0]?.[0])).toContain('E_NO_ACCOUNTS_CONFIGURED');
-    expect(String(stderr.mock.calls[0]?.[0])).toContain('migrate-config');
+  it('empty registry is non-fatal at module-load severity (gap #23): returns an empty set, never exits', () => {
+    // The refuse-to-start moved off module load so the bootstrap/diagnostic CLIs
+    // (doctor/reset/import/config check) can run on a fresh install. The SERVER
+    // still refuses empty via assertServerAccountsConfigured(); the dispatch
+    // reload ('throw') still raises (see the reload-safety test below).
+    const { exit } = spyExit();
+    const set = resolveAccounts({} as NodeJS.ProcessEnv, cfgPath);
+    expect(set.aliases).toEqual([]);
+    expect(set.configs).toEqual({});
+    expect(set.source).toBe('file');
+    expect(exit).not.toHaveBeenCalled();
   });
 
   it('first-run shim materializes config.json from env, and only once', () => {

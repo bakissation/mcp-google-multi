@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../registry.js';
 import { isAllowed, writeDisabledResult, type Policy } from '../write-control.js';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import { getClient } from '../client.js';
 import { coerceJson } from './_coerce.js';
 import { getToolsets, toolsetEnabled, type Toolsets } from '../toolsets.js';
@@ -15,7 +15,7 @@ import {
   searchMethods,
 } from '../discovery-client.js';
 
-const accountEnum = z.enum(ACCOUNTS).optional();
+const accountEnum = accountAliasSchema.optional();
 
 // Policy/toolset namespace for each API alias must match the NAMED tools' service
 // names, or user deny globs and GOOGLE_TOOLSETS silently miss escape-hatch calls.

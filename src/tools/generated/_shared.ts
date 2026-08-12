@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ACCOUNTS } from '../../accounts.js';
+import { accountAliasSchema } from '../../accounts.js';
 import { executeApiMethod, type ApiMethodRef, type ExecuteDeps, type QueryParams } from '../../executor.js';
 import type { Cud, ToolRegistry } from '../../registry.js';
 
@@ -22,7 +22,7 @@ export interface GeneratedToolDef {
 }
 
 export function accountField() {
-  return z.enum(ACCOUNTS).optional().describe('Google account alias (omit for the default account)');
+  return accountAliasSchema.optional().describe('Google account alias (omit for the default account)');
 }
 
 interface GeneratedToolConfig {
