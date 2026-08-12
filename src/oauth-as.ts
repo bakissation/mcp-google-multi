@@ -384,6 +384,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
         return errorPage(res, 403, 'access_denied', 'the Google account you signed in with is not the one configured for this alias');
       }
       deps.writeToken?.(st.alias, exchanged.tokens);
+      log(`callback ok flow=alias_reauth alias=${st.alias}`);
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(`<!doctype html><meta charset=utf-8><p>Re-authenticated "${st.alias}". You can close this window.</p>`);
       return true;
@@ -403,6 +404,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       secret,
       nowSec(),
     );
+    log('callback ok flow=owner_gate');
     const sep = st.redirect_uri.includes('?') ? '&' : '?';
     const s = st.client_state ? `&state=${encodeURIComponent(st.client_state)}` : '';
     return redirect(res, `${st.redirect_uri}${sep}code=${encodeURIComponent(authzCode)}${s}&iss=${iss}`);
@@ -438,12 +440,14 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       }
       const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl });
       const refreshToken = refresh.issue(now());
+      log('token issued grant=authorization_code');
       return json(res, 200, { access_token: access, token_type: 'Bearer', expires_in: accessTtl, refresh_token: refreshToken, scope: 'mcp:use' });
     }
     if (grant === 'refresh_token') {
       const next = refresh.rotate(form.refresh_token ?? '', now());
       if (!next) return json(res, 400, { error: 'invalid_grant', message: 'unknown or rotated refresh token' });
       const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl });
+      log('token issued grant=refresh_token');
       return json(res, 200, { access_token: access, token_type: 'Bearer', expires_in: accessTtl, refresh_token: next, scope: 'mcp:use' });
     }
     return json(res, 400, { error: 'unsupported_grant_type', message: 'authorization_code or refresh_token only' });

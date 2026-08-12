@@ -57,7 +57,7 @@ async function start(depOverrides: Partial<AuthServerDeps> = {}): Promise<number
   );
   const server = new McpServer({ name: 'as-test', version: '0' });
   server.registerTool('ping', { description: 'p', inputSchema: {} }, async () => ({ content: [{ type: 'text' as const, text: 'pong' }] }));
-  const host = new HttpTransportHost({ server, config: cfg, version: '0', ownerConfigured: true, authenticate: as.authenticate, routes: as.routes });
+  const host = new HttpTransportHost({ server, config: cfg, version: '0', ownerConfigured: true, authenticate: as.authenticate, routes: as.routes, log: deps.log });
   await host.start();
   hosts.push(host);
   return host.address()!.port;
@@ -152,6 +152,38 @@ describe('happy path (legs A + B)', () => {
     const ref = JSON.parse((await req(port, 'POST', '/token', form({ grant_type: 'refresh_token', refresh_token: tok.refresh_token }))).text);
     expect(ref.access_token).toBeTruthy();
     expect(ref.refresh_token).not.toBe(tok.refresh_token);
+  });
+});
+
+describe('success-path observability (logs completions, not just failures)', () => {
+  it('logs /callback owner_gate, /token (both grants), and the /mcp dispatch — no PII', async () => {
+    const logs: string[] = [];
+    const port = await start({ log: (l) => logs.push(l) });
+    const state = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).headers.location as string);
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`);
+    const code = new URL(cb.headers.location as string).searchParams.get('code')!;
+    const tok = JSON.parse((await req(port, 'POST', '/token', form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, code_verifier: verifier, resource: `${BASE}/mcp` }))).text);
+    await req(port, 'POST', '/mcp', {
+      headers: { authorization: `Bearer ${tok.access_token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'c', version: '0' } } }),
+    });
+    await req(port, 'POST', '/token', form({ grant_type: 'refresh_token', refresh_token: tok.refresh_token }));
+
+    expect(logs).toContain('callback ok flow=owner_gate');
+    expect(logs).toContain('token issued grant=authorization_code');
+    expect(logs).toContain('token issued grant=refresh_token');
+    expect(logs).toContain('200 /mcp method=initialize');
+    // never leak the owner email, Google tokens, or the minted access/refresh values
+    expect(logs.join('\n')).not.toMatch(/owner@x|g-rt|g-at|access_token|Bearer/);
+  });
+
+  it('logs the /callback alias_reauth completion by alias (no email)', async () => {
+    const logs: string[] = [];
+    const port = await start({ log: (l) => logs.push(l) });
+    const state = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery({ flow: 'alias_reauth', alias: 'work' })}`)).headers.location as string);
+    await req(port, 'GET', `/callback?code=work-code&state=${encodeURIComponent(state)}`);
+    expect(logs).toContain('callback ok flow=alias_reauth alias=work');
+    expect(logs.join('\n')).not.toMatch(/work@x\.example/);
   });
 });
 

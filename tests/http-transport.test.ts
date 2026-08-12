@@ -7,6 +7,7 @@ import {
   parseOwnerEmails,
   originAllowed,
   hostAllowed,
+  jsonRpcMethod,
   type Authenticator,
 } from '../src/http-transport.js';
 
@@ -32,6 +33,14 @@ describe('http-transport pure helpers', () => {
     expect(hostAllowed('evil.example', allowed)).toBe(false);
     expect(hostAllowed(undefined, allowed)).toBe(false);
     expect(hostAllowed('anything', [])).toBe(true); // no allowlist configured
+  });
+
+  it('jsonRpcMethod: method name only, batch-aware, never throws on junk', () => {
+    expect(jsonRpcMethod({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { secret: 'x' } })).toBe('tools/call');
+    expect(jsonRpcMethod([{ method: 'a' }, { method: 'b' }])).toBe('a,b');
+    expect(jsonRpcMethod({})).toBe('unknown');
+    expect(jsonRpcMethod(null)).toBe('unknown');
+    expect(jsonRpcMethod('nonsense')).toBe('unknown');
   });
 
 });
@@ -65,7 +74,7 @@ function makeServer(): McpServer {
 
 async function startHost(
   authenticate: Authenticator = () => ({ ok: true }),
-  extra: { dispatchTimeoutMs?: number } = {},
+  extra: { dispatchTimeoutMs?: number; log?: (line: string) => void } = {},
 ): Promise<number> {
   const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
   const host = new HttpTransportHost({ server: makeServer(), config, version: '9.9.9', ownerConfigured: true, authenticate, ...extra });
@@ -243,5 +252,19 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
     });
     expect(after.status).toBe(200);
     expect(JSON.parse(after.text).result.tools).toBeDefined();
+  });
+
+  it('logs a concise success line on a completed dispatch (method only, no PII)', async () => {
+    const logs: string[] = [];
+    const port = await startHost(() => ({ ok: true }), { log: (l) => logs.push(l) });
+    await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: initBody });
+    await request(port, 'POST', '/mcp', {
+      headers: { accept: MCP_ACCEPT },
+      body: { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
+    });
+    expect(logs).toContain('200 /mcp method=initialize');
+    expect(logs).toContain('200 /mcp method=tools/list');
+    // no params / arguments / secrets leak into the log
+    expect(logs.join('\n')).not.toMatch(/params|arguments|protocolVersion/);
   });
 });
