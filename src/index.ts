@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-import './accounts.js';
+// First import: triggers accounts.js module load (env files + registry) before
+// anything else. Named to also pull the server-only empty-registry guard (BR-4).
+import { assertServerAccountsConfigured } from './accounts.js';
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -171,6 +173,11 @@ async function main() {
     }
     return;
   }
+
+  // BR-4: the SERVER never boots with an empty registry. The bootstrap and
+  // diagnostic CLIs above already returned; a fresh user configures accounts
+  // (env / migrate-config / account import / auth) before the server runs.
+  assertServerAccountsConfigured();
 
   // Resolve (or provision) the master key BEFORE serving: the hard guard is
   // specced "fatal at startup", never mid-dispatch.

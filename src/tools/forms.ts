@@ -1,13 +1,13 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { forms as formsClient } from '@googleapis/forms';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 
-const accountEnum = z.enum(ACCOUNTS).optional();
+const accountEnum = accountAliasSchema.optional();
 
 export function registerFormsTools(server: ToolRegistry): void {
   server.registerTool(

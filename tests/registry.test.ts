@@ -240,7 +240,9 @@ describe('ToolRegistry', () => {
     const schemaOf = (n: string) => tools.find((t) => t.name === n)!.inputSchema.properties.account;
 
     expect(schemaOf('gmail_search').anyOf).toBeDefined();
-    expect((schemaOf('gmail_search').anyOf![0] as { enum: string[] }).enum).toEqual(['test', '*']);
+    // '*' is listed first so the enum tuple is statically non-empty (empty-safe
+    // for a fresh install); order is cosmetic, the accepted set is unchanged.
+    expect((schemaOf('gmail_search').anyOf![0] as { enum: string[] }).enum).toEqual(['*', 'test']);
     expect(schemaOf('gmail_send').enum).toEqual(['test']);
     expect(schemaOf('drive_download').enum).toEqual(['test']);
     expect(schemaOf('google_api_call').enum).toEqual(['test']);

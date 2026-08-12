@@ -1,14 +1,14 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { slides as slidesClient } from '@googleapis/slides';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 import { sliceClean } from '../trim.js';
 
-const accountEnum = z.enum(ACCOUNTS).optional();
+const accountEnum = accountAliasSchema.optional();
 
 const SLIDE_TEXT_DIGEST_CHARS = 200;
 

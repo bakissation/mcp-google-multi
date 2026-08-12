@@ -1,5 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { z } from 'zod';
 import { loadEnvFiles } from './env-load.js';
 import { CONFIG_VERSION, configDir, configFilePath, failStartup, loadConfigFile, mutateConfigFile } from './config-file.js';
 import type { ConfigFile } from './config-file.js';
@@ -27,7 +28,11 @@ export interface AccountConfig {
 }
 
 export interface AccountSet {
-  aliases: [string, ...string[]];
+  // May be empty: a fresh install has zero accounts, and the bootstrap /
+  // diagnostic CLIs (doctor, reset, account import, migrate-config, config
+  // check) must run on it. The SERVER refuses to boot empty — see
+  // assertServerAccountsConfigured (BR-4).
+  aliases: string[];
   configs: Record<string, AccountConfig>;
   scopeProfiles: Record<string, ScopeProfile>;
   source: 'env' | 'file' | 'merged';
@@ -168,7 +173,7 @@ export function resolveAccounts(
     materializeFirstRun(aliases, configs, filePath);
     const def = resolveDefaultAccount(env, null, aliases, fail);
     return {
-      aliases: aliases as [string, ...string[]],
+      aliases,
       configs,
       // Env-sourced accounts cannot reference file profiles; the legacy
       // GOOGLE_OPTIONAL_SCOPES override is applied live in auth.ts.
@@ -186,10 +191,22 @@ export function resolveAccounts(
   const config = loadConfigFile(filePath, onInvalid);
   const entries = Object.entries(config?.accounts ?? {});
   if (entries.length === 0) {
+    // Gap #23: an empty registry is NOT fatal at resolve time — the bootstrap and
+    // diagnostic CLIs (doctor/reset/account import/migrate-config/config check)
+    // must run on a fresh install. Only the stdio/http SERVER refuses to boot
+    // empty (BR-4), enforced by assertServerAccountsConfigured() in index.ts.
+    // The dispatch-path reload ('throw') still throws so a mid-session emptied
+    // config.json keeps the last-good registry (BR-7) instead of dropping tools.
     if (onInvalid === 'throw') {
       throw new Error(`E_NO_ACCOUNTS_CONFIGURED: ${noAccountsMessage()}`);
     }
-    failStartup('E_NO_ACCOUNTS_CONFIGURED', noAccountsMessage());
+    return {
+      aliases: [],
+      configs: {},
+      scopeProfiles: { base: { bundles: [] } },
+      source: 'file',
+      stamp: `${config?.version ?? CONFIG_VERSION}:${preStamp.split(':')[1]}`,
+    };
   }
 
   // BR3: unknown bundle names fail loudly (a mis-scoped token is worse than a
@@ -238,7 +255,7 @@ export function resolveAccounts(
 
   const def = resolveDefaultAccount(env, config?.defaultAccount ?? null, aliases, fail);
   return {
-    aliases: aliases as [string, ...string[]],
+    aliases,
     configs,
     scopeProfiles,
     source: 'file',
@@ -352,10 +369,35 @@ export function isAccountSetStale(): boolean {
   return current.stamp !== fileStamp(configFilePath(), Number(version));
 }
 
-/** Tuple of account aliases (at least one) — usable with z.enum().
+/** Account aliases (possibly empty on a fresh install).
  * Snapshot from the initial load; enums widen only when the registry is
  * rebuilt after a mutation (account_add, later slice). */
 export const ACCOUNTS = current.aliases;
 
-/** Valid account alias (string union isn't static, so tools use z.enum(ACCOUNTS)) */
+/**
+ * The `account` param schema, empty-registry-safe. A `z.enum` requires at least
+ * one value, so a fresh install (zero aliases) would throw at schema-build time
+ * (module load) and take down every CLI — including `doctor`, which is meant to
+ * REPORT the empty registry (gap #23). Fall back to a plain string when there
+ * are no aliases: no alias exists to enumerate, the server refuses to boot empty
+ * anyway, and dispatch validates the account against the live set. */
+export function accountAliasSchemaFor(aliases: readonly string[]): z.ZodType<string> {
+  return aliases.length > 0 ? z.enum(aliases as [string, ...string[]]) : z.string();
+}
+
+/** Shared, load-time snapshot used by every tool's `account` field. */
+export const accountAliasSchema: z.ZodType<string> = accountAliasSchemaFor(ACCOUNTS);
+
+/**
+ * BR-4: the stdio/http SERVER never boots with an empty registry — a fresh user
+ * bootstraps via env / `migrate-config` / `account import` / `auth` first. The
+ * bootstrap and diagnostic CLIs return before this guard, so it gates only the
+ * server path (called from index.ts after the CLI branches). */
+export function assertServerAccountsConfigured(): void {
+  if (current.aliases.length === 0) {
+    failStartup('E_NO_ACCOUNTS_CONFIGURED', noAccountsMessage());
+  }
+}
+
+/** Valid account alias (string union isn't static, so tools use accountAliasSchema) */
 export type Account = string;
