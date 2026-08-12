@@ -65,6 +65,14 @@ export function hostAllowed(host: string | undefined, allowed: string[]): boolea
   return allowed.includes(host) || allowed.includes(bare);
 }
 
+/** JSON-RPC method name(s) for an observability log line — no params, no PII. */
+export function jsonRpcMethod(body: unknown): string {
+  const one = (b: unknown): string | undefined =>
+    b && typeof b === 'object' && 'method' in b ? String((b as { method: unknown }).method) : undefined;
+  if (Array.isArray(body)) return body.map(one).filter(Boolean).join(',') || 'batch';
+  return one(body) ?? 'unknown';
+}
+
 
 export class HttpTransportHost {
   private httpServer?: Server;
@@ -239,6 +247,10 @@ export class HttpTransportHost {
           } else {
             res.destroy();
           }
+        } else if (outcome === 'done') {
+          // Success path: close the observability gap (failures already log; a
+          // completed dispatch logged nothing). Method only — no params, no PII.
+          this.log(`200 /mcp method=${jsonRpcMethod(body)}`);
         }
       } finally {
         if (timer) clearTimeout(timer);
