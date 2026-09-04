@@ -60,11 +60,11 @@
     "gen:coverage": "tsx scripts/gen-coverage.ts"
   },
   "dependencies": {
-    "@googleapis/admin": "^32.0.0",
+    "@googleapis/admin": "^33.0.0",
     "@googleapis/calendar": "^16.0.0",
-    "@googleapis/chat": "^46.0.0",
+    "@googleapis/chat": "^47.0.0",
     "@googleapis/docs": "^10.0.0",
-    "@googleapis/drive": "^21.0.0",
+    "@googleapis/drive": "^22.0.0",
     "@googleapis/forms": "^7.0.0",
     "@googleapis/gmail": "^18.0.0",
     "@googleapis/meet": "^5.0.0",
