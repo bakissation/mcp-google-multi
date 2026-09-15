@@ -8,6 +8,7 @@ The most complete **local Google Workspace MCP server**: Gmail, Drive, Calendar,
 - 🔑 **Multi-account** — drive any number of Google accounts by alias, or fan one call out across all of them
 - 🔒 **Private by design** — your own OAuth app, tokens encrypted at rest (AES-256-GCM), writes deny-by-default, no telemetry, no metering — it talks only to Google
 - 🌐 **Local or remote** — runs locally over stdio, or self-hosted over HTTP with its own built-in OAuth 2.1 server (Claude Code's `/mcp` login and the claude.ai connector, zero custom UI) → [remote setup](./docs/http-setup.md)
+- ✉️ **Built for real work** — send and read email in Markdown with attachments and one-call replies, an interactive setup wizard with a `doctor` self-check, and per-account scope profiles → [features tour](./docs/features.md)
 
 ## Quick setup
 
@@ -57,7 +58,7 @@ Built and maintained by **Abdelbaki Berkati** — [berkati.xyz](https://berkati.
 
 Development is **funded by [IdeaCrafters](https://ideacrafters.com)** ([@IdeaCraftersHQ](https://github.com/IdeaCraftersHQ)) — the studio that pays for this OSS to exist.
 
-Thanks to contributors [@obatried](https://github.com/obatried), [@trevor-commits](https://github.com/trevor-commits), and [@mjreddy](https://github.com/mjreddy). The project is maintainer-led (roadmap on [Milestones](https://github.com/bakissation/mcp-google-multi/milestones); bug reports welcome, feature PRs by prior agreement — see [CONTRIBUTING.md](./CONTRIBUTING.md)). **v5 is complete and in a feedback period: [open an issue](https://github.com/bakissation/mcp-google-multi/issues/new/choose) with bugs, pain points, or what you wish it did — it directly shapes the v6 roadmap.** Security reports go to [SECURITY.md](./SECURITY.md), never a public issue.
+Thanks to contributors [@obatried](https://github.com/obatried), [@trevor-commits](https://github.com/trevor-commits), and [@mjreddy](https://github.com/mjreddy). The project is maintainer-led (roadmap on [Milestones](https://github.com/bakissation/mcp-google-multi/milestones); bug reports welcome, feature PRs by prior agreement — see [CONTRIBUTING.md](./CONTRIBUTING.md)). **Feedback shapes the roadmap: [open an issue](https://github.com/bakissation/mcp-google-multi/issues/new/choose) with bugs, pain points, or what you wish it did.** Security reports go to [SECURITY.md](./SECURITY.md), never a public issue.
 
 ## License
 
