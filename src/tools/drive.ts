@@ -45,6 +45,43 @@ export function prepareLocalDest(savePath: string, filename: string): string {
   return dest;
 }
 
+export const DRIVE_QUERY_HINT =
+  "Drive search syntax: a plain keyword is treated as a full-text search, but a " +
+  "structured query needs an operator, e.g. \"name contains 'report'\", " +
+  "\"mimeType = 'application/pdf'\", or \"'me' in owners\". " +
+  'Reference: https://developers.google.com/drive/api/guides/search-files';
+
+// A bare keyword is not valid Drive `q` syntax (Google 400s "Invalid Value"), yet
+// it is the natural thing to pass to a "search" tool, so wrap it as a full-text
+// match. A query already carrying a comparison operator or a quoted literal is a
+// structured query and is passed through untouched.
+export function normalizeDriveQuery(raw: string): string {
+  const q = raw.trim();
+  if (q === '') return q;
+  // Structured iff it carries a comparison operator or the membership form
+  // "<value> in (parents|owners|writers|readers)". A bare apostrophe does NOT
+  // count (names like O'Brien are keywords, not query syntax).
+  const hasComparison = /(\bcontains\b|!=|<=|>=|[=<>])/i.test(q);
+  const hasMembership = /\bin\s+(parents|owners|writers|readers)\b/i.test(q);
+  if (hasComparison || hasMembership) return q;
+  const escaped = q.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return `fullText contains '${escaped}'`;
+}
+
+// Drive rejects a malformed query with HTTP 400 / reason "invalid" and the opaque
+// message "Invalid Value"; detect that so drive_search returns query-syntax help
+// instead of a generic upstream_error.
+export function isDriveInvalidQuery(error: any): boolean {
+  const raw = error?.code ?? error?.status ?? error?.response?.status;
+  const status = typeof raw === 'string' ? Number(raw) : raw;
+  if (status !== 400) return false;
+  const reason =
+    error?.errors?.[0]?.reason ??
+    error?.response?.data?.error?.errors?.[0]?.reason;
+  const message = error?.response?.data?.error?.message ?? error?.message ?? '';
+  return reason === 'invalid' || reason === 'invalidQuery' || /invalid value/i.test(String(message));
+}
+
 // sendNotificationEmail is only valid for user/group permissions, and Google forbids
 // disabling it on an ownership transfer. Returns undefined to omit the param entirely.
 export function resolveShareNotification(opts: {
@@ -64,10 +101,10 @@ export function registerDriveTools(server: ToolRegistry): void {
   server.registerTool(
     'drive_search',
     {
-      description: 'Search files in a Google Drive account',
+      description: 'Search files in a Google Drive account. A plain keyword is treated as a full-text search; pass Drive query syntax for a structured search.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        query: z.string().describe('Drive search syntax, e.g. "name contains \'MoU\'"'),
+        query: z.string().describe('A plain keyword (full-text search) or Drive query syntax, e.g. "name contains \'MoU\'"'),
         maxResults: z.number().min(1).max(100).default(20).optional()
           .describe('Max results to return (default: 20)'),
         driveId: z.string().optional().describe('Optional shared drive ID'),
@@ -79,7 +116,7 @@ export function registerDriveTools(server: ToolRegistry): void {
         const drive = driveClient({ version: 'v3', auth });
 
         const params: any = {
-          q: query,
+          q: normalizeDriveQuery(query),
           pageSize: maxResults ?? 20,
           fields: 'files(id,name,mimeType,modifiedTime,webViewLink,size,parents,driveId)',
           supportsAllDrives: true,
@@ -96,6 +133,19 @@ export function registerDriveTools(server: ToolRegistry): void {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data.files ?? [], null, 2) }],
         };
       } catch (error: any) {
+        if (isDriveInvalidQuery(error)) {
+          const message = error?.response?.data?.error?.message ?? error?.message ?? 'Invalid Value';
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({
+              error: 'invalid_query',
+              message,
+              hint: DRIVE_QUERY_HINT,
+              retriable: false,
+              account,
+            }) }],
+            isError: true as const,
+          };
+        }
         return handleDriveError(error, account as Account);
       }
     },
