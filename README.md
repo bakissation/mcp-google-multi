@@ -12,45 +12,46 @@ The most complete **local Google Workspace MCP server**: Gmail, Drive, Calendar,
 
 ## Quick setup
 
-You don't need to know anything about MCP or OAuth — five steps, all copy-paste:
+New to all this? It's written for someone who just installed Claude Code and has never made an API key. Copy-paste each step; it says what you'll see. (Already technical? The [Configuration reference](./docs/configuration.md) is the terse version.)
 
-1. **Install [Node.js](https://nodejs.org) 22 or newer**, then install the server:
+1. **Install it.** Get [Node.js](https://nodejs.org) (the green "LTS" button, version 22 or newer), then run:
 
    ```bash
    npm install -g mcp-google-multi
    ```
 
-2. **Create your (free) Google app** so the server can sign in as you — one-time, ~2 minutes: follow [Google Cloud setup](./docs/google-cloud-setup.md). You come back with a **Client ID** and **Client Secret**.
+2. **Make your Google key** (the one manual part, a few minutes, because Google has no way to script it). Follow the step-by-step [Google Cloud setup](./docs/google-cloud-setup.md), or just ask Claude Code: *"walk me through creating a Google OAuth Desktop client for mcp-google-multi."* You finish with two values, a **Client ID** and a **Client Secret**. It's free and private to you.
 
-3. **Create a file named `.env`** in the folder you'll run from, and fill in your values:
+3. **Put them in a file.** In the folder you'll run from, make a file named `.env` and paste this, filling in your values:
 
    ```bash
    GOOGLE_CLIENT_ID=paste-your-client-id
    GOOGLE_CLIENT_SECRET=paste-your-client-secret
-   # name each Google account with a short alias:
-   GOOGLE_ACCOUNTS=work:you@company.com,personal:you@gmail.com
-   # encryption key for stored tokens — generate one with: openssl rand -base64 32
-   MASTER_KEY=paste-the-generated-key
+   # any short nickname, then your Gmail address:
+   GOOGLE_ACCOUNTS=me:you@gmail.com
    ```
 
-4. **Sign in each account** (a browser window opens; approve the permissions):
+   No encryption key to make: the server generates and stores one for you.
+
+4. **Sign in.** A browser opens; pick your account and click Allow:
 
    ```bash
-   mcp-google-multi auth --account work
-   mcp-google-multi auth --account personal
+   mcp-google-multi auth --account me
    ```
 
-5. **Connect it to Claude Code** (any MCP client works the same way):
+5. **Add it to Claude Code, then restart Claude Code:**
 
    ```bash
    claude mcp add google-multi -s user -- npx -y mcp-google-multi
    ```
 
-Restart your client and the tools appear. Check everything with `mcp-google-multi config check`.
+**Stuck at any point? Run `mcp-google-multi doctor`.** It inspects every part and prints the exact fix for anything wrong (a missing sign-in, a Google API you still need to switch on, and so on). Once it reads all-green, just talk to Claude: *"summarize my unread email."*
 
-**Running it remotely?** To reach the server from [claude.ai](https://claude.ai) as a custom connector or from another machine, run it over HTTP — it ships its own OAuth 2.1 server, so no bearer tokens to paste. Follow [Remote HTTP setup](./docs/http-setup.md) (Cloudflare named tunnel, Docker, or one-click Render/Railway). Coming from v5? See the [v6 migration guide](./MIGRATION-v6.md).
+*Got more than one Google account?* Add them together, like `GOOGLE_ACCOUNTS=me:you@gmail.com,work:you@company.com`, and run step 4 once per nickname.
 
-**Go deeper:** [Configuration reference](./docs/configuration.md) · [What's covered](./COVERAGE.md) · [Features tour](./docs/features.md) · [Remote / HTTP setup](./docs/http-setup.md) · [Secrets in a vault](./docs/secrets.md) · [Migrating to v6](./MIGRATION-v6.md) · [Upgrading from v4](./docs/upgrading-v4.md) · [Security policy](./SECURITY.md) · [Roadmap](https://github.com/bakissation/mcp-google-multi/milestones)
+*On a server or from claude.ai?* Advanced path: [Remote / HTTP setup](./docs/http-setup.md). *Coming from v5?* [v6 migration guide](./MIGRATION-v6.md).
+
+**Go deeper:** [Configuration reference](./docs/configuration.md) · [What's covered](./COVERAGE.md) · [Features tour](./docs/features.md) · [Remote / HTTP setup](./docs/http-setup.md) · [Secrets in a vault](./docs/secrets.md) · [Migrating to v6](./MIGRATION-v6.md) · [Security policy](./SECURITY.md) · [Roadmap](https://github.com/bakissation/mcp-google-multi/milestones)
 
 ## Maintainer & credits
 
