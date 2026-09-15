@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../registry.js';
 import { isAllowed, writeDisabledResult, type Policy } from '../write-control.js';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import { getClient } from '../client.js';
 import { coerceJson } from './_coerce.js';
 import { getToolsets, toolsetEnabled, type Toolsets } from '../toolsets.js';
@@ -15,7 +15,7 @@ import {
   searchMethods,
 } from '../discovery-client.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = accountAliasSchema.optional();
 
 // Policy/toolset namespace for each API alias must match the NAMED tools' service
 // names, or user deny globs and GOOGLE_TOOLSETS silently miss escape-hatch calls.
@@ -126,7 +126,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         'policy as named tools. Returns JSON only — for binary/file content (media downloads, ' +
         'drive.files.export) use drive_download / drive_export instead.',
       inputSchema: {
-        account: accountEnum.describe('Google account alias'),
+        account: accountEnum.describe('Google account alias (omit for the default account)'),
         api: z.string().describe(`API alias: ${apiList}`),
         methodId: z.string().describe('Discovery method id, e.g. "drive.revisions.list"'),
         pathParams: coerceJson(z.record(z.string(), z.union([z.string(), z.number()])).optional())
@@ -146,7 +146,10 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         ).describe('Query-string parameters; use an array for repeated params (e.g. resourceNames)'),
         body: coerceJson(z.record(z.string(), z.unknown()).optional()).describe('JSON request body'),
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+      // idempotentHint:false is load-bearing: the computed default (cud=read)
+      // would invite retries that duplicate sends through the escape hatch.
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+      _meta: { 'anthropic/maxResultSizeChars': 100_000 },
     },
     async ({ account, api, methodId, pathParams, queryParams, body }) => {
       if (!WORKSPACE_APIS[api as string]) {

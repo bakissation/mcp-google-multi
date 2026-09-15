@@ -25,6 +25,43 @@ describe('mapGoogleError', () => {
     expect(e.hint).toBe('enable admin writes');
   });
 
+  // B10 noob-proofing hints
+  it('403 accessNotConfigured → api_not_enabled with the per-API enable link', () => {
+    const e = mapGoogleError({
+      code: 403,
+      errors: [{ reason: 'accessNotConfigured' }],
+      message: 'Access Not Configured. Gmail API has not been used in project 12 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/gmail.googleapis.com/overview?project=12 then retry.',
+    }, acc);
+    expect(e.error).toBe('api_not_enabled');
+    expect(e.hint).toContain('console.cloud.google.com/apis/library/gmail.googleapis.com');
+  });
+
+  it('403 SERVICE_DISABLED (no URL) → api_not_enabled, generic library link', () => {
+    const e = mapGoogleError({
+      code: 403,
+      response: { data: { error: { status: 'PERMISSION_DENIED', message: 'Drive API is disabled. SERVICE_DISABLED' } } },
+    }, acc);
+    expect(e.error).toBe('api_not_enabled');
+    expect(e.hint).toContain('apis/library');
+  });
+
+  it('400 invalid_grant → reauth_required naming the 7-day trap fix', () => {
+    const e = mapGoogleError({ code: 400, response: { data: { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' } } }, acc);
+    expect(e.error).toBe('reauth_required');
+    expect(e.hint).toMatch(/In production/i);
+    expect(e.hint).toContain('auth --account work');
+  });
+
+  it('401 invalid_grant still routes to the 7-day-trap hint (before generic auth_required)', () => {
+    const e = mapGoogleError({ code: 401, message: 'invalid_grant' }, acc);
+    expect(e.error).toBe('reauth_required');
+    expect(e.hint).toMatch(/7-day/i);
+  });
+
+  it('plain 401 (no invalid_grant) stays auth_required', () => {
+    expect(mapGoogleError({ code: 401, message: 'Invalid Credentials' }, acc).error).toBe('auth_required');
+  });
+
   it('404 → not_found', () => {
     expect(mapGoogleError({ code: 404, message: 'x' }, acc).error).toBe('not_found');
   });

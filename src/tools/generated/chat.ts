@@ -5,11 +5,45 @@ import { coerceArray, coerceBoolean, coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerChatGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_chat_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/chat.customemojis"],
+    ["https://www.googleapis.com/auth/chat.customemojis","https://www.googleapis.com/auth/chat.customemojis.readonly"],
+    ["https://www.googleapis.com/auth/chat.bot","https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.readonly"],
+    ["https://www.googleapis.com/auth/chat.import","https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.create"],
+    ["https://www.googleapis.com/auth/chat.import"],
+    ["https://www.googleapis.com/auth/chat.app.spaces","https://www.googleapis.com/auth/chat.app.spaces.create","https://www.googleapis.com/auth/chat.import","https://www.googleapis.com/auth/chat.spaces","https://www.googleapis.com/auth/chat.spaces.create"],
+    ["https://www.googleapis.com/auth/chat.admin.delete","https://www.googleapis.com/auth/chat.app.delete","https://www.googleapis.com/auth/chat.delete","https://www.googleapis.com/auth/chat.import"],
+    ["https://www.googleapis.com/auth/chat.bot","https://www.googleapis.com/auth/chat.spaces","https://www.googleapis.com/auth/chat.spaces.readonly"],
+    ["https://www.googleapis.com/auth/chat.memberships","https://www.googleapis.com/auth/chat.memberships.readonly"],
+    ["https://www.googleapis.com/auth/chat.admin.memberships","https://www.googleapis.com/auth/chat.app.memberships","https://www.googleapis.com/auth/chat.import","https://www.googleapis.com/auth/chat.memberships","https://www.googleapis.com/auth/chat.memberships.app"],
+    ["https://www.googleapis.com/auth/chat.admin.memberships","https://www.googleapis.com/auth/chat.admin.memberships.readonly","https://www.googleapis.com/auth/chat.app.memberships","https://www.googleapis.com/auth/chat.bot","https://www.googleapis.com/auth/chat.memberships","https://www.googleapis.com/auth/chat.memberships.readonly"],
+    ["https://www.googleapis.com/auth/chat.admin.memberships","https://www.googleapis.com/auth/chat.admin.memberships.readonly","https://www.googleapis.com/auth/chat.app.memberships","https://www.googleapis.com/auth/chat.bot","https://www.googleapis.com/auth/chat.import","https://www.googleapis.com/auth/chat.memberships","https://www.googleapis.com/auth/chat.memberships.readonly"],
+    ["https://www.googleapis.com/auth/chat.admin.memberships","https://www.googleapis.com/auth/chat.app.memberships","https://www.googleapis.com/auth/chat.import","https://www.googleapis.com/auth/chat.memberships"],
+    ["https://www.googleapis.com/auth/chat.bot"],
+    ["https://www.googleapis.com/auth/chat.bot","https://www.googleapis.com/auth/chat.import","https://www.googleapis.com/auth/chat.messages"],
+    ["https://www.googleapis.com/auth/chat.app.messages.readonly","https://www.googleapis.com/auth/chat.bot","https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.readonly"],
+    ["https://www.googleapis.com/auth/chat.import","https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.reactions","https://www.googleapis.com/auth/chat.messages.reactions.create"],
+    ["https://www.googleapis.com/auth/chat.import","https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.reactions"],
+    ["https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.reactions","https://www.googleapis.com/auth/chat.messages.reactions.readonly","https://www.googleapis.com/auth/chat.messages.readonly"],
+    ["https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.readonly"],
+    ["https://www.googleapis.com/auth/chat.admin.spaces","https://www.googleapis.com/auth/chat.app.spaces","https://www.googleapis.com/auth/chat.import","https://www.googleapis.com/auth/chat.spaces"],
+    ["https://www.googleapis.com/auth/chat.admin.spaces","https://www.googleapis.com/auth/chat.admin.spaces.readonly","https://www.googleapis.com/auth/chat.spaces","https://www.googleapis.com/auth/chat.spaces.readonly"],
+    ["https://www.googleapis.com/auth/chat.spaces","https://www.googleapis.com/auth/chat.spaces.create"],
+    ["https://www.googleapis.com/auth/chat.app.all.memberships.readonly","https://www.googleapis.com/auth/chat.app.all.messages.readonly","https://www.googleapis.com/auth/chat.app.all.spaces.readonly","https://www.googleapis.com/auth/chat.app.memberships","https://www.googleapis.com/auth/chat.app.memberships.readonly","https://www.googleapis.com/auth/chat.app.messages.readonly","https://www.googleapis.com/auth/chat.app.spaces","https://www.googleapis.com/auth/chat.app.spaces.readonly","https://www.googleapis.com/auth/chat.memberships","https://www.googleapis.com/auth/chat.memberships.readonly","https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.reactions","https://www.googleapis.com/auth/chat.messages.reactions.readonly","https://www.googleapis.com/auth/chat.messages.readonly","https://www.googleapis.com/auth/chat.spaces","https://www.googleapis.com/auth/chat.spaces.readonly"],
+    ["https://www.googleapis.com/auth/chat.users.availability","https://www.googleapis.com/auth/chat.users.availability.readonly"],
+    ["https://www.googleapis.com/auth/chat.users.availability"],
+    ["https://www.googleapis.com/auth/chat.users.sections"],
+    ["https://www.googleapis.com/auth/chat.users.sections","https://www.googleapis.com/auth/chat.users.sections.readonly"],
+    ["https://www.googleapis.com/auth/chat.users.readstate","https://www.googleapis.com/auth/chat.users.readstate.readonly"],
+    ["https://www.googleapis.com/auth/chat.users.spacesettings"],
+    ["https://www.googleapis.com/auth/chat.users.readstate"],
+  ];
   registerGeneratedTool(registry, {
     name: "chat_custom_emojis_create",
     cud: "create",
     description: "Creates a custom emoji. Custom emojis are only available for Google Workspace accounts, and the administrator must turn custom emojis on for the organization. F",
-    method: { id: "chat.customEmojis.create", httpMethod: "POST", path: "v1/customEmojis", baseUrl: "https://chat.googleapis.com/", requiredParams: [] },
+    method: { id: "chat.customEmojis.create", httpMethod: "POST", path: "v1/customEmojis", baseUrl: "https://chat.googleapis.com/", requiredParams: [], scopes: S_chat_v1[0] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -22,7 +56,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_custom_emojis_delete",
     cud: "delete",
     description: "Deletes a custom emoji. By default, users can only delete custom emoji they created. [Emoji managers](https://support.google.com/a/answer/12850085) assigned by",
-    method: { id: "chat.customEmojis.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.customEmojis.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -35,7 +69,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_custom_emojis_get",
     cud: "read",
     description: "Returns details about a custom emoji. Custom emojis are only available for Google Workspace accounts, and the administrator must turn custom emojis on for the o",
-    method: { id: "chat.customEmojis.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.customEmojis.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -48,7 +82,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_custom_emojis_list",
     cud: "read",
     description: "Lists custom emojis visible to the authenticated user. Custom emojis are only available for Google Workspace accounts, and the administrator must turn custom em",
-    method: { id: "chat.customEmojis.list", httpMethod: "GET", path: "v1/customEmojis", baseUrl: "https://chat.googleapis.com/", requiredParams: [] },
+    method: { id: "chat.customEmojis.list", httpMethod: "GET", path: "v1/customEmojis", baseUrl: "https://chat.googleapis.com/", requiredParams: [], scopes: S_chat_v1[1] },
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -63,7 +97,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_media_download",
     cud: "read",
     description: "Downloads media. Download is supported on the URI `/v1/media/{+name}?alt=media`.",
-    method: { id: "chat.media.download", httpMethod: "GET", path: "v1/media/{+resourceName}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["resourceName"] },
+    method: { id: "chat.media.download", httpMethod: "GET", path: "v1/media/{+resourceName}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["resourceName"], scopes: S_chat_v1[2] },
     params: [{"field":"resourceName","api":"resourceName","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -76,7 +110,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_media_upload",
     cud: "create",
     description: "Uploads an attachment. For an example, see [Upload media as a file attachment](https://developers.google.com/workspace/chat/upload-media-attachments). Requires",
-    method: { id: "chat.media.upload", httpMethod: "POST", path: "v1/{+parent}/attachments:upload", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "chat.media.upload", httpMethod: "POST", path: "v1/{+parent}/attachments:upload", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[3] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -90,7 +124,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_complete_import",
     cud: "create",
     description: "Completes the [import process](https://developers.google.com/workspace/chat/import-data) for the specified space and makes it visible to users. Requires [user a",
-    method: { id: "chat.spaces.completeImport", httpMethod: "POST", path: "v1/{+name}:completeImport", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.completeImport", httpMethod: "POST", path: "v1/{+name}:completeImport", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[4] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -104,7 +138,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_create",
     cud: "create",
     description: "Creates a space. Can be used to create a named space, or a group chat in `Import mode`. For an example, see [Create a space](https://developers.google.com/works",
-    method: { id: "chat.spaces.create", httpMethod: "POST", path: "v1/spaces", baseUrl: "https://chat.googleapis.com/", requiredParams: [] },
+    method: { id: "chat.spaces.create", httpMethod: "POST", path: "v1/spaces", baseUrl: "https://chat.googleapis.com/", requiredParams: [], scopes: S_chat_v1[5] },
     params: [{"field":"requestId","api":"requestId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -118,7 +152,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_delete",
     cud: "delete",
     description: "Deletes a named space. Always performs a cascading delete, which means that the space's child resources—like messages posted in the space and memberships in the",
-    method: { id: "chat.spaces.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[6] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -132,7 +166,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_find_direct_message",
     cud: "read",
     description: "Returns the existing direct message with the specified user. If no direct message space is found, returns a `404 NOT_FOUND` error. For an example, see [Find a d",
-    method: { id: "chat.spaces.findDirectMessage", httpMethod: "GET", path: "v1/spaces:findDirectMessage", baseUrl: "https://chat.googleapis.com/", requiredParams: [] },
+    method: { id: "chat.spaces.findDirectMessage", httpMethod: "GET", path: "v1/spaces:findDirectMessage", baseUrl: "https://chat.googleapis.com/", requiredParams: [], scopes: S_chat_v1[7] },
     params: [{"field":"name","api":"name","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -145,7 +179,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_find_group_chats",
     cud: "read",
     description: "Returns all spaces with `spaceType == GROUP_CHAT`, whose human memberships contain exactly the calling user, and the users specified in `FindGroupChatsRequest.u",
-    method: { id: "chat.spaces.findGroupChats", httpMethod: "GET", path: "v1/spaces:findGroupChats", baseUrl: "https://chat.googleapis.com/", requiredParams: [] },
+    method: { id: "chat.spaces.findGroupChats", httpMethod: "GET", path: "v1/spaces:findGroupChats", baseUrl: "https://chat.googleapis.com/", requiredParams: [], scopes: S_chat_v1[8] },
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"spaceView","api":"spaceView","location":"query"},{"field":"users","api":"users","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -161,7 +195,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_members_create",
     cud: "create",
     description: "Creates a membership for the calling Chat app, a user, or a Google Group. Creating memberships for other Chat apps isn't supported. When creating a membership,",
-    method: { id: "chat.spaces.members.create", httpMethod: "POST", path: "v1/{+parent}/members", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "chat.spaces.members.create", httpMethod: "POST", path: "v1/{+parent}/members", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[9] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -176,7 +210,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_members_delete",
     cud: "delete",
     description: "Deletes a membership. For an example, see [Remove a user or a Google Chat app from a space](https://developers.google.com/workspace/chat/delete-members). Suppor",
-    method: { id: "chat.spaces.members.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.members.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[9] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -190,7 +224,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_members_get",
     cud: "read",
     description: "Returns details about a membership. For an example, see [Get details about a user's or Google Chat app's membership](https://developers.google.com/workspace/cha",
-    method: { id: "chat.spaces.members.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.members.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[10] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -204,7 +238,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_members_list",
     cud: "read",
     description: "Lists memberships in a space. For an example, see [List users and Google Chat apps in a space](https://developers.google.com/workspace/chat/list-members). Listi",
-    method: { id: "chat.spaces.members.list", httpMethod: "GET", path: "v1/{+parent}/members", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "chat.spaces.members.list", httpMethod: "GET", path: "v1/{+parent}/members", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[11] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"showGroups","api":"showGroups","location":"query"},{"field":"showInvited","api":"showInvited","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -223,7 +257,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_members_patch",
     cud: "update",
     description: "Updates a membership. For an example, see [Update a user's membership in a space](https://developers.google.com/workspace/chat/update-members). Supports the fol",
-    method: { id: "chat.spaces.members.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.members.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[12] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -239,7 +273,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_messages_attachments_get",
     cud: "read",
     description: "Gets the metadata of a message attachment. The attachment data is fetched using the [media API](https://developers.google.com/workspace/chat/api/reference/rest/",
-    method: { id: "chat.spaces.messages.attachments.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.messages.attachments.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[13] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -252,7 +286,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_messages_delete",
     cud: "delete",
     description: "Deletes a message. For an example, see [Delete a message](https://developers.google.com/workspace/chat/delete-messages). Supports the following types of [authen",
-    method: { id: "chat.spaces.messages.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.messages.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[14] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"force","api":"force","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -266,7 +300,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_messages_get",
     cud: "read",
     description: "Returns details about a message. For an example, see [Get details about a message](https://developers.google.com/workspace/chat/get-messages). Supports the foll",
-    method: { id: "chat.spaces.messages.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.messages.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[15] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"markupSyntax","api":"markupSyntax","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -280,7 +314,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_messages_patch",
     cud: "update",
     description: "Updates a message. There's a difference between the `patch` and `update` methods. The `patch` method uses a `patch` request while the `update` method uses a `pu",
-    method: { id: "chat.spaces.messages.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.messages.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[14] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"allowMissing","api":"allowMissing","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -296,7 +330,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_messages_reactions_create",
     cud: "create",
     description: "Creates a reaction and adds it to a message. For an example, see [Add a reaction to a message](https://developers.google.com/workspace/chat/create-reactions). R",
-    method: { id: "chat.spaces.messages.reactions.create", httpMethod: "POST", path: "v1/{+parent}/reactions", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "chat.spaces.messages.reactions.create", httpMethod: "POST", path: "v1/{+parent}/reactions", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[16] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -310,7 +344,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_messages_reactions_delete",
     cud: "delete",
     description: "Deletes a reaction to a message. For an example, see [Delete a reaction](https://developers.google.com/workspace/chat/delete-reactions). Requires [user authenti",
-    method: { id: "chat.spaces.messages.reactions.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.messages.reactions.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[17] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -323,7 +357,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_messages_reactions_list",
     cud: "read",
     description: "Lists reactions to a message. For an example, see [List reactions for a message](https://developers.google.com/workspace/chat/list-reactions). Requires [user au",
-    method: { id: "chat.spaces.messages.reactions.list", httpMethod: "GET", path: "v1/{+parent}/reactions", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "chat.spaces.messages.reactions.list", httpMethod: "GET", path: "v1/{+parent}/reactions", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[18] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -339,7 +373,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_messages_search",
     cud: "read",
     description: "Searches for messages in Google Chat that the calling user has access to. Returns a list of messages matching the search criteria. To search across all spaces t",
-    method: { id: "chat.spaces.messages.search", httpMethod: "POST", path: "v1/{+parent}/messages:search", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "chat.spaces.messages.search", httpMethod: "POST", path: "v1/{+parent}/messages:search", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[19] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -353,7 +387,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_messages_update",
     cud: "update",
     description: "Updates a message. There's a difference between the `patch` and `update` methods. The `patch` method uses a `patch` request while the `update` method uses a `pu",
-    method: { id: "chat.spaces.messages.update", httpMethod: "PUT", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.messages.update", httpMethod: "PUT", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[14] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"allowMissing","api":"allowMissing","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -369,7 +403,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_patch",
     cud: "update",
     description: "Updates a space. For an example, see [Update a space](https://developers.google.com/workspace/chat/update-spaces). If you're updating the `displayName` field an",
-    method: { id: "chat.spaces.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[20] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -385,7 +419,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_search",
     cud: "read",
     description: "Returns a list of spaces in a Google Workspace organization. For an example, see [Search for and manage spaces](https://developers.google.com/workspace/chat/sea",
-    method: { id: "chat.spaces.search", httpMethod: "GET", path: "v1/spaces:search", baseUrl: "https://chat.googleapis.com/", requiredParams: [] },
+    method: { id: "chat.spaces.search", httpMethod: "GET", path: "v1/spaces:search", baseUrl: "https://chat.googleapis.com/", requiredParams: [], scopes: S_chat_v1[21] },
     params: [{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"query","api":"query","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -402,7 +436,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_setup",
     cud: "update",
     description: "Creates a space and adds specified users to it. The calling user is automatically added to the space, and shouldn't be specified as a membership in the request.",
-    method: { id: "chat.spaces.setup", httpMethod: "POST", path: "v1/spaces:setup", baseUrl: "https://chat.googleapis.com/", requiredParams: [] },
+    method: { id: "chat.spaces.setup", httpMethod: "POST", path: "v1/spaces:setup", baseUrl: "https://chat.googleapis.com/", requiredParams: [], scopes: S_chat_v1[22] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -415,7 +449,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_space_events_get",
     cud: "read",
     description: "Returns an event from a Google Chat space. The [event payload](https://developers.google.com/workspace/chat/api/reference/rest/v1/spaces.spaceEvents#SpaceEvent.",
-    method: { id: "chat.spaces.spaceEvents.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.spaces.spaceEvents.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[23] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -428,7 +462,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_spaces_space_events_list",
     cud: "read",
     description: "Lists events from a Google Chat space. For each event, the [payload](https://developers.google.com/workspace/chat/api/reference/rest/v1/spaces.spaceEvents#Space",
-    method: { id: "chat.spaces.spaceEvents.list", httpMethod: "GET", path: "v1/{+parent}/spaceEvents", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "chat.spaces.spaceEvents.list", httpMethod: "GET", path: "v1/{+parent}/spaceEvents", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[23] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -444,7 +478,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_availability_get",
     cud: "read",
     description: "Returns availability information for a human user in Google Chat. For example, this can be used to check if a user is online or away, or to retrieve their custo",
-    method: { id: "chat.users.availability.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.availability.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[24] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -457,7 +491,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_availability_mark_as_active",
     cud: "create",
     description: "Marks user as `ACTIVE` in Google Chat. Sets the user's availability state to `ACTIVE`. The `ACTIVE` state lasts until the specified expiration, at which point t",
-    method: { id: "chat.users.availability.markAsActive", httpMethod: "POST", path: "v1/{+name}:markAsActive", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.availability.markAsActive", httpMethod: "POST", path: "v1/{+name}:markAsActive", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[25] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -471,7 +505,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_availability_mark_as_away",
     cud: "create",
     description: "Marks user as `AWAY` in Google Chat. Sets the user's state to away and is not affected by the user's activity. This method only updates the authenticated user's",
-    method: { id: "chat.users.availability.markAsAway", httpMethod: "POST", path: "v1/{+name}:markAsAway", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.availability.markAsAway", httpMethod: "POST", path: "v1/{+name}:markAsAway", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[25] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -485,7 +519,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_availability_mark_as_do_not_disturb",
     cud: "create",
     description: "Marks user as `DO_NOT_DISTURB` in Google Chat. Sets a user's availability state to `DO_NOT_DISTURB` until a specified expiration time. When in `DO_NOT_DISTURB`,",
-    method: { id: "chat.users.availability.markAsDoNotDisturb", httpMethod: "POST", path: "v1/{+name}:markAsDoNotDisturb", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.availability.markAsDoNotDisturb", httpMethod: "POST", path: "v1/{+name}:markAsDoNotDisturb", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[25] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -499,7 +533,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_availability_patch",
     cud: "update",
     description: "Updates availability information for a human user. Only the `custom_status` field can be updated through this method. This method only updates the authenticated",
-    method: { id: "chat.users.availability.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.availability.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[25] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -514,7 +548,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_sections_create",
     cud: "create",
     description: "Creates a section in Google Chat. Sections help users group conversations and customize the list of spaces displayed in Chat navigation panel. Only sections of",
-    method: { id: "chat.users.sections.create", httpMethod: "POST", path: "v1/{+parent}/sections", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "chat.users.sections.create", httpMethod: "POST", path: "v1/{+parent}/sections", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[26] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -528,7 +562,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_sections_delete",
     cud: "delete",
     description: "Deletes a section of type `CUSTOM_SECTION`. If the section contains items, such as spaces, the items are moved to Google Chat's default sections and are not del",
-    method: { id: "chat.users.sections.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.sections.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[26] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -541,7 +575,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_sections_items_list",
     cud: "read",
     description: "Lists items in a section. Only spaces can be section items. For details, see [Create and organize sections in Google Chat](https://support.google.com/chat/answe",
-    method: { id: "chat.users.sections.items.list", httpMethod: "GET", path: "v1/{+parent}/items", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "chat.users.sections.items.list", httpMethod: "GET", path: "v1/{+parent}/items", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[27] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -557,7 +591,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_sections_items_move",
     cud: "update",
     description: "Moves an item from one section to another. For example, if a section contains spaces, this method can be used to move a space to a different section. For detail",
-    method: { id: "chat.users.sections.items.move", httpMethod: "POST", path: "v1/{+name}:move", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.sections.items.move", httpMethod: "POST", path: "v1/{+name}:move", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[26] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -571,7 +605,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_sections_list",
     cud: "read",
     description: "Lists sections available to the Chat user. Sections help users group their conversations and customize the list of spaces displayed in Chat navigation panel. Fo",
-    method: { id: "chat.users.sections.list", httpMethod: "GET", path: "v1/{+parent}/sections", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "chat.users.sections.list", httpMethod: "GET", path: "v1/{+parent}/sections", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[27] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -586,7 +620,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_sections_patch",
     cud: "update",
     description: "Updates a section. Only sections of type `CUSTOM_SECTION` can be updated. For details, see [Create and organize sections in Google Chat](https://support.google.",
-    method: { id: "chat.users.sections.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.sections.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[26] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -601,7 +635,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_sections_position",
     cud: "create",
     description: "Changes the sort order of a section. For details, see [Create and organize sections in Google Chat](https://support.google.com/chat/answer/16059854). Requires [",
-    method: { id: "chat.users.sections.position", httpMethod: "POST", path: "v1/{+name}:position", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.sections.position", httpMethod: "POST", path: "v1/{+name}:position", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[26] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -615,7 +649,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_spaces_get_space_read_state",
     cud: "read",
     description: "Returns details about a user's read state within a space, used to identify read and unread messages. For an example, see [Get details about a user's space read",
-    method: { id: "chat.users.spaces.getSpaceReadState", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.spaces.getSpaceReadState", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[28] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -628,7 +662,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_spaces_space_notification_setting_get",
     cud: "read",
     description: "Gets the space notification setting. For an example, see [Get the caller's space notification setting](https://developers.google.com/workspace/chat/get-space-no",
-    method: { id: "chat.users.spaces.spaceNotificationSetting.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.spaces.spaceNotificationSetting.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[29] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -641,7 +675,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_spaces_space_notification_setting_patch",
     cud: "update",
     description: "Updates the space notification setting. For an example, see [Update the caller's space notification setting](https://developers.google.com/workspace/chat/update",
-    method: { id: "chat.users.spaces.spaceNotificationSetting.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.spaces.spaceNotificationSetting.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[29] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -656,7 +690,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_spaces_threads_get_thread_read_state",
     cud: "read",
     description: "Returns details about a user's read state within a thread, used to identify read and unread messages. For an example, see [Get details about a user's thread rea",
-    method: { id: "chat.users.spaces.threads.getThreadReadState", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.spaces.threads.getThreadReadState", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[28] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -669,7 +703,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     name: "chat_users_spaces_update_space_read_state",
     cud: "update",
     description: "Updates a user's read state within a space, used to identify read and unread messages. For an example, see [Update a user's space read state](https://developers",
-    method: { id: "chat.users.spaces.updateSpaceReadState", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "chat.users.spaces.updateSpaceReadState", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[30] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

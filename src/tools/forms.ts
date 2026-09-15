@@ -1,13 +1,13 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { forms as formsClient } from '@googleapis/forms';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = accountAliasSchema.optional();
 
 export function registerFormsTools(server: ToolRegistry): void {
   server.registerTool(
@@ -145,6 +145,8 @@ export function registerFormsTools(server: ToolRegistry): void {
   server.registerTool(
     'forms_batch_update',
     {
+      // Insert/append-capable or non-convergent: a retry duplicates content.
+      annotations: { idempotentHint: false },
       description: 'Generic forms.batchUpdate pass-through: add/edit/delete questions, update form info and settings. See https://developers.google.com/workspace/forms/api/reference/rest/v1/forms/request',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),

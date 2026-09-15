@@ -165,9 +165,42 @@ function emitShapeField(field: string, zod: string): string {
 
 export function emitService(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: Set<string> = new Set()): { fileText: string; report: ServiceReport; names: string[] } {
   const { plans, report } = planTools(doc, api, alreadyEmitted);
+
+  // Baked + INTERNED scope sets (#114): tools sharing a scope set share one
+  // frozen array. Keys sorted for deterministic regen diffs.
+  const scopeSetIndex = new Map<string, number>();
+  const scopeSets: string[][] = [];
+  for (const plan of plans) {
+    const sorted = [...new Set(plan.method.scopes ?? [])].sort();
+    if (sorted.length === 0) continue;
+    const key = sorted.join(' ');
+    if (!scopeSetIndex.has(key)) {
+      scopeSetIndex.set(key, scopeSets.length);
+      scopeSets.push(sorted);
+    }
+  }
+
+  // Bodies from multiple Discovery docs merge into one service file
+  // (buildServiceFile slices between the outer braces), so the interned table
+  // lives INSIDE the body under a per-doc unique name.
+  const tableName = `S_${api.file.replace(/\.json$/, '')}`.replace(/[^a-zA-Z0-9_]/g, '_');
   const lines: string[] = [
     `export function register${api.service[0].toUpperCase()}${api.service.slice(1)}GeneratedTools(registry: ToolRegistry): void {`,
+    ...(scopeSets.length > 0
+      ? [
+          '  // Interned method scope sets (shared across tools; see scope-observability).',
+          `  const ${tableName}: readonly (readonly string[])[] = [`,
+          ...scopeSets.map((set) => `    ${JSON.stringify(set)},`),
+          '  ];',
+        ]
+      : []),
   ];
+
+  const scopeRef = (m: DiscoveryMethod): string => {
+    const sorted = [...new Set(m.scopes ?? [])].sort();
+    if (sorted.length === 0) return '';
+    return `, scopes: ${tableName}[${scopeSetIndex.get(sorted.join(' '))}]`;
+  };
 
   for (const plan of plans) {
     const m = plan.method;
@@ -194,7 +227,7 @@ export function emitService(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: 
       `    name: ${stringLiteral(plan.name)},`,
       `    cud: ${stringLiteral(plan.cud)},`,
       `    description: ${stringLiteral(plan.description)},`,
-      `    method: { id: ${stringLiteral(m.id)}, httpMethod: ${stringLiteral(m.httpMethod)}, path: ${stringLiteral(m.path)}, baseUrl: ${stringLiteral(m.baseUrl)}, requiredParams: ${JSON.stringify(m.requiredParams)} },`,
+      `    method: { id: ${stringLiteral(m.id)}, httpMethod: ${stringLiteral(m.httpMethod)}, path: ${stringLiteral(m.path)}, baseUrl: ${stringLiteral(m.baseUrl)}, requiredParams: ${JSON.stringify(m.requiredParams)}${scopeRef(m)} },`,
       `    params: ${JSON.stringify(paramEntries)},`,
       `    hasBody: ${plan.bodyRef ? 'true' : 'false'},`,
       '    shape: {',

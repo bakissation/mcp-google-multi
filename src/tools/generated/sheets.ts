@@ -5,11 +5,15 @@ import { coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_sheets_v4: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/spreadsheets"],
+  ];
   registerGeneratedTool(registry, {
     name: "sheets_spreadsheets_developer_metadata_get",
     cud: "read",
     description: "Returns the developer metadata with the specified ID. The caller must specify the spreadsheet ID and the developer metadata's unique metadataId. For more inform",
-    method: { id: "sheets.spreadsheets.developerMetadata.get", httpMethod: "GET", path: "v4/spreadsheets/{spreadsheetId}/developerMetadata/{metadataId}", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId","metadataId"] },
+    method: { id: "sheets.spreadsheets.developerMetadata.get", httpMethod: "GET", path: "v4/spreadsheets/{spreadsheetId}/developerMetadata/{metadataId}", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId","metadataId"], scopes: S_sheets_v4[0] },
     params: [{"field":"metadataId","api":"metadataId","location":"path"},{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -23,7 +27,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     name: "sheets_spreadsheets_developer_metadata_search",
     cud: "read",
     description: "Returns all developer metadata matching the specified DataFilter. For more information, see [Read, write, and search metadata](https://developers.google.com/wor",
-    method: { id: "sheets.spreadsheets.developerMetadata.search", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/developerMetadata:search", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"] },
+    method: { id: "sheets.spreadsheets.developerMetadata.search", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/developerMetadata:search", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"], scopes: S_sheets_v4[0] },
     params: [{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -37,7 +41,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     name: "sheets_spreadsheets_get_by_data_filter",
     cud: "read",
     description: "Returns the spreadsheet at the given ID. The caller must specify the spreadsheet ID. For more information, see [Read, write, and search metadata](https://develo",
-    method: { id: "sheets.spreadsheets.getByDataFilter", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}:getByDataFilter", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"] },
+    method: { id: "sheets.spreadsheets.getByDataFilter", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}:getByDataFilter", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"], scopes: S_sheets_v4[0] },
     params: [{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -51,7 +55,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     name: "sheets_spreadsheets_sheets_copy_to",
     cud: "create",
     description: "Copies a single sheet from a spreadsheet to another spreadsheet. Returns the properties of the newly created sheet.",
-    method: { id: "sheets.spreadsheets.sheets.copyTo", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/sheets/{sheetId}:copyTo", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId","sheetId"] },
+    method: { id: "sheets.spreadsheets.sheets.copyTo", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/sheets/{sheetId}:copyTo", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId","sheetId"], scopes: S_sheets_v4[0] },
     params: [{"field":"sheetId","api":"sheetId","location":"path"},{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -66,7 +70,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     name: "sheets_spreadsheets_values_batch_clear_by_data_filter",
     cud: "delete",
     description: "Clears one or more ranges of values from a spreadsheet. For more information, see [Read, write, and search metadata](https://developers.google.com/workspace/she",
-    method: { id: "sheets.spreadsheets.values.batchClearByDataFilter", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/values:batchClearByDataFilter", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"] },
+    method: { id: "sheets.spreadsheets.values.batchClearByDataFilter", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/values:batchClearByDataFilter", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"], scopes: S_sheets_v4[0] },
     params: [{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -80,7 +84,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     name: "sheets_spreadsheets_values_batch_get_by_data_filter",
     cud: "read",
     description: "Returns one or more ranges of values that match the specified data filters. For more information, see [Read, write, and search metadata](https://developers.goog",
-    method: { id: "sheets.spreadsheets.values.batchGetByDataFilter", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/values:batchGetByDataFilter", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"] },
+    method: { id: "sheets.spreadsheets.values.batchGetByDataFilter", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/values:batchGetByDataFilter", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"], scopes: S_sheets_v4[0] },
     params: [{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -94,7 +98,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     name: "sheets_spreadsheets_values_batch_update_by_data_filter",
     cud: "create",
     description: "Sets values in one or more ranges of a spreadsheet. For more information, see [Read, write, and search metadata](https://developers.google.com/workspace/sheets/",
-    method: { id: "sheets.spreadsheets.values.batchUpdateByDataFilter", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/values:batchUpdateByDataFilter", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"] },
+    method: { id: "sheets.spreadsheets.values.batchUpdateByDataFilter", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/values:batchUpdateByDataFilter", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"], scopes: S_sheets_v4[0] },
     params: [{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

@@ -5,11 +5,16 @@ import { coerceBoolean, coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_drivelabels_v2: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/drive.admin.labels","https://www.googleapis.com/auth/drive.labels"],
+    ["https://www.googleapis.com/auth/drive.admin.labels","https://www.googleapis.com/auth/drive.admin.labels.readonly","https://www.googleapis.com/auth/drive.labels","https://www.googleapis.com/auth/drive.labels.readonly"],
+  ];
   registerGeneratedTool(registry, {
     name: "drivelabels_labels_create",
     cud: "create",
     description: "Creates a label. For more information, see [Create and publish a label](https://developers.google.com/workspace/drive/labels/guides/create-label).",
-    method: { id: "drivelabels.labels.create", httpMethod: "POST", path: "v2/labels", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: [] },
+    method: { id: "drivelabels.labels.create", httpMethod: "POST", path: "v2/labels", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: [], scopes: S_drivelabels_v2[0] },
     params: [{"field":"languageCode","api":"languageCode","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -24,7 +29,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_delete",
     cud: "delete",
     description: "Permanently deletes a label and related metadata on Drive items. For more information, see [Disable, enable, and delete a label](https://developers.google.com/w",
-    method: { id: "drivelabels.labels.delete", httpMethod: "DELETE", path: "v2/{+name}", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "drivelabels.labels.delete", httpMethod: "DELETE", path: "v2/{+name}", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"writeControl.requiredRevisionId","api":"writeControl.requiredRevisionId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -39,7 +44,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_delta",
     cud: "create",
     description: "Updates a single label by applying a set of update requests resulting in a new draft revision. For more information, see [Update a label](https://developers.goo",
-    method: { id: "drivelabels.labels.delta", httpMethod: "POST", path: "v2/{+name}:delta", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "drivelabels.labels.delta", httpMethod: "POST", path: "v2/{+name}:delta", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -53,7 +58,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_disable",
     cud: "create",
     description: "Disable a published label. For more information, see [Disable, enable, and delete a label](https://developers.google.com/workspace/drive/labels/guides/disable-d",
-    method: { id: "drivelabels.labels.disable", httpMethod: "POST", path: "v2/{+name}:disable", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "drivelabels.labels.disable", httpMethod: "POST", path: "v2/{+name}:disable", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -67,7 +72,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_enable",
     cud: "create",
     description: "Enable a disabled label and restore it to its published state. For more information, see [Disable, enable, and delete a label](https://developers.google.com/wor",
-    method: { id: "drivelabels.labels.enable", httpMethod: "POST", path: "v2/{+name}:enable", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "drivelabels.labels.enable", httpMethod: "POST", path: "v2/{+name}:enable", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -81,7 +86,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_get",
     cud: "read",
     description: "Get a label by its resource name. For more information, see [Search for labels](https://developers.google.com/workspace/drive/labels/guides/search-label). Resou",
-    method: { id: "drivelabels.labels.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "drivelabels.labels.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"languageCode","api":"languageCode","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -97,7 +102,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_list",
     cud: "read",
     description: "List labels. For more information, see [Search for labels](https://developers.google.com/workspace/drive/labels/guides/search-label).",
-    method: { id: "drivelabels.labels.list", httpMethod: "GET", path: "v2/labels", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: [] },
+    method: { id: "drivelabels.labels.list", httpMethod: "GET", path: "v2/labels", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: [], scopes: S_drivelabels_v2[1] },
     params: [{"field":"customer","api":"customer","location":"query"},{"field":"languageCode","api":"languageCode","location":"query"},{"field":"minimumRole","api":"minimumRole","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"publishedOnly","api":"publishedOnly","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -117,7 +122,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_locks_list",
     cud: "read",
     description: "Lists the label locks on a label.",
-    method: { id: "drivelabels.labels.locks.list", httpMethod: "GET", path: "v2/{+parent}/locks", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.locks.list", httpMethod: "GET", path: "v2/{+parent}/locks", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[1] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -132,7 +137,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_permissions_batch_delete",
     cud: "delete",
     description: "Deletes label permissions. Permissions affect the label resource as a whole, aren't revisioned, and don't require publishing.",
-    method: { id: "drivelabels.labels.permissions.batchDelete", httpMethod: "POST", path: "v2/{+parent}/permissions:batchDelete", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.permissions.batchDelete", httpMethod: "POST", path: "v2/{+parent}/permissions:batchDelete", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -146,7 +151,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_permissions_batch_update",
     cud: "create",
     description: "Updates label permissions. If a permission for the indicated principal doesn't exist, a label permission is created, otherwise the existing permission is update",
-    method: { id: "drivelabels.labels.permissions.batchUpdate", httpMethod: "POST", path: "v2/{+parent}/permissions:batchUpdate", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.permissions.batchUpdate", httpMethod: "POST", path: "v2/{+parent}/permissions:batchUpdate", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -160,7 +165,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_permissions_create",
     cud: "create",
     description: "Updates a label's permissions. If a permission for the indicated principal doesn't exist, a label permission is created, otherwise the existing permission is up",
-    method: { id: "drivelabels.labels.permissions.create", httpMethod: "POST", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.permissions.create", httpMethod: "POST", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -175,7 +180,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_permissions_delete",
     cud: "delete",
     description: "Deletes a label's permission. Permissions affect the label resource as a whole, aren't revisioned, and don't require publishing.",
-    method: { id: "drivelabels.labels.permissions.delete", httpMethod: "DELETE", path: "v2/{+name}", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "drivelabels.labels.permissions.delete", httpMethod: "DELETE", path: "v2/{+name}", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -189,7 +194,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_permissions_list",
     cud: "read",
     description: "Lists a label's permissions.",
-    method: { id: "drivelabels.labels.permissions.list", httpMethod: "GET", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.permissions.list", httpMethod: "GET", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[1] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -205,7 +210,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_publish",
     cud: "update",
     description: "Publish all draft changes to the label. Once published, the label may not return to its draft state. For more information, see [Create and publish a label](http",
-    method: { id: "drivelabels.labels.publish", httpMethod: "POST", path: "v2/{+name}:publish", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "drivelabels.labels.publish", httpMethod: "POST", path: "v2/{+name}:publish", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -219,7 +224,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_revisions_locks_list",
     cud: "read",
     description: "Lists the label locks on a label.",
-    method: { id: "drivelabels.labels.revisions.locks.list", httpMethod: "GET", path: "v2/{+parent}/locks", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.revisions.locks.list", httpMethod: "GET", path: "v2/{+parent}/locks", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[1] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -234,7 +239,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_revisions_permissions_batch_delete",
     cud: "delete",
     description: "Deletes label permissions. Permissions affect the label resource as a whole, aren't revisioned, and don't require publishing.",
-    method: { id: "drivelabels.labels.revisions.permissions.batchDelete", httpMethod: "POST", path: "v2/{+parent}/permissions:batchDelete", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.revisions.permissions.batchDelete", httpMethod: "POST", path: "v2/{+parent}/permissions:batchDelete", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -248,7 +253,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_revisions_permissions_batch_update",
     cud: "create",
     description: "Updates label permissions. If a permission for the indicated principal doesn't exist, a label permission is created, otherwise the existing permission is update",
-    method: { id: "drivelabels.labels.revisions.permissions.batchUpdate", httpMethod: "POST", path: "v2/{+parent}/permissions:batchUpdate", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.revisions.permissions.batchUpdate", httpMethod: "POST", path: "v2/{+parent}/permissions:batchUpdate", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -262,7 +267,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_revisions_permissions_create",
     cud: "create",
     description: "Updates a label's permissions. If a permission for the indicated principal doesn't exist, a label permission is created, otherwise the existing permission is up",
-    method: { id: "drivelabels.labels.revisions.permissions.create", httpMethod: "POST", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.revisions.permissions.create", httpMethod: "POST", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -277,7 +282,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_revisions_permissions_delete",
     cud: "delete",
     description: "Deletes a label's permission. Permissions affect the label resource as a whole, aren't revisioned, and don't require publishing.",
-    method: { id: "drivelabels.labels.revisions.permissions.delete", httpMethod: "DELETE", path: "v2/{+name}", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "drivelabels.labels.revisions.permissions.delete", httpMethod: "DELETE", path: "v2/{+name}", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -291,7 +296,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_revisions_permissions_list",
     cud: "read",
     description: "Lists a label's permissions.",
-    method: { id: "drivelabels.labels.revisions.permissions.list", httpMethod: "GET", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.revisions.permissions.list", httpMethod: "GET", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[1] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -307,7 +312,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_revisions_update_permissions",
     cud: "update",
     description: "Updates a label's permissions. If a permission for the indicated principal doesn't exist, a label permission is created, otherwise the existing permission is up",
-    method: { id: "drivelabels.labels.revisions.updatePermissions", httpMethod: "PATCH", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.revisions.updatePermissions", httpMethod: "PATCH", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -322,7 +327,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_update_label_copy_mode",
     cud: "update",
     description: "Updates a label's `CopyMode`. Changes to this policy aren't revisioned, don't require publishing, and take effect immediately.",
-    method: { id: "drivelabels.labels.updateLabelCopyMode", httpMethod: "POST", path: "v2/{+name}:updateLabelCopyMode", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "drivelabels.labels.updateLabelCopyMode", httpMethod: "POST", path: "v2/{+name}:updateLabelCopyMode", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -350,7 +355,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_labels_update_permissions",
     cud: "update",
     description: "Updates a label's permissions. If a permission for the indicated principal doesn't exist, a label permission is created, otherwise the existing permission is up",
-    method: { id: "drivelabels.labels.updatePermissions", httpMethod: "PATCH", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"] },
+    method: { id: "drivelabels.labels.updatePermissions", httpMethod: "PATCH", path: "v2/{+parent}/permissions", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -365,7 +370,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_limits_get_label",
     cud: "read",
     description: "Get the constraints on the structure of a label; such as, the maximum number of fields allowed and maximum length of the label title.",
-    method: { id: "drivelabels.limits.getLabel", httpMethod: "GET", path: "v2/limits/label", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: [] },
+    method: { id: "drivelabels.limits.getLabel", httpMethod: "GET", path: "v2/limits/label", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: [], scopes: S_drivelabels_v2[1] },
     params: [{"field":"name","api":"name","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -378,7 +383,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
     name: "drivelabels_users_get_capabilities",
     cud: "read",
     description: "Gets the user capabilities.",
-    method: { id: "drivelabels.users.getCapabilities", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"] },
+    method: { id: "drivelabels.users.getCapabilities", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {

@@ -5,11 +5,15 @@ import { coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerFormsGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_forms_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.readonly","https://www.googleapis.com/auth/forms.body","https://www.googleapis.com/auth/forms.body.readonly","https://www.googleapis.com/auth/forms.responses.readonly"],
+  ];
   registerGeneratedTool(registry, {
     name: "forms_forms_watches_create",
     cud: "create",
     description: "Create a new watch. If a watch ID is provided, it must be unused. For each invoking project, the per form limit is one watch per Watch.EventType. A watch expire",
-    method: { id: "forms.forms.watches.create", httpMethod: "POST", path: "v1/forms/{formId}/watches", baseUrl: "https://forms.googleapis.com/", requiredParams: ["formId"] },
+    method: { id: "forms.forms.watches.create", httpMethod: "POST", path: "v1/forms/{formId}/watches", baseUrl: "https://forms.googleapis.com/", requiredParams: ["formId"], scopes: S_forms_v1[0] },
     params: [{"field":"formId","api":"formId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -23,7 +27,7 @@ export function registerFormsGeneratedTools(registry: ToolRegistry): void {
     name: "forms_forms_watches_delete",
     cud: "delete",
     description: "Delete a watch.",
-    method: { id: "forms.forms.watches.delete", httpMethod: "DELETE", path: "v1/forms/{formId}/watches/{watchId}", baseUrl: "https://forms.googleapis.com/", requiredParams: ["formId","watchId"] },
+    method: { id: "forms.forms.watches.delete", httpMethod: "DELETE", path: "v1/forms/{formId}/watches/{watchId}", baseUrl: "https://forms.googleapis.com/", requiredParams: ["formId","watchId"], scopes: S_forms_v1[0] },
     params: [{"field":"formId","api":"formId","location":"path"},{"field":"watchId","api":"watchId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -37,7 +41,7 @@ export function registerFormsGeneratedTools(registry: ToolRegistry): void {
     name: "forms_forms_watches_renew",
     cud: "create",
     description: "Renew an existing watch for seven days. The state of the watch after renewal is `ACTIVE`, and the `expire_time` is seven days from the renewal. Renewing a watch",
-    method: { id: "forms.forms.watches.renew", httpMethod: "POST", path: "v1/forms/{formId}/watches/{watchId}:renew", baseUrl: "https://forms.googleapis.com/", requiredParams: ["formId","watchId"] },
+    method: { id: "forms.forms.watches.renew", httpMethod: "POST", path: "v1/forms/{formId}/watches/{watchId}:renew", baseUrl: "https://forms.googleapis.com/", requiredParams: ["formId","watchId"], scopes: S_forms_v1[0] },
     params: [{"field":"formId","api":"formId","location":"path"},{"field":"watchId","api":"watchId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

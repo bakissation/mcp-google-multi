@@ -5,11 +5,21 @@ import { coerceArray, coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerScriptGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_script_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/script.processes"],
+    ["https://www.googleapis.com/auth/script.projects"],
+    ["https://www.googleapis.com/auth/script.deployments"],
+    ["https://www.googleapis.com/auth/script.deployments","https://www.googleapis.com/auth/script.deployments.readonly"],
+    ["https://www.googleapis.com/auth/script.projects","https://www.googleapis.com/auth/script.projects.readonly"],
+    ["https://www.googleapis.com/auth/script.metrics"],
+    ["https://mail.google.com/","https://www.google.com/calendar/feeds","https://www.google.com/m8/feeds","https://www.googleapis.com/auth/admin.directory.group","https://www.googleapis.com/auth/admin.directory.user","https://www.googleapis.com/auth/documents","https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/forms","https://www.googleapis.com/auth/forms.currentonly","https://www.googleapis.com/auth/groups","https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/userinfo.email"],
+  ];
   registerGeneratedTool(registry, {
     name: "script_processes_list",
     cud: "read",
     description: "List information about processes made by or on behalf of a user, such as process type and current status.",
-    method: { id: "script.processes.list", httpMethod: "GET", path: "v1/processes", baseUrl: "https://script.googleapis.com/", requiredParams: [] },
+    method: { id: "script.processes.list", httpMethod: "GET", path: "v1/processes", baseUrl: "https://script.googleapis.com/", requiredParams: [], scopes: S_script_v1[0] },
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"userProcessFilter.deploymentId","api":"userProcessFilter.deploymentId","location":"query"},{"field":"userProcessFilter.endTime","api":"userProcessFilter.endTime","location":"query"},{"field":"userProcessFilter.functionName","api":"userProcessFilter.functionName","location":"query"},{"field":"userProcessFilter.projectName","api":"userProcessFilter.projectName","location":"query"},{"field":"userProcessFilter.scriptId","api":"userProcessFilter.scriptId","location":"query"},{"field":"userProcessFilter.startTime","api":"userProcessFilter.startTime","location":"query"},{"field":"userProcessFilter.statuses","api":"userProcessFilter.statuses","location":"query"},{"field":"userProcessFilter.types","api":"userProcessFilter.types","location":"query"},{"field":"userProcessFilter.userAccessLevels","api":"userProcessFilter.userAccessLevels","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -32,7 +42,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_processes_list_script_processes",
     cud: "read",
     description: "List information about a script's executed processes, such as process type and current status.",
-    method: { id: "script.processes.listScriptProcesses", httpMethod: "GET", path: "v1/processes:listScriptProcesses", baseUrl: "https://script.googleapis.com/", requiredParams: [] },
+    method: { id: "script.processes.listScriptProcesses", httpMethod: "GET", path: "v1/processes:listScriptProcesses", baseUrl: "https://script.googleapis.com/", requiredParams: [], scopes: S_script_v1[0] },
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"scriptId","api":"scriptId","location":"query"},{"field":"scriptProcessFilter.deploymentId","api":"scriptProcessFilter.deploymentId","location":"query"},{"field":"scriptProcessFilter.endTime","api":"scriptProcessFilter.endTime","location":"query"},{"field":"scriptProcessFilter.functionName","api":"scriptProcessFilter.functionName","location":"query"},{"field":"scriptProcessFilter.startTime","api":"scriptProcessFilter.startTime","location":"query"},{"field":"scriptProcessFilter.statuses","api":"scriptProcessFilter.statuses","location":"query"},{"field":"scriptProcessFilter.types","api":"scriptProcessFilter.types","location":"query"},{"field":"scriptProcessFilter.userAccessLevels","api":"scriptProcessFilter.userAccessLevels","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -54,7 +64,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_create",
     cud: "create",
     description: "Creates a new, empty script project with no script files and a base manifest file.",
-    method: { id: "script.projects.create", httpMethod: "POST", path: "v1/projects", baseUrl: "https://script.googleapis.com/", requiredParams: [] },
+    method: { id: "script.projects.create", httpMethod: "POST", path: "v1/projects", baseUrl: "https://script.googleapis.com/", requiredParams: [], scopes: S_script_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -67,7 +77,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_deployments_create",
     cud: "create",
     description: "Creates a deployment of an Apps Script project.",
-    method: { id: "script.projects.deployments.create", httpMethod: "POST", path: "v1/projects/{scriptId}/deployments", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"] },
+    method: { id: "script.projects.deployments.create", httpMethod: "POST", path: "v1/projects/{scriptId}/deployments", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"], scopes: S_script_v1[2] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -81,7 +91,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_deployments_delete",
     cud: "delete",
     description: "Deletes a deployment of an Apps Script project.",
-    method: { id: "script.projects.deployments.delete", httpMethod: "DELETE", path: "v1/projects/{scriptId}/deployments/{deploymentId}", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId","deploymentId"] },
+    method: { id: "script.projects.deployments.delete", httpMethod: "DELETE", path: "v1/projects/{scriptId}/deployments/{deploymentId}", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId","deploymentId"], scopes: S_script_v1[2] },
     params: [{"field":"deploymentId","api":"deploymentId","location":"path"},{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -95,7 +105,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_deployments_get",
     cud: "read",
     description: "Gets a deployment of an Apps Script project.",
-    method: { id: "script.projects.deployments.get", httpMethod: "GET", path: "v1/projects/{scriptId}/deployments/{deploymentId}", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId","deploymentId"] },
+    method: { id: "script.projects.deployments.get", httpMethod: "GET", path: "v1/projects/{scriptId}/deployments/{deploymentId}", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId","deploymentId"], scopes: S_script_v1[3] },
     params: [{"field":"deploymentId","api":"deploymentId","location":"path"},{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -109,7 +119,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_deployments_list",
     cud: "read",
     description: "Lists the deployments of an Apps Script project.",
-    method: { id: "script.projects.deployments.list", httpMethod: "GET", path: "v1/projects/{scriptId}/deployments", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"] },
+    method: { id: "script.projects.deployments.list", httpMethod: "GET", path: "v1/projects/{scriptId}/deployments", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"], scopes: S_script_v1[3] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -124,7 +134,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_deployments_update",
     cud: "update",
     description: "Updates a deployment of an Apps Script project.",
-    method: { id: "script.projects.deployments.update", httpMethod: "PUT", path: "v1/projects/{scriptId}/deployments/{deploymentId}", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId","deploymentId"] },
+    method: { id: "script.projects.deployments.update", httpMethod: "PUT", path: "v1/projects/{scriptId}/deployments/{deploymentId}", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId","deploymentId"], scopes: S_script_v1[2] },
     params: [{"field":"deploymentId","api":"deploymentId","location":"path"},{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -139,7 +149,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_get",
     cud: "read",
     description: "Gets a script project's metadata.",
-    method: { id: "script.projects.get", httpMethod: "GET", path: "v1/projects/{scriptId}", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"] },
+    method: { id: "script.projects.get", httpMethod: "GET", path: "v1/projects/{scriptId}", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"], scopes: S_script_v1[4] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -152,7 +162,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_get_content",
     cud: "read",
     description: "Gets the content of the script project, including the code source and metadata for each script file.",
-    method: { id: "script.projects.getContent", httpMethod: "GET", path: "v1/projects/{scriptId}/content", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"] },
+    method: { id: "script.projects.getContent", httpMethod: "GET", path: "v1/projects/{scriptId}/content", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"], scopes: S_script_v1[4] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"versionNumber","api":"versionNumber","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -166,7 +176,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_get_metrics",
     cud: "read",
     description: "Get metrics data for scripts, such as number of executions and active users.",
-    method: { id: "script.projects.getMetrics", httpMethod: "GET", path: "v1/projects/{scriptId}/metrics", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"] },
+    method: { id: "script.projects.getMetrics", httpMethod: "GET", path: "v1/projects/{scriptId}/metrics", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"], scopes: S_script_v1[5] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"metricsFilter.deploymentId","api":"metricsFilter.deploymentId","location":"query"},{"field":"metricsGranularity","api":"metricsGranularity","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -181,7 +191,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_update_content",
     cud: "update",
     description: "Updates the content of the specified script project. This content is stored as the HEAD version, and is used when the script is executed as a trigger, in the sc",
-    method: { id: "script.projects.updateContent", httpMethod: "PUT", path: "v1/projects/{scriptId}/content", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"] },
+    method: { id: "script.projects.updateContent", httpMethod: "PUT", path: "v1/projects/{scriptId}/content", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"], scopes: S_script_v1[1] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -195,7 +205,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_versions_create",
     cud: "create",
     description: "Creates a new immutable version using the current code, with a unique version number.",
-    method: { id: "script.projects.versions.create", httpMethod: "POST", path: "v1/projects/{scriptId}/versions", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"] },
+    method: { id: "script.projects.versions.create", httpMethod: "POST", path: "v1/projects/{scriptId}/versions", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"], scopes: S_script_v1[1] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -209,7 +219,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_versions_get",
     cud: "read",
     description: "Gets a version of a script project.",
-    method: { id: "script.projects.versions.get", httpMethod: "GET", path: "v1/projects/{scriptId}/versions/{versionNumber}", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId","versionNumber"] },
+    method: { id: "script.projects.versions.get", httpMethod: "GET", path: "v1/projects/{scriptId}/versions/{versionNumber}", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId","versionNumber"], scopes: S_script_v1[4] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"versionNumber","api":"versionNumber","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -223,7 +233,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_projects_versions_list",
     cud: "read",
     description: "List the versions of a script project.",
-    method: { id: "script.projects.versions.list", httpMethod: "GET", path: "v1/projects/{scriptId}/versions", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"] },
+    method: { id: "script.projects.versions.list", httpMethod: "GET", path: "v1/projects/{scriptId}/versions", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"], scopes: S_script_v1[4] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -238,7 +248,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     name: "script_scripts_run",
     cud: "create",
     description: "POST script.scripts.run",
-    method: { id: "script.scripts.run", httpMethod: "POST", path: "v1/scripts/{scriptId}:run", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"] },
+    method: { id: "script.scripts.run", httpMethod: "POST", path: "v1/scripts/{scriptId}:run", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"], scopes: S_script_v1[6] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

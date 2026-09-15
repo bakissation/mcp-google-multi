@@ -5,11 +5,26 @@ import { coerceArray, coerceBoolean, coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerGmailGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_gmail_v1: readonly (readonly string[])[] = [
+    ["https://mail.google.com/","https://www.googleapis.com/auth/gmail.addons.current.action.compose","https://www.googleapis.com/auth/gmail.compose","https://www.googleapis.com/auth/gmail.modify"],
+    ["https://mail.google.com/","https://www.googleapis.com/auth/gmail.labels","https://www.googleapis.com/auth/gmail.metadata","https://www.googleapis.com/auth/gmail.modify","https://www.googleapis.com/auth/gmail.readonly"],
+    ["https://mail.google.com/","https://www.googleapis.com/auth/gmail.labels","https://www.googleapis.com/auth/gmail.modify"],
+    ["https://mail.google.com/","https://www.googleapis.com/auth/gmail.insert","https://www.googleapis.com/auth/gmail.modify"],
+    ["https://mail.google.com/","https://www.googleapis.com/auth/gmail.modify"],
+    ["https://www.googleapis.com/auth/gmail.settings.basic","https://www.googleapis.com/auth/gmail.settings.sharing"],
+    ["https://mail.google.com/","https://www.googleapis.com/auth/gmail.modify","https://www.googleapis.com/auth/gmail.readonly","https://www.googleapis.com/auth/gmail.settings.basic","https://www.googleapis.com/auth/gmail.settings.sharing"],
+    ["https://www.googleapis.com/auth/gmail.settings.sharing"],
+    ["https://mail.google.com/","https://www.googleapis.com/auth/gmail.modify","https://www.googleapis.com/auth/gmail.readonly","https://www.googleapis.com/auth/gmail.settings.basic"],
+    ["https://www.googleapis.com/auth/gmail.settings.basic"],
+    ["https://mail.google.com/","https://www.googleapis.com/auth/gmail.metadata","https://www.googleapis.com/auth/gmail.modify","https://www.googleapis.com/auth/gmail.readonly"],
+    ["https://mail.google.com/"],
+  ];
   registerGeneratedTool(registry, {
     name: "gmail_users_drafts_delete",
     cud: "delete",
     description: "Immediately and permanently deletes the specified draft. Does not simply trash it. For more information, see [Create and send draft emails](https://developers.g",
-    method: { id: "gmail.users.drafts.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/drafts/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.drafts.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/drafts/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[0] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -23,7 +38,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_drafts_update",
     cud: "update",
     description: "Replaces a draft's content. For more information, see [Create and send draft emails](https://developers.google.com/workspace/gmail/api/guides/drafts).",
-    method: { id: "gmail.users.drafts.update", httpMethod: "PUT", path: "gmail/v1/users/{userId}/drafts/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.drafts.update", httpMethod: "PUT", path: "gmail/v1/users/{userId}/drafts/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[0] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -38,7 +53,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_labels_get",
     cud: "read",
     description: "Gets the specified label. For more information, see [Manage labels](https://developers.google.com/workspace/gmail/api/guides/labels).",
-    method: { id: "gmail.users.labels.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/labels/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.labels.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/labels/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[1] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -52,7 +67,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_labels_patch",
     cud: "update",
     description: "Patch the specified label. For more information, see [Manage labels](https://developers.google.com/workspace/gmail/api/guides/labels).",
-    method: { id: "gmail.users.labels.patch", httpMethod: "PATCH", path: "gmail/v1/users/{userId}/labels/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.labels.patch", httpMethod: "PATCH", path: "gmail/v1/users/{userId}/labels/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[2] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -67,7 +82,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_labels_update",
     cud: "update",
     description: "Updates the specified label. For more information, see [Manage labels](https://developers.google.com/workspace/gmail/api/guides/labels).",
-    method: { id: "gmail.users.labels.update", httpMethod: "PUT", path: "gmail/v1/users/{userId}/labels/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.labels.update", httpMethod: "PUT", path: "gmail/v1/users/{userId}/labels/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[2] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -82,7 +97,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_messages_import",
     cud: "create",
     description: "Imports a message into only this user's mailbox, with standard email delivery scanning and classification similar to receiving via SMTP. This method doesn't per",
-    method: { id: "gmail.users.messages.import", httpMethod: "POST", path: "gmail/v1/users/{userId}/messages/import", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.messages.import", httpMethod: "POST", path: "gmail/v1/users/{userId}/messages/import", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[3] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"deleted","api":"deleted","location":"query"},{"field":"internalDateSource","api":"internalDateSource","location":"query"},{"field":"neverMarkSpam","api":"neverMarkSpam","location":"query"},{"field":"processForCalendar","api":"processForCalendar","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -100,7 +115,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_messages_insert",
     cud: "create",
     description: "Directly inserts a message into only this user's mailbox similar to `IMAP APPEND`, bypassing most scanning and classification. Does not send a message. For more",
-    method: { id: "gmail.users.messages.insert", httpMethod: "POST", path: "gmail/v1/users/{userId}/messages", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.messages.insert", httpMethod: "POST", path: "gmail/v1/users/{userId}/messages", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[3] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"deleted","api":"deleted","location":"query"},{"field":"internalDateSource","api":"internalDateSource","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -116,7 +131,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_messages_untrash",
     cud: "update",
     description: "Removes the specified message from the trash.",
-    method: { id: "gmail.users.messages.untrash", httpMethod: "POST", path: "gmail/v1/users/{userId}/messages/{id}/untrash", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.messages.untrash", httpMethod: "POST", path: "gmail/v1/users/{userId}/messages/{id}/untrash", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[4] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -130,7 +145,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_identities_create",
     cud: "create",
     description: "Creates and configures a client-side encryption identity that's authorized to send mail from the user account. Google publishes the S/MIME certificate to a shar",
-    method: { id: "gmail.users.settings.cse.identities.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/identities", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.cse.identities.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/identities", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[5] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -144,7 +159,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_identities_delete",
     cud: "delete",
     description: "Deletes a client-side encryption identity. The authenticated user can no longer use the identity to send encrypted messages. You cannot restore the identity aft",
-    method: { id: "gmail.users.settings.cse.identities.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/cse/identities/{cseEmailAddress}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","cseEmailAddress"] },
+    method: { id: "gmail.users.settings.cse.identities.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/cse/identities/{cseEmailAddress}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","cseEmailAddress"], scopes: S_gmail_v1[5] },
     params: [{"field":"cseEmailAddress","api":"cseEmailAddress","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -158,7 +173,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_identities_get",
     cud: "read",
     description: "Retrieves a client-side encryption identity configuration. For administrators managing identities and keypairs for users in their organization, requests require",
-    method: { id: "gmail.users.settings.cse.identities.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/cse/identities/{cseEmailAddress}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","cseEmailAddress"] },
+    method: { id: "gmail.users.settings.cse.identities.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/cse/identities/{cseEmailAddress}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","cseEmailAddress"], scopes: S_gmail_v1[6] },
     params: [{"field":"cseEmailAddress","api":"cseEmailAddress","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -172,7 +187,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_identities_list",
     cud: "read",
     description: "Lists the client-side encrypted identities for an authenticated user. For administrators managing identities and keypairs for users in their organization, reque",
-    method: { id: "gmail.users.settings.cse.identities.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/cse/identities", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.cse.identities.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/cse/identities", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[6] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -187,7 +202,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_identities_patch",
     cud: "update",
     description: "Associates a different key pair with an existing client-side encryption identity. The updated key pair must validate against Google's [S/MIME certificate profil",
-    method: { id: "gmail.users.settings.cse.identities.patch", httpMethod: "PATCH", path: "gmail/v1/users/{userId}/settings/cse/identities/{emailAddress}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","emailAddress"] },
+    method: { id: "gmail.users.settings.cse.identities.patch", httpMethod: "PATCH", path: "gmail/v1/users/{userId}/settings/cse/identities/{emailAddress}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","emailAddress"], scopes: S_gmail_v1[5] },
     params: [{"field":"emailAddress","api":"emailAddress","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -202,7 +217,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_keypairs_create",
     cud: "create",
     description: "Creates and uploads a client-side encryption S/MIME public key certificate chain and private key metadata for the authenticated user. For administrators managin",
-    method: { id: "gmail.users.settings.cse.keypairs.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.cse.keypairs.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[5] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"chainValidation","api":"chainValidation","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -217,7 +232,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_keypairs_disable",
     cud: "create",
     description: "Turns off a client-side encryption key pair. The authenticated user can no longer use the key pair to decrypt incoming CSE message texts or sign outgoing CSE ma",
-    method: { id: "gmail.users.settings.cse.keypairs.disable", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:disable", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"] },
+    method: { id: "gmail.users.settings.cse.keypairs.disable", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:disable", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"], scopes: S_gmail_v1[5] },
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -232,7 +247,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_keypairs_enable",
     cud: "create",
     description: "Turns on a client-side encryption key pair that was turned off. The key pair becomes active again for any associated client-side encryption identities. For admi",
-    method: { id: "gmail.users.settings.cse.keypairs.enable", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:enable", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"] },
+    method: { id: "gmail.users.settings.cse.keypairs.enable", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:enable", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"], scopes: S_gmail_v1[5] },
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -247,7 +262,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_keypairs_get",
     cud: "read",
     description: "Retrieves an existing client-side encryption key pair. For administrators managing identities and keypairs for users in their organization, requests require aut",
-    method: { id: "gmail.users.settings.cse.keypairs.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"] },
+    method: { id: "gmail.users.settings.cse.keypairs.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"], scopes: S_gmail_v1[6] },
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -261,7 +276,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_keypairs_list",
     cud: "read",
     description: "Lists client-side encryption key pairs for an authenticated user. For administrators managing identities and keypairs for users in their organization, requests",
-    method: { id: "gmail.users.settings.cse.keypairs.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/cse/keypairs", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.cse.keypairs.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/cse/keypairs", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[6] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -276,7 +291,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_cse_keypairs_obliterate",
     cud: "delete",
     description: "Deletes a client-side encryption key pair permanently and immediately. You can only permanently delete key pairs that have been turned off for more than 30 days",
-    method: { id: "gmail.users.settings.cse.keypairs.obliterate", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:obliterate", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"] },
+    method: { id: "gmail.users.settings.cse.keypairs.obliterate", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:obliterate", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"], scopes: S_gmail_v1[5] },
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -291,7 +306,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_delegates_create",
     cud: "create",
     description: "Adds a delegate with its verification status set directly to `accepted`, without sending any verification email. The delegate user must be a member of the same",
-    method: { id: "gmail.users.settings.delegates.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/delegates", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.delegates.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/delegates", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[7] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -305,7 +320,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_delegates_delete",
     cud: "delete",
     description: "Removes the specified delegate (which can be of any verification status), and revokes any verification that may have been required for using it. For more inform",
-    method: { id: "gmail.users.settings.delegates.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/delegates/{delegateEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","delegateEmail"] },
+    method: { id: "gmail.users.settings.delegates.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/delegates/{delegateEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","delegateEmail"], scopes: S_gmail_v1[7] },
     params: [{"field":"delegateEmail","api":"delegateEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -319,7 +334,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_delegates_get",
     cud: "read",
     description: "Gets the specified delegate. For more information, see [Manage delegates](https://developers.google.com/workspace/gmail/api/guides/delegate_settings). A delegat",
-    method: { id: "gmail.users.settings.delegates.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/delegates/{delegateEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","delegateEmail"] },
+    method: { id: "gmail.users.settings.delegates.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/delegates/{delegateEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","delegateEmail"], scopes: S_gmail_v1[8] },
     params: [{"field":"delegateEmail","api":"delegateEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -333,7 +348,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_delegates_list",
     cud: "read",
     description: "Lists the delegates for the specified account. For more information, see [Manage delegates](https://developers.google.com/workspace/gmail/api/guides/delegate_se",
-    method: { id: "gmail.users.settings.delegates.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/delegates", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.delegates.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/delegates", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[8] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -346,7 +361,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_filters_create",
     cud: "create",
     description: "Creates a filter. Note: you can only create a maximum of 1,000 filters. For more information, see [Manage Gmail filters](https://developers.google.com/workspace",
-    method: { id: "gmail.users.settings.filters.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/filters", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.filters.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/filters", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[9] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -360,7 +375,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_filters_delete",
     cud: "delete",
     description: "Immediately and permanently deletes the specified filter. For more information, see [Manage Gmail filters](https://developers.google.com/workspace/gmail/api/gui",
-    method: { id: "gmail.users.settings.filters.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/filters/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.settings.filters.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/filters/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[9] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -374,7 +389,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_filters_get",
     cud: "read",
     description: "Gets a filter. For more information, see [Manage Gmail filters](https://developers.google.com/workspace/gmail/api/guides/filter_settings).",
-    method: { id: "gmail.users.settings.filters.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/filters/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.settings.filters.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/filters/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[8] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -388,7 +403,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_filters_list",
     cud: "read",
     description: "Lists the message filters of a Gmail user. For more information, see [Manage Gmail filters](https://developers.google.com/workspace/gmail/api/guides/filter_sett",
-    method: { id: "gmail.users.settings.filters.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/filters", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.filters.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/filters", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[8] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -401,7 +416,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_forwarding_addresses_create",
     cud: "create",
     description: "Creates a forwarding address. If ownership verification is required, a message will be sent to the recipient and the resource's verification status will be set",
-    method: { id: "gmail.users.settings.forwardingAddresses.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/forwardingAddresses", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.forwardingAddresses.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/forwardingAddresses", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[7] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -415,7 +430,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_forwarding_addresses_delete",
     cud: "delete",
     description: "Deletes the specified forwarding address and revokes any verification that may have been required. For more information, see [Manage email forwarding](https://d",
-    method: { id: "gmail.users.settings.forwardingAddresses.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/forwardingAddresses/{forwardingEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","forwardingEmail"] },
+    method: { id: "gmail.users.settings.forwardingAddresses.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/forwardingAddresses/{forwardingEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","forwardingEmail"], scopes: S_gmail_v1[7] },
     params: [{"field":"forwardingEmail","api":"forwardingEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -429,7 +444,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_forwarding_addresses_get",
     cud: "read",
     description: "Gets the specified forwarding address. For more information, see [Manage email forwarding](https://developers.google.com/workspace/gmail/api/guides/forwarding_s",
-    method: { id: "gmail.users.settings.forwardingAddresses.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/forwardingAddresses/{forwardingEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","forwardingEmail"] },
+    method: { id: "gmail.users.settings.forwardingAddresses.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/forwardingAddresses/{forwardingEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","forwardingEmail"], scopes: S_gmail_v1[8] },
     params: [{"field":"forwardingEmail","api":"forwardingEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -443,7 +458,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_forwarding_addresses_list",
     cud: "read",
     description: "Lists the forwarding addresses for the specified account. For more information, see [Manage email forwarding](https://developers.google.com/workspace/gmail/api/",
-    method: { id: "gmail.users.settings.forwardingAddresses.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/forwardingAddresses", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.forwardingAddresses.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/forwardingAddresses", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[8] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -456,7 +471,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_get_auto_forwarding",
     cud: "read",
     description: "Gets the auto-forwarding setting for the specified account. For more information, see [Manage email forwarding](https://developers.google.com/workspace/gmail/ap",
-    method: { id: "gmail.users.settings.getAutoForwarding", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/autoForwarding", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.getAutoForwarding", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/autoForwarding", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[8] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -469,7 +484,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_get_imap",
     cud: "read",
     description: "Gets IMAP settings. For more information, see [Configure POP and IMAP settings with the Gmail API](https://developers.google.com/workspace/gmail/api/guides/pop_",
-    method: { id: "gmail.users.settings.getImap", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/imap", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.getImap", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/imap", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[8] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -482,7 +497,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_get_language",
     cud: "read",
     description: "Gets language settings. For more information, see [Manage language settings](https://developers.google.com/workspace/gmail/api/guides/language-settings).",
-    method: { id: "gmail.users.settings.getLanguage", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/language", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.getLanguage", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/language", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[8] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -495,7 +510,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_get_pop",
     cud: "read",
     description: "Gets POP settings. For more information, see [Configure POP and IMAP settings with the Gmail API](https://developers.google.com/workspace/gmail/api/guides/pop_i",
-    method: { id: "gmail.users.settings.getPop", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/pop", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.getPop", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/pop", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[8] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -508,7 +523,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_create",
     cud: "create",
     description: "Creates a custom \"from\" send-as alias. If an SMTP MSA is specified, Gmail will attempt to connect to the SMTP service to validate the configuration before creat",
-    method: { id: "gmail.users.settings.sendAs.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.sendAs.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[7] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -522,7 +537,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_delete",
     cud: "delete",
     description: "Deletes the specified send-as alias. Revokes any verification that may have been required for using it. For more information, see [Manage aliases and signatures",
-    method: { id: "gmail.users.settings.sendAs.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"] },
+    method: { id: "gmail.users.settings.sendAs.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"], scopes: S_gmail_v1[7] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -536,7 +551,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_get",
     cud: "read",
     description: "Gets the specified send-as alias. Fails with an HTTP 404 error if the specified address is not a member of the collection. For more information, see [Manage ali",
-    method: { id: "gmail.users.settings.sendAs.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"] },
+    method: { id: "gmail.users.settings.sendAs.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"], scopes: S_gmail_v1[8] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -550,7 +565,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_list",
     cud: "read",
     description: "Lists the send-as aliases for the specified account. The result includes the primary send-as address associated with the account as well as any custom \"from\" al",
-    method: { id: "gmail.users.settings.sendAs.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.sendAs.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[8] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -563,7 +578,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_patch",
     cud: "update",
     description: "Patch the specified send-as alias. For more information, see [Manage aliases and signatures with the Gmail API](https://developers.google.com/workspace/gmail/ap",
-    method: { id: "gmail.users.settings.sendAs.patch", httpMethod: "PATCH", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"] },
+    method: { id: "gmail.users.settings.sendAs.patch", httpMethod: "PATCH", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"], scopes: S_gmail_v1[5] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -578,7 +593,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_delete",
     cud: "delete",
     description: "Deletes the specified S/MIME config for the specified send-as alias. For more information, see [Manage S/MIME certificates with the Gmail API](https://developer",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail","id"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail","id"], scopes: S_gmail_v1[5] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -593,7 +608,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_get",
     cud: "read",
     description: "Gets the specified S/MIME config for the specified send-as alias. For more information, see [Manage S/MIME certificates with the Gmail API](https://developers.g",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail","id"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.get", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail","id"], scopes: S_gmail_v1[6] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -608,7 +623,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_insert",
     cud: "create",
     description: "Insert (upload) the given S/MIME config for the specified send-as alias. Note that `pkcs12` format is required for the key. For more information, see [Manage S/",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.insert", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.insert", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"], scopes: S_gmail_v1[5] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -623,7 +638,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_list",
     cud: "read",
     description: "Lists S/MIME configs for the specified send-as alias. For more information, see [Manage S/MIME certificates with the Gmail API](https://developers.google.com/wo",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"], scopes: S_gmail_v1[6] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -637,7 +652,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_smime_info_set_default",
     cud: "update",
     description: "Sets the default S/MIME config for the specified send-as alias. For more information, see [Manage S/MIME certificates with the Gmail API](https://developers.goo",
-    method: { id: "gmail.users.settings.sendAs.smimeInfo.setDefault", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}/setDefault", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail","id"] },
+    method: { id: "gmail.users.settings.sendAs.smimeInfo.setDefault", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo/{id}/setDefault", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail","id"], scopes: S_gmail_v1[5] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -652,7 +667,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_update",
     cud: "update",
     description: "Updates a send-as alias. If a signature is provided, Gmail will sanitize the HTML before saving it with the alias. For more information, see [Manage aliases and",
-    method: { id: "gmail.users.settings.sendAs.update", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"] },
+    method: { id: "gmail.users.settings.sendAs.update", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"], scopes: S_gmail_v1[5] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -667,7 +682,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_send_as_verify",
     cud: "create",
     description: "Sends a verification email to the specified send-as alias address. The verification status must be `pending`. For more information, see [Manage aliases and sign",
-    method: { id: "gmail.users.settings.sendAs.verify", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/verify", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"] },
+    method: { id: "gmail.users.settings.sendAs.verify", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/verify", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"], scopes: S_gmail_v1[7] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -681,7 +696,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_update_auto_forwarding",
     cud: "update",
     description: "Updates the auto-forwarding setting for the specified account. A verified forwarding address must be specified when auto-forwarding is enabled. For more informa",
-    method: { id: "gmail.users.settings.updateAutoForwarding", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/autoForwarding", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.updateAutoForwarding", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/autoForwarding", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[7] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -695,7 +710,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_update_imap",
     cud: "update",
     description: "Updates IMAP settings. For more information, see [Configure POP and IMAP settings with the Gmail API](https://developers.google.com/workspace/gmail/api/guides/p",
-    method: { id: "gmail.users.settings.updateImap", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/imap", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.updateImap", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/imap", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[9] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -709,7 +724,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_update_language",
     cud: "update",
     description: "Updates language settings. For more information, see [Manage language settings](https://developers.google.com/workspace/gmail/api/guides/language-settings). If",
-    method: { id: "gmail.users.settings.updateLanguage", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/language", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.updateLanguage", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/language", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[9] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -723,7 +738,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_settings_update_pop",
     cud: "update",
     description: "Updates POP settings. For more information, see [Configure POP and IMAP settings with the Gmail API](https://developers.google.com/workspace/gmail/api/guides/po",
-    method: { id: "gmail.users.settings.updatePop", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/pop", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.settings.updatePop", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/pop", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[9] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -737,7 +752,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_stop",
     cud: "create",
     description: "Turn off push notification delivery for the given user mailbox. For more information, see [Configure push notifications in Gmail API](https://developers.google.",
-    method: { id: "gmail.users.stop", httpMethod: "POST", path: "gmail/v1/users/{userId}/stop", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.stop", httpMethod: "POST", path: "gmail/v1/users/{userId}/stop", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[10] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -750,7 +765,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_threads_delete",
     cud: "delete",
     description: "Immediately and permanently deletes the specified thread. Any messages that belong to the thread are also deleted. This operation cannot be undone. Prefer `thre",
-    method: { id: "gmail.users.threads.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/threads/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.threads.delete", httpMethod: "DELETE", path: "gmail/v1/users/{userId}/threads/{id}", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[11] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -764,7 +779,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_threads_list",
     cud: "read",
     description: "Lists the threads in the user's mailbox. For more information, see [Manage threads](https://developers.google.com/workspace/gmail/api/guides/threads).",
-    method: { id: "gmail.users.threads.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/threads", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.threads.list", httpMethod: "GET", path: "gmail/v1/users/{userId}/threads", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[10] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"includeSpamTrash","api":"includeSpamTrash","location":"query"},{"field":"labelIds","api":"labelIds","location":"query"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"q","api":"q","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -782,7 +797,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_threads_modify",
     cud: "update",
     description: "Modifies the labels applied to the thread. This applies to all messages in the thread. For more information, see [Manage threads](https://developers.google.com/",
-    method: { id: "gmail.users.threads.modify", httpMethod: "POST", path: "gmail/v1/users/{userId}/threads/{id}/modify", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.threads.modify", httpMethod: "POST", path: "gmail/v1/users/{userId}/threads/{id}/modify", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[4] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -797,7 +812,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_threads_trash",
     cud: "delete",
     description: "Moves the specified thread to the trash. Any messages that belong to the thread are also moved to the trash. For more information, see [Manage threads](https://",
-    method: { id: "gmail.users.threads.trash", httpMethod: "POST", path: "gmail/v1/users/{userId}/threads/{id}/trash", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.threads.trash", httpMethod: "POST", path: "gmail/v1/users/{userId}/threads/{id}/trash", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[4] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -811,7 +826,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_threads_untrash",
     cud: "update",
     description: "Removes the specified thread from the trash. Any messages that belong to the thread are also removed from the trash. For more information, see [Manage threads](",
-    method: { id: "gmail.users.threads.untrash", httpMethod: "POST", path: "gmail/v1/users/{userId}/threads/{id}/untrash", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"] },
+    method: { id: "gmail.users.threads.untrash", httpMethod: "POST", path: "gmail/v1/users/{userId}/threads/{id}/untrash", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[4] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -825,7 +840,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     name: "gmail_users_watch",
     cud: "create",
     description: "Set up or update a push notification watch on the given user mailbox. For more information, see [Configure push notifications in Gmail API](https://developers.g",
-    method: { id: "gmail.users.watch", httpMethod: "POST", path: "gmail/v1/users/{userId}/watch", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"] },
+    method: { id: "gmail.users.watch", httpMethod: "POST", path: "gmail/v1/users/{userId}/watch", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[10] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

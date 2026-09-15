@@ -21,7 +21,12 @@ describe('deriveAccountHealth', () => {
     const h = deriveAccountHealth(ALIAS, deps({ hasToken: () => false }));
     expect(h.token.status).toBe('missing');
     expect(h.token.hint).toContain('auth --account test');
-    expect(h.scopes).toEqual({ configured: CONFIGURED.length, granted: 0, missing: CONFIGURED });
+    expect(h.scopes).toMatchObject({ configured: CONFIGURED.length, granted: 0 });
+    // B3 extension: missing kept for v5 consumers, now sorted; three-state
+    // breakdown present.
+    expect(h.scopes.missing).toEqual([...CONFIGURED].sort());
+    expect(h.scopes.requestable).toEqual([...CONFIGURED].sort());
+    expect(h.scopes.callable).toEqual([]);
     expect(h.email).toBe('test@example.com');
   });
 
@@ -58,7 +63,7 @@ describe('deriveAccountHealth', () => {
     expect(h.token.status).toBe('ok');
     expect(h.token.expiryDate).toBe(new Date(NOW + 60_000).toISOString());
     expect(h.scopes.granted).toBe(2);
-    expect(h.scopes.missing).toEqual(CONFIGURED.slice(2));
+    expect(h.scopes.missing).toEqual([...CONFIGURED.slice(2)].sort());
   });
 
   it('reports expired_refreshable when expired but a refresh token exists', () => {
