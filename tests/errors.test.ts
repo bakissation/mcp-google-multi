@@ -97,6 +97,48 @@ describe('mapGoogleError', () => {
     expect(json).not.toContain('Authorization');
   });
 
+  // Connect-level failures (no HTTP status): the gaxios path flattens the
+  // happy-eyeballs AggregateError into a bare code with an empty message.
+  it('gaxios/node-fetch empty-reason ETIMEDOUT → network_error, retriable, code surfaced', () => {
+    const e = mapGoogleError(
+      { message: 'request to https://oauth2.googleapis.com/token failed, reason: ', code: 'ETIMEDOUT', type: 'system' },
+      acc,
+    );
+    expect(e.error).toBe('network_error');
+    expect(e.retriable).toBe(true);
+    expect(e.message).toBe('request to https://oauth2.googleapis.com/token failed, reason: ETIMEDOUT');
+    expect(e.hint).toContain('network-family-autoselection');
+  });
+
+  it('undici fetch failed → network_error via cause AggregateError sub-errors', () => {
+    const e = mapGoogleError(
+      { message: 'fetch failed', cause: { message: '', errors: [{ code: 'ENETUNREACH' }, { code: 'ETIMEDOUT' }] } },
+      acc,
+    );
+    expect(e.error).toBe('network_error');
+    expect(e.retriable).toBe(true);
+    expect(e.message).toContain('ENETUNREACH');
+  });
+
+  it('ENOTFOUND (bad hostname) → network_error but not retriable', () => {
+    const e = mapGoogleError({ message: 'getaddrinfo ENOTFOUND example.invalid', code: 'ENOTFOUND' }, acc);
+    expect(e.error).toBe('network_error');
+    expect(e.retriable).toBe(false);
+    expect(e.message).toBe('getaddrinfo ENOTFOUND example.invalid');
+  });
+
+  it('a real HTTP status still wins over a network-looking cause', () => {
+    const e = mapGoogleError({ code: 503, message: 'unavailable', cause: { code: 'ECONNRESET' } }, acc);
+    expect(e.error).toBe('upstream_error');
+    expect(e.retriable).toBe(true);
+  });
+
+  it('statusless error without a network code stays upstream_error', () => {
+    const e = mapGoogleError({ message: 'something odd' }, acc);
+    expect(e.error).toBe('upstream_error');
+    expect(e.retriable).toBe(false);
+  });
+
   it('reads the nested Google message + reason', () => {
     const e = mapGoogleError(
       { response: { status: 404, data: { error: { message: 'Not found here', errors: [{ reason: 'notFound' }] } } } },

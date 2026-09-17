@@ -27,6 +27,28 @@ function messageOf(error: any): string {
   return error?.response?.data?.error?.message ?? error?.message ?? String(error);
 }
 
+// Connect/DNS syscall codes. ENOTFOUND (no such name) is the one non-transient
+// member. node-fetch flattens the happy-eyeballs AggregateError to a bare code
+// with an empty message, so the code is the only surviving signal to surface.
+const RETRIABLE_NET_CODES = new Set([
+  'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'ECONNABORTED', 'ENETUNREACH',
+  'EHOSTUNREACH', 'EPIPE', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET',
+]);
+const NET_CODES = new Set([...RETRIABLE_NET_CODES, 'ENOTFOUND']);
+
+/** First known network code on the error or its cause chain (GaxiosError.cause
+ * -> FetchError; undici TypeError.cause -> AggregateError.errors). */
+function netCodeOf(error: any): string | undefined {
+  for (let e = error, depth = 0; e && depth < 5; e = e.cause ?? e.error, depth++) {
+    if (typeof e.code === 'string' && NET_CODES.has(e.code)) return e.code;
+    if (Array.isArray(e.errors)) {
+      const sub = e.errors.find((x: any) => typeof x?.code === 'string' && NET_CODES.has(x.code));
+      if (sub) return sub.code;
+    }
+  }
+  return undefined;
+}
+
 /** Console deep-link to enable one API (noob-proofing hint, B10). */
 function apiEnableLink(api: string): string {
   return `https://console.cloud.google.com/apis/library/${api}.googleapis.com`;
@@ -137,6 +159,20 @@ export function mapGoogleError(
   }
   if (status !== undefined && status >= 500) {
     return { error: 'upstream_error', message, retriable: true, account };
+  }
+  if (status === undefined) {
+    const netCode = netCodeOf(error);
+    if (netCode) {
+      return {
+        error: 'network_error',
+        message: message.includes(netCode) ? message : message.endsWith('reason: ') ? `${message}${netCode}` : `${message} (${netCode})`,
+        hint:
+          `Network failure (${netCode}) before reaching Google - not an auth or API problem. Usually transient: retry. ` +
+          'If it persists on a high-latency or broken-IPv6 link, raise the happy-eyeballs budget: NODE_OPTIONS=--network-family-autoselection-attempt-timeout=4000 (server default 2000ms), and check connectivity with curl.',
+        retriable: RETRIABLE_NET_CODES.has(netCode),
+        account,
+      };
+    }
   }
   return { error: 'upstream_error', message, retriable: false, account };
 }
