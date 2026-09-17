@@ -14,6 +14,16 @@ Contributor-facing rationale for non-obvious implementation choices — why the 
 
 The Admin SDK requires a Workspace account with admin privileges; consumer @gmail.com accounts always get a 403. Strictly speaking, the only person with admin rights over a @gmail.com account is a Corporate Operations Engineer on Google's internal Techstop helpdesk — and if that's you, an MCP server is really not how you should be doing this. Requesting admin scopes on an account that cannot use them would only add consent-screen noise, so `GOOGLE_ADMIN_ACCOUNTS` grants them per-account instead of globally.
 
+## Networking
+
+### Why the server raises Node's happy-eyeballs timeout (`applyNetTuning`, `src/net-tuning.ts`)
+
+Node enables Happy Eyeballs (`autoSelectFamily`) by default since v20 and gives each address-family connect attempt 250ms (`autoSelectFamilyAttemptTimeout`). On a high-latency link to a distant Google edge, or when the ISP router advertises a dead IPv6 route, that budget aborts the IPv6 attempt *and* the IPv4 attempt, so every Google call fails with `ETIMEDOUT` while `curl` (which waits normally) works. Node itself raised the default to 500ms ([nodejs/node#60334](https://github.com/nodejs/node/pull/60334)) but only from v25.2; every LTS line this package supports ships 250ms, and the real fix (RFC 8305 parallel attempts, [nodejs/node#48145](https://github.com/nodejs/node/issues/48145)) is still open. The server therefore raises the process-wide default to 2000ms at startup. The trade-off is a slower failover when one address family hangs rather than fails fast — acceptable for a personal MCP server, not worth per-request agent plumbing through gaxios and undici. The tuning is skipped whenever the user passes `--network-family-autoselection-attempt-timeout` or `--no-network-family-autoselection` (via CLI or `NODE_OPTIONS`), and it never lowers a value that is already at or above 2000ms.
+
+### Why connect failures get their own `network_error` envelope (`netCodeOf`, `src/tools/_errors.ts`)
+
+The Google API path is gaxios → node-fetch → `node:https`. When the happy-eyeballs `AggregateError` (whose `message` is empty) reaches node-fetch, its `FetchError` keeps only the `code`/`syscall` and discards the error object, producing the famously unhelpful `request to <url> failed, reason: ` with the real signal hiding in `error.code`. `mapGoogleError` previously fed `error.code` through `Number()` (built for HTTP statuses), so `ETIMEDOUT` was dropped and the envelope said `upstream_error, retriable: false` — wrong on both counts. `netCodeOf` walks the cause chain (GaxiosError → FetchError; undici `TypeError` → `AggregateError.errors`) for known connect/DNS syscall codes and returns a `network_error` envelope that names the code, marks transient codes retriable, and points at the happy-eyeballs flag. Per-address sub-errors are only available on undici call sites; node-fetch destroys them upstream.
+
 ## Executor
 
 ### Request bodies on GET/HEAD (`resolveRequestBody`, `src/executor.ts`)
