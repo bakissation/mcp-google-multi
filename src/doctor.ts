@@ -7,6 +7,7 @@ import { deriveAccountHealth, type AccountHealth } from './tools/accounts-tool.j
 import { peekMasterKeyProvenance, deleteMasterKeyMaterial } from './master-key.js';
 import { hasToken } from './token-store.js';
 import { configDir } from './config-file.js';
+import { probeApiEnablement } from './api-probe.js';
 
 // B9: one engine (runDiagnostics), two skins — `doctor` (CLI glyph) and
 // `diagnose` (agent tool, structured). Sections 1-6 here; section 7 (HTTP:
@@ -73,6 +74,7 @@ const DEFAULT_DEPS: DiagnosticsDeps = {
   masterKeyProvenance: () => peekMasterKeyProvenance(),
   anyTokensExist: (aliases) => aliases.some((a) => hasToken(a)),
   fileExists: fs.existsSync,
+  probeApi: (alias) => probeApiEnablement(alias),
 };
 
 /** Console deep-link to enable one API (section-6 hint, error taxonomy B10). */
@@ -222,6 +224,9 @@ async function sectionApiEnablement(deps: DiagnosticsDeps, aliases: string[]): P
   } catch (e: any) {
     // Network / transient: WARN with the target, never crash the report.
     return { id: 6, title: 'API enablement', verdict: 'warn', lines: [`Probe could not complete: ${e?.message ?? e}`] };
+  }
+  if (results.length === 0) {
+    return { id: 6, title: 'API enablement', verdict: 'unknown', lines: [`No probeable service scopes granted on "${healthy}".`] };
   }
   const disabled = results.filter((r) => r.notEnabled);
   const lines = results.map((r) => `${r.service}: ${r.ok ? 'enabled' : r.notEnabled ? 'NOT ENABLED' : `unknown (${r.message ?? 'error'})`}`);
