@@ -109,6 +109,14 @@ describe('runDiagnostics sections', () => {
     expect(r.sections.find((x) => x.id === 6)!.verdict).toBe('warn');
   });
 
+  it('§6 reports unknown when the probe finds nothing probeable (no matching grants)', async () => {
+    const probeApi = async (): Promise<ApiProbeResult[]> => [];
+    const r = await runDiagnostics(deps({ probeApi }));
+    const s = r.sections.find((x) => x.id === 6)!;
+    expect(s.verdict).toBe('unknown');
+    expect(s.lines[0]).toContain('No probeable');
+  });
+
   it('§7 HTTP appears (deferred, unknown) only when transport includes http', async () => {
     const withHttp = await runDiagnostics(deps({ env: { MCP_TRANSPORT: 'stdio,http' } }));
     expect(withHttp.sections.find((x) => x.id === 7)?.verdict).toBe('unknown');
