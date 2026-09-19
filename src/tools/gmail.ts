@@ -7,6 +7,7 @@ import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
+import { prepareLocalDest } from './_local-files.js';
 import addressparser from 'nodemailer/lib/addressparser/index.js';
 import { lookup as lookupMime } from 'mime-types';
 import { configDir } from '../config-file.js';
@@ -768,8 +769,7 @@ export function registerGmailTools(server: ToolRegistry): void {
         if (!data) throw new Error('No attachment data returned');
 
         const buffer = Buffer.from(data, 'base64url');
-        // Strip path components so callers can't escape savePath via "../".
-        const fullPath = path.join(savePath, path.basename(filename));
+        const fullPath = prepareLocalDest(savePath, filename);
         await fs.promises.writeFile(fullPath, buffer, { mode: 0o600 });
 
         return {

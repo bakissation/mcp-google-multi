@@ -148,3 +148,36 @@ describe('mapGoogleError', () => {
     expect(e.message).toBe('Not found here');
   });
 });
+
+describe('mapGoogleError local-filesystem paths', () => {
+  it('ENOENT on a caller-supplied path → invalid_params with the remote-path hint', () => {
+    const err = Object.assign(new Error("ENOENT: no such file or directory, open '/data/missing.pdf'"), {
+      code: 'ENOENT',
+      path: '/data/missing.pdf',
+    });
+    const e = mapGoogleError(err, acc);
+    expect(e.error).toBe('invalid_params');
+    expect(e.message).toContain('/data/missing.pdf');
+    expect(e.message).toContain('ENOENT');
+    expect(e.hint).toContain('machine running this server');
+    expect(e.retriable).toBe(false);
+  });
+
+  it('EACCES and EISDIR map the same way; the path is optional', () => {
+    for (const code of ['EACCES', 'EISDIR']) {
+      const e = mapGoogleError(Object.assign(new Error(`${code}: denied`), { code }), acc);
+      expect(e.error).toBe('invalid_params');
+      expect(e.message).toContain(code);
+    }
+  });
+
+  it('network string codes are NOT treated as local-fs errors', () => {
+    const e = mapGoogleError(Object.assign(new Error('request failed'), { code: 'ETIMEDOUT' }), acc);
+    expect(e.error).toBe('network_error');
+  });
+
+  it('numeric Google statuses are untouched by the local-fs branch', () => {
+    const e = mapGoogleError({ code: 404, message: 'File not found: abc' }, acc);
+    expect(e.error).toBe('not_found');
+  });
+});

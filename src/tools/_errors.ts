@@ -36,6 +36,11 @@ const RETRIABLE_NET_CODES = new Set([
 ]);
 const NET_CODES = new Set([...RETRIABLE_NET_CODES, 'ENOTFOUND']);
 
+// Local-filesystem syscall codes from caller-supplied paths (localPath/savePath).
+// String codes, so they never collide with Google's numeric statuses; the
+// network codes above are deliberately excluded.
+const LOCAL_FS_CODES = new Set(['ENOENT', 'EACCES', 'EISDIR', 'ENOTDIR', 'EPERM', 'ELOOP', 'ENAMETOOLONG', 'ENOSPC']);
+
 /** First known network code on the error or its cause chain (GaxiosError.cause
  * -> FetchError; undici TypeError.cause -> AggregateError.errors). */
 function netCodeOf(error: any): string | undefined {
@@ -161,6 +166,19 @@ export function mapGoogleError(
     return { error: 'upstream_error', message, retriable: true, account };
   }
   if (status === undefined) {
+    const fsCode = typeof error?.code === 'string' && LOCAL_FS_CODES.has(error.code) ? error.code : undefined;
+    if (fsCode) {
+      const p = typeof error?.path === 'string' ? ` "${error.path}"` : '';
+      return {
+        error: 'invalid_params',
+        message: `Cannot access local path${p}: ${fsCode}`,
+        hint:
+          'The path must exist on the machine running this server and be accessible to it. ' +
+          'When the server runs remotely (HTTP transport), paths on your own machine are not visible to it.',
+        retriable: false,
+        account,
+      };
+    }
     const netCode = netCodeOf(error);
     if (netCode) {
       return {
