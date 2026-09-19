@@ -8,6 +8,7 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HttpConfig } from './http-config.js';
+import { withArgNormalization } from './arg-normalize.js';
 
 export type AuthOutcome =
   | { ok: true }
@@ -34,6 +35,8 @@ export interface HttpHostOptions {
   /** Deadline for a single /mcp dispatch; a hung handler past this releases the
    * shared lock instead of wedging the transport (default 120s). */
   dispatchTimeoutMs?: number;
+  /** tools/call argument-key normalization lookup (arg-normalize.ts); absent = off. */
+  argShapeFor?: (tool: string) => ReadonlySet<string> | undefined;
 }
 
 // A hung handler that keeps the connection open would otherwise hold the global
@@ -225,7 +228,9 @@ export class HttpTransportHost {
         timer = setTimeout(() => resolve('timeout'), deadlineMs);
         timer.unref?.();
       });
-      await this.opts.server.connect(transport);
+      await this.opts.server.connect(
+        this.opts.argShapeFor ? withArgNormalization(transport, this.opts.argShapeFor, this.opts.log) : transport,
+      );
       // Reflect the dispatch into a non-rejecting arm: if the deadline wins the
       // race, an orphaned handler settling later must not surface as an unhandled
       // rejection — but a genuine dispatch error still propagates (rethrown below).
