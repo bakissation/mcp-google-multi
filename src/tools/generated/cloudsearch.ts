@@ -17,7 +17,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
   ];
   registerGeneratedTool(registry, {
     name: "cloudsearch_debug_datasources_items_check_access",
-    cud: "create",
+    cud: "read",
     description: "Checks whether an item is accessible by specified principal. Principal must be a user; groups and domain values aren't supported. **Note:** This API requires an",
     method: { id: "cloudsearch.debug.datasources.items.checkAccess", httpMethod: "POST", path: "v1/debug/{+name}:checkAccess", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],

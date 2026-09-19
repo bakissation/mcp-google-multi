@@ -21,6 +21,8 @@ export const WORKSPACE_APIS: Record<string, { id: string; version: string }> = {
   admin_reports: { id: 'admin', version: 'reports_v1' },
   admin_datatransfer: { id: 'admin', version: 'datatransfer_v1' },
   groupssettings: { id: 'groupssettings', version: 'v1' },
+  analyticsadmin: { id: 'analyticsadmin', version: 'v1beta' },
+  analyticsdata: { id: 'analyticsdata', version: 'v1beta' },
   appsmarket: { id: 'appsmarket', version: 'v2' },
   classroom: { id: 'classroom', version: 'v1' },
   cloudidentity: { id: 'cloudidentity', version: 'v1' },
@@ -199,9 +201,13 @@ export function clearDiscoveryMemoryCache(): void {
   memoryCache.clear();
 }
 
-const POST_READ_VERB = /^(get|list|search|query|lookup|count|batchGet|generateIds|export|download|inspect)/i;
+// GA4-style report execution (runReport, batchRunPivotReports, runAccessReport)
+// and check* predicates are POSTs purely for the request-body size — reads.
+const POST_READ_VERB = /^(get|list|search|query|lookup|count|batchGet|generateIds|export|download|inspect|check|(batch)?run\w*report)/i;
 const POST_UPDATE_VERB = /^(untrash|undelete|restore|modify|move|set|sort|merge|unmerge|replace|resize|publish|resolve|update|patch|write|format)/i;
-const POST_DELETE_VERB = /^(batch)?(delete|remove|trash|clear|empty|obliterate|purge|revoke|wipeout)/i;
+// archive sits with the deletes: in GA4 archiving a custom dimension/metric is
+// permanent, so the most restrictive write class is the safe classification.
+const POST_DELETE_VERB = /^(batch)?(delete|remove|trash|clear|empty|obliterate|purge|revoke|wipeout|archive)/i;
 
 export function cudFromMethod(method: Pick<DiscoveryMethod, 'httpMethod' | 'id'>): 'read' | 'create' | 'update' | 'delete' {
   switch (method.httpMethod) {
