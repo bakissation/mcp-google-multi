@@ -44,11 +44,11 @@ export function registerFormsGeneratedTools(registry: ToolRegistry): void {
     method: { id: "forms.forms.watches.renew", httpMethod: "POST", path: "v1/forms/{formId}/watches/{watchId}:renew", baseUrl: "https://forms.googleapis.com/", requiredParams: ["formId","watchId"], scopes: S_forms_v1[0] },
     params: [{"field":"formId","api":"formId","location":"path"},{"field":"watchId","api":"watchId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
       formId: z.string().describe("Required. The ID of the Form."),
       watchId: z.string().describe("Required. The ID of the Watch to renew."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("RenewWatchRequest JSON request body."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

@@ -157,10 +157,10 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     method: { id: "meet.spaces.endActiveConference", httpMethod: "POST", path: "v2/{+name}:endActiveConference", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
       name: z.string().describe("Required. Resource name of the space. Format: `spaces/{space}`. `{space}` is the resource identifier for the space. It's a unique, server-generated ID and is case sensitive. For example, `jQCFfuBOdN5z"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("EndActiveConferenceRequest JSON request body."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

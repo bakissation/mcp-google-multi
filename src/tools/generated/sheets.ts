@@ -58,11 +58,12 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     method: { id: "sheets.spreadsheets.sheets.copyTo", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/sheets/{sheetId}:copyTo", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId","sheetId"], scopes: S_sheets_v4[0] },
     params: [{"field":"sheetId","api":"sheetId","location":"path"},{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"destinationSpreadsheetId","api":"destinationSpreadsheetId"}],
     shape: {
       account: accountField(),
       sheetId: z.number().describe("The ID of the sheet to copy."),
       spreadsheetId: z.string().describe("The ID of the spreadsheet containing the sheet to copy."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("CopySheetToAnotherSpreadsheetRequest JSON request body. Top-level fields: destinationSpreadsheetId."),
+      destinationSpreadsheetId: z.string().describe("The ID of the spreadsheet to copy the sheet to.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

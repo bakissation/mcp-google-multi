@@ -187,6 +187,12 @@ export const CURATED_METHOD_IDS: string[] = [
   'webmasters.sites.list',
 ];
 
+// Per-method escape valves for the typed-body heuristic (gen-tools): 'opaque'
+// keeps the single coerceJson body arg even when the schema is flat; 'typed'
+// lifts the property-count cap (flatness stays mandatory — the generator
+// throws if a forced method has nested/$ref props).
+export const BODY_OVERRIDES: Record<string, 'typed' | 'opaque'> = {};
+
 // Corrections where HTTP-verb inference misreads a method's effect.
 export const CUD_OVERRIDES: Record<string, Cud> = {
   // One-time consent flag on the property: a state write, not a creation.

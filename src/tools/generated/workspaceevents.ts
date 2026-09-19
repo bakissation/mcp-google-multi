@@ -117,10 +117,10 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     method: { id: "workspaceevents.subscriptions.reactivate", httpMethod: "POST", path: "v1/{+name}:reactivate", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"], scopes: S_workspaceevents_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
       name: z.string().describe("Required. Resource name of the subscription. Format: `subscriptions/{subscription}`"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("ReactivateSubscriptionRequest JSON request body."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -131,10 +131,11 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     method: { id: "workspaceevents.tasks.cancel", httpMethod: "POST", path: "v1/{+name}:cancel", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"tenant","api":"tenant"}],
     shape: {
       account: accountField(),
       name: z.string().describe("The resource name of the task to cancel. Format: tasks/{task_id}"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("CancelTaskRequest JSON request body. Top-level fields: tenant."),
+      tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
