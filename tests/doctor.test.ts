@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   runDiagnostics, overallVerdict, exitCodeFor, apiEnableLink,
   renderReport, renderDoctorText,
-  type DiagnosticsDeps, type AccountHealth, type ApiProbeResult,
+  type DiagnosticsDeps, type AccountHealth, type ApiProbeResult, type HttpProbeResult,
 } from '../src/doctor.js';
 
 function emptyScopes() {
@@ -117,9 +117,11 @@ describe('runDiagnostics sections', () => {
     expect(s.lines[0]).toContain('No probeable');
   });
 
-  it('§7 HTTP appears (deferred, unknown) only when transport includes http', async () => {
-    const withHttp = await runDiagnostics(deps({ env: { MCP_TRANSPORT: 'stdio,http' } }));
-    expect(withHttp.sections.find((x) => x.id === 7)?.verdict).toBe('unknown');
+  it('§7 HTTP appears for http/both transports; an invalid MCP_TRANSPORT fails it (not silently unknown)', async () => {
+    const withHttp = await runDiagnostics(deps({ env: { MCP_TRANSPORT: 'both', MCP_OWNER_EMAILS: 'ic@example.com' } }));
+    expect(withHttp.sections.find((x) => x.id === 7)?.verdict).toBe('ok');
+    const invalid = await runDiagnostics(deps({ env: { MCP_TRANSPORT: 'stdio,http' } }));
+    expect(invalid.sections.find((x) => x.id === 7)?.slug).toBe('E_INVALID_TRANSPORT');
     const stdio = await runDiagnostics(deps());
     expect(stdio.sections.find((x) => x.id === 7)).toBeUndefined();
   });
@@ -152,5 +154,59 @@ describe('renderers', () => {
     const out = renderDoctorText(report);
     expect(out).toContain('Overall: FAIL');
     expect(out).toContain('→ upgrade');
+  });
+});
+
+describe('§7 HTTP', () => {
+  const httpEnv = { MCP_TRANSPORT: 'http', MCP_OWNER_EMAILS: 'ic@example.com' };
+
+  it('is absent entirely on stdio-only transport', async () => {
+    const r = await runDiagnostics(deps());
+    expect(r.sections.find((x) => x.id === 7)).toBeUndefined();
+  });
+
+  it('fails on an invalid MCP_PUBLIC_URL with the config slug', async () => {
+    const r = await runDiagnostics(deps({ env: { ...httpEnv, MCP_PUBLIC_URL: 'not a url' } }));
+    const s = r.sections.find((x) => x.id === 7)!;
+    expect(s.verdict).toBe('fail');
+    expect(s.slug).toBe('E_PUBLIC_URL_INVALID');
+  });
+
+  it('fails when MCP_OWNER_EMAILS is empty', async () => {
+    const r = await runDiagnostics(deps({ env: { MCP_TRANSPORT: 'http' } }));
+    const s = r.sections.find((x) => x.id === 7)!;
+    expect(s.verdict).toBe('fail');
+    expect(s.slug).toBe('E_OWNER_EMAILS_REQUIRED');
+  });
+
+  it('warns when an owner email matches no configured account', async () => {
+    const r = await runDiagnostics(deps({ env: { ...httpEnv, MCP_OWNER_EMAILS: 'stranger@example.com' } }));
+    const s = r.sections.find((x) => x.id === 7)!;
+    expect(s.verdict).toBe('warn');
+    expect(s.slug).toBe('W_OWNER_EMAIL_UNKNOWN');
+  });
+
+  it('reports unknown (never a fail, never worsening overall) when the live probe cannot reach the server', async () => {
+    const probeHttp = async (): Promise<HttpProbeResult> => ({ ok: false, unreachable: true });
+    const r = await runDiagnostics(deps({ env: httpEnv, probeHttp }));
+    const s = r.sections.find((x) => x.id === 7)!;
+    expect(s.verdict).toBe('unknown');
+    expect(s.lines.join(' ')).toContain('not reachable');
+  });
+
+  it('fails on a metadata mismatch from a reachable server', async () => {
+    const probeHttp = async (): Promise<HttpProbeResult> => ({ ok: false, problem: 'PRM resource "http://other/mcp" does not match' });
+    const r = await runDiagnostics(deps({ env: httpEnv, probeHttp }));
+    const s = r.sections.find((x) => x.id === 7)!;
+    expect(s.verdict).toBe('fail');
+    expect(s.slug).toBe('E_HTTP_METADATA_MISMATCH');
+  });
+
+  it('is ok end-to-end with matching owners and a green probe', async () => {
+    const probeHttp = async (): Promise<HttpProbeResult> => ({ ok: true });
+    const r = await runDiagnostics(deps({ env: httpEnv, probeHttp }));
+    const s = r.sections.find((x) => x.id === 7)!;
+    expect(s.verdict).toBe('ok');
+    expect(s.lines.join(' ')).toContain('PRM + AS metadata verified');
   });
 });
