@@ -31,6 +31,30 @@ const GOOGLE_WORKSPACE_TYPES = new Set([
   'application/vnd.google-apps.drawing',
 ]);
 
+// drive_read inlines only textual content. Beyond text/*, RFC 6839 structured-
+// syntax suffixes (+json/+xml/...) and a few bare application/* types are text
+// in practice — image/svg+xml was the motivating false "binary" refusal.
+const TEXTUAL_EXACT = new Set([
+  'application/json',
+  'application/xml',
+  'application/javascript',
+  'application/x-ndjson',
+  'application/yaml',
+  'application/x-yaml',
+  'application/sql',
+  'application/x-sh',
+  'application/csv',
+]);
+export function isTextualMime(mimeType: string): boolean {
+  const bare = mimeType.split(';')[0].trim().toLowerCase();
+  if (bare.startsWith('text/')) return true;
+  if (/\+(json|xml|yaml|toml|csv)$/.test(bare)) return true;
+  return TEXTUAL_EXACT.has(bare);
+}
+
+const BINARY_READ_HINT =
+  'Binary content cannot be inlined. Use drive_download to save the file to disk, or drive_export for Google Workspace files.';
+
 // Comment/Reply fields list — Drive API requires explicit `fields` on every call.
 const COMMENT_BASE_FIELDS = 'id,kind,content,htmlContent,createdTime,modifiedTime,resolved,anchor,author,deleted,quotedFileContent';
 const REPLY_SUBFIELDS = 'id,content,action,createdTime,modifiedTime,author,deleted';
@@ -149,7 +173,7 @@ export function registerDriveTools(server: ToolRegistry): void {
     'drive_read',
     {
       _meta: { 'anthropic/maxResultSizeChars': 100_000 },
-      description: 'Read the content of a Google Drive file (returns up to maxChars characters per call; non-Google-native files over 2MB return too_large)',
+      description: 'Read the content of a Google Drive file: Workspace docs and textual types (text/*, JSON/XML/SVG and similar) inline; other binaries return error:binary (returns up to maxChars characters per call; non-Google-native files over 2MB return too_large)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().describe('Google Drive file ID'),
@@ -208,6 +232,7 @@ export function registerDriveTools(server: ToolRegistry): void {
                 name,
                 mimeType,
                 error: 'binary',
+                hint: BINARY_READ_HINT,
                 webViewLink,
               }, null, 2),
             }],
@@ -230,7 +255,7 @@ export function registerDriveTools(server: ToolRegistry): void {
           };
         }
 
-        if (mimeType?.startsWith('text/')) {
+        if (mimeType && isTextualMime(mimeType)) {
           const downloaded = await drive.files.get(
             { fileId, alt: 'media', supportsAllDrives: true },
             { responseType: 'text' },
@@ -246,6 +271,7 @@ export function registerDriveTools(server: ToolRegistry): void {
               name,
               mimeType,
               error: 'binary',
+              hint: BINARY_READ_HINT,
               webViewLink,
             }, null, 2),
           }],

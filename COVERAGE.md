@@ -656,7 +656,7 @@ Optional scope bundles: `appsmarket`, `chat`, `classroom`, `cloudidentity`, `clo
 | `drive_operations_get` | generated | read | Gets the latest state of a long-running operation. Clients can use this method to poll the operation result at intervals |
 | `drive_permission_update` | curated | update | Change the role and/or expirationTime of an existing permission without removing it. Use "removeExpiration=true" to clea |
 | `drive_permissions_get` | generated | read | Gets a permission by ID. For more information, see [Share files, folders, and drives](https://developers.google.com/work |
-| `drive_read` | curated | read | Read the content of a Google Drive file (returns up to maxChars characters per call; non-Google-native files over 2MB re |
+| `drive_read` | curated | read | Read the content of a Google Drive file: Workspace docs and textual types (text/*, JSON/XML/SVG and similar) inline; oth |
 | `drive_remove_permission` | curated | delete | Revoke access to a Drive file for a specific permission |
 | `drive_replies_get` | generated | read | Gets a reply by ID. For more information, see [Manage comments and replies](https://developers.google.com/workspace/driv |
 | `drive_reply_create` | curated | create | Reply to a comment. Optionally close or reopen the thread by setting action to "resolve" or "reopen". |
@@ -667,7 +667,7 @@ Optional scope bundles: `appsmarket`, `chat`, `classroom`, `cloudidentity`, `clo
 | `drive_revision_list` | curated | read | List version history of a Drive file |
 | `drive_revision_update` | curated | update | Pin a revision (keepForever=true) against the 200-version cap, or change its published state for Docs. |
 | `drive_revisions_get` | generated | read | Gets a revision's metadata or content by ID. For more information, see [Manage file revisions](https://developers.google |
-| `drive_search` | curated | read | Search files in a Google Drive account |
+| `drive_search` | curated | read | Search files in a Google Drive account. A plain keyword is treated as a full-text search; pass Drive query syntax for a  |
 | `drive_share` | curated | create | Share a file or folder with a user, group, domain, or anyone with the link |
 | `drive_shared_drive_get` | curated | read | Get metadata for a specific shared drive |
 | `drive_shared_drives_list` | curated | read | List shared drives the account has access to |
