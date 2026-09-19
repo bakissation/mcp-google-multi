@@ -40,7 +40,7 @@ export const SERVICES: ServiceEntry[] = [
 // and workspaceevents is deliberately absent — no dedicated scope (subscriptions use resource scopes).
 const bundleGate = (name: string) => ({
   enabled: () => new Set(getOptionalBundles()).has(name),
-  hint: `add "${name}" to GOOGLE_OPTIONAL_SCOPES`,
+  hint: `add "${name}" to an account's scope profile (or legacy GOOGLE_OPTIONAL_SCOPES)`,
 });
 export const GENERATED_GATES: Record<string, { enabled: () => boolean; hint: string }> = {
   appsmarket: bundleGate('appsmarket'),

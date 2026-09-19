@@ -5,11 +5,15 @@ import { coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerTasksGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_tasks_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/tasks"],
+  ];
   registerGeneratedTool(registry, {
     name: "tasks_tasklists_update",
     cud: "update",
     description: "Updates the authenticated user's specified task list.",
-    method: { id: "tasks.tasklists.update", httpMethod: "PUT", path: "tasks/v1/users/@me/lists/{tasklist}", baseUrl: "https://tasks.googleapis.com/", requiredParams: ["tasklist"] },
+    method: { id: "tasks.tasklists.update", httpMethod: "PUT", path: "tasks/v1/users/@me/lists/{tasklist}", baseUrl: "https://tasks.googleapis.com/", requiredParams: ["tasklist"], scopes: S_tasks_v1[0] },
     params: [{"field":"tasklist","api":"tasklist","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -23,7 +27,7 @@ export function registerTasksGeneratedTools(registry: ToolRegistry): void {
     name: "tasks_tasks_update",
     cud: "update",
     description: "Updates the specified task.",
-    method: { id: "tasks.tasks.update", httpMethod: "PUT", path: "tasks/v1/lists/{tasklist}/tasks/{task}", baseUrl: "https://tasks.googleapis.com/", requiredParams: ["tasklist","task"] },
+    method: { id: "tasks.tasks.update", httpMethod: "PUT", path: "tasks/v1/lists/{tasklist}/tasks/{task}", baseUrl: "https://tasks.googleapis.com/", requiredParams: ["tasklist","task"], scopes: S_tasks_v1[0] },
     params: [{"field":"task","api":"task","location":"path"},{"field":"tasklist","api":"tasklist","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

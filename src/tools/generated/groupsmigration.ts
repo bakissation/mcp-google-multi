@@ -4,11 +4,15 @@ import type { ToolRegistry } from '../../registry.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerGroupsmigrationGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_groupsmigration_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/apps.groups.migration"],
+  ];
   registerGeneratedTool(registry, {
     name: "groupsmigration_archive_insert",
     cud: "create",
     description: "Inserts a new mail into the archive of the Google group.",
-    method: { id: "groupsmigration.archive.insert", httpMethod: "POST", path: "groups/v1/groups/{groupId}/archive", baseUrl: "https://groupsmigration.googleapis.com/", requiredParams: ["groupId"] },
+    method: { id: "groupsmigration.archive.insert", httpMethod: "POST", path: "groups/v1/groups/{groupId}/archive", baseUrl: "https://groupsmigration.googleapis.com/", requiredParams: ["groupId"], scopes: S_groupsmigration_v1[0] },
     params: [{"field":"groupId","api":"groupId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {

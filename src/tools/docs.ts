@@ -2,13 +2,55 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceBoolean, coerceJson } from './_coerce.js';
 import { docs as docsClient } from '@googleapis/docs';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 import { capText } from '../trim.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = accountAliasSchema.optional();
+
+// A single very large insertText has been observed to apply only partially while
+// the request still returns success, silently dropping the tail. Split a large
+// insert into bounded pieces sent as sequential insertText requests in one atomic
+// batchUpdate: small inserts keep the exact single-request path, and a large one
+// can no longer be silently truncated. Docs indices are UTF-16 code units (= JS
+// string length), so index math advances by `.length`; never split a surrogate pair.
+export const DOCS_INSERT_CHUNK = 5000;
+
+export function splitInsertText(text: string, maxLen = DOCS_INSERT_CHUNK): string[] {
+  if (text.length === 0) return [];
+  if (text.length <= maxLen) return [text];
+  const chunks: string[] = [];
+  let i = 0;
+  while (i < text.length) {
+    let end = Math.min(i + maxLen, text.length);
+    if (end < text.length) {
+      const code = text.charCodeAt(end - 1);
+      if (code >= 0xd800 && code <= 0xdbff) end -= 1; // keep a surrogate pair together
+    }
+    chunks.push(text.slice(i, end));
+    i = end;
+  }
+  return chunks;
+}
+
+// Sequential insertText requests: appends chain at end-of-segment; index inserts
+// advance the cursor by each prior chunk's length so the pieces stay contiguous.
+export function buildInsertRequests(text: string, index?: number): any[] {
+  const chunks = splitInsertText(text);
+  const requests: any[] = [];
+  let cursor = index;
+  for (const chunk of chunks) {
+    if (cursor === undefined) {
+      requests.push({ insertText: { text: chunk, endOfSegmentLocation: { segmentId: '' } } });
+    } else {
+      requests.push({ insertText: { text: chunk, location: { index: cursor } } });
+      cursor += chunk.length;
+    }
+  }
+  return requests;
+}
 
 function extractPlainText(body: any): string {
   return extractPlainTextInRange(body, 0, Infinity);
@@ -333,21 +375,24 @@ export function registerDocsTools(server: ToolRegistry): void {
         const auth = await getClient(account as Account);
         const docs = docsClient({ version: 'v1', auth });
 
-        const request: any = { insertText: { text } };
-        if (index !== undefined) {
-          request.insertText.location = { index };
-        } else {
-          request.insertText.endOfSegmentLocation = { segmentId: '' };
+        const requests = buildInsertRequests(text, index);
+        if (requests.length === 0) {
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({
+              documentId, insertedAt: index ?? 'end', inserted: 0,
+            }, null, 2) }],
+          };
         }
 
         const res = await docs.documents.batchUpdate({
           documentId,
-          requestBody: { requests: [request] },
+          requestBody: { requests },
         });
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({
             documentId: res.data.documentId,
             insertedAt: index ?? 'end',
+            inserted: text.length,
           }, null, 2) }],
         };
       } catch (error: any) {
@@ -359,6 +404,8 @@ export function registerDocsTools(server: ToolRegistry): void {
   server.registerTool(
     'docs_replace_text',
     {
+      // Insert/append-capable or non-convergent: a retry duplicates content.
+      annotations: { idempotentHint: false },
       description: 'Find and replace all occurrences of text in a document',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
@@ -1073,6 +1120,8 @@ export function registerDocsTools(server: ToolRegistry): void {
   server.registerTool(
     'docs_modify_table',
     {
+      // Insert/append-capable or non-convergent: a retry duplicates content.
+      annotations: { idempotentHint: false },
       description: 'Mutate a table by operation: insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, unmergeCells. Locate the cell with tableStartIndex (the table\'s start index in the doc) plus rowIndex/columnIndex (0-based).',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
@@ -1258,6 +1307,8 @@ export function registerDocsTools(server: ToolRegistry): void {
   server.registerTool(
     'docs_batch_update',
     {
+      // Insert/append-capable or non-convergent: a retry duplicates content.
+      annotations: { idempotentHint: false },
       description: 'Generic documents.batchUpdate pass-through. Accepts the full Request union (40 types). See https://developers.google.com/workspace/docs/api/reference/rest/v1/documents/request',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),

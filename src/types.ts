@@ -35,7 +35,7 @@ export interface GmailMessageFull {
   cc: string;
   date: string;
   body: string;
-  bodyOrigin?: 'text/plain' | 'text/html';
+  bodyFormat: 'plain' | 'markdown' | 'html';
   bodyTruncated?: boolean;
   bodyTotalChars?: number;
   messageIdHeader?: string;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ACCOUNTS } from './accounts.js';
+import { ACCOUNTS, getAccountSet } from './accounts.js';
 
 export const CSV_RE = /^[a-zA-Z0-9_-]+(\s*,\s*[a-zA-Z0-9_-]+)+$/;
 
@@ -8,15 +8,18 @@ const FANOUT_CONCURRENCY = 5;
 export function fanoutAccountField(description: string): z.ZodType {
   const csvExample = ACCOUNTS.length > 1 ? `; or a CSV subset like "${ACCOUNTS.slice(0, 2).join(',')}"` : '';
   return z
-    .union([z.enum([...ACCOUNTS, '*'] as [string, ...string[]]), z.string().regex(CSV_RE)])
-    .describe(`${description}; "*" = all accounts${csvExample}`);
+    // '*' first so the tuple is statically non-empty even when ACCOUNTS is empty
+    // (a fresh install): z.enum requires [string, ...string[]].
+    .union([z.enum(['*', ...ACCOUNTS]), z.string().regex(CSV_RE)])
+    .optional()
+    .describe(`${description}; "*" = all accounts${csvExample}; omit for the default account`);
 }
 
 export type AccountSelector =
   | { ok: true; fanout: boolean; aliases: string[] }
   | { ok: false; invalid: string[] };
 
-export function parseAccountSelector(value: string, accounts: readonly string[] = ACCOUNTS): AccountSelector {
+export function parseAccountSelector(value: string, accounts: readonly string[] = getAccountSet().aliases): AccountSelector {
   if (value === '*') return { ok: true, fanout: true, aliases: [...accounts] };
   if (!value.includes(',')) return { ok: true, fanout: false, aliases: [value] };
   const seen = new Set<string>();
@@ -34,7 +37,7 @@ export function parseAccountSelector(value: string, accounts: readonly string[] 
   return { ok: true, fanout: aliases.length > 1, aliases };
 }
 
-export function invalidAccountsResult(invalid: string[], accounts: readonly string[] = ACCOUNTS) {
+export function invalidAccountsResult(invalid: string[], accounts: readonly string[] = getAccountSet().aliases) {
   return {
     content: [
       {

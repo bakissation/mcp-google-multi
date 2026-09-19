@@ -1,12 +1,24 @@
 import type { Cud } from './registry.js';
 
 export type Profile = 'read-only' | 'safe-writes' | 'full-writes';
+export type Transport = 'stdio' | 'http';
 
 export interface Policy {
   profile: Profile;
   readOnly: boolean;
   allow: string[];
   deny: string[];
+  /**
+   * B14 reserved seam (cc-write-control "HTTP posture", LOCKED to OQ-5
+   * "annotations only"): the dispatch transport is threaded into the resolved
+   * policy for the EE/future seam, but in v6 alpha it does NOT stiffen the
+   * profile or alter any `isAllowed` verdict. "Stricter on HTTP" is achieved
+   * entirely by the `anthropic/requiresUserInteraction` annotation on the
+   * irreversible set (A12), emitted identically on both transports.
+   * Optional so existing Policy literals (codegen/tests) need no change;
+   * resolvePolicy always populates it.
+   */
+  transport?: Transport;
 }
 
 interface ToolRef {
@@ -17,11 +29,38 @@ interface ToolRef {
 
 const PROFILES: Profile[] = ['read-only', 'safe-writes', 'full-writes'];
 
+/** The irreversible set (frozen, cc-write-control): real sends leave the
+ * user's (or org's) identity unrecallably; permanent deletes bypass Trash.
+ * Includes the callable GENERATED twins of the curated ops — the surface is
+ * always callable by name, so a prompt-free twin would defeat the layer.
+ * Reversible mutations (trash/untrash, draft create/update, labels, calendar
+ * edits) are deliberately excluded so the approval prompt never nags. The
+ * escape hatch is documented as outside this layer (server write-control
+ * still gates it). */
+export const IRREVERSIBLE_TOOLS = new Set([
+  // curated
+  'gmail_send',
+  'gmail_send_draft',
+  'gmail_delete',
+  'gmail_batch_delete',
+  'drive_delete',
+  'drive_empty_trash',
+  // generated twins (permanent deletes / real sends)
+  'gmail_users_threads_delete',
+  'gmail_users_drafts_delete',
+  'chat_spaces_messages_delete',
+  'cloudidentity_customers_userinvitations_send',
+  'vault_matters_holds_delete',
+]);
+
 function parseGlobs(value: string | undefined): string[] {
   return (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-export function resolvePolicy(env: NodeJS.ProcessEnv = process.env): Policy {
+export function resolvePolicy(
+  env: NodeJS.ProcessEnv = process.env,
+  opts: { transport?: Transport } = {},
+): Policy {
   const raw = (env.GOOGLE_PROFILE ?? 'read-only').trim() as Profile;
   if (raw && !PROFILES.includes(raw)) {
     // Fail-closed to read-only, but say so — a typo'd profile otherwise looks
@@ -33,6 +72,8 @@ export function resolvePolicy(env: NodeJS.ProcessEnv = process.env): Policy {
     readOnly: /^(1|true|yes)$/i.test(env.GOOGLE_READ_ONLY ?? ''),
     allow: parseGlobs(env.GOOGLE_WRITE_ALLOW),
     deny: parseGlobs(env.GOOGLE_WRITE_DENY),
+    // Reserved seam only (see Policy.transport): does not affect the verdict.
+    transport: opts.transport ?? 'stdio',
   };
 }
 

@@ -94,7 +94,7 @@ describe('ToolRegistry', () => {
     reg.registerTool('gmail_modify_labels', { description: 'x' }, () => {});
     reg.registerTool('gmail_delete', { description: 'x' }, () => {});
     const expected: Record<string, { readOnlyHint: boolean; destructiveHint: boolean }> = {
-      gmail_search: { readOnlyHint: true, destructiveHint: false },
+      gmail_search: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       gmail_create_draft: { readOnlyHint: false, destructiveHint: false },
       gmail_modify_labels: { readOnlyHint: false, destructiveHint: true },
       gmail_delete: { readOnlyHint: false, destructiveHint: true },
@@ -192,7 +192,7 @@ describe('ToolRegistry', () => {
     expect(search.inputSchema.type).toBe('object');
     expect(Object.keys(search.inputSchema.properties)).toEqual(['account']);
     expect(search.inputSchema.required).toEqual(['account']);
-    expect(search.annotations).toEqual({ readOnlyHint: true, destructiveHint: false });
+    expect(search.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
 
     const schemaOf = (r: { tools: unknown[] }, name: string) =>
       (r.tools.find((t) => (t as { name: string }).name === name) as { inputSchema: unknown }).inputSchema;
@@ -240,7 +240,9 @@ describe('ToolRegistry', () => {
     const schemaOf = (n: string) => tools.find((t) => t.name === n)!.inputSchema.properties.account;
 
     expect(schemaOf('gmail_search').anyOf).toBeDefined();
-    expect((schemaOf('gmail_search').anyOf![0] as { enum: string[] }).enum).toEqual(['test', '*']);
+    // '*' is listed first so the enum tuple is statically non-empty (empty-safe
+    // for a fresh install); order is cosmetic, the accepted set is unchanged.
+    expect((schemaOf('gmail_search').anyOf![0] as { enum: string[] }).enum).toEqual(['*', 'test']);
     expect(schemaOf('gmail_send').enum).toEqual(['test']);
     expect(schemaOf('drive_download').enum).toEqual(['test']);
     expect(schemaOf('google_api_call').enum).toEqual(['test']);
@@ -319,5 +321,24 @@ describe('ToolRegistry', () => {
     expect(reg.visibleCount()).toEqual({ eager: 1, revealed: 0, hidden: 2 });
     reg.reveal('drive');
     expect(reg.visibleCount()).toEqual({ eager: 1, revealed: 1, hidden: 1 });
+  });
+});
+
+describe('result-size budget default (_meta)', () => {
+  const FULL: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: [] };
+
+  it('injects the default cap, keeps declared ones, aligns generated tools with the executor cap', async () => {
+    const { server, getListHandler } = fakeServer();
+    const reg = new ToolRegistry(server as never, FULL);
+    reg.registerTool('gmail_search', { description: 'x' }, () => {});
+    reg.registerTool('gmail_read_thread', { description: 'x', _meta: { 'anthropic/maxResultSizeChars': 100_000 } }, () => {});
+    reg.registerTool('gmail_gen_probe', { description: 'x', cud: 'read' } as never, () => {});
+    reg.installListHandler();
+    reg.reveal('gmail');
+    const listed = (await getListHandler()!()).tools as { name: string; _meta?: Record<string, unknown> }[];
+    const byName = Object.fromEntries(listed.map((t) => [t.name, t._meta]));
+    expect(byName['gmail_search']?.['anthropic/maxResultSizeChars']).toBe(50_000);
+    expect(byName['gmail_read_thread']?.['anthropic/maxResultSizeChars']).toBe(100_000);
+    expect(byName['gmail_gen_probe']?.['anthropic/maxResultSizeChars']).toBe(100_000);
   });
 });

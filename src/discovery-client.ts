@@ -104,10 +104,19 @@ export function buildMethodIndex(doc: DiscoveryDoc, api: string): DiscoveryMetho
         flatPath?: string;
         description?: string;
         parameters?: Record<string, DiscoveryParam>;
+        parameterOrder?: string[];
         scopes?: string[];
       };
       if (!method.id || !method.httpMethod || !method.path) continue;
       const params = method.parameters ?? {};
+      // Google serves parameters{} with unstable key order between fetches;
+      // parameterOrder is the canonical sequence, so sort by it (alphabetical
+      // tie-break) to keep gen-tools output deterministic.
+      const order = method.parameterOrder ?? [];
+      const pos = (n: string) => {
+        const i = order.indexOf(n);
+        return i === -1 ? order.length : i;
+      };
       out.push({
         id: method.id,
         api,
@@ -118,7 +127,8 @@ export function buildMethodIndex(doc: DiscoveryDoc, api: string): DiscoveryMetho
         params,
         requiredParams: Object.entries(params)
           .filter(([, p]) => p.required)
-          .map(([name]) => name),
+          .map(([name]) => name)
+          .sort((a, b) => pos(a) - pos(b) || a.localeCompare(b)),
         scopes: method.scopes ?? [],
       });
     }

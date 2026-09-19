@@ -1,0 +1,71 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/dist/mcpb-manifest-v0.3.schema.json",
+  "manifest_version": "0.3",
+  "name": "mcp-google-multi",
+  "display_name": "Google Workspace (multi-account)",
+  "version": "0.0.0",
+  "description": "Multi-account Google Workspace MCP server: Gmail, Drive, Calendar, Docs, Sheets, and more, with discover-first tools and deny-by-default write-control.",
+  "author": {
+    "name": "Abdelbaki Berkati"
+  },
+  "homepage": "https://github.com/bakissation/mcp-google-multi",
+  "documentation": "https://github.com/bakissation/mcp-google-multi#readme",
+  "license": "MIT",
+  "keywords": ["google", "gmail", "drive", "calendar", "sheets", "workspace", "mcp"],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "GOOGLE_CLIENT_ID": "${user_config.google_client_id}",
+        "GOOGLE_CLIENT_SECRET": "${user_config.google_client_secret}",
+        "MASTER_KEY": "${user_config.master_key}",
+        "GOOGLE_ACCOUNTS": "${user_config.google_accounts}",
+        "GOOGLE_PROFILE": "${user_config.google_profile}"
+      }
+    }
+  },
+  "user_config": {
+    "google_client_id": {
+      "type": "string",
+      "title": "Google OAuth client ID",
+      "description": "From a Google Cloud OAuth 2.0 client (Desktop app type). Use the setup prompt for step-by-step help creating one.",
+      "required": true
+    },
+    "google_client_secret": {
+      "type": "string",
+      "title": "Google OAuth client secret",
+      "description": "The secret paired with the client ID above. Stored in your OS keychain, never in plaintext.",
+      "sensitive": true,
+      "required": true
+    },
+    "master_key": {
+      "type": "string",
+      "title": "Token encryption key (MASTER_KEY)",
+      "description": "A base64 32-byte key that encrypts your stored Google tokens at rest. Generate one with: openssl rand -base64 32 — and keep it safe, since losing it means re-authenticating every account.",
+      "sensitive": true,
+      "required": true
+    },
+    "google_accounts": {
+      "type": "string",
+      "title": "Accounts",
+      "description": "Comma-separated alias:email pairs, e.g. work:me@company.com,personal:me@gmail.com",
+      "required": true
+    },
+    "google_profile": {
+      "type": "string",
+      "title": "Write profile",
+      "description": "Which mutations the server may perform: read-only (default, no writes), safe-writes (create/update, no permanent deletes or sends), or full-writes.",
+      "default": "read-only",
+      "required": false
+    }
+  },
+  "compatibility": {
+    "runtimes": {
+      "node": ">=22.0.0"
+    },
+    "platforms": ["darwin", "win32", "linux"]
+  }
+}

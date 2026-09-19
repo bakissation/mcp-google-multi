@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ACCOUNTS } from '../../accounts.js';
+import { accountAliasSchema } from '../../accounts.js';
 import { executeApiMethod, type ApiMethodRef, type ExecuteDeps, type QueryParams } from '../../executor.js';
 import type { Cud, ToolRegistry } from '../../registry.js';
 
@@ -22,7 +22,7 @@ export interface GeneratedToolDef {
 }
 
 export function accountField() {
-  return z.enum(ACCOUNTS).describe('Google account alias');
+  return accountAliasSchema.optional().describe('Google account alias (omit for the default account)');
 }
 
 interface GeneratedToolConfig {
@@ -30,6 +30,7 @@ interface GeneratedToolConfig {
   inputSchema: z.ZodRawShape;
   cud: Cud;
   annotations: Record<string, unknown>;
+  requiredScopes?: readonly string[];
 }
 
 export function registerGeneratedTool(registry: ToolRegistry, def: GeneratedToolDef, deps: ExecuteDeps = {}): void {
@@ -43,6 +44,7 @@ export function registerGeneratedTool(registry: ToolRegistry, def: GeneratedTool
       inputSchema: def.shape,
       cud: def.cud,
       annotations: { openWorldHint: true },
+      requiredScopes: def.method.scopes,
     },
     async (args: Record<string, unknown>) => {
       const pathParams: Record<string, string | number> = {};

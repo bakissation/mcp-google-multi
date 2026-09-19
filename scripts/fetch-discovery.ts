@@ -12,7 +12,6 @@ const APIS: Api[] = [
   { id: 'admin', version: 'datatransfer_v1' },
   { id: 'admin', version: 'directory_v1' },
   { id: 'admin', version: 'reports_v1' },
-  { id: 'alertcenter', version: 'v1beta1' },
   { id: 'appsmarket', version: 'v2' },
   { id: 'calendar', version: 'v3' },
   { id: 'chat', version: 'v1' },

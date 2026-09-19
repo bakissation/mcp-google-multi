@@ -1,6 +1,74 @@
 # Configuration reference
 
-Everything is configured through environment variables (a `.env` in the working directory is loaded automatically). Back to the [README](../README.md).
+Everything is configured through environment variables and an optional `${XDG_CONFIG_HOME:-~/.config}/mcp-google-multi/config.json`. `.env` files load automatically with this precedence (highest first): real environment, then `.env` in the working directory, then `.env` in the package root, then `${XDG_CONFIG_HOME:-~/.config}/mcp-google-multi/.env`. Set `MCP_GOOGLE_MULTI_ENV=/abs/path/.env` to load exactly that file instead of searching; a missing or unreadable pointed file is a fatal `E_ENV_NOT_FOUND`. Node.js 22+ is required; older runtimes exit with `E_NODE_TOO_OLD`. Back to the [README](../README.md).
+
+## config.json (account registry)
+
+Accounts live in a mutable, plaintext-by-design `config.json` (no secrets ever; safe to commit):
+
+```jsonc
+{
+  "version": 1,
+  "accounts": {
+    "work":     { "email": "you@company.com", "admin": true },
+    "personal": { "email": "you@gmail.com" }
+  }
+}
+```
+
+- **Env override:** while `GOOGLE_ACCOUNTS` is set and non-empty, the whole registry comes from env and the file is ignored (12-factor deployments keep working unchanged). `GOOGLE_ADMIN_ACCOUNTS`, when set, overrides per-account `admin` flags.
+- **`mcp-google-multi migrate-config`** synthesizes the file from your current env (idempotent; never edits env).
+- On first start with `GOOGLE_ACCOUNTS` set and no file, the file is materialized automatically.
+- Secrets (`GOOGLE_CLIENT_ID`/`SECRET`, `MASTER_KEY`) are never config fields — a secret-shaped key fails validation (`E_CONFIG_INVALID`).
+- Startup errors: no accounts anywhere = `E_NO_ACCOUNTS_CONFIGURED`; invalid file = `E_CONFIG_INVALID`; a file written by a newer version = `E_CONFIG_VERSION_UNSUPPORTED` (upgrade the package).
+
+## Scope profiles (per-account consent)
+
+Each account can point at a named **scope profile** so consent is exactly what that account uses — a Workspace account can carry admin + `gmail_settings` while a personal account is never asked for them:
+
+```jsonc
+{
+  "version": 1,
+  "accounts": {
+    "work":     { "email": "you@company.com", "scopeProfile": "workspace-admin" },
+    "personal": { "email": "you@gmail.com" }
+  },
+  "scopeProfiles": {
+    "workspace-admin": { "bundles": ["gmail_settings", "chat"], "admin": true }
+  }
+}
+```
+
+- A missing `scopeProfile` means the built-in `base` profile (base scopes only). `admin: true` on a profile equals including the `admin` bundle.
+- Services register for the **union** of every account's bundles; authorization stays per account at call time (an account without the bundle gets a scope error with a re-auth hint, not silent access).
+- Changing a profile changes that account's consent set — re-run `auth --account <alias>` for it.
+- An unknown bundle name fails startup with `E_UNKNOWN_BUNDLE` and a did-you-mean suggestion (v5 silently ignored typos).
+- `GOOGLE_OPTIONAL_SCOPES` still works as a legacy global override applied to every account (warns `E_LEGACY_GLOBAL_SCOPES`; `migrate-config` folds it into an explicit `legacy-global` profile).
+
+### Bundle catalog
+
+| Bundle | Risk | Unlocks |
+|---|---|---|
+| `slides` | low | Create and edit Slides presentations |
+| `keep` | low | Read and edit Keep notes |
+| `driveactivity` | low | Read the Drive activity feed |
+| `postmaster` | low | Read Postmaster Tools deliverability data |
+| `forms` | medium | Build Forms and read responses |
+| `chat` | medium | Read/send Chat messages, manage spaces |
+| `gmail_settings` | medium | Mailbox settings: filters, labels, vacation |
+| `classroom` | medium | Courses, coursework, rosters, announcements |
+| `cloudsearch` | medium | Query Cloud Search across Workspace content |
+| `drivelabels` | medium | Manage Drive labels |
+| `script` | medium | Apps Script projects and deployments |
+| `groupssettings` | medium | Google Groups settings |
+| `gmail_settings_sharing` | high | Forwarding/delegation — can route mail out |
+| `cloudidentity` | high | Cloud Identity groups and devices |
+| `groupsmigration` | high | Migrate messages into Groups |
+| `licensing` | high | Assign/revoke license seats |
+| `reseller` | high | Reseller subscriptions and orders |
+| `appsmarket` | high | Marketplace license assignments |
+| `vault` | high (Workspace-only) | eDiscovery over the whole domain |
+| `admin` | high (Workspace-only) | Directory management + audit reports |
 
 ## Environment variables
 
@@ -8,7 +76,9 @@ Everything is configured through environment variables (a `.env` in the working 
 |---|---|---|
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ✓ | OAuth **Desktop** client from Google Cloud — see [Google Cloud setup](./google-cloud-setup.md) |
 | `GOOGLE_ACCOUNTS` | ✓ | `alias:email,…` — e.g. `work:you@co.com,personal:you@gmail.com` |
-| `MASTER_KEY` | ✓ | base64 32-byte key that encrypts the token store (`openssl rand -base64 32`) |
+| `GOOGLE_DEFAULT_ACCOUNT` | | Alias used when a tool call omits `account` (or set `"defaultAccount"` in config.json; env wins; note: while `GOOGLE_ACCOUNTS` is set, the whole registry — including the default — comes from env, so the config field is inert). Unset = `account` stays required per call (`E_NO_DEFAULT_ACCOUNT` hint on omission). Explicit aliases, `*` and CSV are never affected |
+| `GOOGLE_DISCOVERY` | | Tool-surface visibility: `lazy` (default — meta-tools only until `{service}_discover`), `curated` (~200 curated tools advertised eagerly), `eager` (everything). At runtime an agent can `discover_all` / `discover_reset` to expand/collapse a lazy surface without config changes |
+| `MASTER_KEY` | | encrypts the token store. Optional since v6: auto-provisioned as env > OS keychain > `master.key` (0600) > generated-on-setup. Keep it in env for deployments that may downgrade or move hosts. Never regenerated while encrypted tokens exist (`E_MASTER_KEY_MISSING_TOKENS_EXIST`) |
 | `GOOGLE_PROFILE` | — | write policy: `read-only` (default) · `safe-writes` · `full-writes` |
 | `GOOGLE_READ_ONLY` | — | `true` = hard kill-switch for all writes |
 | `GOOGLE_WRITE_ALLOW` / `GOOGLE_WRITE_DENY` | — | glob overrides, e.g. `calendar:*`, `*:delete*` (deny wins) |
@@ -18,8 +88,42 @@ Everything is configured through environment variables (a `.env` in the working 
 | `TOKEN_STORE_PATH` | — | override the encrypted token dir (default: `$XDG_CONFIG_HOME/mcp-google-multi/tokens`, falling back to `~/.config/mcp-google-multi/tokens`) |
 | `DISCOVERY_CACHE_PATH` | — | override the Discovery-doc cache dir (default: `$XDG_CONFIG_HOME/mcp-google-multi/discovery`, falling back to `~/.config/mcp-google-multi/discovery`) |
 | `GOOGLE_TRIM` | — | `off` (or `0`/`false`/`no`) disables compact JSON serialization of tool responses |
+| `GOOGLE_ARG_NORMALIZE` | — | `off` (or `0`/`false`/`no`) disables tools/call argument-key normalization (snake_case → declared camelCase when unambiguous; each rename logs one line to stderr) |
 
 Inspect the resolved setup any time: `mcp-google-multi config check`.
+
+## Transport
+
+By default the server speaks **stdio** (`MCP_TRANSPORT=stdio`), the zero-network local transport every example uses. It can also serve **Streamable HTTP** for MCP clients that connect over a URL.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `MCP_TRANSPORT` | `stdio` | `stdio`, `http`, or `both` |
+| `MCP_HTTP_HOST` | `127.0.0.1` | bind address (loopback) |
+| `MCP_HTTP_PORT` | `4243` | bind port |
+| `MCP_PUBLIC_URL` | `http://<host>:<port>` | the canonical public base URL; `${MCP_PUBLIC_URL}/mcp` is the endpoint clients connect to |
+| `MCP_OWNER_EMAILS` | *(required for http)* | CSV of Google emails allowed to authenticate; the server refuses to start HTTP without it |
+| `MCP_ALLOWED_ORIGINS` | — | extra Origins to allow beyond `MCP_PUBLIC_URL` and `https://claude.ai` |
+| `MCP_CIMD_ALLOWED_ISSUERS` | `claude.ai` | CSV host allowlist for OAuth client-metadata documents |
+| `MCP_ACCESS_TTL` | `600` | MCP access-token lifetime (seconds) |
+
+Over HTTP the server is its own **OAuth 2.1 authorization server**: Claude Code and the claude.ai connector authenticate with zero custom UI. A client that connects to `${MCP_PUBLIC_URL}/mcp` is sent through Google login; only an email in `MCP_OWNER_EMAILS` is admitted (the owner gate), and the server then mints its own audience-bound token for the client — your Google tokens are never handed to the client, and the client's token is never sent to Google. Behind a Cloudflare named tunnel, keep the bind on loopback and set `MCP_PUBLIC_URL` to the public HTTPS host; add `${MCP_PUBLIC_URL}/callback` as an authorized redirect URI in your Google Cloud console. Register the URL with a local client via `mcp-google-multi write-client-config --url ${MCP_PUBLIC_URL}/mcp`. Full remote-HTTP walkthrough — named tunnel, Docker, and one-click Render/Railway deploys — is in [docs/http-setup.md](./http-setup.md).
+
+### Docker
+
+A distroless, non-root image is provided (`Dockerfile`). Build and run it, passing secrets at runtime (never baked into the image):
+
+```sh
+docker build -t mcp-google-multi .
+docker run --init --rm \
+  -e GOOGLE_ACCOUNTS="work:me@company.example,personal:me@gmail.example" \
+  -e MASTER_KEY="$(openssl rand -base64 32)" \
+  -e MCP_OWNER_EMAILS="me@company.example" \
+  -v mcp-config:/home/nonroot/.config/mcp-google-multi \
+  mcp-google-multi
+```
+
+`--init` forwards SIGTERM for a clean shutdown. Persist the config volume across restarts — the OS keychain is unavailable in distroless, so `MASTER_KEY` falls back to a `0600` file there and a regenerated key would brick existing tokens. The image defaults to `MCP_TRANSPORT=http` bound to loopback; the full tunnel/remote recipe (including `cloudflared` + compose wiring and the Render/Railway deploy buttons) is in [docs/http-setup.md](./http-setup.md).
 
 ## Write-control (deny-by-default)
 

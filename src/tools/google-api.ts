@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../registry.js';
 import { isAllowed, writeDisabledResult, type Policy } from '../write-control.js';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import { getClient } from '../client.js';
 import { coerceJson } from './_coerce.js';
 import { getToolsets, toolsetEnabled, type Toolsets } from '../toolsets.js';
+import { editDistance } from '../scope-catalog.js';
 import { executeApiMethod, jsonResult, type QueryParams } from '../executor.js';
 import {
   WORKSPACE_APIS,
@@ -15,7 +16,7 @@ import {
   searchMethods,
 } from '../discovery-client.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = accountAliasSchema.optional();
 
 // Policy/toolset namespace for each API alias must match the NAMED tools' service
 // names, or user deny globs and GOOGLE_TOOLSETS silently miss escape-hatch calls.
@@ -43,6 +44,18 @@ const SERVICE_FOR_ALIAS: Record<string, string> = {
 export interface EscapeDeps extends DiscoveryDeps {
   getClientFn?: typeof getClient;
   toolsets?: Toolsets;
+}
+
+/** Up to three closest known ids for the unknown_method did-you-mean hint;
+ * bounded distance so unrelated ids never masquerade as suggestions. */
+export function nearestMethodIds(methodId: string, index: DiscoveryMethod[]): string[] {
+  const maxDist = Math.max(3, Math.floor(methodId.length / 3));
+  return index
+    .map((m) => ({ id: m.id, d: editDistance(methodId.toLowerCase(), m.id.toLowerCase()) }))
+    .filter((x) => x.d <= maxDist)
+    .sort((a, b) => a.d - b.d)
+    .slice(0, 3)
+    .map((x) => x.id);
 }
 
 function describeMethod(m: DiscoveryMethod) {
@@ -126,7 +139,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         'policy as named tools. Returns JSON only — for binary/file content (media downloads, ' +
         'drive.files.export) use drive_download / drive_export instead.',
       inputSchema: {
-        account: accountEnum.describe('Google account alias'),
+        account: accountEnum.describe('Google account alias (omit for the default account)'),
         api: z.string().describe(`API alias: ${apiList}`),
         methodId: z.string().describe('Discovery method id, e.g. "drive.revisions.list"'),
         pathParams: coerceJson(z.record(z.string(), z.union([z.string(), z.number()])).optional())
@@ -146,7 +159,10 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         ).describe('Query-string parameters; use an array for repeated params (e.g. resourceNames)'),
         body: coerceJson(z.record(z.string(), z.unknown()).optional()).describe('JSON request body'),
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+      // idempotentHint:false is load-bearing: the computed default (cud=read)
+      // would invite retries that duplicate sends through the escape hatch.
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+      _meta: { 'anthropic/maxResultSizeChars': 100_000 },
     },
     async ({ account, api, methodId, pathParams, queryParams, body }) => {
       if (!WORKSPACE_APIS[api as string]) {
@@ -159,13 +175,27 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       } catch (err) {
         return jsonResult({ error: 'discovery_unavailable', message: (err as Error).message, retriable: true, account }, true);
       }
-      const method = index.find((m) => m.id === methodId);
+      let method = index.find((m) => m.id === methodId);
       if (!method) {
+        // Some discovery docs keep a legacy id prefix (the searchconsole doc's
+        // methods are webmasters.*): when the caller prefixed with our api
+        // alias, retry under the doc's own prefix before failing.
+        const docPrefix = index[0]?.id.split('.')[0];
+        const [head, ...rest] = String(methodId).split('.');
+        if (docPrefix && head === api && head !== docPrefix && rest.length > 0) {
+          const swapped = [docPrefix, ...rest].join('.');
+          method = index.find((m) => m.id === swapped);
+        }
+      }
+      if (!method) {
+        const near = nearestMethodIds(String(methodId), index);
         return jsonResult(
           {
             error: 'unknown_method',
             message: `No method "${methodId}" in ${api}.`,
-            hint: `Use google_api_search({query: "...", api: "${api}"}) to find the right method id.`,
+            hint:
+              `${near.length ? `Did you mean: ${near.join(', ')}? ` : ''}` +
+              `Use google_api_search({query: "...", api: "${api}"}) to find the right method id.`,
             retriable: false,
             account,
           },

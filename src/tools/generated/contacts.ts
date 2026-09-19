@@ -5,11 +5,19 @@ import { coerceArray, coerceBoolean, coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerContactsGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_people_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/contacts","https://www.googleapis.com/auth/contacts.readonly"],
+    ["https://www.googleapis.com/auth/contacts"],
+    ["https://www.googleapis.com/auth/contacts","https://www.googleapis.com/auth/contacts.other.readonly"],
+    ["https://www.googleapis.com/auth/contacts.other.readonly"],
+    ["https://www.googleapis.com/auth/directory.readonly"],
+  ];
   registerGeneratedTool(registry, {
     name: "contacts_contact_groups_batch_get",
     cud: "read",
     description: "Get a list of contact groups owned by the authenticated user by specifying a list of contact group resource names.",
-    method: { id: "people.contactGroups.batchGet", httpMethod: "GET", path: "v1/contactGroups:batchGet", baseUrl: "https://people.googleapis.com/", requiredParams: [] },
+    method: { id: "people.contactGroups.batchGet", httpMethod: "GET", path: "v1/contactGroups:batchGet", baseUrl: "https://people.googleapis.com/", requiredParams: [], scopes: S_people_v1[0] },
     params: [{"field":"groupFields","api":"groupFields","location":"query"},{"field":"maxMembers","api":"maxMembers","location":"query"},{"field":"resourceNames","api":"resourceNames","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -24,7 +32,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_contact_groups_delete",
     cud: "delete",
     description: "Delete an existing contact group owned by the authenticated user by specifying a contact group resource name. Mutate requests for the same user should be sent s",
-    method: { id: "people.contactGroups.delete", httpMethod: "DELETE", path: "v1/{+resourceName}", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"] },
+    method: { id: "people.contactGroups.delete", httpMethod: "DELETE", path: "v1/{+resourceName}", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"], scopes: S_people_v1[1] },
     params: [{"field":"resourceName","api":"resourceName","location":"path"},{"field":"deleteContacts","api":"deleteContacts","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -38,7 +46,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_contact_groups_members_modify",
     cud: "update",
     description: "Modify the members of a contact group owned by the authenticated user. The only system contact groups that can have members added are `contactGroups/myContacts`",
-    method: { id: "people.contactGroups.members.modify", httpMethod: "POST", path: "v1/{+resourceName}/members:modify", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"] },
+    method: { id: "people.contactGroups.members.modify", httpMethod: "POST", path: "v1/{+resourceName}/members:modify", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"], scopes: S_people_v1[1] },
     params: [{"field":"resourceName","api":"resourceName","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -52,7 +60,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_contact_groups_update",
     cud: "update",
     description: "Update the name of an existing contact group owned by the authenticated user. Updated contact group names must be unique to the users contact groups. Attempting",
-    method: { id: "people.contactGroups.update", httpMethod: "PUT", path: "v1/{+resourceName}", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"] },
+    method: { id: "people.contactGroups.update", httpMethod: "PUT", path: "v1/{+resourceName}", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"], scopes: S_people_v1[1] },
     params: [{"field":"resourceName","api":"resourceName","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -66,7 +74,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_other_contacts_copy_other_contact_to_my_contacts_group",
     cud: "create",
     description: "Copies an \"Other contact\" to a new contact in the user's \"myContacts\" group Mutate requests for the same user should be sent sequentially to avoid increased lat",
-    method: { id: "people.otherContacts.copyOtherContactToMyContactsGroup", httpMethod: "POST", path: "v1/{+resourceName}:copyOtherContactToMyContactsGroup", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"] },
+    method: { id: "people.otherContacts.copyOtherContactToMyContactsGroup", httpMethod: "POST", path: "v1/{+resourceName}:copyOtherContactToMyContactsGroup", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"], scopes: S_people_v1[2] },
     params: [{"field":"resourceName","api":"resourceName","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -80,7 +88,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_other_contacts_list",
     cud: "read",
     description: "List all \"Other contacts\", that is contacts that are not in a contact group. \"Other contacts\" are typically auto created contacts from interactions. Sync tokens",
-    method: { id: "people.otherContacts.list", httpMethod: "GET", path: "v1/otherContacts", baseUrl: "https://people.googleapis.com/", requiredParams: [] },
+    method: { id: "people.otherContacts.list", httpMethod: "GET", path: "v1/otherContacts", baseUrl: "https://people.googleapis.com/", requiredParams: [], scopes: S_people_v1[3] },
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"readMask","api":"readMask","location":"query"},{"field":"requestSyncToken","api":"requestSyncToken","location":"query"},{"field":"sources","api":"sources","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -98,7 +106,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_other_contacts_search",
     cud: "read",
     description: "Provides a list of contacts in the authenticated user's other contacts that matches the search query. The query matches on a contact's `names`, `emailAddresses`",
-    method: { id: "people.otherContacts.search", httpMethod: "GET", path: "v1/otherContacts:search", baseUrl: "https://people.googleapis.com/", requiredParams: [] },
+    method: { id: "people.otherContacts.search", httpMethod: "GET", path: "v1/otherContacts:search", baseUrl: "https://people.googleapis.com/", requiredParams: [], scopes: S_people_v1[3] },
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"query","api":"query","location":"query"},{"field":"readMask","api":"readMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -113,7 +121,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_people_batch_create_contacts",
     cud: "create",
     description: "Create a batch of new contacts and return the PersonResponses for the newly Mutate requests for the same user should be sent sequentially to avoid increased lat",
-    method: { id: "people.people.batchCreateContacts", httpMethod: "POST", path: "v1/people:batchCreateContacts", baseUrl: "https://people.googleapis.com/", requiredParams: [] },
+    method: { id: "people.people.batchCreateContacts", httpMethod: "POST", path: "v1/people:batchCreateContacts", baseUrl: "https://people.googleapis.com/", requiredParams: [], scopes: S_people_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -126,7 +134,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_people_batch_delete_contacts",
     cud: "delete",
     description: "Delete a batch of contacts. Any non-contact data will not be deleted. Mutate requests for the same user should be sent sequentially to avoid increased latency a",
-    method: { id: "people.people.batchDeleteContacts", httpMethod: "POST", path: "v1/people:batchDeleteContacts", baseUrl: "https://people.googleapis.com/", requiredParams: [] },
+    method: { id: "people.people.batchDeleteContacts", httpMethod: "POST", path: "v1/people:batchDeleteContacts", baseUrl: "https://people.googleapis.com/", requiredParams: [], scopes: S_people_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -139,7 +147,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_people_batch_update_contacts",
     cud: "create",
     description: "Update a batch of contacts and return a map of resource names to PersonResponses for the updated contacts. Mutate requests for the same user should be sent sequ",
-    method: { id: "people.people.batchUpdateContacts", httpMethod: "POST", path: "v1/people:batchUpdateContacts", baseUrl: "https://people.googleapis.com/", requiredParams: [] },
+    method: { id: "people.people.batchUpdateContacts", httpMethod: "POST", path: "v1/people:batchUpdateContacts", baseUrl: "https://people.googleapis.com/", requiredParams: [], scopes: S_people_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -152,7 +160,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_people_delete_contact_photo",
     cud: "delete",
     description: "Delete a contact's photo. Mutate requests for the same user should be done sequentially to avoid // lock contention.",
-    method: { id: "people.people.deleteContactPhoto", httpMethod: "DELETE", path: "v1/{+resourceName}:deleteContactPhoto", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"] },
+    method: { id: "people.people.deleteContactPhoto", httpMethod: "DELETE", path: "v1/{+resourceName}:deleteContactPhoto", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"], scopes: S_people_v1[1] },
     params: [{"field":"resourceName","api":"resourceName","location":"path"},{"field":"personFields","api":"personFields","location":"query"},{"field":"sources","api":"sources","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -167,7 +175,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_people_list_directory_people",
     cud: "read",
     description: "Provides a list of domain profiles and domain contacts in the authenticated user's domain directory. When the `sync_token` is specified, resources deleted since",
-    method: { id: "people.people.listDirectoryPeople", httpMethod: "GET", path: "v1/people:listDirectoryPeople", baseUrl: "https://people.googleapis.com/", requiredParams: [] },
+    method: { id: "people.people.listDirectoryPeople", httpMethod: "GET", path: "v1/people:listDirectoryPeople", baseUrl: "https://people.googleapis.com/", requiredParams: [], scopes: S_people_v1[4] },
     params: [{"field":"mergeSources","api":"mergeSources","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"readMask","api":"readMask","location":"query"},{"field":"requestSyncToken","api":"requestSyncToken","location":"query"},{"field":"sources","api":"sources","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -186,7 +194,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_people_search_directory_people",
     cud: "read",
     description: "Provides a list of domain profiles and domain contacts in the authenticated user's domain directory that match the search query.",
-    method: { id: "people.people.searchDirectoryPeople", httpMethod: "GET", path: "v1/people:searchDirectoryPeople", baseUrl: "https://people.googleapis.com/", requiredParams: [] },
+    method: { id: "people.people.searchDirectoryPeople", httpMethod: "GET", path: "v1/people:searchDirectoryPeople", baseUrl: "https://people.googleapis.com/", requiredParams: [], scopes: S_people_v1[4] },
     params: [{"field":"mergeSources","api":"mergeSources","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"query","api":"query","location":"query"},{"field":"readMask","api":"readMask","location":"query"},{"field":"sources","api":"sources","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -204,7 +212,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     name: "contacts_people_update_contact_photo",
     cud: "update",
     description: "Update a contact's photo. Mutate requests for the same user should be sent sequentially to avoid increased latency and failures.",
-    method: { id: "people.people.updateContactPhoto", httpMethod: "PATCH", path: "v1/{+resourceName}:updateContactPhoto", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"] },
+    method: { id: "people.people.updateContactPhoto", httpMethod: "PATCH", path: "v1/{+resourceName}:updateContactPhoto", baseUrl: "https://people.googleapis.com/", requiredParams: ["resourceName"], scopes: S_people_v1[1] },
     params: [{"field":"resourceName","api":"resourceName","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

@@ -2,6 +2,7 @@ import type { Account } from './accounts.js';
 import { getClient } from './client.js';
 import { expandPath, isGoogleApiUrl } from './discovery-client.js';
 import { handleGoogleApiError } from './tools/_errors.js';
+import { scopeHintForMethod } from './scope-observability.js';
 
 export const MAX_RESPONSE_CHARS = 100_000;
 
@@ -14,6 +15,8 @@ export interface ApiMethodRef {
   path: string;
   baseUrl: string;
   requiredParams: string[];
+  /** Escape hatch: from runtime Discovery. Generated tools: baked at gen time. */
+  scopes?: readonly string[];
 }
 
 export interface ExecuteDeps {
@@ -130,6 +133,8 @@ export async function executeApiMethod(method: ApiMethodRef, args: ExecuteArgs, 
     }
     return { content: [{ type: 'text' as const, text }] };
   } catch (error) {
-    return handleGoogleApiError(error, args.account as Account);
+    return handleGoogleApiError(error, args.account as Account, undefined, () =>
+      method.scopes?.length ? scopeHintForMethod(method.scopes, args.account) : null,
+    );
   }
 }

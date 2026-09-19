@@ -1,0 +1,20 @@
+# Railway config-as-code (B17) — one-click remote HTTP deploy.
+# Railway builds the repo Dockerfile; set the variables below in the Railway
+# dashboard (Variables), never here. Walkthrough: docs/http-setup.md#railway
+#
+# Required variables (Railway → Variables):
+#   MCP_TRANSPORT      = http
+#   MCP_PUBLIC_URL     = <the Railway-provided public domain>   (Settings → Networking → Generate Domain)
+#   MCP_OWNER_EMAILS   = <owner@example.com>                    (empty ⇒ startup refuses, by design)
+#   GOOGLE_CLIENT_ID   = <your OAuth client id>
+#   GOOGLE_CLIENT_SECRET = <your OAuth client secret>
+#   GOOGLE_ACCOUNTS    = work:you@company.com,personal:you@gmail.com
+#   MASTER_KEY         = <openssl rand -base64 32>              (set once; Railway persists it)
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

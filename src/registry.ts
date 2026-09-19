@@ -1,11 +1,33 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { type Policy, isAllowed, writeDisabledResult } from './write-control.js';
+import { type Policy, isAllowed, writeDisabledResult, IRREVERSIBLE_TOOLS } from './write-control.js';
+import { getAccountSet, refreshAccountSetIfStale } from './accounts.js';
 import { compactResult, trimEnabled } from './trim.js';
 import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFanout } from './fanout.js';
+import { MAX_RESPONSE_CHARS } from './executor.js';
+import type { ArgKind, ArgShape } from './arg-normalize.js';
+
+// Client-side result budget advertised for tools that do not declare their own
+// (fat readers do; see trim.ts). ~50k chars stays well inside a default client
+// context limit while leaving room for real list payloads.
+const DEFAULT_MAX_RESULT_CHARS = 50_000;
 
 export type Cud = 'read' | 'create' | 'update' | 'delete';
+
+export type DiscoveryMode = 'lazy' | 'curated' | 'eager';
+
+const DISCOVERY_MODES: DiscoveryMode[] = ['lazy', 'curated', 'eager'];
+
+export function resolveDiscoveryMode(env: NodeJS.ProcessEnv = process.env): DiscoveryMode {
+  const raw = (env.GOOGLE_DISCOVERY ?? 'lazy').trim() as DiscoveryMode;
+  if (raw && !DISCOVERY_MODES.includes(raw)) {
+    // Fail-open to the lean default, but say so — a typo'd mode otherwise
+    // looks like tools silently missing (or silently flooding the context).
+    process.stderr.write(`GOOGLE_DISCOVERY="${raw}" is not valid (${DISCOVERY_MODES.join(' | ')}); using lazy\n`);
+  }
+  return DISCOVERY_MODES.includes(raw) ? raw : 'lazy';
+}
 
 export interface ToolEntry {
   name: string;
@@ -14,7 +36,18 @@ export interface ToolEntry {
   description: string;
   inputShape: z.ZodRawShape;
   annotations: Record<string, unknown>;
+  /** anthropic/* client extension keys: honoring clients (Claude Code) read
+   * these from the wire Tool's _meta — SDK clients STRIP unknown keys from
+   * annotations (closed ToolAnnotationsSchema), so they must never live there. */
+  clientMeta?: Record<string, unknown>;
   meta: boolean;
+  /** Discovery-codegen provenance (the only tools passing an explicit cud). */
+  generated: boolean;
+  /** Member of the frozen irreversible set (real send / permanent delete). */
+  irreversible: boolean;
+  /** Baked per-method scopes (generated tools); curated tools authorize at
+   * service/bundle grain and leave this undefined. */
+  requiredScopes?: readonly string[];
 }
 
 export interface CatalogOperation {
@@ -31,11 +64,23 @@ interface ToolConfig {
   // Set only by generated tools (cud from HTTP semantics at gen time): open-ended
   // Discovery verbs (undeploy, wipeout, …) would slip past name-based write-control.
   cud?: Cud;
+  requiredScopes?: readonly string[];
+  _meta?: Record<string, unknown>;
 }
 
 const CUD_OVERRIDES: Record<string, Cud> = {
   drive_untrash: 'update',
   drive_transfer: 'create',
+  // read-only resolver; the name's "resolve" verb would otherwise infer update.
+  contacts_resolve: 'read',
+  // Account management is gated by anthropic/requiresUserInteraction (forced
+  // human approval), NOT the Google-data write-control profile — so onboarding
+  // works under any profile. cud=read also keeps them off the fan-out path.
+  account_add: 'read',
+  account_reauth: 'read',
+  // Writes a LOCAL MCP-client config, not Google data; gated by
+  // requiresUserInteraction. "write" verb would otherwise infer update.
+  account_write_config: 'read',
 };
 
 const SERVICE_OVERRIDES: Record<string, string> = {
@@ -45,8 +90,30 @@ const SERVICE_OVERRIDES: Record<string, string> = {
 // read tools that write local files — same savePath fanned across accounts would clobber
 const FANOUT_EXCLUDE = new Set(['gmail_download_attachment', 'drive_download', 'drive_export']);
 
+/** Unwrap optional/default/nullable to the declared scalar kind (zod 4 defs). */
+function scalarKindOf(field: unknown): ArgKind {
+  type Def = { type?: string; innerType?: unknown };
+  let cur = field as { _zod?: { def?: Def } } | undefined;
+  for (let i = 0; i < 4 && cur?._zod?.def; i++) {
+    const def = cur._zod.def;
+    if (def.type === 'number') return 'number';
+    if (def.type === 'boolean') return 'boolean';
+    if (def.type === 'optional' || def.type === 'default' || def.type === 'nullable') {
+      cur = def.innerType as typeof cur;
+      continue;
+    }
+    return 'other';
+  }
+  return 'other';
+}
+
 function isAccountEnum(field: unknown): boolean {
-  return (field as { _zod?: { def?: { type?: string } } } | undefined)?._zod?.def?.type === 'enum';
+  type Def = { type?: string; innerType?: { _zod?: { def?: Def } } };
+  const def = (field as { _zod?: { def?: Def } } | undefined)?._zod?.def;
+  if (!def) return false;
+  // A2 made account enums .optional(); unwrap it or fan-out silently dies.
+  if (def.type === 'optional') return def.innerType?._zod?.def?.type === 'enum';
+  return def.type === 'enum';
 }
 
 const DELETE_VERB = /(^|_)(delete|remove|trash|clear|empty)(_|$)/;
@@ -68,28 +135,52 @@ export class ToolRegistry {
   readonly registerTool: McpServer['registerTool'];
   private readonly revealed = new Set<string>();
   private readonly jsonSchemaCache = new Map<string, unknown>();
+  private readonly argShapeCache = new Map<string, ArgShape>();
   private readonly compactOutput = trimEnabled();
   private registeringMeta = false;
+  /** Configured visibility mode (GOOGLE_DISCOVERY); default lazy = v5 exact. */
+  readonly mode: DiscoveryMode;
+  /** Agent-toggled runtime overlay (discover_all / discover_reset): lifts a
+   * lazy surface to curated without touching the configured mode. */
+  private expanded = false;
 
   constructor(
     private readonly server: McpServer,
     policy: Policy,
+    mode: DiscoveryMode = resolveDiscoveryMode(),
   ) {
     this.policy = policy;
+    this.mode = mode;
     this.registerTool = ((name: string, config: ToolConfig, handler: (...a: unknown[]) => unknown) => {
       const service =
         SERVICE_OVERRIDES[name] ?? (name.includes('_') ? name.slice(0, name.indexOf('_')) : name);
       const cud = config.cud ?? inferCud(name);
       // destructiveHint=false claims "additive only" (MCP spec) — updates overwrite, so they stay true.
+      // idempotent: reads trivially, deletes (already-gone = same), updates
+      // (overwrite converges); creates are not (send twice = two emails).
       const annotations = {
         readOnlyHint: cud === 'read',
         destructiveHint: cud === 'delete' || cud === 'update',
+        idempotentHint: cud !== 'create',
         ...config.annotations,
+      };
+      // A12: forced per-call human approval on the irreversible set, even in
+      // bypass mode. Client-enforced via the wire _meta (Claude Code reads
+      // anthropic/* ONLY there); the server verdict stays separate.
+      // Every tool also advertises a result-size budget: fat readers declare
+      // their own, everything else inherits the default, so an uncapped tool
+      // can never blow past a client's context limit. Generated tools align
+      // with the executor's server-side cap.
+      const clientMeta = {
+        'anthropic/maxResultSizeChars': config.cud !== undefined ? MAX_RESPONSE_CHARS : DEFAULT_MAX_RESULT_CHARS,
+        ...config._meta,
+        ...(IRREVERSIBLE_TOOLS.has(name) ? { 'anthropic/requiresUserInteraction': true } : {}),
       };
 
       // never fan out meta tools: google_api_call infers cud=read but executes writes
       let inputShape = config.inputSchema ?? {};
       let baseHandler = handler;
+      const hasAccountField = 'account' in inputShape;
       if (cud === 'read' && !this.registeringMeta && !FANOUT_EXCLUDE.has(name) && isAccountEnum(inputShape.account)) {
         const description = (inputShape.account as z.ZodType).description ?? 'Google account alias';
         inputShape = { ...inputShape, account: fanoutAccountField(description) };
@@ -109,7 +200,11 @@ export class ToolRegistry {
         description: config.description ?? '',
         inputShape,
         annotations,
+        clientMeta,
         meta: this.registeringMeta,
+        generated: config.cud !== undefined,
+        irreversible: IRREVERSIBLE_TOOLS.has(name),
+        requiredScopes: config.requiredScopes,
       });
       const guarded =
         cud === 'read'
@@ -118,9 +213,42 @@ export class ToolRegistry {
               isAllowed({ name, service, cud }, policy)
                 ? baseHandler(...args)
                 : writeDisabledResult({ name, service, cud }, policy);
+      // A2: the ONE default-account injection site — outside the CUD gate and
+      // the fan-out parse so both observe a concrete alias; NOT meta-skipped
+      // (that is what covers google_api_call with zero bespoke code). Explicit
+      // aliases, "*" and CSV pass through untouched.
+      const withDefault = !hasAccountField
+        ? guarded
+        : (...args: unknown[]) => {
+            const first = args[0] as { account?: unknown } | undefined;
+            const value = first?.account;
+            if (value != null && value !== '') return guarded(...args);
+            // Refresh here or the unset->configured default transition never
+            // heals for a client that always omits account (this branch never
+            // reaches getClient's probe). One stat, only on omission.
+            refreshAccountSetIfStale();
+            const def = getAccountSet().defaultAccount;
+            if (!def) {
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                      error: 'E_NO_DEFAULT_ACCOUNT',
+                      message: 'No "account" given and no default account is configured.',
+                      hint: `Pass account explicitly (valid: ${getAccountSet().aliases.join(', ')}), or set GOOGLE_DEFAULT_ACCOUNT / "defaultAccount" in config.json.`,
+                      retriable: false,
+                    }),
+                  },
+                ],
+                isError: true,
+              };
+            }
+            return guarded({ ...(first ?? {}), account: def }, ...args.slice(1));
+          };
       const finalHandler = this.compactOutput
-        ? async (...args: unknown[]) => compactResult(await (guarded(...args) as Promise<Parameters<typeof compactResult>[0]>))
-        : guarded;
+        ? async (...args: unknown[]) => compactResult(await (withDefault(...args) as Promise<Parameters<typeof compactResult>[0]>))
+        : withDefault;
       const { cud: _cud, ...sdkConfig } = config;
       return (server.registerTool as (...a: unknown[]) => unknown)(name, { ...sdkConfig, inputSchema: inputShape, annotations }, finalHandler);
     }) as McpServer['registerTool'];
@@ -137,6 +265,19 @@ export class ToolRegistry {
 
   services(): string[] {
     return [...new Set(this.tools.filter((t) => !t.meta).map((t) => t.service))];
+  }
+
+  /** Declared input-schema keys + scalar kinds for one tool (tools/call arg
+   * normalization; the kind drives value coercion on renamed keys). */
+  argShape(name: string): ArgShape | undefined {
+    const cached = this.argShapeCache.get(name);
+    if (cached) return cached;
+    const entry = this.tools.find((t) => t.name === name);
+    if (!entry) return undefined;
+    const shape = new Map<string, ArgKind>();
+    for (const [key, field] of Object.entries(entry.inputShape)) shape.set(key, scalarKindOf(field));
+    this.argShapeCache.set(name, shape);
+    return shape;
   }
 
   catalog(service: string, query?: string): CatalogOperation[] {
@@ -159,8 +300,39 @@ export class ToolRegistry {
     return true;
   }
 
+  /** discover_all: advertise the full curated set at once. Idempotent. */
+  expand(): boolean {
+    if (this.expanded || this.effectiveMode() !== 'lazy') return false;
+    this.expanded = true;
+    this.server.sendToolListChanged();
+    return true;
+  }
+
+  /** discover_reset: back to the lean meta-only surface. Clears reveals too.
+   * BV-8: if a client mishandles a SHRINKING tools/list, this degrades to a
+   * no-op for that session — tools stay callable regardless (graceful
+   * dispatch), zero correctness impact. */
+  collapse(): boolean {
+    if (!this.expanded && this.revealed.size === 0) return false;
+    this.expanded = false;
+    this.revealed.clear();
+    this.server.sendToolListChanged();
+    return true;
+  }
+
+  private effectiveMode(): DiscoveryMode {
+    if (this.mode !== 'lazy') return this.mode;
+    return this.expanded ? 'curated' : 'lazy';
+  }
+
   isVisible(tool: ToolEntry): boolean {
-    return tool.meta || this.revealed.has(tool.service);
+    const mode = this.effectiveMode();
+    return (
+      tool.meta ||
+      mode === 'eager' ||
+      this.revealed.has(tool.service) ||
+      (mode === 'curated' && !tool.generated)
+    );
   }
 
   visibleCount(): { eager: number; revealed: number; hidden: number } {
@@ -180,7 +352,7 @@ export class ToolRegistry {
     }));
   }
 
-  private toToolJson(tool: ToolEntry): { name: string; description: string; inputSchema: unknown; annotations: Record<string, unknown> } {
+  private toToolJson(tool: ToolEntry): { name: string; description: string; inputSchema: unknown; annotations: Record<string, unknown>; _meta?: Record<string, unknown> } {
     let inputSchema = this.jsonSchemaCache.get(tool.name);
     if (!inputSchema) {
       inputSchema = z.toJSONSchema(z.object(tool.inputShape), { target: 'draft-7', io: 'input' });
@@ -191,6 +363,7 @@ export class ToolRegistry {
       description: tool.description,
       inputSchema,
       annotations: tool.annotations,
+      ...(tool.clientMeta ? { _meta: tool.clientMeta } : {}),
     };
   }
 }

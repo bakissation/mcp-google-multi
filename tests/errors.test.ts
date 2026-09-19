@@ -25,6 +25,43 @@ describe('mapGoogleError', () => {
     expect(e.hint).toBe('enable admin writes');
   });
 
+  // B10 noob-proofing hints
+  it('403 accessNotConfigured → api_not_enabled with the per-API enable link', () => {
+    const e = mapGoogleError({
+      code: 403,
+      errors: [{ reason: 'accessNotConfigured' }],
+      message: 'Access Not Configured. Gmail API has not been used in project 12 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/gmail.googleapis.com/overview?project=12 then retry.',
+    }, acc);
+    expect(e.error).toBe('api_not_enabled');
+    expect(e.hint).toContain('console.cloud.google.com/apis/library/gmail.googleapis.com');
+  });
+
+  it('403 SERVICE_DISABLED (no URL) → api_not_enabled, generic library link', () => {
+    const e = mapGoogleError({
+      code: 403,
+      response: { data: { error: { status: 'PERMISSION_DENIED', message: 'Drive API is disabled. SERVICE_DISABLED' } } },
+    }, acc);
+    expect(e.error).toBe('api_not_enabled');
+    expect(e.hint).toContain('apis/library');
+  });
+
+  it('400 invalid_grant → reauth_required naming the 7-day trap fix', () => {
+    const e = mapGoogleError({ code: 400, response: { data: { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' } } }, acc);
+    expect(e.error).toBe('reauth_required');
+    expect(e.hint).toMatch(/In production/i);
+    expect(e.hint).toContain('auth --account work');
+  });
+
+  it('401 invalid_grant still routes to the 7-day-trap hint (before generic auth_required)', () => {
+    const e = mapGoogleError({ code: 401, message: 'invalid_grant' }, acc);
+    expect(e.error).toBe('reauth_required');
+    expect(e.hint).toMatch(/7-day/i);
+  });
+
+  it('plain 401 (no invalid_grant) stays auth_required', () => {
+    expect(mapGoogleError({ code: 401, message: 'Invalid Credentials' }, acc).error).toBe('auth_required');
+  });
+
   it('404 → not_found', () => {
     expect(mapGoogleError({ code: 404, message: 'x' }, acc).error).toBe('not_found');
   });
@@ -60,6 +97,48 @@ describe('mapGoogleError', () => {
     expect(json).not.toContain('Authorization');
   });
 
+  // Connect-level failures (no HTTP status): the gaxios path flattens the
+  // happy-eyeballs AggregateError into a bare code with an empty message.
+  it('gaxios/node-fetch empty-reason ETIMEDOUT → network_error, retriable, code surfaced', () => {
+    const e = mapGoogleError(
+      { message: 'request to https://oauth2.googleapis.com/token failed, reason: ', code: 'ETIMEDOUT', type: 'system' },
+      acc,
+    );
+    expect(e.error).toBe('network_error');
+    expect(e.retriable).toBe(true);
+    expect(e.message).toBe('request to https://oauth2.googleapis.com/token failed, reason: ETIMEDOUT');
+    expect(e.hint).toContain('network-family-autoselection');
+  });
+
+  it('undici fetch failed → network_error via cause AggregateError sub-errors', () => {
+    const e = mapGoogleError(
+      { message: 'fetch failed', cause: { message: '', errors: [{ code: 'ENETUNREACH' }, { code: 'ETIMEDOUT' }] } },
+      acc,
+    );
+    expect(e.error).toBe('network_error');
+    expect(e.retriable).toBe(true);
+    expect(e.message).toContain('ENETUNREACH');
+  });
+
+  it('ENOTFOUND (bad hostname) → network_error but not retriable', () => {
+    const e = mapGoogleError({ message: 'getaddrinfo ENOTFOUND example.invalid', code: 'ENOTFOUND' }, acc);
+    expect(e.error).toBe('network_error');
+    expect(e.retriable).toBe(false);
+    expect(e.message).toBe('getaddrinfo ENOTFOUND example.invalid');
+  });
+
+  it('a real HTTP status still wins over a network-looking cause', () => {
+    const e = mapGoogleError({ code: 503, message: 'unavailable', cause: { code: 'ECONNRESET' } }, acc);
+    expect(e.error).toBe('upstream_error');
+    expect(e.retriable).toBe(true);
+  });
+
+  it('statusless error without a network code stays upstream_error', () => {
+    const e = mapGoogleError({ message: 'something odd' }, acc);
+    expect(e.error).toBe('upstream_error');
+    expect(e.retriable).toBe(false);
+  });
+
   it('reads the nested Google message + reason', () => {
     const e = mapGoogleError(
       { response: { status: 404, data: { error: { message: 'Not found here', errors: [{ reason: 'notFound' }] } } } },
@@ -67,5 +146,38 @@ describe('mapGoogleError', () => {
     );
     expect(e.error).toBe('not_found');
     expect(e.message).toBe('Not found here');
+  });
+});
+
+describe('mapGoogleError local-filesystem paths', () => {
+  it('ENOENT on a caller-supplied path → invalid_params with the remote-path hint', () => {
+    const err = Object.assign(new Error("ENOENT: no such file or directory, open '/data/missing.pdf'"), {
+      code: 'ENOENT',
+      path: '/data/missing.pdf',
+    });
+    const e = mapGoogleError(err, acc);
+    expect(e.error).toBe('invalid_params');
+    expect(e.message).toContain('/data/missing.pdf');
+    expect(e.message).toContain('ENOENT');
+    expect(e.hint).toContain('machine running this server');
+    expect(e.retriable).toBe(false);
+  });
+
+  it('EACCES and EISDIR map the same way; the path is optional', () => {
+    for (const code of ['EACCES', 'EISDIR']) {
+      const e = mapGoogleError(Object.assign(new Error(`${code}: denied`), { code }), acc);
+      expect(e.error).toBe('invalid_params');
+      expect(e.message).toContain(code);
+    }
+  });
+
+  it('network string codes are NOT treated as local-fs errors', () => {
+    const e = mapGoogleError(Object.assign(new Error('request failed'), { code: 'ETIMEDOUT' }), acc);
+    expect(e.error).toBe('network_error');
+  });
+
+  it('numeric Google statuses are untouched by the local-fs branch', () => {
+    const e = mapGoogleError({ code: 404, message: 'File not found: abc' }, acc);
+    expect(e.error).toBe('not_found');
   });
 });
