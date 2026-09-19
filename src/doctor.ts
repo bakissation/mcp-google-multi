@@ -8,6 +8,8 @@ import { peekMasterKeyProvenance, deleteMasterKeyMaterial } from './master-key.j
 import { hasToken } from './token-store.js';
 import { configDir } from './config-file.js';
 import { probeApiEnablement } from './api-probe.js';
+import { resolveHttpConfig, HttpConfigError, type HttpConfig } from './http-config.js';
+import { parseOwnerEmails } from './http-transport.js';
 
 // B9: one engine (runDiagnostics), two skins — `doctor` (CLI glyph) and
 // `diagnose` (agent tool, structured). Sections 1-6 here; section 7 (HTTP:
@@ -55,6 +57,18 @@ export interface DiagnosticsDeps {
   /** Optional live section-6 probe; when absent the section reports `unknown`
    * (spec: a section that cannot run is unknown, not FAIL). */
   probeApi?: (alias: string) => Promise<ApiProbeResult[]>;
+  /** Optional live section-7 endpoint probe (PRM/AS-metadata self-fetch);
+   * when absent, section 7 stays on its offline config checks. */
+  probeHttp?: (cfg: HttpConfig) => Promise<HttpProbeResult>;
+}
+
+/** Live §7 probe outcome. `unreachable` = connection-level failure (server not
+ * running), reported as `unknown` rather than FAIL; `problem` = a real
+ * metadata fault at a reachable server. */
+export interface HttpProbeResult {
+  ok: boolean;
+  unreachable?: boolean;
+  problem?: string;
 }
 
 const MIN_NODE_MAJOR = 22;
@@ -75,19 +89,43 @@ const DEFAULT_DEPS: DiagnosticsDeps = {
   anyTokensExist: (aliases) => aliases.some((a) => hasToken(a)),
   fileExists: fs.existsSync,
   probeApi: (alias) => probeApiEnablement(alias),
+  probeHttp: (cfg) => probeHttpEndpoints(cfg),
 };
+
+/** §7 live check: the advertised OAuth metadata must derive from MCP_PUBLIC_URL
+ * exactly — one mismatch between PRM `resource` / AS `issuer` and what clients
+ * compute from the public URL is the perpetual-401 interop bug (BR4). */
+async function probeHttpEndpoints(cfg: HttpConfig): Promise<HttpProbeResult> {
+  try {
+    const prmRes = await fetch(`${cfg.publicUrl}/.well-known/oauth-protected-resource`, {
+      signal: AbortSignal.timeout(2000),
+      redirect: 'manual',
+    });
+    if (!prmRes.ok) return { ok: false, problem: `PRM endpoint returned HTTP ${prmRes.status}` };
+    const prm = (await prmRes.json()) as { resource?: string };
+    if (prm.resource !== cfg.resourceUri) {
+      return { ok: false, problem: `PRM resource "${prm.resource}" does not match the expected "${cfg.resourceUri}"` };
+    }
+    const asRes = await fetch(`${cfg.publicUrl}/.well-known/oauth-authorization-server`, {
+      signal: AbortSignal.timeout(2000),
+      redirect: 'manual',
+    });
+    if (!asRes.ok) return { ok: false, problem: `AS metadata endpoint returned HTTP ${asRes.status}` };
+    const as = (await asRes.json()) as { issuer?: string };
+    if (as.issuer !== cfg.publicUrl) {
+      return { ok: false, problem: `AS metadata issuer "${as.issuer}" does not match the public URL "${cfg.publicUrl}"` };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, unreachable: true };
+  }
+}
 
 /** Console deep-link to enable one API (section-6 hint, error taxonomy B10). */
 export function apiEnableLink(api: string): string {
   return `https://console.cloud.google.com/apis/library/${api}.googleapis.com`;
 }
 
-function transportsFrom(env: Record<string, string | undefined>): string[] {
-  return (env.MCP_TRANSPORT ?? 'stdio')
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-}
 
 const LEGACY_ENV_KEYS = ['GOOGLE_ACCOUNTS', 'GOOGLE_OPTIONAL_SCOPES', 'GOOGLE_ADMIN_ACCOUNTS'] as const;
 
@@ -243,14 +281,66 @@ async function sectionApiEnablement(deps: DiagnosticsDeps, aliases: string[]): P
   return { id: 6, title: 'API enablement', verdict: 'ok', lines: lines.length ? lines : ['(probed account, all enabled)'] };
 }
 
-function sectionHttpDeferred(deps: DiagnosticsDeps): DiagnosticSection | null {
-  if (!transportsFrom(deps.env).includes('http')) return null;
-  return {
-    id: 7,
-    title: 'HTTP',
-    verdict: 'unknown',
-    lines: ['HTTP diagnostics (MCP_PUBLIC_URL canonicalization, MCP_OWNER_EMAILS, PRM/AS-metadata self-fetch) land with the OAuth authorization server (not yet built).'],
-  };
+async function sectionHttp(deps: DiagnosticsDeps, aliases: string[]): Promise<DiagnosticSection | null> {
+  const raw = (deps.env.MCP_TRANSPORT ?? '').trim().toLowerCase();
+  if (raw === '' || raw === 'stdio') return null;
+
+  let cfg: HttpConfig;
+  try {
+    cfg = resolveHttpConfig(deps.env as NodeJS.ProcessEnv);
+  } catch (err) {
+    return {
+      id: 7,
+      title: 'HTTP',
+      verdict: 'fail',
+      slug: err instanceof HttpConfigError ? err.slug : 'E_HTTP_CONFIG',
+      lines: [(err as Error).message],
+      hint: 'Fix the MCP_* variable above and re-run doctor.',
+    };
+  }
+
+  const lines = [`bind ${cfg.host}:${cfg.port}, public URL ${cfg.publicUrl} (resource ${cfg.resourceUri})`];
+  let verdict: Verdict = 'ok';
+  let slug: string | undefined;
+  const hints: string[] = [];
+
+  const owners = parseOwnerEmails(deps.env as NodeJS.ProcessEnv);
+  if (owners.length === 0) {
+    verdict = 'fail';
+    slug = 'E_OWNER_EMAILS_REQUIRED';
+    lines.push('MCP_OWNER_EMAILS is empty — nobody can pass the owner gate.');
+    hints.push('Set MCP_OWNER_EMAILS to the Google email(s) allowed to authenticate.');
+  } else {
+    const known = new Set(aliases.map((a) => deps.accountHealth(a).email.toLowerCase()));
+    const strangers = known.size > 0 ? owners.filter((o) => !known.has(o)) : [];
+    lines.push(`owner gate: ${owners.length} email(s)${strangers.length ? `, ${strangers.length} matching no configured account` : ''}`);
+    if (strangers.length > 0) {
+      verdict = 'warn';
+      slug = 'W_OWNER_EMAIL_UNKNOWN';
+      hints.push(
+        `Owner entry ${strangers.join(', ')} is not a configured account email. ` +
+          'If that is a misspelling of your account email, sign-in will be refused — fix MCP_OWNER_EMAILS.',
+      );
+    }
+  }
+
+  if (verdict !== 'fail' && deps.probeHttp) {
+    const probe = await deps.probeHttp(cfg);
+    if (probe.ok) {
+      lines.push('live: PRM + AS metadata verified at the public URL');
+    } else if (probe.unreachable) {
+      if (verdict === 'ok') verdict = 'unknown';
+      lines.push(`live: ${cfg.publicUrl} not reachable (server not running?)`);
+      hints.push('Start the server (MCP_TRANSPORT=http) and re-run doctor for the live endpoint checks.');
+    } else {
+      verdict = 'fail';
+      slug = 'E_HTTP_METADATA_MISMATCH';
+      lines.push(`live: ${probe.problem}`);
+      hints.push('The advertised OAuth metadata must derive from MCP_PUBLIC_URL exactly; restart the server after changing it.');
+    }
+  }
+
+  return { id: 7, title: 'HTTP', verdict, ...(slug ? { slug } : {}), lines, ...(hints.length ? { hint: hints.join('\n') } : {}) };
 }
 
 const RANK: Record<Verdict, number> = { ok: 0, unknown: 0, warn: 1, fail: 2 };
@@ -280,7 +370,7 @@ export async function runDiagnostics(deps: DiagnosticsDeps = DEFAULT_DEPS): Prom
     sections.push(await sectionApiEnablement(deps, aliases));
   }
 
-  const http = sectionHttpDeferred(deps);
+  const http = await sectionHttp(deps, aliases);
   if (http) sections.push(http);
 
   return { verdict: overallVerdict(sections), sections };
