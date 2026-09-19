@@ -139,11 +139,13 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     method: { id: "reseller.subscriptions.changeRenewalSettings", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/changeRenewalSettings", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"kind","api":"kind"},{"field":"renewalType","api":"renewalType"}],
     shape: {
       account: accountField(),
       customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
       subscriptionId: z.string().describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("RenewalSettings JSON request body. Top-level fields: kind, renewalType."),
+      kind: z.string().describe("Identifies the resource as a subscription renewal setting. Value: `subscriptions#renewalSettings`").optional(),
+      renewalType: z.string().describe("Renewal settings for the annual commitment plan. For more detailed information, see renewal options in the administrator help center. When renewing a subscription, the `renewalType` is a required prop").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -154,11 +156,15 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     method: { id: "reseller.subscriptions.changeSeats", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/changeSeats", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"kind","api":"kind"},{"field":"licensedNumberOfSeats","api":"licensedNumberOfSeats"},{"field":"maximumNumberOfSeats","api":"maximumNumberOfSeats"},{"field":"numberOfSeats","api":"numberOfSeats"}],
     shape: {
       account: accountField(),
       customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
       subscriptionId: z.string().describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Seats JSON request body. Top-level fields: kind, licensedNumberOfSeats, maximumNumberOfSeats, numberOfSeats."),
+      kind: z.string().describe("Identifies the resource as a subscription seat setting. Value: `subscriptions#seats`").optional(),
+      licensedNumberOfSeats: z.number().describe("Read-only field containing the current number of users that are assigned a license for the product defined in `skuId`. This field's value is equivalent to the numerical count of users returned by the ").optional(),
+      maximumNumberOfSeats: z.number().describe("This is a required property and is exclusive to subscriptions with `FLEXIBLE` or `TRIAL` plans. This property sets the maximum number of licensed users allowed on a subscription. This quantity can be ").optional(),
+      numberOfSeats: z.number().describe("This is a required property and is exclusive to subscriptions with `ANNUAL_MONTHLY_PAY` and `ANNUAL_YEARLY_PAY` plans. This property sets the maximum number of licenses assignable to users on a subscr").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

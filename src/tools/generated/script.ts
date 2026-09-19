@@ -67,9 +67,11 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     method: { id: "script.projects.create", httpMethod: "POST", path: "v1/projects", baseUrl: "https://script.googleapis.com/", requiredParams: [], scopes: S_script_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"parentId","api":"parentId"},{"field":"title","api":"title"}],
     shape: {
       account: accountField(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("CreateProjectRequest JSON request body. Top-level fields: parentId, title."),
+      parentId: z.string().describe("The Drive ID of a parent file that the created script project is bound to. This is usually the ID of a Google Doc, Google Sheet, Google Form, or Google Slides file. If not set, a standalone script pro").optional(),
+      title: z.string().describe("The title for the project.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -80,10 +82,14 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     method: { id: "script.projects.deployments.create", httpMethod: "POST", path: "v1/projects/{scriptId}/deployments", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"], scopes: S_script_v1[2] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"description","api":"description"},{"field":"manifestFileName","api":"manifestFileName"},{"field":"scriptId_","api":"scriptId"},{"field":"versionNumber","api":"versionNumber"}],
     shape: {
       account: accountField(),
       scriptId: z.string().describe("The script project's Drive ID."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("DeploymentConfig JSON request body. Top-level fields: description, manifestFileName, scriptId, versionNumber."),
+      description: z.string().describe("The description for this deployment.").optional(),
+      manifestFileName: z.string().describe("The manifest file name for this deployment.").optional(),
+      scriptId_: z.string().describe("The script project's Drive ID.").optional(),
+      versionNumber: z.number().describe("The version number on which this deployment is based.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -208,10 +214,14 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     method: { id: "script.projects.versions.create", httpMethod: "POST", path: "v1/projects/{scriptId}/versions", baseUrl: "https://script.googleapis.com/", requiredParams: ["scriptId"], scopes: S_script_v1[1] },
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"createTime","api":"createTime"},{"field":"description","api":"description"},{"field":"scriptId_","api":"scriptId"},{"field":"versionNumber","api":"versionNumber"}],
     shape: {
       account: accountField(),
       scriptId: z.string().describe("The script project's Drive ID."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Version JSON request body. Top-level fields: createTime, description, scriptId, versionNumber."),
+      createTime: z.string().describe("When the version was created.").optional(),
+      description: z.string().describe("The description for this version.").optional(),
+      scriptId_: z.string().describe("The script project's Drive ID.").optional(),
+      versionNumber: z.number().describe("The incremental ID that is created by Apps Script when a version is created. This is system assigned number and is immutable once created.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

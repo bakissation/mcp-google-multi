@@ -18,6 +18,9 @@ export interface GeneratedToolDef {
   method: ApiMethodRef;
   params: GeneratedParam[];
   hasBody: boolean;
+  /** Typed-body tier: these top-level args assemble into the request body
+   * (flat schemas only; deep schemas keep the single opaque `body` arg). */
+  bodyParams?: Array<{ field: string; api: string }>;
   shape: z.ZodRawShape;
 }
 
@@ -55,13 +58,22 @@ export function registerGeneratedTool(registry: ToolRegistry, def: GeneratedTool
         if (p.location === 'path') pathParams[p.api] = value as string | number;
         else queryParams[p.api] = value as QueryParams[string];
       }
+      let body: unknown = def.hasBody ? args.body : undefined;
+      if (def.bodyParams) {
+        const assembled: Record<string, unknown> = {};
+        for (const bp of def.bodyParams) {
+          const value = args[bp.field];
+          if (value !== undefined) assembled[bp.api] = value;
+        }
+        body = assembled;
+      }
       return executeApiMethod(
         def.method,
         {
           account: args.account as string,
           pathParams,
           queryParams,
-          body: def.hasBody ? args.body : undefined,
+          body,
         },
         deps,
       );

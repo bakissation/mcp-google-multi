@@ -278,9 +278,9 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     method: { id: "cloudsearch.initializeCustomer", httpMethod: "POST", path: "v1:initializeCustomer", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("InitializeCustomerRequest JSON request body."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -291,10 +291,11 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     method: { id: "cloudsearch.media.upload", httpMethod: "POST", path: "v1/media/{+resourceName}", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["resourceName"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"resourceName","api":"resourceName","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"resourceName_","api":"resourceName"}],
     shape: {
       account: accountField(),
       resourceName: z.string().describe("Name of the media that is being downloaded. See ReadRequest.resource_name."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Media JSON request body. Top-level fields: resourceName."),
+      resourceName_: z.string().describe("Name of the media resource.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

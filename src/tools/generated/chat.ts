@@ -113,10 +113,11 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.media.upload", httpMethod: "POST", path: "v1/{+parent}/attachments:upload", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[3] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"filename","api":"filename"}],
     shape: {
       account: accountField(),
       parent: z.string().describe("Required. Resource name of the Chat space in which the attachment is uploaded. Format \"spaces/{space}\"."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("UploadAttachmentRequest JSON request body. Top-level fields: filename."),
+      filename: z.string().describe("Required. The filename of the attachment, including the file extension.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -127,10 +128,10 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.spaces.completeImport", httpMethod: "POST", path: "v1/{+name}:completeImport", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[4] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
       name: z.string().describe("Required. Resource name of the import mode space. Format: `spaces/{space}`"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("CompleteImportSpaceRequest JSON request body."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -376,10 +377,16 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.spaces.messages.search", httpMethod: "POST", path: "v1/{+parent}/messages:search", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[19] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"filter","api":"filter"},{"field":"markupSyntax","api":"markupSyntax"},{"field":"orderBy","api":"orderBy"},{"field":"pageSize","api":"pageSize"},{"field":"pageToken","api":"pageToken"},{"field":"view","api":"view"}],
     shape: {
       account: accountField(),
       parent: z.string().describe("Required. The resource name of the space to search within. To search across all spaces the user has access to, set this field to `spaces/-`. Using any other value for `parent` results in an `INVALID_A"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchMessagesRequest JSON request body. Top-level fields: filter, markupSyntax, orderBy, pageSize, pageToken, view."),
+      filter: z.string().describe("Required. A search query. The query can specify one or more search keywords, which are used to filter the results, You can also filter the results using the following message fields: - `create_time`: ").optional(),
+      markupSyntax: z.enum(["MARKUP_SYNTAX_UNSPECIFIED","MARKUP_SYNTAX_CHAT","MARKUP_SYNTAX_MARKDOWN"]).describe("Optional. Specifies the desired output syntax for the Chat message `formatted_text` field.").optional(),
+      orderBy: z.string().describe("Optional. How the results list is ordered. Supported attributes to order by are: - `create_time`: Sorts the results by the time of the message creation. Default value. - `relevance`: Sorts the results").optional(),
+      pageSize: z.number().describe("Optional. The maximum number of results to return. The service may return fewer than this value. If unspecified, at most 25 are returned. The maximum value is 100. If you use a value more than 100, it").optional(),
+      pageToken: z.string().describe("Optional. A token, received from the previous search messages call. Provide this parameter to retrieve the subsequent page. When paginating, all other parameters provided should match the call that pr").optional(),
+      view: z.enum(["SEARCH_MESSAGES_VIEW_UNSPECIFIED","SEARCH_MESSAGES_VIEW_BASIC","SEARCH_MESSAGES_VIEW_FULL"]).describe("Optional. Specifies what kind of search results view to return. The default is `SEARCH_MESSAGES_VIEW_BASIC`.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -494,10 +501,12 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.users.availability.markAsActive", httpMethod: "POST", path: "v1/{+name}:markAsActive", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[25] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"expireTime","api":"expireTime"},{"field":"ttl","api":"ttl"}],
     shape: {
       account: accountField(),
       name: z.string().describe("Required. The resource name of the availability to mark as active. Format: users/{user}/availability `{user}` is the id for the Person in the People API or Admin SDK directory API. For example, `users"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("MarkAsActiveRequest JSON request body. Top-level fields: expireTime, ttl."),
+      expireTime: z.string().describe("The absolute timestamp when the ACTIVE state expires.").optional(),
+      ttl: z.string().describe("The duration from the current time until the ACTIVE state expires. Using a short TTL can effectively reset the user's state to be based on activity after this brief duration.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -508,10 +517,10 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.users.availability.markAsAway", httpMethod: "POST", path: "v1/{+name}:markAsAway", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[25] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
       name: z.string().describe("Required. The resource name of the availability to mark as away. Format: users/{user}/availability `{user}` is the id for the Person in the People API or Admin SDK directory API. For example, `users/1"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("MarkAsAwayRequest JSON request body."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -522,10 +531,12 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.users.availability.markAsDoNotDisturb", httpMethod: "POST", path: "v1/{+name}:markAsDoNotDisturb", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[25] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"expireTime","api":"expireTime"},{"field":"ttl","api":"ttl"}],
     shape: {
       account: accountField(),
       name: z.string().describe("Required. The resource name of the availability to mark as Do Not Disturb. Format: users/{user}/availability `{user}` is the id for the Person in the People API or Admin SDK directory API. For example"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("MarkAsDoNotDisturbRequest JSON request body. Top-level fields: expireTime, ttl."),
+      expireTime: z.string().describe("The absolute timestamp when the DND state expires.").optional(),
+      ttl: z.string().describe("The duration from the current time until the DND state expires.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -551,10 +562,14 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.users.sections.create", httpMethod: "POST", path: "v1/{+parent}/sections", baseUrl: "https://chat.googleapis.com/", requiredParams: ["parent"], scopes: S_chat_v1[26] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"displayName","api":"displayName"},{"field":"name","api":"name"},{"field":"sortOrder","api":"sortOrder"},{"field":"type","api":"type"}],
     shape: {
       account: accountField(),
       parent: z.string().describe("Required. The parent resource name where the section is created. Format: `users/{user}`"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleChatV1Section JSON request body. Top-level fields: displayName, name, sortOrder, type."),
+      displayName: z.string().describe("Optional. The section's display name. Only populated for sections of type `CUSTOM_SECTION`. Supports up to 80 characters. Required when creating a `CUSTOM_SECTION`.").optional(),
+      name: z.string().describe("Identifier. Resource name of the section. For system sections, the section ID is a constant string: - DEFAULT_DIRECT_MESSAGES: `users/{user}/sections/default-direct-messages` - DEFAULT_SPACES: `users/").optional(),
+      sortOrder: z.number().describe("Output only. The order of the section in relation to other sections. Sections with a lower `sort_order` value appear before sections with a higher value.").optional(),
+      type: z.enum(["SECTION_TYPE_UNSPECIFIED","CUSTOM_SECTION","DEFAULT_DIRECT_MESSAGES","DEFAULT_SPACES","DEFAULT_APPS"]).describe("Required. The type of the section.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -594,10 +609,11 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.users.sections.items.move", httpMethod: "POST", path: "v1/{+name}:move", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[26] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"targetSection","api":"targetSection"}],
     shape: {
       account: accountField(),
       name: z.string().describe("Required. The resource name of the section item to move. Format: `users/{user}/sections/{section}/items/{item}`"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("MoveSectionItemRequest JSON request body. Top-level fields: targetSection."),
+      targetSection: z.string().describe("Required. The resource name of the section to move the section item to. Format: `users/{user}/sections/{section}`").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -623,11 +639,15 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.users.sections.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[26] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"displayName","api":"displayName"},{"field":"name_","api":"name"},{"field":"sortOrder","api":"sortOrder"},{"field":"type","api":"type"}],
     shape: {
       account: accountField(),
       name: z.string().describe("Identifier. Resource name of the section. For system sections, the section ID is a constant string: - DEFAULT_DIRECT_MESSAGES: `users/{user}/sections/default-direct-messages` - DEFAULT_SPACES: `users/"),
       updateMask: z.string().describe("Required. The mask to specify which fields to update. Currently supported field paths: - `display_name`").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleChatV1Section JSON request body. Top-level fields: displayName, name, sortOrder, type."),
+      displayName: z.string().describe("Optional. The section's display name. Only populated for sections of type `CUSTOM_SECTION`. Supports up to 80 characters. Required when creating a `CUSTOM_SECTION`.").optional(),
+      name_: z.string().describe("Identifier. Resource name of the section. For system sections, the section ID is a constant string: - DEFAULT_DIRECT_MESSAGES: `users/{user}/sections/default-direct-messages` - DEFAULT_SPACES: `users/").optional(),
+      sortOrder: z.number().describe("Output only. The order of the section in relation to other sections. Sections with a lower `sort_order` value appear before sections with a higher value.").optional(),
+      type: z.enum(["SECTION_TYPE_UNSPECIFIED","CUSTOM_SECTION","DEFAULT_DIRECT_MESSAGES","DEFAULT_SPACES","DEFAULT_APPS"]).describe("Required. The type of the section.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -638,10 +658,12 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.users.sections.position", httpMethod: "POST", path: "v1/{+name}:position", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[26] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"relativePosition","api":"relativePosition"},{"field":"sortOrder","api":"sortOrder"}],
     shape: {
       account: accountField(),
       name: z.string().describe("Required. The resource name of the section to position. Format: `users/{user}/sections/{section}`"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("PositionSectionRequest JSON request body. Top-level fields: relativePosition, sortOrder."),
+      relativePosition: z.enum(["POSITION_UNSPECIFIED","START","END"]).describe("Optional. The relative position of the section in the list of sections.").optional(),
+      sortOrder: z.number().describe("Optional. The absolute position of the section in the list of sections. The position must be greater than 0. If the position is greater than the number of sections, the section will be appended to the").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -678,11 +700,14 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.users.spaces.spaceNotificationSetting.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[29] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"muteSetting","api":"muteSetting"},{"field":"name_","api":"name"},{"field":"notificationSetting","api":"notificationSetting"}],
     shape: {
       account: accountField(),
       name: z.string().describe("Identifier. The resource name of the space notification setting. Format: `users/{user}/spaces/{space}/spaceNotificationSetting`."),
       updateMask: z.string().describe("Required. Supported field paths: - `notification_setting` - `mute_setting`").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("SpaceNotificationSetting JSON request body. Top-level fields: muteSetting, name, notificationSetting."),
+      muteSetting: z.enum(["MUTE_SETTING_UNSPECIFIED","UNMUTED","MUTED"]).describe("The space notification mute setting.").optional(),
+      name_: z.string().describe("Identifier. The resource name of the space notification setting. Format: `users/{user}/spaces/{space}/spaceNotificationSetting`.").optional(),
+      notificationSetting: z.enum(["NOTIFICATION_SETTING_UNSPECIFIED","ALL","MAIN_CONVERSATIONS","FOR_YOU","OFF"]).describe("The notification setting.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -706,11 +731,13 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     method: { id: "chat.users.spaces.updateSpaceReadState", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[30] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"lastReadTime","api":"lastReadTime"},{"field":"name_","api":"name"}],
     shape: {
       account: accountField(),
       name: z.string().describe("Resource name of the space read state. Format: `users/{user}/spaces/{space}/spaceReadState`"),
       updateMask: z.string().describe("Required. The field paths to update. Currently supported field paths: - `last_read_time` When the `last_read_time` is before the latest message create time, the space appears as unread in the UI. To m").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("SpaceReadState JSON request body. Top-level fields: lastReadTime, name."),
+      lastReadTime: z.string().describe("Optional. The time when the user's space read state was updated. Usually this corresponds with either the timestamp of the last read message, or a timestamp specified by the user to mark the last read").optional(),
+      name_: z.string().describe("Resource name of the space read state. Format: `users/{user}/spaces/{space}/spaceReadState`").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
