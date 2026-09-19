@@ -14,20 +14,35 @@ export function argNormalizationEnabled(env: NodeJS.ProcessEnv = process.env): b
   return !/^(0|false|off|no)$/i.test((env.GOOGLE_ARG_NORMALIZE ?? '').trim());
 }
 
+/** Declared scalar kind per schema key; drives value coercion on RENAMED keys
+ * only. Clients string-encode values for keys absent from the advertised
+ * schema, so a renamed key almost always arrives as a string — without
+ * coercion the rename would just move the -32602 from the key to the value. */
+export type ArgKind = 'number' | 'boolean' | 'other';
+export type ArgShape = ReadonlyMap<string, ArgKind>;
+
 const snakeToCamel = (key: string): string => key.replace(/_([a-z0-9])/g, (_m, c: string) => c.toUpperCase());
 
+function coerceRenamedValue(value: unknown, kind: ArgKind | undefined): unknown {
+  if (typeof value !== 'string') return value;
+  const v = value.trim();
+  if (kind === 'number' && /^-?\d+(\.\d+)?$/.test(v)) return Number(v);
+  if (kind === 'boolean' && /^(true|false)$/i.test(v)) return v.toLowerCase() === 'true';
+  return value;
+}
+
 export function normalizeCallArguments(
-  shapeKeys: ReadonlySet<string>,
+  shape: ArgShape,
   args: Record<string, unknown>,
 ): { args: Record<string, unknown>; renamed: [string, string][] } {
   const renamed: [string, string][] = [];
   let out: Record<string, unknown> | undefined;
   for (const key of Object.keys(args)) {
-    if (shapeKeys.has(key) || !key.includes('_')) continue;
+    if (shape.has(key) || !key.includes('_')) continue;
     const camel = snakeToCamel(key);
-    if (camel !== key && shapeKeys.has(camel) && !(camel in args)) {
+    if (camel !== key && shape.has(camel) && !(camel in args)) {
       out ??= { ...args };
-      out[camel] = out[key];
+      out[camel] = coerceRenamedValue(out[key], shape.get(camel));
       delete out[key];
       renamed.push([key, camel]);
     }
@@ -42,7 +57,7 @@ interface ToolCallLike {
 
 export function normalizeMessage(
   msg: JSONRPCMessage,
-  shapeFor: (tool: string) => ReadonlySet<string> | undefined,
+  shapeFor: (tool: string) => ArgShape | undefined,
   log: (line: string) => void = (l) => process.stderr.write(`${l}\n`),
 ): JSONRPCMessage {
   const m = msg as ToolCallLike;
@@ -69,7 +84,7 @@ type OnMessage = (<T extends JSONRPCMessage>(message: T, extra?: MessageExtraInf
  * identically for stdio and (per-request, stateless) HTTP transports. */
 export function withArgNormalization(
   transport: Transport,
-  shapeFor: (tool: string) => ReadonlySet<string> | undefined,
+  shapeFor: (tool: string) => ArgShape | undefined,
   log?: (line: string) => void,
 ): Transport {
   const wrapper = {
