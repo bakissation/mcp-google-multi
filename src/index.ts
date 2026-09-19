@@ -21,6 +21,7 @@ import { isAllowed, describePolicy } from './write-control.js';
 import { buildIdentityContext, type IdentityContext } from './identity.js';
 import { registerSetupPrompt } from './setup-prompt.js';
 import { applyNetTuning } from './net-tuning.js';
+import { argNormalizationEnabled, withArgNormalization } from './arg-normalize.js';
 
 applyNetTuning();
 
@@ -205,7 +206,10 @@ async function main() {
     const registry = buildRegistry(server, buildIdentityContext(process.env, { transport: 'stdio' }));
     registry.installListHandler();
     registerSetupPrompt(server);
-    await server.connect(new StdioServerTransport());
+    const stdioTransport = new StdioServerTransport();
+    await server.connect(
+      argNormalizationEnabled() ? withArgNormalization(stdioTransport, (n) => registry.argShape(n)) : stdioTransport,
+    );
   }
 
   if (wantHttp) {
@@ -303,6 +307,7 @@ async function main() {
       authenticate: authServer.authenticate,
       routes: authServer.routes,
       log: (l) => process.stderr.write(`[http] ${l}\n`),
+      argShapeFor: argNormalizationEnabled() ? (n) => registry.argShape(n) : undefined,
     });
     await host.start();
     process.stderr.write(`HTTP transport listening on http://${httpCfg.host}:${httpCfg.port} (public ${httpCfg.publicUrl})\n`);

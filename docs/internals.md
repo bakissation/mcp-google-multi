@@ -37,3 +37,7 @@ The Google API path is gaxios → node-fetch → `node:https`. When the happy-ey
 - gaxios stringifies any object passed as `data` without checking the HTTP verb, and undici (Node's `fetch`) rejects GET/HEAD requests that carry a body (`Request with GET/HEAD method cannot have body`). A caller-supplied `{}` body on a read tool would therefore crash the request.
 - Stripping is lossless: no Google Discovery GET/HEAD method declares a request schema, so there is never a legitimate GET/HEAD body to preserve.
 - Write verbs keep the usual semantics: `null`/`undefined` means no body is sent.
+
+## Argument normalization
+
+`src/arg-normalize.ts` renames snake_case `tools/call` argument keys to their declared camelCase twins (e.g. `thread_id` → `threadId`) before SDK validation, at the transport `onmessage` seam. The seam is deliberate: SDK 1.x advertises an EMPTY input schema in `tools/list` for any non-object schema wrapper (pipe/preprocess), so schema-level normalization would blank every tool's advertised parameters, while the JSON-RPC message shape is versioned MCP spec. The rename is lossless by construction (sent key unknown to the schema, camel twin declared, twin not also sent) and each one logs key names — never values — to stderr. `GOOGLE_ARG_NORMALIZE=off` disables it.

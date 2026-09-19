@@ -111,6 +111,7 @@ export class ToolRegistry {
   readonly registerTool: McpServer['registerTool'];
   private readonly revealed = new Set<string>();
   private readonly jsonSchemaCache = new Map<string, unknown>();
+  private readonly argShapeCache = new Map<string, ReadonlySet<string>>();
   private readonly compactOutput = trimEnabled();
   private registeringMeta = false;
   /** Configured visibility mode (GOOGLE_DISCOVERY); default lazy = v5 exact. */
@@ -234,6 +235,17 @@ export class ToolRegistry {
 
   services(): string[] {
     return [...new Set(this.tools.filter((t) => !t.meta).map((t) => t.service))];
+  }
+
+  /** Declared input-schema keys for one tool (tools/call arg normalization). */
+  argShape(name: string): ReadonlySet<string> | undefined {
+    const cached = this.argShapeCache.get(name);
+    if (cached) return cached;
+    const entry = this.tools.find((t) => t.name === name);
+    if (!entry) return undefined;
+    const keys: ReadonlySet<string> = new Set(Object.keys(entry.inputShape));
+    this.argShapeCache.set(name, keys);
+    return keys;
   }
 
   catalog(service: string, query?: string): CatalogOperation[] {
