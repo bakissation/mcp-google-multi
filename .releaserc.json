@@ -14,6 +14,12 @@
         "successCommentCondition": "<% return nextRelease.channel == null; %>",
         "failCommentCondition": false
       }
+    ],
+    [
+      "@semantic-release/exec",
+      {
+        "publishCmd": "echo \"version=${nextRelease.version}\" >> \"$GITHUB_OUTPUT\"; echo \"channel=${nextRelease.channel || 'latest'}\" >> \"$GITHUB_OUTPUT\""
+      }
     ]
   ]
 }
