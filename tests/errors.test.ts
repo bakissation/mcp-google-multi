@@ -76,6 +76,17 @@ describe('mapGoogleError', () => {
     expect(e.hint).toContain('30');
   });
 
+  it('GA4 429 (property tokens) → rate_limited with the quota-bucket hint', () => {
+    const e = mapGoogleError(
+      { code: 429, message: 'Exhausted property tokens for a project per hour. These quota tokens will return in under an hour.' },
+      acc,
+    );
+    expect(e.error).toBe('rate_limited');
+    expect(e.retriable).toBe(true);
+    expect(e.hint).toContain('returnPropertyQuota');
+    expect(e.hint).toContain('Narrow the date range');
+  });
+
   it('5xx → upstream_error, retriable', () => {
     const e = mapGoogleError({ code: 503, message: 'unavailable' }, acc);
     expect(e.error).toBe('upstream_error');
