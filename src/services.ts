@@ -43,6 +43,7 @@ const bundleGate = (name: string) => ({
   hint: `add "${name}" to an account's scope profile (or legacy GOOGLE_OPTIONAL_SCOPES)`,
 });
 export const GENERATED_GATES: Record<string, { enabled: () => boolean; hint: string }> = {
+  analytics: bundleGate('analytics'),
   appsmarket: bundleGate('appsmarket'),
   classroom: bundleGate('classroom'),
   cloudidentity: bundleGate('cloudidentity'),

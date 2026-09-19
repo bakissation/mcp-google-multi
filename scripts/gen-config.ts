@@ -14,6 +14,8 @@ export const GEN_APIS: GenApi[] = [
   { file: 'admin.datatransfer_v1.json', service: 'admin' },
   { file: 'admin.directory_v1.json', service: 'admin' },
   { file: 'admin.reports_v1.json', service: 'admin' },
+  { file: 'analyticsadmin.v1beta.json', service: 'analytics' },
+  { file: 'analyticsdata.v1beta.json', service: 'analytics' },
   { file: 'appsmarket.v2.json', service: 'appsmarket' },
   { file: 'calendar.v3.json', service: 'calendar' },
   { file: 'chat.v1.json', service: 'chat' },
@@ -182,7 +184,10 @@ export const CURATED_METHOD_IDS: string[] = [
 ];
 
 // Corrections where HTTP-verb inference misreads a method's effect.
-export const CUD_OVERRIDES: Record<string, Cud> = {};
+export const CUD_OVERRIDES: Record<string, Cud> = {
+  // One-time consent flag on the property: a state write, not a creation.
+  'analyticsadmin.properties.acknowledgeUserDataCollection': 'update',
+};
 
 // Replacement tool names for methodIds whose derived name exceeds the 64-char
 // MCP limit or collides with another generated name.
@@ -190,6 +195,11 @@ export const NAME_OVERRIDES: Record<string, string> = {
   // curated admin_users_update wraps directory.users.patch; the full-PUT
   // variant needs its own name
   'directory.users.update': 'admin_users_replace',
+  'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.create': 'analytics_data_streams_measurement_protocol_secrets_create',
+  'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.delete': 'analytics_data_streams_measurement_protocol_secrets_delete',
+  'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.get': 'analytics_data_streams_measurement_protocol_secrets_get',
+  'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.list': 'analytics_data_streams_measurement_protocol_secrets_list',
+  'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.patch': 'analytics_data_streams_measurement_protocol_secrets_patch',
   'classroom.courses.courseWork.addOnAttachments.studentSubmissions.get': 'classroom_coursework_addon_submissions_get',
   'classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch': 'classroom_coursework_addon_submissions_patch',
   'classroom.courses.courseWork.studentSubmissions.modifyAttachments': 'classroom_coursework_submissions_modify_attachments',

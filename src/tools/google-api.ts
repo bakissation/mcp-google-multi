@@ -39,6 +39,8 @@ const SERVICE_FOR_ALIAS: Record<string, string> = {
   admin_reports: 'admin',
   admin_datatransfer: 'admin',
   groupssettings: 'groupssettings',
+  analyticsadmin: 'analytics',
+  analyticsdata: 'analytics',
 };
 
 export interface EscapeDeps extends DiscoveryDeps {

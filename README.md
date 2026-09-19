@@ -4,7 +4,7 @@ The most complete **local Google Workspace MCP server**: Gmail, Drive, Calendar,
 
 [![npm](https://img.shields.io/npm/v/mcp-google-multi?label=npm&color=cb3837)](https://www.npmjs.com/package/mcp-google-multi)
 
-- 🧰 **Exhaustive** — 874 tools across 28 services + an escape hatch for anything else → [COVERAGE.md](./COVERAGE.md)
+- 🧰 **Exhaustive** — 940 tools across 29 services, now including Google Analytics (GA4), + an escape hatch for anything else → [COVERAGE.md](./COVERAGE.md)
 - 🔑 **Multi-account** — drive any number of Google accounts by alias, or fan one call out across all of them
 - 🔒 **Private by design** — your own OAuth app, tokens encrypted at rest (AES-256-GCM), writes deny-by-default, no telemetry, no metering — it talks only to Google
 - 🌐 **Local or remote** — runs locally over stdio, or self-hosted over HTTP with its own built-in OAuth 2.1 server (Claude Code's `/mcp` login and the claude.ai connector, zero custom UI). Pull-and-up Docker Compose with optional automatic HTTPS → [remote setup](./docs/http-setup.md)
