@@ -6,6 +6,7 @@ import { getAccountSet, refreshAccountSetIfStale } from './accounts.js';
 import { compactResult, trimEnabled } from './trim.js';
 import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFanout } from './fanout.js';
 import { MAX_RESPONSE_CHARS } from './executor.js';
+import type { ArgKind, ArgShape } from './arg-normalize.js';
 
 // Client-side result budget advertised for tools that do not declare their own
 // (fat readers do; see trim.ts). ~50k chars stays well inside a default client
@@ -89,6 +90,23 @@ const SERVICE_OVERRIDES: Record<string, string> = {
 // read tools that write local files — same savePath fanned across accounts would clobber
 const FANOUT_EXCLUDE = new Set(['gmail_download_attachment', 'drive_download', 'drive_export']);
 
+/** Unwrap optional/default/nullable to the declared scalar kind (zod 4 defs). */
+function scalarKindOf(field: unknown): ArgKind {
+  type Def = { type?: string; innerType?: unknown };
+  let cur = field as { _zod?: { def?: Def } } | undefined;
+  for (let i = 0; i < 4 && cur?._zod?.def; i++) {
+    const def = cur._zod.def;
+    if (def.type === 'number') return 'number';
+    if (def.type === 'boolean') return 'boolean';
+    if (def.type === 'optional' || def.type === 'default' || def.type === 'nullable') {
+      cur = def.innerType as typeof cur;
+      continue;
+    }
+    return 'other';
+  }
+  return 'other';
+}
+
 function isAccountEnum(field: unknown): boolean {
   type Def = { type?: string; innerType?: { _zod?: { def?: Def } } };
   const def = (field as { _zod?: { def?: Def } } | undefined)?._zod?.def;
@@ -117,7 +135,7 @@ export class ToolRegistry {
   readonly registerTool: McpServer['registerTool'];
   private readonly revealed = new Set<string>();
   private readonly jsonSchemaCache = new Map<string, unknown>();
-  private readonly argShapeCache = new Map<string, ReadonlySet<string>>();
+  private readonly argShapeCache = new Map<string, ArgShape>();
   private readonly compactOutput = trimEnabled();
   private registeringMeta = false;
   /** Configured visibility mode (GOOGLE_DISCOVERY); default lazy = v5 exact. */
@@ -249,15 +267,17 @@ export class ToolRegistry {
     return [...new Set(this.tools.filter((t) => !t.meta).map((t) => t.service))];
   }
 
-  /** Declared input-schema keys for one tool (tools/call arg normalization). */
-  argShape(name: string): ReadonlySet<string> | undefined {
+  /** Declared input-schema keys + scalar kinds for one tool (tools/call arg
+   * normalization; the kind drives value coercion on renamed keys). */
+  argShape(name: string): ArgShape | undefined {
     const cached = this.argShapeCache.get(name);
     if (cached) return cached;
     const entry = this.tools.find((t) => t.name === name);
     if (!entry) return undefined;
-    const keys: ReadonlySet<string> = new Set(Object.keys(entry.inputShape));
-    this.argShapeCache.set(name, keys);
-    return keys;
+    const shape = new Map<string, ArgKind>();
+    for (const [key, field] of Object.entries(entry.inputShape)) shape.set(key, scalarKindOf(field));
+    this.argShapeCache.set(name, shape);
+    return shape;
   }
 
   catalog(service: string, query?: string): CatalogOperation[] {

@@ -11,7 +11,16 @@ import {
 import { ToolRegistry } from '../src/registry.js';
 import type { Policy } from '../src/write-control.js';
 
-const SHAPE: ReadonlySet<string> = new Set(['account', 'threadId', 'messageId', 'newParentFolderId']);
+import type { ArgShape } from '../src/arg-normalize.js';
+
+const SHAPE: ArgShape = new Map([
+  ['account', 'other'],
+  ['threadId', 'other'],
+  ['messageId', 'other'],
+  ['newParentFolderId', 'other'],
+  ['maxResults', 'number'],
+  ['replyAll', 'boolean'],
+] as const);
 
 describe('normalizeCallArguments', () => {
   it('renames a snake_case key to its declared camelCase twin', () => {
@@ -37,6 +46,20 @@ describe('normalizeCallArguments', () => {
   it('handles multi-underscore keys', () => {
     const { args } = normalizeCallArguments(SHAPE, { new_parent_folder_id: 'f1' });
     expect(args).toEqual({ newParentFolderId: 'f1' });
+  });
+
+  it('coerces string-encoded scalars on RENAMED keys (clients type-strip unknown keys)', () => {
+    expect(normalizeCallArguments(SHAPE, { max_results: '2' }).args).toEqual({ maxResults: 2 });
+    expect(normalizeCallArguments(SHAPE, { max_results: '-1.5' }).args).toEqual({ maxResults: -1.5 });
+    expect(normalizeCallArguments(SHAPE, { reply_all: 'true' }).args).toEqual({ replyAll: true });
+    expect(normalizeCallArguments(SHAPE, { reply_all: 'False' }).args).toEqual({ replyAll: false });
+  });
+
+  it('never coerces non-parseable strings, non-strings, or declared keys', () => {
+    expect(normalizeCallArguments(SHAPE, { max_results: 'abc' }).args).toEqual({ maxResults: 'abc' });
+    expect(normalizeCallArguments(SHAPE, { max_results: 3 }).args).toEqual({ maxResults: 3 });
+    const declared = { maxResults: '2' };
+    expect(normalizeCallArguments(SHAPE, declared).args).toBe(declared);
   });
 });
 
@@ -112,11 +135,22 @@ describe('registry integration + flag', () => {
     const registry = new ToolRegistry(server as never, POLICY, 'lazy');
     registry.registerTool(
       'gmail_read_thread',
-      { description: 'x', inputSchema: { account: z.string().optional(), threadId: z.string() } },
+      {
+        description: 'x',
+        inputSchema: {
+          account: z.string().optional(),
+          threadId: z.string(),
+          maxResults: z.number().min(1).default(20).optional(),
+          full: z.boolean().optional(),
+        },
+      },
       () => {},
     );
     const shape = registry.argShape('gmail_read_thread')!;
-    expect([...shape].sort()).toEqual(['account', 'threadId']);
+    expect([...shape.keys()].sort()).toEqual(['account', 'full', 'maxResults', 'threadId']);
+    expect(shape.get('maxResults')).toBe('number');
+    expect(shape.get('full')).toBe('boolean');
+    expect(shape.get('threadId')).toBe('other');
     expect(registry.argShape('nope')).toBeUndefined();
 
     const out = normalizeMessage(

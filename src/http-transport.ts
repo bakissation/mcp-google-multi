@@ -8,7 +8,7 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HttpConfig } from './http-config.js';
-import { withArgNormalization } from './arg-normalize.js';
+import { withArgNormalization, type ArgShape } from './arg-normalize.js';
 
 export type AuthOutcome =
   | { ok: true }
@@ -36,7 +36,7 @@ export interface HttpHostOptions {
    * shared lock instead of wedging the transport (default 120s). */
   dispatchTimeoutMs?: number;
   /** tools/call argument-key normalization lookup (arg-normalize.ts); absent = off. */
-  argShapeFor?: (tool: string) => ReadonlySet<string> | undefined;
+  argShapeFor?: (tool: string) => ArgShape | undefined;
 }
 
 // A hung handler that keeps the connection open would otherwise hold the global
