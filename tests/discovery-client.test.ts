@@ -156,6 +156,24 @@ describe('loadMethodIndex caching', () => {
     expect(fs.existsSync(path.join(dir, 'gmail.json'))).toBe(true);
   });
 
+  it('falls back to the per-service $discovery endpoint when the central directory 404s (newer APIs)', async () => {
+    const calls: string[] = [];
+    const fetchFn = async (url: string) => {
+      calls.push(url);
+      if (url.startsWith('https://www.googleapis.com/discovery')) {
+        return { ok: false, status: 404, json: async () => ({}) };
+      }
+      return { ok: true, status: 200, json: async () => FIXTURE };
+    };
+    const index = await loadMethodIndex('analyticsadmin', { fetchFn, cacheDir: dir });
+    expect(index).toHaveLength(3);
+    expect(calls).toEqual([
+      'https://www.googleapis.com/discovery/v1/apis/analyticsadmin/v1beta/rest',
+      'https://analyticsadmin.googleapis.com/$discovery/rest?version=v1beta',
+    ]);
+    expect(fs.existsSync(path.join(dir, 'analyticsadmin.json'))).toBe(true);
+  });
+
   it('falls back to a stale cache when offline', async () => {
     const calls: string[] = [];
     await loadMethodIndex('gmail', { fetchFn: okFetch(calls), cacheDir: dir });

@@ -174,20 +174,34 @@ export async function loadMethodIndex(api: string, deps: DiscoveryDeps = {}): Pr
   let staleFallback = false;
   if (cacheFresh()) doc = readCache();
   if (!doc) {
-    const url = `https://www.googleapis.com/discovery/v1/apis/${spec.id}/${spec.version}/rest`;
-    try {
-      const res = await fetchFn(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      doc = (await res.json()) as DiscoveryDoc;
-      fs.mkdirSync(cacheDir, { recursive: true });
-      fs.writeFileSync(cacheFile, JSON.stringify(doc), { mode: 0o600 });
-    } catch (err) {
+    // Newer APIs (analyticsadmin/analyticsdata) are absent from the central
+    // discovery directory (404); each service's own $discovery endpoint is
+    // authoritative, so try both — same fallback as scripts/fetch-discovery.
+    const urls = [
+      `https://www.googleapis.com/discovery/v1/apis/${spec.id}/${spec.version}/rest`,
+      `https://${spec.id}.googleapis.com/$discovery/rest?version=${spec.version}`,
+    ];
+    let fetchError: Error | undefined;
+    for (const url of urls) {
+      try {
+        const res = await fetchFn(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        doc = (await res.json()) as DiscoveryDoc;
+        fs.mkdirSync(cacheDir, { recursive: true });
+        fs.writeFileSync(cacheFile, JSON.stringify(doc), { mode: 0o600 });
+        break;
+      } catch (err) {
+        fetchError = err as Error;
+        doc = undefined;
+      }
+    }
+    if (!doc) {
       doc = readCache();
       staleFallback = true;
       if (!doc) {
         throw new Error(
-          `Could not fetch the Google API Discovery document for "${api}" and no local cache exists (${(err as Error).message}). Retry when online.`,
-          { cause: err },
+          `Could not fetch the Google API Discovery document for "${api}" and no local cache exists (${fetchError?.message ?? 'fetch failed'}). Retry when online.`,
+          { cause: fetchError },
         );
       }
     }
