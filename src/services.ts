@@ -34,7 +34,7 @@ export const SERVICES: ServiceEntry[] = [
   { name: 'slides', register: registerSlidesTools, enabled: () => new Set(getOptionalBundles()).has('slides') },
   { name: 'forms', register: registerFormsTools, enabled: () => new Set(getOptionalBundles()).has('forms') },
   { name: 'chat', register: registerChatTools, enabled: () => new Set(getOptionalBundles()).has('chat') },
-  { name: 'analytics', register: registerAnalyticsTools, enabled: () => new Set(getOptionalBundles()).has('analytics') },
+  { name: 'analytics', register: registerAnalyticsTools, enabled: () => { const b = new Set(getOptionalBundles()); return b.has('analytics') || b.has('analytics_write'); } },
   { name: 'admin', register: registerAdminTools, enabled: () => getAdminAccounts().length > 0 },
 ];
 
