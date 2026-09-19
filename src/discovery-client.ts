@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
-export const WORKSPACE_APIS: Record<string, { id: string; version: string }> = {
+export const SUPPORTED_APIS: Record<string, { id: string; version: string }> = {
   gmail: { id: 'gmail', version: 'v1' },
   drive: { id: 'drive', version: 'v3' },
   calendar: { id: 'calendar', version: 'v3' },
@@ -147,9 +147,9 @@ export async function loadMethodIndex(api: string, deps: DiscoveryDeps = {}): Pr
   const cached = memoryCache.get(api);
   if (cached && now() < cached.refreshAfter) return cached.index;
 
-  const spec = WORKSPACE_APIS[api];
+  const spec = SUPPORTED_APIS[api];
   if (!spec) {
-    throw new Error(`Unknown api "${api}". Known: ${Object.keys(WORKSPACE_APIS).join(', ')}`);
+    throw new Error(`Unknown api "${api}". Known: ${Object.keys(SUPPORTED_APIS).join(', ')}`);
   }
   const fetchFn = deps.fetchFn ?? ((url: string) => fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }));
   const cacheDir = deps.cacheDir ?? discoveryCacheDir();
