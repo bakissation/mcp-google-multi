@@ -154,6 +154,20 @@ export function mapGoogleError(
   }
   if (status === 429) {
     const retryAfter = error?.response?.headers?.['retry-after'];
+    // GA4 quota exhaustion ("Exhausted property tokens ...") is a per-property
+    // token bucket, not a transient rate spike: shrinking the request is the
+    // lever that helps, and a blind immediate retry only burns more tokens.
+    if (/property tokens/i.test(message)) {
+      return {
+        error: 'rate_limited',
+        message,
+        hint:
+          'GA4 quotas are per-property token buckets that refill over the hour/day. ' +
+          'Narrow the date range, request fewer dimensions/metrics/rows, and pass returnPropertyQuota to see the remaining tokens before retrying.',
+        retriable: true,
+        account,
+      };
+    }
     return {
       error: 'rate_limited',
       message,

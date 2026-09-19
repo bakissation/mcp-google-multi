@@ -8,7 +8,7 @@ import { getToolsets, toolsetEnabled, type Toolsets } from '../toolsets.js';
 import { editDistance } from '../scope-catalog.js';
 import { executeApiMethod, jsonResult, type QueryParams } from '../executor.js';
 import {
-  WORKSPACE_APIS,
+  SUPPORTED_APIS,
   type DiscoveryDeps,
   type DiscoveryMethod,
   cudFromMethod,
@@ -79,7 +79,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
   const apiEnabled = (alias: string): boolean => {
     return toolsetEnabled(toolsets, serviceForAlias(alias));
   };
-  const enabledApis = Object.keys(WORKSPACE_APIS).filter(apiEnabled);
+  const enabledApis = Object.keys(SUPPORTED_APIS).filter(apiEnabled);
   const apiList = enabledApis.join(', ');
   const toolsetDisabled = (alias: string) =>
     jsonResult(
@@ -107,7 +107,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       annotations: { openWorldHint: true },
     },
     async ({ query, api, maxResults }) => {
-      if (api && !WORKSPACE_APIS[api]) {
+      if (api && !SUPPORTED_APIS[api]) {
         return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false }, true);
       }
       if (api && !apiEnabled(api)) return toolsetDisabled(api);
@@ -167,7 +167,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       _meta: { 'anthropic/maxResultSizeChars': 100_000 },
     },
     async ({ account, api, methodId, pathParams, queryParams, body }) => {
-      if (!WORKSPACE_APIS[api as string]) {
+      if (!SUPPORTED_APIS[api as string]) {
         return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false, account }, true);
       }
       if (!apiEnabled(api as string)) return toolsetDisabled(api as string);
