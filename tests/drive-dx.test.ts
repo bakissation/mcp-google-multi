@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { resolveShareNotification } from '../src/tools/drive.js';
+import { resolveConvertTarget, resolveShareNotification } from '../src/tools/drive.js';
 import { prepareLocalDest } from '../src/tools/_local-files.js';
 import { executeApiMethod, type ApiMethodRef } from '../src/executor.js';
 
@@ -86,5 +86,19 @@ describe('executeApiMethod binary/export steering', () => {
     const p = await payload(getMethod, { account: 'test', queryParams: { alt: 'media' } });
     expect(p.error).toBe('binary_unsupported');
     expect(p.hint).toContain('drive_download');
+  });
+});
+
+describe('resolveConvertTarget', () => {
+  it('maps the shorthands to the full google-apps ids', () => {
+    expect(resolveConvertTarget('document')).toBe('application/vnd.google-apps.document');
+    expect(resolveConvertTarget('spreadsheet')).toBe('application/vnd.google-apps.spreadsheet');
+    expect(resolveConvertTarget('presentation')).toBe('application/vnd.google-apps.presentation');
+    expect(resolveConvertTarget('drawing')).toBe('application/vnd.google-apps.drawing');
+  });
+
+  it('passes full ids through and keeps undefined undefined', () => {
+    expect(resolveConvertTarget('application/vnd.google-apps.document')).toBe('application/vnd.google-apps.document');
+    expect(resolveConvertTarget(undefined)).toBeUndefined();
   });
 });

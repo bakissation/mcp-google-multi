@@ -751,7 +751,7 @@ export function registerGmailTools(server: ToolRegistry): void {
         messageId: z.string().describe('The Gmail message ID'),
         attachmentId: z.string().describe('The attachment ID from gmail_read response'),
         filename: z.string().describe('Filename to save as (e.g. report.xlsx)'),
-        savePath: z.string().describe('Absolute directory path to save into, e.g. /home/user/Downloads'),
+        savePath: z.string().describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server), e.g. /home/user/Downloads; the file name comes from `filename`'),
       },
     },
     async ({ account, messageId, attachmentId, filename, savePath }) => {
