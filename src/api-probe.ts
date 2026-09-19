@@ -38,6 +38,9 @@ export const API_PROBES: ApiProbeSpec[] = [
   { service: 'chat', api: 'chat', url: 'https://chat.googleapis.com/v1/spaces?pageSize=1', scopePrefixes: [`${P}chat.`] },
   { service: 'meet', api: 'meet', url: 'https://meet.googleapis.com/v2/conferenceRecords?pageSize=1', scopePrefixes: [`${P}meetings.`] },
   { service: 'forms', api: 'forms', url: `https://forms.googleapis.com/v1/forms/${BOGUS_ID}`, scopePrefixes: [`${P}forms.`], notFoundMeansEnabled: true },
+  // Probes the Admin API only: the Data API has no no-arg read (every call
+  // needs a property id), so its enablement surfaces on first report instead.
+  { service: 'analytics', api: 'analyticsadmin', url: 'https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=1', scopePrefixes: [`${P}analytics`] },
 ];
 
 export function planProbes(granted: string[], probes: ApiProbeSpec[] = API_PROBES): ApiProbeSpec[] {

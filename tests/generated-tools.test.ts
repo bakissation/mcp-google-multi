@@ -228,7 +228,7 @@ describe('gen-tools generator', () => {
 
   it('exposes every new optional bundle used by generated gates', async () => {
     const { OPTIONAL_SCOPE_BUNDLES } = await import('../src/auth.js');
-    for (const bundle of ['classroom', 'cloudidentity', 'cloudsearch', 'vault', 'keep', 'driveactivity', 'drivelabels', 'script', 'postmaster', 'groupssettings', 'groupsmigration', 'licensing', 'reseller', 'appsmarket']) {
+    for (const bundle of ['classroom', 'cloudidentity', 'cloudsearch', 'vault', 'keep', 'driveactivity', 'drivelabels', 'script', 'postmaster', 'groupssettings', 'groupsmigration', 'licensing', 'reseller', 'appsmarket', 'analytics']) {
       expect(OPTIONAL_SCOPE_BUNDLES[bundle]?.length, bundle).toBeGreaterThan(0);
       for (const scope of OPTIONAL_SCOPE_BUNDLES[bundle]) {
         expect(scope, bundle).toMatch(/^https:\/\/www\.googleapis\.com\/auth\//);

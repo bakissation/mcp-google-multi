@@ -1,6 +1,6 @@
 # Features tour
 
-How the server keeps 874 tools usable, fast, and safe. Back to the [README](../README.md).
+How the server keeps 940 tools usable, fast, and safe. Back to the [README](../README.md).
 
 ## Discover-first tools (tiny idle context)
 

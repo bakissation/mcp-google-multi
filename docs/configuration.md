@@ -53,6 +53,7 @@ Each account can point at a named **scope profile** so consent is exactly what t
 | `keep` | low | Read and edit Keep notes |
 | `driveactivity` | low | Read the Drive activity feed |
 | `postmaster` | low | Read Postmaster Tools deliverability data |
+| `analytics` | low | Read Google Analytics (GA4): reports, realtime, account/property config |
 | `forms` | medium | Build Forms and read responses |
 | `chat` | medium | Read/send Chat messages, manage spaces |
 | `gmail_settings` | medium | Mailbox settings: filters, labels, vacation |
@@ -141,7 +142,7 @@ Reads are never gated. **Every create/update/delete is off until you opt in** �
 
 Core services register by default: `gmail`, `drive`, `calendar`, `sheets`, `docs`, `contacts`, `searchconsole`, `tasks`, `meet`, `workspaceevents`.
 
-Optional services register when their bundle is enabled (below): `slides`, `forms`, `chat`, `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket` — plus `admin`, which requires `GOOGLE_ADMIN_ACCOUNTS`.
+Optional services register when their bundle is enabled (below): `slides`, `forms`, `chat`, `analytics`, `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket` — plus `admin`, which requires `GOOGLE_ADMIN_ACCOUNTS`.
 
 `GOOGLE_TOOLSETS` is a filter only: listing an optional service does not enable it without its bundle/admin gate.
 
@@ -149,7 +150,7 @@ Optional services register when their bundle is enabled (below): `slides`, `form
 
 Add bundle names to `GOOGLE_OPTIONAL_SCOPES` (CSV), then re-run `auth` for each account so the new scopes are granted:
 
-`slides`, `forms`, `chat`, `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket`.
+`slides`, `forms`, `chat`, `analytics`, `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket`.
 
 Two bundles extend the always-on `gmail` service instead of enabling a new one — Gmail settings **writes** only accept the dedicated settings scopes (reads already work with the base scope):
 

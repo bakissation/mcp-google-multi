@@ -123,6 +123,13 @@ export const BUNDLE_CATALOG: Record<string, BundleCatalogEntry> = {
     description: 'Read Gmail Postmaster Tools deliverability data.',
     risk: 'low',
   },
+  // Read-only by design: GA4 admin writes need analytics.edit, which ships as
+  // a separate opt-in bundle only if real demand appears (plan 6.0.0 GA-1).
+  analytics: {
+    scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
+    description: 'Read Google Analytics (GA4): run reports and inspect accounts, properties and their configuration.',
+    risk: 'low',
+  },
   groupssettings: {
     scopes: ['https://www.googleapis.com/auth/apps.groups.settings'],
     description: 'Change Google Groups settings for the domain.',

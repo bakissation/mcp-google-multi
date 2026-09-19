@@ -85,6 +85,14 @@ describe('cudFromMethod', () => {
     ['POST', 'tasks.tasks.clear', 'delete'],
     ['POST', 'people.people.batchDeleteContacts', 'delete'],
     ['POST', 'searchconsole.urlInspection.index.inspect', 'read'],
+    ['POST', 'analyticsdata.properties.runReport', 'read'],
+    ['POST', 'analyticsdata.properties.runRealtimeReport', 'read'],
+    ['POST', 'analyticsdata.properties.batchRunPivotReports', 'read'],
+    ['POST', 'analyticsdata.properties.checkCompatibility', 'read'],
+    ['POST', 'analyticsadmin.properties.runAccessReport', 'read'],
+    ['POST', 'analyticsadmin.properties.customDimensions.archive', 'delete'],
+    ['POST', 'analyticsadmin.accounts.provisionAccountTicket', 'create'],
+    ['POST', 'script.scripts.run', 'create'],
   ])('%s %s → %s', (httpMethod, id, expected) => {
     expect(cudFromMethod({ httpMethod, id })).toBe(expected);
   });
