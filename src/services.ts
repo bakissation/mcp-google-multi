@@ -11,6 +11,7 @@ import { registerSlidesTools } from './tools/slides.js';
 import { registerFormsTools } from './tools/forms.js';
 import { registerChatTools } from './tools/chat.js';
 import { registerAdminTools } from './tools/admin.js';
+import { registerAnalyticsTools } from './tools/analytics.js';
 import { getOptionalBundles, getAdminAccounts } from './auth.js';
 import type { ToolRegistry } from './registry.js';
 
@@ -33,17 +34,17 @@ export const SERVICES: ServiceEntry[] = [
   { name: 'slides', register: registerSlidesTools, enabled: () => new Set(getOptionalBundles()).has('slides') },
   { name: 'forms', register: registerFormsTools, enabled: () => new Set(getOptionalBundles()).has('forms') },
   { name: 'chat', register: registerChatTools, enabled: () => new Set(getOptionalBundles()).has('chat') },
+  { name: 'analytics', register: registerAnalyticsTools, enabled: () => new Set(getOptionalBundles()).has('analytics') },
   { name: 'admin', register: registerAdminTools, enabled: () => getAdminAccounts().length > 0 },
 ];
 
-// Generated-only services with opt-in scopes; admin/forms/chat reuse their curated gate in buildRegistry,
+// Generated-only services with opt-in scopes; admin/forms/chat/analytics reuse their curated gate in buildRegistry,
 // and workspaceevents is deliberately absent — no dedicated scope (subscriptions use resource scopes).
 const bundleGate = (name: string) => ({
   enabled: () => new Set(getOptionalBundles()).has(name),
   hint: `add "${name}" to an account's scope profile (or legacy GOOGLE_OPTIONAL_SCOPES)`,
 });
 export const GENERATED_GATES: Record<string, { enabled: () => boolean; hint: string }> = {
-  analytics: bundleGate('analytics'),
   appsmarket: bundleGate('appsmarket'),
   classroom: bundleGate('classroom'),
   cloudidentity: bundleGate('cloudidentity'),

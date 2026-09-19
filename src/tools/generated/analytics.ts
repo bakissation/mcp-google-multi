@@ -121,20 +121,6 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry): void {
     },
   });
   registerGeneratedTool(registry, {
-    name: "analytics_account_summaries_list",
-    cud: "read",
-    description: "Returns summaries of all accounts accessible by the caller.",
-    method: { id: "analyticsadmin.accountSummaries.list", httpMethod: "GET", path: "v1beta/accountSummaries", baseUrl: "https://analyticsadmin.googleapis.com/", requiredParams: [], scopes: S_analyticsadmin_v1beta[1] },
-    params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: false,
-    shape: {
-      account: accountField(),
-      pageSize: z.number().describe("Optional. The maximum number of AccountSummary resources to return. The service may return fewer than this value, even if there are additional pages. If unspecified, at most 50 resources will be retur").optional(),
-      pageToken: z.string().describe("Optional. A page token, received from a previous `ListAccountSummaries` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListAccountSummaries` mus").optional(),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  });
-  registerGeneratedTool(registry, {
     name: "analytics_properties_acknowledge_user_data_collection",
     cud: "update",
     description: "Acknowledges the terms of user data collection for the specified property. This acknowledgement must be completed (either in the Google Analytics UI or through",
@@ -884,19 +870,6 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry): void {
     },
   });
   registerGeneratedTool(registry, {
-    name: "analytics_properties_get_metadata",
-    cud: "read",
-    description: "Returns metadata for dimensions and metrics available in reporting methods. Used to explore the dimensions and metrics. In this method, a Google Analytics prope",
-    method: { id: "analyticsdata.properties.getMetadata", httpMethod: "GET", path: "v1beta/{+name}", baseUrl: "https://analyticsdata.googleapis.com/", requiredParams: ["name"], scopes: S_analyticsdata_v1beta[0] },
-    params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: false,
-    shape: {
-      account: accountField(),
-      name: z.string().describe("Required. The resource name of the metadata to retrieve. This name field is specified in the URL path and not URL parameters. Property is a numeric Google Analytics property identifier. To learn more,"),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  });
-  registerGeneratedTool(registry, {
     name: "analytics_properties_run_pivot_report",
     cud: "read",
     description: "Returns a customized pivot report of your Google Analytics event data. Pivot reports are more advanced and expressive formats than regular reports. In a pivot r",
@@ -907,34 +880,6 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry): void {
       account: accountField(),
       property: z.string().describe("A Google Analytics property identifier whose events are tracked. Specified in the URL path and not the body. To learn more, see [where to find your Property ID](https://developers.google.com/analytics"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("RunPivotReportRequest JSON request body. Top-level fields: cohortSpec, comparisons, currencyCode, dateRanges, dimensionFilter, dimensions, keepEmptyRows, metricFilter, metrics, pivots, property, returnPropertyQuota."),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  });
-  registerGeneratedTool(registry, {
-    name: "analytics_properties_run_realtime_report",
-    cud: "read",
-    description: "Returns a customized report of realtime event data for your property. Events appear in realtime reports seconds after they have been sent to the Google Analytic",
-    method: { id: "analyticsdata.properties.runRealtimeReport", httpMethod: "POST", path: "v1beta/{+property}:runRealtimeReport", baseUrl: "https://analyticsdata.googleapis.com/", requiredParams: ["property"], scopes: S_analyticsdata_v1beta[0] },
-    params: [{"field":"property","api":"property","location":"path"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: true,
-    shape: {
-      account: accountField(),
-      property: z.string().describe("A Google Analytics property identifier whose events are tracked. Specified in the URL path and not the body. To learn more, see [where to find your Property ID](https://developers.google.com/analytics"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("RunRealtimeReportRequest JSON request body. Top-level fields: dimensionFilter, dimensions, limit, metricAggregations, metricFilter, metrics, minuteRanges, orderBys, returnPropertyQuota."),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  });
-  registerGeneratedTool(registry, {
-    name: "analytics_properties_run_report",
-    cud: "read",
-    description: "Returns a customized report of your Google Analytics event data. Reports contain statistics derived from data collected by the Google Analytics tracking code. T",
-    method: { id: "analyticsdata.properties.runReport", httpMethod: "POST", path: "v1beta/{+property}:runReport", baseUrl: "https://analyticsdata.googleapis.com/", requiredParams: ["property"], scopes: S_analyticsdata_v1beta[0] },
-    params: [{"field":"property","api":"property","location":"path"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: true,
-    shape: {
-      account: accountField(),
-      property: z.string().describe("A Google Analytics property identifier whose events are tracked. Specified in the URL path and not the body. To learn more, see [where to find your Property ID](https://developers.google.com/analytics"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("RunReportRequest JSON request body. Top-level fields: cohortSpec, comparisons, currencyCode, dateRanges, dimensionFilter, dimensions, keepEmptyRows, limit, metricAggregations, metricFilter, metrics, offset, +3 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

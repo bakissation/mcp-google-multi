@@ -48,6 +48,10 @@ export const GEN_APIS: GenApi[] = [
 // Methods already implemented by curated tools — curated quality wins, the
 // generator skips them. Sorted; keep it that way.
 export const CURATED_METHOD_IDS: string[] = [
+  'analyticsadmin.accountSummaries.list',
+  'analyticsdata.properties.getMetadata',
+  'analyticsdata.properties.runRealtimeReport',
+  'analyticsdata.properties.runReport',
   'calendar.calendarList.list',
   'calendar.calendars.insert',
   'calendar.events.delete',
