@@ -58,7 +58,8 @@
     "gen:discovery": "tsx scripts/fetch-discovery.ts",
     "gen:tools": "tsx scripts/gen-tools.ts",
     "gen:coverage": "tsx scripts/gen-coverage.ts",
-    "pack:mcpb": "mcpb pack . mcp-google-multi.mcpb"
+    "pack:mcpb": "mcpb pack . mcp-google-multi.mcpb",
+    "bundle": "esbuild dist/index.js --bundle --platform=node --format=esm --outfile=bundle/index.js --external:@napi-rs/keyring --banner:js=\"import{createRequire as __dockerCR}from'node:module';var require=__dockerCR(import.meta.url);\" --log-level=warning"
   },
   "dependencies": {
     "@googleapis/admin": "^37.0.0",
@@ -95,6 +96,7 @@
     "@types/node": "^22.20.1",
     "@types/nodemailer": "^8.0.1",
     "@types/turndown": "^5.0.6",
+    "esbuild": "^0.28.2",
     "eslint": "^10.2.1",
     "js-yaml": "^4.3.2",
     "semantic-release": "^25.0.3",

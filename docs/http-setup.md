@@ -11,6 +11,7 @@ Pick your path:
 
 | You have… | Use | Section |
 |---|---|---|
+| A box + a domain, want it up in 3 commands | the **published image** + Docker Compose, optional automatic HTTPS via Caddy | [Pull and up](#option-0-pull-and-up-docker-compose) |
 | Your own always-on box | a Cloudflare **named** tunnel in front of the local server | [Named tunnel](#option-a-cloudflare-named-tunnel) |
 | A box, and you prefer containers | the [Docker image](../Dockerfile) + a named tunnel | [Docker + tunnel](#option-b-docker--tunnel) |
 | No box | a one-click **deploy button** (Render / Railway) | [Deploy buttons](#option-c-one-click-deploy-render--railway) |
@@ -26,6 +27,31 @@ Everything you paste is generic: replace `mcp.example.com` with your host and `<
 3. Your accounts, as usual: `GOOGLE_ACCOUNTS=work:you@company.com,personal:you@gmail.com` (or a `config.json`; see [configuration](./configuration.md)).
 
 Full key reference: [docs/configuration.md](./configuration.md). Keeping secrets out of plaintext files: [docs/secrets.md](./secrets.md).
+
+---
+
+## Option 0: pull and up (Docker Compose)
+
+No build step: every release publishes a multi-arch image to `ghcr.io/bakissation/mcp-google-multi` (a ~6 MB single-file bundle on distroless Node — attested provenance + SBOM). The [`deploy/`](../deploy) folder holds everything you need:
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/bakissation/mcp-google-multi/main/deploy/{compose.yaml,Caddyfile,.env.example}
+cp .env.example .env   # fill it in (client ID/secret, accounts, owner emails, public URL)
+docker compose up -d
+```
+
+That serves loopback-only `127.0.0.1:4243` — front it with your own proxy or a [named tunnel](#option-a-cloudflare-named-tunnel). **Have a domain instead?** Point an A record at the box, open ports 80+443, uncomment `MCP_DOMAIN` and `MCP_HTTP_HOST=0.0.0.0` in `.env`, set `MCP_PUBLIC_URL=https://<your domain>`, then:
+
+```sh
+COMPOSE_PROFILES=caddy docker compose up -d
+```
+
+Caddy obtains and renews the certificate automatically; nothing else to configure.
+
+- **Image tags**: the compose file tracks the stable major (`:6`). Until 6.0.0 stable ships, set `MCP_IMAGE_TAG=beta` (or `dev`) in `.env`. Exact versions (`:6.0.0`) work too.
+- **Upgrade**: `docker compose pull && docker compose up -d`.
+- **State**: tokens + the auto-provisioned `MASTER_KEY` file live in the `mcp-config` volume — keep it. Recreating the volume invalidates every stored token.
+- The Google **redirect URI** and Claude connection steps below apply to this option too.
 
 ---
 
