@@ -103,7 +103,7 @@ Both route through `composeRaw()` in `gmail-mime.ts` (nodemailer MailComposer): 
 - semantic-release on push to `dev` (alpha) / `staging` (beta) / `main` (stable). Never bump `package.json`, write a changelog, or tag by hand.
 - Conventional Commits: `fix:`=patch, `feat:`=minor, a `BREAKING CHANGE:` footer=major. The analyzer's default (angular) preset does NOT parse a bare `feat!:` — a breaking commit MUST carry the footer or it releases nothing. A new `BASE_SCOPES` scope is breaking.
 - **Merge commits only** (squash/rebase disabled) — each branch's commits land individually, so keep them clean Conventional Commits.
-- After a stable release, `.github/workflows/backmerge.yml` resyncs `main → staging → dev`.
+- After a release, `.github/workflows/backmerge.yml` resyncs the source branch forward: stable = `main → staging + dev`, beta = `staging → dev`. Never start new work on `dev` until the post-promotion backmerge has merged.
 
 ## Testing
 
