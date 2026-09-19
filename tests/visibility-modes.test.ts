@@ -96,7 +96,7 @@ describe('A11: anthropic/* keys ride _meta, never annotations (SDK strips unknow
     reg2.installListHandler();
     return (listed as unknown as () => Promise<{ tools: { name: string; _meta?: Record<string, unknown>; annotations: Record<string, unknown> }[] }>)().then((r) => {
       const t = r.tools.find((x) => x.name === 'gmail_probe2')!;
-      expect(t._meta).toEqual({ 'anthropic/alwaysLoad': true });
+      expect(t._meta).toEqual({ 'anthropic/alwaysLoad': true, 'anthropic/maxResultSizeChars': 50_000 });
       expect(Object.keys(t.annotations).some((k) => k.startsWith('anthropic/'))).toBe(false);
     });
   });

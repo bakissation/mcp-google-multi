@@ -323,3 +323,22 @@ describe('ToolRegistry', () => {
     expect(reg.visibleCount()).toEqual({ eager: 1, revealed: 1, hidden: 1 });
   });
 });
+
+describe('result-size budget default (_meta)', () => {
+  const FULL: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: [] };
+
+  it('injects the default cap, keeps declared ones, aligns generated tools with the executor cap', async () => {
+    const { server, getListHandler } = fakeServer();
+    const reg = new ToolRegistry(server as never, FULL);
+    reg.registerTool('gmail_search', { description: 'x' }, () => {});
+    reg.registerTool('gmail_read_thread', { description: 'x', _meta: { 'anthropic/maxResultSizeChars': 100_000 } }, () => {});
+    reg.registerTool('gmail_gen_probe', { description: 'x', cud: 'read' } as never, () => {});
+    reg.installListHandler();
+    reg.reveal('gmail');
+    const listed = (await getListHandler()!()).tools as { name: string; _meta?: Record<string, unknown> }[];
+    const byName = Object.fromEntries(listed.map((t) => [t.name, t._meta]));
+    expect(byName['gmail_search']?.['anthropic/maxResultSizeChars']).toBe(50_000);
+    expect(byName['gmail_read_thread']?.['anthropic/maxResultSizeChars']).toBe(100_000);
+    expect(byName['gmail_gen_probe']?.['anthropic/maxResultSizeChars']).toBe(100_000);
+  });
+});
