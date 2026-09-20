@@ -22,6 +22,16 @@ export function coerceJson<T extends z.ZodTypeAny>(schema: T) {
   return z.preprocess((val) => (typeof val === 'string' ? parseJsonLoose(val) : val), schema);
 }
 
+/** Numeric args arrive string-encoded from some clients; over stdio the SDK
+ * validates the schema directly (the HTTP transport's arg-normalization layer
+ * never runs), so the coercion must live in the schema itself. */
+export function coerceNumber<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((val) => {
+    if (typeof val === 'string' && val.trim() !== '' && !Number.isNaN(Number(val))) return Number(val);
+    return val;
+  }, schema);
+}
+
 export const coerceBoolean = z.preprocess((val) => {
   if (typeof val === 'boolean') return val;
   if (typeof val === 'string') {

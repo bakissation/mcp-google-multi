@@ -1,6 +1,6 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
-import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
+import { coerceArray, coerceBoolean, coerceJson, coerceNumber } from './_coerce.js';
 import { gmail as gmailClient } from '@googleapis/gmail';
 import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
@@ -496,7 +496,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         query: z.string().describe('Gmail search syntax, e.g. "from:monaam is:unread"'),
-        maxResults: z.number().min(1).max(100).default(20).optional()
+        maxResults: coerceNumber(z.number().min(1).max(100)).optional()
           .describe('Max results to return (default: 20, max: 100)'),
         full: coerceBoolean.optional().describe('Return the full row shape instead of the compact default'),
       },

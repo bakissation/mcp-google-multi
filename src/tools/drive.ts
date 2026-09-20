@@ -1,6 +1,6 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
-import { coerceArray, coerceBoolean } from './_coerce.js';
+import { coerceArray, coerceBoolean, coerceNumber } from './_coerce.js';
 import { drive as driveClient, type drive_v3 } from '@googleapis/drive';
 import { accountAliasSchema, getAccountSet } from '../accounts.js';
 import type { Account } from '../accounts.js';
@@ -146,7 +146,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         query: z.string().describe('A plain keyword (full-text search) or Drive query syntax, e.g. "name contains \'MoU\'"'),
-        maxResults: z.number().min(1).max(100).default(10).optional()
+        maxResults: coerceNumber(z.number().min(1).max(100)).optional()
           .describe('Max results to return (default: 10, max: 100)'),
         driveId: z.string().optional().describe('Optional shared drive ID'),
       },
