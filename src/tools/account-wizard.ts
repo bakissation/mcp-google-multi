@@ -8,7 +8,7 @@ import { resolveScopesForAccount } from '../auth.js';
 import { BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from '../scope-catalog.js';
 import { openUrl } from '../open-url.js';
 import {
-  buildConsentClient, openLoopbackConsent, hasClientCredentials,
+  buildConsentClient, openLoopbackConsent, hasClientCredentials, TESTING_MODE_WARNING,
 } from '../oauth-consent.js';
 import {
   detectClients, buildServerEntry, renderInstruction, applyFileEntry, resolveMode,
@@ -171,8 +171,10 @@ async function runConsent(server: McpServer, alias: string): Promise<{ ok: true;
 }
 
 function s4Text(alias: string, missing: string[]): string {
-  if (missing.length === 0) return `✔ "${alias}" authenticated; all requested scopes granted. It is now usable without a restart.`;
-  return `⚠ "${alias}" authenticated, but ${missing.length} requested scope(s) were NOT granted (E_SCOPE_NOT_GRANTED) — you may have unchecked some on the consent screen. Re-run account_reauth to grant them. The account is usable for the granted scopes.`;
+  const outcome = missing.length === 0
+    ? `✔ "${alias}" authenticated; all requested scopes granted. It is now usable without a restart.`
+    : `⚠ "${alias}" authenticated, but ${missing.length} requested scope(s) were NOT granted (E_SCOPE_NOT_GRANTED) — you may have unchecked some on the consent screen. Re-run account_reauth to grant them. The account is usable for the granted scopes.`;
+  return `${outcome}\n${TESTING_MODE_WARNING}`;
 }
 
 const REQUIRES_INTERACTION = { 'anthropic/requiresUserInteraction': true };

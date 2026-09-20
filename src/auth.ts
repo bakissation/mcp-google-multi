@@ -5,7 +5,7 @@ import { ADMIN_SCOPES, BUNDLE_CATALOG, closestBundle, resolveBundleAliases } fro
 import { resolveMasterKey } from './master-key.js';
 import type { ScopeProfile } from './scope-catalog.js';
 import { writeToken } from './token-store.js';
-import { buildConsentClient, openLoopbackConsent } from './oauth-consent.js';
+import { buildConsentClient, openLoopbackConsent, TESTING_MODE_WARNING } from './oauth-consent.js';
 
 // Personal (non-Workspace) accounts 403 on admin scopes; ADMIN_SCOPES stays per-account opt-in, never granted by default.
 
@@ -186,5 +186,6 @@ export async function runAuthFlow(args: string[]): Promise<void> {
   writeToken(alias, tokens);
 
   console.log(`Token saved (encrypted) for ${alias}.`);
+  console.log(TESTING_MODE_WARNING);
   console.log('Next: authenticate your other aliases, then verify with: mcp-google-multi config check');
 }

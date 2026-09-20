@@ -32,6 +32,15 @@ export class ConsentDeniedError extends Error {
   }
 }
 
+// Surfaced after every successful consent: the expiry is invisible until the
+// token dies a week later as reauth_required, so the moment of success is the
+// one place the warning is guaranteed to be seen. Full walkthrough in
+// docs/google-cloud-setup.md.
+export const TESTING_MODE_WARNING =
+  'Heads-up: while your OAuth client\'s Publishing status is "Testing", Google expires refresh tokens after 7 days (weekly re-auth for every account). ' +
+  'When your setup works, set it to "In production" at https://console.cloud.google.com/auth/audience. ' +
+  'No verification review is needed for personal use; see docs/google-cloud-setup.md.';
+
 export function hasClientCredentials(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 }
