@@ -10,7 +10,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { GENERATED_SERVICES } from './tools/generated/index.js';
 import { GENERATED_GATES, SERVICES } from './services.js';
-import { ToolRegistry, type DiscoveryMode } from './registry.js';
+import { ToolRegistry, resolveDiscoveryMode, type DiscoveryMode } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
 import { registerAccountTools } from './tools/accounts-tool.js';
@@ -22,15 +22,18 @@ import { buildIdentityContext, type IdentityContext } from './identity.js';
 import { registerSetupPrompt } from './setup-prompt.js';
 import { applyNetTuning } from './net-tuning.js';
 import { argNormalizationEnabled, withArgNormalization } from './arg-normalize.js';
+import { envValueSource } from './env-load.js';
+import { loadConfigFile } from './config-file.js';
+import { initUsageMetrics, resolveUsageMetrics, sourceLabel, type Metrics } from './usage-metrics.js';
 
 applyNetTuning();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
 
-function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: DiscoveryMode): ToolRegistry {
+function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: DiscoveryMode, metrics: Metrics | null = null): ToolRegistry {
   const policy = ctx.policy;
-  const registry = new ToolRegistry(server, policy, mode);
+  const registry = new ToolRegistry(server, policy, mode, metrics);
   const toolsets = getToolsets();
   if (toolsets !== 'all') {
     const known = new Set([...SERVICES.map((s) => s.name), ...GENERATED_SERVICES.map((s) => s.name)]);
@@ -199,11 +202,45 @@ async function main() {
   const wantStdio = httpCfg.transport === 'stdio' || httpCfg.transport === 'both';
   const wantHttp = transportIncludesHttp(httpCfg.transport);
 
+  // Local usage metrics: fail-closed resolve, self-announcing source, null
+  // when off (no wrapper, no dir, nothing initializes). One instance per
+  // transport so `boots` keys stay honest under `both`.
+  const envSrc = envValueSource('GOOGLE_USAGE_METRICS');
+  const metricsState = resolveUsageMetrics(
+    process.env,
+    loadConfigFile()?.usageMetrics,
+    envSrc?.kind === 'file' ? envSrc.file : undefined,
+  );
+  if (metricsState.warning) process.stderr.write(metricsState.warning);
+  const metricsInstances: Metrics[] = [];
+  const initMetricsFor = (transport: string, mode: string): Metrics | null => {
+    const m = initUsageMetrics(metricsState, { version: pkg.version as string, mode, transport });
+    if (m) {
+      metricsInstances.push(m);
+      process.stderr.write(`local usage metrics: on ${sourceLabel(metricsState.source)} -> ${m.statusLine()}\n`);
+    }
+    return m;
+  };
+  if (!metricsState.enabled && metricsState.source.kind !== 'default') {
+    process.stderr.write(`local usage metrics: off ${sourceLabel(metricsState.source)}\n`);
+  }
+  const flushMetrics = () => { for (const m of metricsInstances) m.shutdown(); };
+  process.on('exit', flushMetrics);
+  if (metricsState.enabled) {
+    for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+      process.once(sig, () => {
+        flushMetrics();
+        // stdio has no other signal handler; preserve terminate-on-signal.
+        if (!wantHttp) process.exit(sig === 'SIGINT' ? 130 : 143);
+      });
+    }
+  }
+
   // Build one McpServer + registry per transport at boot (P1 / BV gap #4:
   // never rebuilt per request); `both` runs the two concurrently.
   if (wantStdio) {
     const server = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
-    const registry = buildRegistry(server, buildIdentityContext(process.env, { transport: 'stdio' }));
+    const registry = buildRegistry(server, buildIdentityContext(process.env, { transport: 'stdio' }), undefined, initMetricsFor('stdio', resolveDiscoveryMode()));
     registry.installListHandler();
     registerSetupPrompt(server);
     const stdioTransport = new StdioServerTransport();
@@ -229,7 +266,7 @@ async function main() {
       process.stderr.write(`GOOGLE_DISCOVERY="${configuredMode}" is ignored over HTTP; the stateless transport forces "curated".\n`);
     }
     const httpServer = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
-    const registry = buildRegistry(httpServer, buildIdentityContext(process.env, { transport: 'http' }), 'curated');
+    const registry = buildRegistry(httpServer, buildIdentityContext(process.env, { transport: 'http' }), 'curated', initMetricsFor('http', 'curated'));
     registry.installListHandler();
     registerSetupPrompt(httpServer);
 

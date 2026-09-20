@@ -7,6 +7,7 @@ import { compactResult, trimEnabled } from './trim.js';
 import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFanout } from './fanout.js';
 import { MAX_RESPONSE_CHARS } from './executor.js';
 import type { ArgKind, ArgShape } from './arg-normalize.js';
+import type { Metrics } from './usage-metrics.js';
 
 // Client-side result budget advertised for tools that do not declare their own
 // (fat readers do; see trim.ts). ~50k chars stays well inside a default client
@@ -148,6 +149,7 @@ export class ToolRegistry {
     private readonly server: McpServer,
     policy: Policy,
     mode: DiscoveryMode = resolveDiscoveryMode(),
+    private readonly metrics: Metrics | null = null,
   ) {
     this.policy = policy;
     this.mode = mode;
@@ -249,8 +251,24 @@ export class ToolRegistry {
       const finalHandler = this.compactOutput
         ? async (...args: unknown[]) => compactResult(await (withDefault(...args) as Promise<Parameters<typeof compactResult>[0]>))
         : withDefault;
+      // Usage metrics wrap OUTERMOST and only when enabled: off means no
+      // wrapper exists and the chain is byte-identical to the pre-metrics
+      // chain. Fan-out width is derived here (bucketed in the module) so the
+      // metrics module never imports fanout.
+      const instrumented = this.metrics
+        ? this.metrics.wrap(
+            { name, service, meta: this.registeringMeta, generated: config.cud !== undefined },
+            finalHandler as (...a: unknown[]) => Promise<unknown>,
+            (a) => {
+              const v = (a as { account?: unknown } | undefined)?.account;
+              if (typeof v !== 'string' || (v !== '*' && !v.includes(','))) return 1;
+              const sel = parseAccountSelector(v);
+              return sel.ok ? sel.aliases.length : 1;
+            },
+          )
+        : finalHandler;
       const { cud: _cud, ...sdkConfig } = config;
-      return (server.registerTool as (...a: unknown[]) => unknown)(name, { ...sdkConfig, inputSchema: inputShape, annotations }, finalHandler);
+      return (server.registerTool as (...a: unknown[]) => unknown)(name, { ...sdkConfig, inputSchema: inputShape, annotations }, instrumented);
     }) as McpServer['registerTool'];
   }
 
