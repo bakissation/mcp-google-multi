@@ -43,7 +43,7 @@ export const KNOWN_ERROR_SLUGS: ReadonlySet<string> = new Set([
   'insufficient_scope', 'internal', 'invalid_client', 'invalid_client_metadata',
   'invalid_grant', 'invalid_params', 'invalid_query', 'invalid_request',
   'invalid_scope', 'network_error', 'not_found', 'rate_limited',
-  'reauth_required', 'too_large', 'toolset_disabled', 'unknown_api',
+  'reauth_required', 'recipient_not_allowed', 'too_large', 'toolset_disabled', 'unknown_api',
   'unknown_method', 'unsupported_grant_type', 'unsupported_type',
   'untrusted_host', 'upstream_error', 'validation_error', 'write_disabled',
 ]);

@@ -5,6 +5,7 @@ import { calendar as calendarClient } from '@googleapis/calendar';
 import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
+import { checkOutbound } from '../outbound-allowlist.js';
 import { handleGoogleApiError } from './_errors.js';
 import { sliceClean } from '../trim.js';
 
@@ -142,6 +143,10 @@ export function registerCalendarTools(server: ToolRegistry): void {
     },
     async ({ account, summary, start, end, description, location, attendees, calendarId, allDay }) => {
       try {
+        if (attendees) {
+          const outbound = checkOutbound('calendar attendee', attendees.split(','), String(account));
+          if (outbound) return outbound;
+        }
         const auth = await getClient(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 
@@ -198,6 +203,10 @@ export function registerCalendarTools(server: ToolRegistry): void {
     },
     async ({ account, eventId, summary, start, end, description, location, attendees, calendarId }) => {
       try {
+        if (attendees) {
+          const outbound = checkOutbound('calendar attendee', attendees.split(','), String(account));
+          if (outbound) return outbound;
+        }
         const auth = await getClient(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 

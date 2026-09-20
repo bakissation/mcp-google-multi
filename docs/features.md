@@ -34,6 +34,10 @@ Two eager tools cover anything outside the snapshot: `google_api_search` finds a
 
 Discovery documents are fetched from Google on first use and cached on disk for 7 days (`DISCOVERY_CACHE_PATH`); a stale cache is used when offline.
 
+## Outbound recipient allowlist (off by default)
+
+For unattended or agent-driven deployments, `GOOGLE_OUTBOUND_ALLOWLIST` (comma-separated addresses and `@domain` suffixes) constrains WHO the server can mail, invite or grant access to: Gmail recipients (reply-derived ones included), Calendar attendees, and Drive grantees, enforced across curated tools, generated tools and the escape hatch. While active, escape-hatch raw-compose methods (whose base64 message cannot be inspected) and `anyone` link shares are refused with a hint pointing at the curated, enforced path. It is a prompt-injection blast-radius control: a hijacked agent cannot exfiltrate to arbitrary targets. Blocked calls fail with a typed `recipient_not_allowed` envelope naming the target and the active list. Unset by default: nothing is gated.
+
 ## Lean responses by default
 
 Tool responses are serialized compactly (no pretty-print token tax; set `GOOGLE_TRIM=off` to restore pretty JSON), and the fat readers ship sensible caps with per-call escape valves. The caps are per-call controls (`full` / `maxChars`) and are NOT affected by `GOOGLE_TRIM`:
