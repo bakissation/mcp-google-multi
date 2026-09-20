@@ -55,6 +55,10 @@ New to all this? It's written for someone who just installed Claude Code and has
 
 **Go deeper:** [Configuration reference](./docs/configuration.md) · [What's covered](./COVERAGE.md) · [Features tour](./docs/features.md) · [Remote / HTTP setup](./docs/http-setup.md) · [Secrets in a vault](./docs/secrets.md) · [Migrating to v6](./MIGRATION-v6.md) · [Security policy](./SECURITY.md) · [Roadmap](https://github.com/bakissation/mcp-google-multi/milestones)
 
+## Local usage metrics (off by default)
+
+The server can keep anonymous, **local-only** usage aggregates for its operator: tool names, error classes, latency buckets. Never arguments, payloads, message content, accounts, or identities of any kind, and **zero network egress ever** — the data cannot leave your machine unless you copy files yourself. It is off until you set `GOOGLE_USAGE_METRICS=on`; when on, the boot log and `doctor` say so and name the source. Read your own data with `mcp-google-multi metrics report`. Details, file format, and the honest threat model: [docs/usage-metrics.md](./docs/usage-metrics.md).
+
 ## Maintainer & credits
 
 Built and maintained by **Abdelbaki Berkati** — [berkati.xyz](https://berkati.xyz) · [@bakissation](https://github.com/bakissation). [Read the case study →](https://berkati.xyz/case-studies/mcp-google-multi/)

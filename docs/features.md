@@ -88,6 +88,10 @@ Any value you pass explicitly wins over the derived one (`to`, `cc`, `subject` a
 
 The same engine is exposed to agents as the read-only **`diagnose`** tool, returning the structured report so an agent can self-diagnose an auth/config failure and surface the fix. (HTTP-transport checks and the live per-service API-enablement probe land with the OAuth authorization server.)
 
+## Local usage metrics (off by default)
+
+Operator-enabled, **local-only** usage aggregates (tool names, error classes, latency buckets; never arguments, payloads, or identities) with **zero network egress ever**: no endpoint, no beacon, no push; data leaves the machine only when the operator copies files. Off until `GOOGLE_USAGE_METRICS=on`, self-announcing when on (boot log, `doctor`, `diagnose` name the state and its source), read locally with `mcp-google-multi metrics report`. The file format, structural guarantees at their true scope, the promotion workflow and the operator responsibility note live in [usage-metrics.md](./usage-metrics.md).
+
 `mcp-google-multi reset` recovers a bricked or stale install: it wipes encrypted token files (all accounts, or `--account <alias>`) — **config.json is always kept** — and with `--regenerate-key` also drops the generated `MASTER_KEY` (refused while any account still holds a token, since a fresh key would brick it). It is confirmation-gated (`--yes` for non-interactive) and, after a wipe, prints the exact re-auth command per account.
 
 

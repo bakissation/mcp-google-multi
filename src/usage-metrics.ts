@@ -143,7 +143,7 @@ interface ToolAgg {
   argfix?: number;
 }
 
-interface DayAgg {
+export interface DayAgg {
   v: 1;
   day: string;
   boots: Record<string, number>;
@@ -183,7 +183,7 @@ function addInto(target: Record<string, number>, key: string, by = 1): void {
 }
 
 /** Deep-add b into a for the DayAgg shape (numbers add, maps union). */
-function mergeDay(a: DayAgg, b: DayAgg): DayAgg {
+export function mergeDay(a: DayAgg, b: DayAgg): DayAgg {
   const num = (x: number | undefined, y: number | undefined) => (x ?? 0) + (y ?? 0);
   const map = (x: Record<string, number> = {}, y: Record<string, number> = {}) => {
     const out: Record<string, number> = { ...x };
