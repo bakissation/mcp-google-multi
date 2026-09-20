@@ -8,6 +8,7 @@ import {
   cudFromMethod,
   expandPath,
   loadMethodIndex,
+  resolveApiAliases,
   searchMethods,
 } from '../src/discovery-client.js';
 
@@ -215,5 +216,32 @@ describe('loadMethodIndex caching', () => {
 
   it('rejects unknown apis', async () => {
     await expect(loadMethodIndex('nope', { cacheDir: dir })).rejects.toThrow(/Unknown api/);
+  });
+});
+
+describe('resolveApiAliases', () => {
+  it('returns an exact SUPPORTED_APIS key as-is', () => {
+    expect(resolveApiAliases('gmail')).toEqual(['gmail']);
+    expect(resolveApiAliases('admin_directory')).toEqual(['admin_directory']);
+  });
+
+  it('normalizes case and punctuation to a real key', () => {
+    expect(resolveApiAliases('Search-Console')).toEqual(['searchconsole']);
+    expect(resolveApiAliases('Admin Directory')).toEqual(['admin_directory']);
+  });
+
+  it('fans an umbrella alias out to every real API behind it', () => {
+    expect(resolveApiAliases('analytics')).toEqual(['analyticsadmin', 'analyticsdata']);
+    expect(resolveApiAliases('ga4')).toEqual(['analyticsadmin', 'analyticsdata']);
+    expect(resolveApiAliases('admin')).toEqual(['admin_directory', 'admin_reports', 'admin_datatransfer']);
+  });
+
+  it('maps legacy/common names to the current key', () => {
+    expect(resolveApiAliases('webmasters')).toEqual(['searchconsole']);
+    expect(resolveApiAliases('contacts')).toEqual(['people']);
+  });
+
+  it('returns null for a genuinely unknown name', () => {
+    expect(resolveApiAliases('nope')).toBeNull();
   });
 });

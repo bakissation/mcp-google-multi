@@ -9,6 +9,7 @@ import { editDistance } from '../scope-catalog.js';
 import { executeApiMethod, jsonResult, type QueryParams } from '../executor.js';
 import {
   SUPPORTED_APIS,
+  resolveApiAliases,
   type DiscoveryDeps,
   type DiscoveryMethod,
   cudFromMethod,
@@ -107,11 +108,19 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       annotations: { openWorldHint: true },
     },
     async ({ query, api, maxResults }) => {
-      if (api && !SUPPORTED_APIS[api]) {
-        return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false }, true);
+      // Alias resolution: "analytics" fans out to both GA4 Discovery APIs
+      // instead of dead-ending on unknown_api.
+      let requested: string[] | null = null;
+      if (api) {
+        requested = resolveApiAliases(api);
+        if (!requested) {
+          return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false }, true);
+        }
+        const enabled = requested.filter(apiEnabled);
+        if (enabled.length === 0) return toolsetDisabled(requested[0]);
+        requested = enabled;
       }
-      if (api && !apiEnabled(api)) return toolsetDisabled(api);
-      const apis = api ? [api] : enabledApis;
+      const apis = requested ?? enabledApis;
       const unavailable: string[] = [];
       const indexes = await Promise.all(
         apis.map(async (a) => {
@@ -125,6 +134,9 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       );
       const matches = searchMethods(indexes.flat(), query as string, (maxResults as number | undefined) ?? 10);
       return jsonResult({
+        // Teach the resolved keys whenever the input wasn't already one, so the
+        // follow-up google_api_call uses a real key.
+        ...(requested && (requested.length > 1 || requested[0] !== api) ? { resolvedApi: requested } : {}),
         methods: matches.map(describeMethod),
         ...(unavailable.length > 0 ? { unavailableApis: unavailable } : {}),
         next: 'Invoke with google_api_call({account, api, methodId, pathParams, queryParams, body}).',
@@ -167,13 +179,19 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       _meta: { 'anthropic/maxResultSizeChars': 100_000 },
     },
     async ({ account, api, methodId, pathParams, queryParams, body }) => {
-      if (!SUPPORTED_APIS[api as string]) {
+      const resolved = resolveApiAliases(api as string);
+      if (!resolved) {
         return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false, account }, true);
       }
-      if (!apiEnabled(api as string)) return toolsetDisabled(api as string);
+      if (resolved.length > 1) {
+        // A call targets exactly one Discovery doc; only search can fan out.
+        return jsonResult({ error: 'unknown_api', message: `"${api}" maps to ${resolved.length} APIs.`, hint: `Pass one of: ${resolved.join(', ')} (method ids differ per API; google_api_search({query, api: "${api}"}) finds the right one).`, retriable: false, account }, true);
+      }
+      const apiKey = resolved[0];
+      if (!apiEnabled(apiKey)) return toolsetDisabled(apiKey);
       let index: DiscoveryMethod[];
       try {
-        index = await loadMethodIndex(api as string, deps);
+        index = await loadMethodIndex(apiKey, deps);
       } catch (err) {
         return jsonResult({ error: 'discovery_unavailable', message: (err as Error).message, retriable: true, account }, true);
       }
@@ -184,7 +202,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         // alias, retry under the doc's own prefix before failing.
         const docPrefix = index[0]?.id.split('.')[0];
         const [head, ...rest] = String(methodId).split('.');
-        if (docPrefix && head === api && head !== docPrefix && rest.length > 0) {
+        if (docPrefix && (head === apiKey || head === api) && head !== docPrefix && rest.length > 0) {
           const swapped = [docPrefix, ...rest].join('.');
           method = index.find((m) => m.id === swapped);
         }
@@ -194,10 +212,10 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         return jsonResult(
           {
             error: 'unknown_method',
-            message: `No method "${methodId}" in ${api}.`,
+            message: `No method "${methodId}" in ${apiKey}.`,
             hint:
               `${near.length ? `Did you mean: ${near.join(', ')}? ` : ''}` +
-              `Use google_api_search({query: "...", api: "${api}"}) to find the right method id.`,
+              `Use google_api_search({query: "...", api: "${apiKey}"}) to find the right method id.`,
             retriable: false,
             account,
           },
@@ -206,7 +224,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       }
 
       const cud = cudFromMethod(method);
-      const policyService = serviceForAlias(api as string);
+      const policyService = serviceForAlias(apiKey);
       const lastSegment = method.id.split('.').pop() ?? method.id;
       const toolRef = { name: `${policyService}_${lastSegment}`, service: policyService, cud };
       if (cud !== 'read' && !isAllowed(toolRef, policy)) {
