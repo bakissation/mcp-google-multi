@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -73,5 +73,25 @@ export function loadEnvFiles(paths: EnvLoadPaths = {}): EnvLoadResult {
   }
   for (const [k, v] of boot) process.env[k] = v;
 
+  lastLoad = { bootKeys: new Set(boot.keys()), loaded };
   return { loaded, searched: candidates };
+}
+
+let lastLoad: { bootKeys: Set<string>; loaded: string[] } | undefined;
+
+/**
+ * Which layer supplied `key`: the real process env, or the first loaded .env
+ * file defining it (autoload never overwrites, so first wins). undefined when
+ * the key is unset. Powers self-announcing enablement sources (usage metrics).
+ */
+export function envValueSource(key: string): { kind: 'process' } | { kind: 'file'; file: string } | undefined {
+  if (process.env[key] === undefined) return undefined;
+  if (!lastLoad || lastLoad.bootKeys.has(key)) return { kind: 'process' };
+  const re = new RegExp(`^\\s*${key}\\s*=`, 'm');
+  for (const p of lastLoad.loaded) {
+    try {
+      if (re.test(readFileSync(p, 'utf-8'))) return { kind: 'file', file: p };
+    } catch { /* file vanished since load: fall through */ }
+  }
+  return { kind: 'process' };
 }
