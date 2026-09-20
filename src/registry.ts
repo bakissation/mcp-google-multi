@@ -315,6 +315,13 @@ export class ToolRegistry {
     return this.metrics;
   }
 
+  /** Membership test against the REGISTERED tool set (hidden tools included:
+   * they stay callable). The metrics tap uses this so a client-supplied name
+   * can never enter the closed vocabulary. */
+  hasTool(name: string): boolean {
+    return this.tools.some((t) => t.name === name);
+  }
+
   /** Op-name vocabulary for a service, split by provenance so the capped
    * discover descriptions can list curated ops and only summarize the
    * generated long tail. */

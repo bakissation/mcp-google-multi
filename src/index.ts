@@ -266,7 +266,7 @@ async function main() {
     let transport: Transport = new StdioServerTransport();
     if (stdioMetrics) {
       const { tapUsageMetrics } = await import('./metrics-tap.js');
-      transport = tapUsageMetrics(transport, stdioMetrics);
+      transport = tapUsageMetrics(transport, stdioMetrics, (n) => registry.hasTool(n));
     }
     await server.connect(
       argNormalizationEnabled()
@@ -366,7 +366,7 @@ async function main() {
     let httpTap: ((t: Transport) => Transport) | undefined;
     if (httpMetrics) {
       const { tapUsageMetrics } = await import('./metrics-tap.js');
-      httpTap = (t) => tapUsageMetrics(t, httpMetrics);
+      httpTap = (t) => tapUsageMetrics(t, httpMetrics, (n) => registry.hasTool(n));
     }
     const host = new HttpTransportHost({
       server: httpServer,

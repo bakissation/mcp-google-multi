@@ -41,9 +41,11 @@ const call = (id: number, name: string): JSONRPCMessage =>
 const errFrame = (id: number, code: number, message: string): JSONRPCMessage =>
   ({ jsonrpc: '2.0', id, error: { code, message } }) as JSONRPCMessage;
 
-function drive(m: Metrics) {
+const KNOWN = new Set(['tasks_update', 'gmail_search']);
+
+function drive(m: Metrics, isKnownTool: (n: string) => boolean = (n) => KNOWN.has(n)) {
   const { t } = fakeTransport();
-  const tapped = tapUsageMetrics(t, m);
+  const tapped = tapUsageMetrics(t, m, isKnownTool);
   const seen: JSONRPCMessage[] = [];
   tapped.onmessage = (msg: JSONRPCMessage) => seen.push(msg);
   const inbound = (msg: JSONRPCMessage) => (t as unknown as { onmessage: (m: JSONRPCMessage) => void }).onmessage(msg);
@@ -151,5 +153,69 @@ describe('normalizeMessage onRename observer', () => {
     let fired = 0;
     normalizeMessage(msg({ maxResults: 5 }), () => shape, () => {}, () => { fired += 1; });
     expect(fired).toBe(0);
+  });
+});
+
+describe('closed vocabulary: only REGISTERED tool names may be persisted', () => {
+  // The name on a tools/call frame is client-supplied. A shape check alone
+  // would let a shape-valid invented name reach disk, which is exactly what
+  // the metrics privacy guarantee forbids.
+  it('a shape-valid but UNREGISTERED name is never written; it counts as not-found', async () => {
+    const { m, dir } = makeMetrics();
+    const { tapped, inbound } = drive(m);
+    inbound(call(20, 'totally_made_up_tool'));
+    await tapped.send({
+      jsonrpc: '2.0', id: 20,
+      result: { isError: true, content: [{ type: 'text', text: 'Input validation error: Invalid arguments for tool totally_made_up_tool' }] },
+    } as unknown as JSONRPCMessage);
+    m.flush();
+    const day = readDay(dir);
+    expect(day.validation).toEqual({});
+    expect(day.rpc.tool_not_found).toBe(1);
+    expect(JSON.stringify(day)).not.toContain('totally_made_up');
+  });
+
+  it('the same path via a -32602 ERROR frame is equally guarded', async () => {
+    const { m, dir } = makeMetrics();
+    const { tapped, inbound } = drive(m);
+    inbound(call(21, 'invented_name_here'));
+    await tapped.send(errFrame(21, -32602, 'Invalid arguments'));
+    m.flush();
+    const day = readDay(dir);
+    expect(day.validation).toEqual({});
+    expect(JSON.stringify(day)).not.toContain('invented_name');
+  });
+
+  it('a REGISTERED tool still attributes normally', async () => {
+    const { m, dir } = makeMetrics();
+    const { tapped, inbound } = drive(m);
+    inbound(call(22, 'tasks_update'));
+    await tapped.send({
+      jsonrpc: '2.0', id: 22,
+      result: { isError: true, content: [{ type: 'text', text: 'Input validation error: Invalid arguments for tool tasks_update' }] },
+    } as unknown as JSONRPCMessage);
+    m.flush();
+    expect(readDay(dir).validation).toEqual({ tasks_update: 1 });
+  });
+});
+
+describe('v2 transport member forwarding', () => {
+  it('forwards setSupportedProtocolVersions through the tap to the inner transport', () => {
+    const { m } = makeMetrics();
+    const seen: string[][] = [];
+    const inner = {
+      start: async () => {}, send: async () => {}, close: async () => {},
+      onmessage: undefined,
+      setSupportedProtocolVersions: (v: string[]) => seen.push(v),
+    } as unknown as Transport;
+    const tapped = tapUsageMetrics(inner, m);
+    tapped.setSupportedProtocolVersions?.(['2025-11-25', '2026-07-28']);
+    expect(seen).toEqual([['2025-11-25', '2026-07-28']]);
+  });
+
+  it('stays absent when the inner transport does not implement it', () => {
+    const { m } = makeMetrics();
+    const { t } = fakeTransport();
+    expect(tapUsageMetrics(t, m).setSupportedProtocolVersions).toBeUndefined();
   });
 });

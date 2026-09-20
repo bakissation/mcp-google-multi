@@ -20,6 +20,7 @@ const RETRY_WINDOW_MS = 10 * 60_000;
 const BIGRAM_GAP_MS = 5 * 60_000;
 const BIGRAM_CAP = 1_500;
 const ERR_SLUG_CAP = 32;
+const VALIDATION_CAP = 200;
 const ESCAPE_CAP = 500;
 const EVENTS_ROTATE_BYTES = 4 * 1024 * 1024;
 const RETENTION_DAYS = 180;
@@ -245,6 +246,9 @@ function applyCaps(day: DayAgg): DayAgg {
     return kept;
   };
   for (const t of Object.values(day.tools)) t.err = cap(t.err, ERR_SLUG_CAP);
+  // Bounded by the registered tool set via the tap's membership test, but
+  // capped anyway: this map is the only one fed by a wire-supplied key.
+  day.validation = cap(day.validation, VALIDATION_CAP);
   day.escape.methods = cap(day.escape.methods, ESCAPE_CAP, (n) => { day.escape._overflow += n; });
   day.bigrams = cap(day.bigrams, BIGRAM_CAP, (n) => { day.bigrams._overflow = (day.bigrams._overflow ?? 0) + n; });
   return day;

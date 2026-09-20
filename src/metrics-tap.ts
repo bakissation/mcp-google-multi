@@ -28,8 +28,19 @@ export function isSchemaValidationText(text: string): boolean {
   return SCHEMA_VALIDATION_TEXT.test(text);
 }
 
-export function tapUsageMetrics(transport: Transport, metrics: Metrics): Transport {
+/**
+ * @param isKnownTool membership test against the REGISTERED tool set. The
+ * name on a `tools/call` frame is client-supplied, so a shape check alone
+ * would let a shape-valid but invented name reach disk and break the
+ * closed-vocabulary guarantee. A validation failure against a name the server
+ * never registered is a not-found, and is counted as one.
+ */
+export function tapUsageMetrics(transport: Transport, metrics: Metrics, isKnownTool: (name: string) => boolean = () => false): Transport {
   const pending = new Map<string | number, string>();
+  const recordValidation = (tool: string | undefined): void => {
+    if (tool !== undefined && isKnownTool(tool)) metrics.recordRpc('schema_validation', tool);
+    else metrics.recordRpc('tool_not_found');
+  };
   const wrapper = {
     start: () => transport.start(),
     send: (message: JSONRPCMessage, options?: Parameters<Transport['send']>[1]) => {
@@ -45,14 +56,14 @@ export function tapUsageMetrics(transport: Transport, metrics: Metrics): Transpo
           if (m.error && typeof m.error.code === 'number') {
             if (m.error.code === -32602) {
               if (/unknown tool|not found/i.test(m.error.message ?? '')) metrics.recordRpc('tool_not_found');
-              else metrics.recordRpc('schema_validation', tool);
+              else recordValidation(tool);
             } else {
               metrics.recordRpc(m.error.code);
             }
           } else if (m.result?.isError === true) {
             const first = m.result.content?.[0]?.text;
             if (typeof first === 'string' && isSchemaValidationText(first)) {
-              metrics.recordRpc('schema_validation', tool);
+              recordValidation(tool);
             }
           }
         }
@@ -89,6 +100,11 @@ export function tapUsageMetrics(transport: Transport, metrics: Metrics): Transpo
   Object.defineProperty(wrapper, 'sessionId', { get: () => transport.sessionId });
   if (transport.setProtocolVersion) {
     wrapper.setProtocolVersion = (v: string) => transport.setProtocolVersion!(v);
+  }
+  // v2-only; see the same forward in arg-normalize.ts. Both proxies compose,
+  // so a member dropped by either layer never reaches the real transport.
+  if (transport.setSupportedProtocolVersions) {
+    wrapper.setSupportedProtocolVersions = (v: string[]) => transport.setSupportedProtocolVersions!(v);
   }
   return wrapper;
 }
