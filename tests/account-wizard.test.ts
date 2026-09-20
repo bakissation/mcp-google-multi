@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addFormSchema, validateAddForm, scopeGrantDiff, allOptionalBundles } from '../src/tools/account-wizard.js';
+import { addFormSchema, validateAddForm, scopeGrantDiff, allOptionalBundles, argsToAddForm } from '../src/tools/account-wizard.js';
 
 describe('addFormSchema', () => {
   it('is a flat object schema with alias+email required and bundle checkboxes', () => {
@@ -83,6 +83,30 @@ describe('validateAddForm', () => {
     const r = validateAddForm({ alias: 'work', email: 'a@b.com', otherBundles: 'admin' }, existing);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.slug).toBe('E_UNKNOWN_BUNDLE');
+  });
+});
+
+describe('argsToAddForm (argument-mode fallback)', () => {
+  it('maps CSV bundles through otherBundles and validates end to end', () => {
+    const v = validateAddForm(argsToAddForm({ alias: 'work', email: 'a@b.c', bundles: 'forms, chat' }), []);
+    expect(v).toEqual({ ok: true, alias: 'work', email: 'a@b.c', bundles: ['forms', 'chat'], admin: false });
+  });
+
+  it('passes allBundles and admin through', () => {
+    const v = validateAddForm(argsToAddForm({ alias: 'w', email: 'a@b.c', allBundles: true, admin: true }), []);
+    expect(v).toEqual({ ok: true, alias: 'w', email: 'a@b.c', bundles: allOptionalBundles(), admin: true });
+  });
+
+  it('a missing email still fails validation', () => {
+    const v = validateAddForm(argsToAddForm({ alias: 'work' }), []);
+    expect(v.ok).toBe(false);
+    if (!v.ok) expect(v.slug).toBe('E_VALIDATION');
+  });
+
+  it('an unknown bundle still gets the did-you-mean', () => {
+    const v = validateAddForm(argsToAddForm({ alias: 'work', email: 'a@b.c', bundles: 'form' }), []);
+    expect(v.ok).toBe(false);
+    if (!v.ok) expect(v.slug).toBe('E_UNKNOWN_BUNDLE');
   });
 });
 

@@ -7,6 +7,7 @@ import { writeToken } from '../token-store.js';
 import { resolveScopesForAccount } from '../auth.js';
 import { BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from '../scope-catalog.js';
 import { openUrl } from '../open-url.js';
+import { coerceBoolean } from './_coerce.js';
 import {
   buildConsentClient, openLoopbackConsent, hasClientCredentials, TESTING_MODE_WARNING,
 } from '../oauth-consent.js';
@@ -96,6 +97,19 @@ export function validateAddForm(input: Partial<AddForm>, existingAliases: string
     }
   }
   return { ok: true, alias, email, bundles, admin: input.admin === true };
+}
+
+/** Map direct tool arguments onto the elicitation form shape: the argument-
+ * mode fallback for clients without form elicitation. All bundle picks travel
+ * through otherBundles, which validateAddForm resolves and validates. Pure. */
+export function argsToAddForm(a: { alias?: string; email?: string; bundles?: string; allBundles?: boolean; admin?: boolean }): Partial<AddForm> {
+  return {
+    alias: a.alias ?? '',
+    email: a.email ?? '',
+    allBundles: a.allBundles === true,
+    otherBundles: a.bundles ?? '',
+    admin: a.admin === true,
+  };
 }
 
 /** Scopes requested by the profile but NOT granted at consent (granular
@@ -194,10 +208,16 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
     {
       _meta: REQUIRES_INTERACTION,
       annotations: { openWorldHint: true },
-      description: 'Add a new Google account interactively: collects alias/email/scope bundles via a form, writes the registry, and runs Google consent in the browser — no file editing or restart needed. Requires GOOGLE_CLIENT_ID/SECRET (run the `setup` prompt first if missing).',
-      inputSchema: {},
+      description: 'Add a new Google account: pass alias + email directly (plus optional bundles/allBundles/admin), or pass nothing for an interactive form where the client supports elicitation. Writes the registry and runs Google consent in the browser — no file editing or restart needed. Requires GOOGLE_CLIENT_ID/SECRET (run the `setup` prompt first if missing).',
+      inputSchema: {
+        alias: z.string().optional().describe('Account alias (letters, digits, _ or -). Pass with email to add directly, skipping the form.'),
+        email: z.string().optional().describe("The account's Google address (used as the login hint)"),
+        bundles: z.string().optional().describe('Optional scope bundles, comma-separated (e.g. "forms,chat"); blank = base scopes only'),
+        allBundles: coerceBoolean.optional().describe('Grant every optional bundle (biggest consent screen); overrides bundles'),
+        admin: coerceBoolean.optional().describe('Grant Workspace admin scopes (super-admin accounts only)'),
+      },
     },
-    async () => {
+    async (args: unknown) => {
       try {
         // Env-sourced registry: GOOGLE_ACCOUNTS is the exclusive source and
         // config.json accounts are ignored, so a wizard add would be a phantom
@@ -208,17 +228,25 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
         if (!hasClientCredentials()) {
           return textResult('E_CLIENT_CREDENTIALS_MISSING: GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET are not set. Run the `setup` prompt (/mcp__google-multi__setup) to create an OAuth client, then set them.', true);
         }
-        const caps = server.server.getClientCapabilities?.() as { elicitation?: { form?: boolean } } | undefined;
-        if (!caps?.elicitation?.form) {
-          return textResult('This client does not support form elicitation. Add the account from the CLI instead: `npx mcp-google-multi account add --alias <alias> --email <email> [--profile a,b] [--admin]`.', true);
+        // S1: collect the registry row. Arguments win over the form so the
+        // wizard still works in clients without form elicitation (where the
+        // interactive path used to dead-end).
+        const a = (args ?? {}) as { alias?: string; email?: string; bundles?: string; allBundles?: boolean; admin?: boolean };
+        let input: Partial<AddForm>;
+        if (a.alias?.trim() || a.email?.trim()) {
+          input = argsToAddForm(a);
+        } else {
+          const caps = server.server.getClientCapabilities?.() as { elicitation?: { form?: boolean } } | undefined;
+          if (!caps?.elicitation?.form) {
+            return textResult('E_NO_FORM_ELICITATION: this client does not support the interactive form. Call account_add again with arguments instead, e.g. {"alias": "work", "email": "you@example.com"} (optional: "bundles" as a comma-separated list, "allBundles": true, "admin": true).', true);
+          }
+          const form = await server.server.elicitInput({ message: 'Add a Google account', requestedSchema: addFormSchema() } as never);
+          if ((form as { action?: string }).action !== 'accept') {
+            return textResult('confirmation_declined: no account was added.');
+          }
+          input = (form as { content?: Partial<AddForm> }).content ?? {};
         }
-
-        // S1: collect the registry row.
-        const form = await server.server.elicitInput({ message: 'Add a Google account', requestedSchema: addFormSchema() } as never);
-        if ((form as { action?: string }).action !== 'accept') {
-          return textResult('confirmation_declined: no account was added.');
-        }
-        const validated = validateAddForm((form as { content?: Partial<AddForm> }).content ?? {}, getAccountSet().aliases);
+        const validated = validateAddForm(input, getAccountSet().aliases);
         if (!validated.ok) return textResult(`${validated.slug}: ${validated.message}`, true);
 
         // S2: atomic write + make the alias callable without a restart (BR3).
