@@ -99,6 +99,21 @@ export function validateAddForm(input: Partial<AddForm>, existingAliases: string
   return { ok: true, alias, email, bundles, admin: input.admin === true };
 }
 
+/** URL-mode elicitation params. `elicitationId` is REQUIRED by the spec
+ * schema; omitting it made every url-mode request fail client-side
+ * validation, so the branch silently never worked. Pure, so the shape is
+ * testable against the SDK's own schema without a live client. */
+export function urlElicitationParams(alias: string, url: string, elicitationId: string): {
+  mode: 'url'; elicitationId: string; message: string; url: string;
+} {
+  return {
+    mode: 'url',
+    elicitationId,
+    message: `Authorize the "${alias}" Google account in your browser.`,
+    url,
+  };
+}
+
 /** Map direct tool arguments onto the elicitation form shape: the argument-
  * mode fallback for clients without form elicitation. All bundle picks travel
  * through otherBundles, which validateAddForm resolves and validates. Pure. */
@@ -156,12 +171,19 @@ async function runConsent(server: McpServer, alias: string): Promise<{ ok: true;
   const url = client.generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: scopes, login_hint: cfg.email, state: expectedState });
   const consent = loop.finish(client, expectedState);
 
-  const caps = server.server.getClientCapabilities?.();
+  // Capability probe: the spec advertises each elicitation mode as a PRESENT
+  // object, not a boolean, so test presence rather than truthiness.
+  const caps = server.server.getClientCapabilities?.() as { elicitation?: { url?: unknown } } | undefined;
   let opened = false;
-  if ((caps as { elicitation?: { url?: boolean } } | undefined)?.elicitation?.url) {
+  if (caps?.elicitation?.url !== undefined) {
     try {
-      const r = await server.server.elicitInput({ mode: 'url', message: `Authorize the "${alias}" Google account in your browser.`, url } as never);
-      if ((r as { action?: string }).action !== 'accept') {
+      // elicitationId is REQUIRED by the spec schema; omitting it made every
+      // url-mode request fail client-side validation, so this branch always
+      // fell through to the server-side browser open.
+      const r = await server.server.elicitInput(
+        urlElicitationParams(alias, url, randomBytes(16).toString('hex')),
+      );
+      if (r.action !== 'accept') {
         loop.close();
         return { ok: false, text: 'confirmation_declined: consent was cancelled; the account row was kept but no token was stored (doctor will show it as "missing").' };
       }
@@ -178,7 +200,9 @@ async function runConsent(server: McpServer, alias: string): Promise<{ ok: true;
   try {
     tokens = await consent;
   } catch (e: unknown) {
-    return { ok: false, text: `${(e as Error).message}${opened ? '' : `\nOpen this URL to authorize:\n${url}`}` };
+    // Always surface the URL: the browser hand-off can succeed and consent
+    // still fail (declined, timed out), and the URL is the only recovery.
+    return { ok: false, text: `${(e as Error).message}\nOpen this URL to authorize:\n${url}` };
   }
   writeToken(alias, tokens);
   return { ok: true, missing: scopeGrantDiff(scopes, typeof tokens.scope === 'string' ? tokens.scope : undefined) };
@@ -236,15 +260,16 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
         if (a.alias?.trim() || a.email?.trim()) {
           input = argsToAddForm(a);
         } else {
-          const caps = server.server.getClientCapabilities?.() as { elicitation?: { form?: boolean } } | undefined;
-          if (!caps?.elicitation?.form) {
+          // Modes are advertised as PRESENT objects, not booleans.
+          const caps = server.server.getClientCapabilities?.() as { elicitation?: { form?: unknown } } | undefined;
+          if (caps?.elicitation?.form === undefined) {
             return textResult('E_NO_FORM_ELICITATION: this client does not support the interactive form. Call account_add again with arguments instead, e.g. {"alias": "work", "email": "you@example.com"} (optional: "bundles" as a comma-separated list, "allBundles": true, "admin": true).', true);
           }
-          const form = await server.server.elicitInput({ message: 'Add a Google account', requestedSchema: addFormSchema() } as never);
-          if ((form as { action?: string }).action !== 'accept') {
+          const form = await server.server.elicitInput({ message: 'Add a Google account', requestedSchema: addFormSchema() as never });
+          if (form.action !== 'accept') {
             return textResult('confirmation_declined: no account was added.');
           }
-          input = (form as { content?: Partial<AddForm> }).content ?? {};
+          input = (form.content ?? {}) as Partial<AddForm>;
         }
         const validated = validateAddForm(input, getAccountSet().aliases);
         if (!validated.ok) return textResult(`${validated.slug}: ${validated.message}`, true);

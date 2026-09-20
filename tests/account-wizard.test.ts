@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { addFormSchema, validateAddForm, scopeGrantDiff, allOptionalBundles, argsToAddForm } from '../src/tools/account-wizard.js';
+import { addFormSchema, validateAddForm, scopeGrantDiff, allOptionalBundles, argsToAddForm, urlElicitationParams } from '../src/tools/account-wizard.js';
+import { specTypeSchemas } from '@modelcontextprotocol/server';
 
 describe('addFormSchema', () => {
   it('is a flat object schema with alias+email required and bundle checkboxes', () => {
@@ -120,5 +121,32 @@ describe('scopeGrantDiff (BR5)', () => {
   });
   it('all missing when scope absent', () => {
     expect(scopeGrantDiff(['a', 'b'], undefined)).toEqual(['a', 'b']);
+  });
+});
+
+describe('elicitation param shapes (validated against the SDK schemas)', () => {
+  // Schemas come from the SDK package we DECLARE as a dependency; the
+  // core package that defines them is only transitive.
+  // The url-mode branch shipped broken because `as never` at the call site
+  // disabled every shape check: elicitationId is required, so the request
+  // failed client-side validation and the branch always fell through.
+  it('url-mode params satisfy ElicitRequestURLParamsSchema', () => {
+    const r = specTypeSchemas.ElicitRequestURLParams.safeParse(
+      urlElicitationParams('work', 'https://accounts.google.com/o/oauth2/v2/auth?x=1', 'a'.repeat(32)),
+    );
+    expect(r.success, r.success ? '' : JSON.stringify(r.error.issues)).toBe(true);
+  });
+
+  it('omitting elicitationId is rejected (the original defect)', () => {
+    const { elicitationId: _drop, ...without } = urlElicitationParams('work', 'https://x', 'id');
+    expect(specTypeSchemas.ElicitRequestURLParams.safeParse(without).success).toBe(false);
+  });
+
+  it('the form-mode params we send satisfy ElicitRequestFormParamsSchema', () => {
+    const r = specTypeSchemas.ElicitRequestFormParams.safeParse({
+      message: 'Add a Google account',
+      requestedSchema: addFormSchema(),
+    });
+    expect(r.success, r.success ? '' : JSON.stringify(r.error.issues)).toBe(true);
   });
 });
