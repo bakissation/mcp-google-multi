@@ -8,7 +8,7 @@ import { resolveScopesForAccount } from '../auth.js';
 import { BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from '../scope-catalog.js';
 import { openUrl } from '../open-url.js';
 import {
-  buildConsentClient, awaitLoopbackConsent, hasClientCredentials,
+  buildConsentClient, openLoopbackConsent, hasClientCredentials,
 } from '../oauth-consent.js';
 import {
   detectClients, buildServerEntry, renderInstruction, applyFileEntry, resolveMode,
@@ -132,14 +132,15 @@ async function runConsent(server: McpServer, alias: string): Promise<{ ok: true;
   const { randomBytes } = await import('node:crypto');
   const cfg = getAccountSet().configs[alias];
   if (!cfg) return { ok: false, text: `E_VALIDATION: account "${alias}" is not in the live registry (env-sourced accounts are not editable here).` };
-  const client = buildConsentClient();
+  // Bind the ephemeral loopback listener BEFORE building the auth URL: the
+  // redirect URI needs the assigned port, and listening first means the
+  // callback can't race the browser.
+  const loop = await openLoopbackConsent();
+  const client = buildConsentClient(loop.redirect);
   const expectedState = randomBytes(32).toString('hex');
   const scopes = resolveScopesForAccount(alias);
   const url = client.generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: scopes, login_hint: cfg.email, state: expectedState });
-
-  // Start the loopback listener BEFORE opening the browser so it can't miss the
-  // redirect. Any startup error (e.g. port in use) surfaces synchronously.
-  const consent = awaitLoopbackConsent(client, expectedState);
+  const consent = loop.finish(client, expectedState);
 
   const caps = server.server.getClientCapabilities?.();
   let opened = false;
@@ -147,6 +148,7 @@ async function runConsent(server: McpServer, alias: string): Promise<{ ok: true;
     try {
       const r = await server.server.elicitInput({ mode: 'url', message: `Authorize the "${alias}" Google account in your browser.`, url } as never);
       if ((r as { action?: string }).action !== 'accept') {
+        loop.close();
         return { ok: false, text: 'confirmation_declined: consent was cancelled; the account row was kept but no token was stored (doctor will show it as "missing").' };
       }
       opened = true;

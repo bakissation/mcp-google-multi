@@ -117,7 +117,7 @@ For remote HTTP, Google must be told to send the sign-in callback to your public
 https://mcp.example.com/callback
 ```
 
-(The local stdio flow uses `http://localhost:4242/oauth2callback`; the remote flow uses `/callback` on your public host. You can keep both.)
+(The local stdio flow uses an ephemeral `http://localhost:<port>/oauth2callback` loopback redirect, which Desktop OAuth clients accept on any port; the remote flow uses `/callback` on your public host. You can keep both.)
 
 Then [connect Claude](#connecting-claude).
 
