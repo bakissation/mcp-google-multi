@@ -114,6 +114,22 @@ async function main() {
     return;
   }
 
+  if (process.argv.includes('metrics')) {
+    const { runMetricsCli } = await import('./metrics-cli.js');
+    const { GENERATED_METHOD_TOOLS, CURATED_METHOD_IDS } = await import('./tools/generated/method-map.js');
+    const envSrc = envValueSource('GOOGLE_USAGE_METRICS');
+    let configValue: boolean | undefined;
+    try {
+      configValue = loadConfigFile(undefined, 'throw')?.usageMetrics;
+    } catch { /* an invalid config never blocks reading local metrics files */ }
+    const state = resolveUsageMetrics(process.env, configValue, envSrc?.kind === 'file' ? envSrc.file : undefined);
+    process.exitCode = runMetricsCli(process.argv, {
+      enabled: state.enabled,
+      promotion: { methodMap: GENERATED_METHOD_TOOLS, curatedIds: CURATED_METHOD_IDS },
+    });
+    return;
+  }
+
   if (process.argv.includes('write-client-config')) {
     const { runWriteClientConfigCli } = await import('./client-config.js');
     process.exitCode = await runWriteClientConfigCli(process.argv);

@@ -366,13 +366,21 @@ describe('storage discipline', () => {
 describe('egress guard (structural)', () => {
   const read = (p: string) => fs.readFileSync(path.join(__dirname, '..', p), 'utf-8');
 
-  it('usage-metrics imports are an allowlist subset with no dynamic import', () => {
-    const src = read('src/usage-metrics.ts');
-    const allowed = new Set(['node:fs', 'node:path', 'node:os', 'node:crypto', 'node:perf_hooks', './fs-atomic.js']);
-    for (const m of src.matchAll(/from '([^']+)'/g)) {
-      expect(allowed.has(m[1]), `disallowed import ${m[1]}`).toBe(true);
+  it('metrics module imports are an allowlist subset with no dynamic import', () => {
+    const base = ['node:fs', 'node:path', 'node:os', 'node:crypto', 'node:perf_hooks', './fs-atomic.js'];
+    const perFile: Record<string, Set<string>> = {
+      // the CLI reads the same local files through the guarded module; its
+      // promotion join data is passed IN by the dispatcher, never imported.
+      'src/usage-metrics.ts': new Set(base),
+      'src/metrics-cli.ts': new Set([...base, './usage-metrics.js']),
+    };
+    for (const [file, allowed] of Object.entries(perFile)) {
+      const src = read(file);
+      for (const m of src.matchAll(/from '([^']+)'/g)) {
+        expect(allowed.has(m[1]), `${file}: disallowed import ${m[1]}`).toBe(true);
+      }
+      expect(src.includes('import('), `${file}: dynamic import`).toBe(false);
     }
-    expect(src.includes('import(')).toBe(false);
   });
 
   it('the metrics dir constant is referenced only by the metrics modules', () => {

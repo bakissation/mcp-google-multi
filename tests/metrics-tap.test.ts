@@ -82,6 +82,32 @@ describe('tapUsageMetrics', () => {
     expect(readDay(dir).rpc).toEqual({ 'rpc_error_-32601': 1, rpc_error_other: 1 });
   });
 
+  it('an SDK-synthesized -32602 isError RESULT counts as schema_validation (SDK 1.x shape)', async () => {
+    const { m, dir } = makeMetrics();
+    const { tapped, inbound } = drive(m);
+    inbound(call(7, 'tasks_update'));
+    await tapped.send({
+      jsonrpc: '2.0', id: 7,
+      result: { isError: true, content: [{ type: 'text', text: 'MCP error -32602: Input validation error: Invalid arguments for tool tasks_update' }] },
+    } as unknown as JSONRPCMessage);
+    m.flush();
+    expect(readDay(dir).validation).toEqual({ tasks_update: 1 });
+  });
+
+  it('a handler isError envelope on the send path counts nothing here', async () => {
+    const { m, dir } = makeMetrics();
+    const { tapped, inbound } = drive(m);
+    inbound(call(8, 'gmail_search'));
+    await tapped.send({
+      jsonrpc: '2.0', id: 8,
+      result: { isError: true, content: [{ type: 'text', text: '{"error":"not_found","message":"x","retriable":false,"account":"a"}' }] },
+    } as unknown as JSONRPCMessage);
+    m.flush();
+    const day = readDay(dir);
+    expect(day.validation).toEqual({});
+    expect(day.rpc).toEqual({});
+  });
+
   it('result frames count nothing (the registry wrapper owns handler results)', async () => {
     const { m, dir } = makeMetrics();
     const { tapped, inbound } = drive(m);
