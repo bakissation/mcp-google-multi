@@ -159,6 +159,14 @@ describe('google_api_search', () => {
     expect(res.isError).toBe(true);
     expect(JSON.parse(res.content[0].text).error).toBe('unknown_api');
   });
+
+  it('fans "analytics" out to both GA4 APIs and reports the resolution', async () => {
+    const { search, dir } = setup(FULL);
+    cleanupDirs.push(dir);
+    const res = await search({ query: 'x', api: 'analytics' });
+    expect(res.isError).toBeUndefined();
+    expect(JSON.parse(res.content[0].text).resolvedApi).toEqual(['analyticsadmin', 'analyticsdata']);
+  });
 });
 
 describe('google_api_call', () => {

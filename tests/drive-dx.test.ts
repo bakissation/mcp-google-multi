@@ -24,6 +24,19 @@ describe('prepareLocalDest', () => {
     expect(dest).toBe(path.join(savePath, 'report.pdf'));
   });
 
+  it('tolerates a savePath that already ends with the filename (no double join)', () => {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-dx-'));
+    created.push(parent);
+    const intended = path.join(parent, 'out', 'report.pdf');
+
+    const dest = prepareLocalDest(intended, 'report.pdf');
+
+    expect(dest).toBe(intended);
+    // and no directory named like the file was created
+    expect(fs.existsSync(intended)).toBe(false);
+    expect(fs.statSync(path.join(parent, 'out')).isDirectory()).toBe(true);
+  });
+
   it('basename-sanitizes the filename so it never escapes savePath', () => {
     const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-dx-'));
     created.push(parent);

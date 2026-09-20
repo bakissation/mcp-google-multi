@@ -37,6 +37,38 @@ export const SUPPORTED_APIS: Record<string, { id: string; version: string }> = {
   workspaceevents: { id: 'workspaceevents', version: 'v1' },
 };
 
+// Names agents actually type for an API, mapped to real SUPPORTED_APIS keys.
+// Motivated by observed escape-hatch misses ("analytics" is two Discovery
+// APIs, the Admin SDK is three); keep entries plural-target only when the
+// split is real.
+export const API_ALIASES: Record<string, string[]> = {
+  analytics: ['analyticsadmin', 'analyticsdata'],
+  ga4: ['analyticsadmin', 'analyticsdata'],
+  googleanalytics: ['analyticsadmin', 'analyticsdata'],
+  admin: ['admin_directory', 'admin_reports', 'admin_datatransfer'],
+  adminsdk: ['admin_directory', 'admin_reports', 'admin_datatransfer'],
+  directory: ['admin_directory'],
+  webmasters: ['searchconsole'],
+  gsc: ['searchconsole'],
+  contacts: ['people'],
+  appsscript: ['script'],
+  appscript: ['script'],
+  gmailpostmastertools: ['postmaster'],
+};
+
+/**
+ * Resolve an `api` argument to real SUPPORTED_APIS keys: exact match, then
+ * case/punctuation-normalized ("Search-Console" -> searchconsole), then the
+ * alias map. null = genuinely unknown.
+ */
+export function resolveApiAliases(api: string): string[] | null {
+  if (SUPPORTED_APIS[api]) return [api];
+  const norm = api.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const direct = Object.keys(SUPPORTED_APIS).find((k) => k.replace(/[^a-z0-9]/g, '') === norm);
+  if (direct) return [direct];
+  return API_ALIASES[norm] ?? null;
+}
+
 export interface DiscoveryParam {
   location: 'path' | 'query';
   required?: boolean;

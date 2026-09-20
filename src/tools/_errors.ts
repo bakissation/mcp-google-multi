@@ -144,13 +144,33 @@ export function mapGoogleError(
         account,
       };
     }
-    return { error: 'forbidden', message, hint: forbiddenHint, retriable: false, account };
+    return {
+      error: 'forbidden',
+      message,
+      hint:
+        forbiddenHint ??
+        `Google denied access at the resource level (not a scope problem): check that "${account}" actually has access to this item, e.g. it is shared with that account, and that you picked the right account alias.`,
+      retriable: false,
+      account,
+    };
   }
   if (status === 400 && /invalid[_ ]scope/i.test(message)) {
-    return { error: 'invalid_scope', message, retriable: false, account };
+    return {
+      error: 'invalid_scope',
+      message,
+      hint: 'One of the requested OAuth scopes is malformed or unavailable to this client. Run `config check` to review the account scope profile, fix it, then re-auth.',
+      retriable: false,
+      account,
+    };
   }
   if (status === 404) {
-    return { error: 'not_found', message, retriable: false, account };
+    return {
+      error: 'not_found',
+      message,
+      hint: `The ID does not exist or is not visible to "${account}". IDs are account-specific: re-fetch it with the matching list/search tool, and check the account alias is the one that owns the resource.`,
+      retriable: false,
+      account,
+    };
   }
   if (status === 429) {
     const retryAfter = error?.response?.headers?.['retry-after'];
@@ -177,7 +197,13 @@ export function mapGoogleError(
     };
   }
   if (status !== undefined && status >= 500) {
-    return { error: 'upstream_error', message, retriable: true, account };
+    return {
+      error: 'upstream_error',
+      message,
+      hint: 'Google-side server error, usually transient: retry, with backoff if it repeats.',
+      retriable: true,
+      account,
+    };
   }
   if (status === undefined) {
     const fsCode = typeof error?.code === 'string' && LOCAL_FS_CODES.has(error.code) ? error.code : undefined;
@@ -206,7 +232,18 @@ export function mapGoogleError(
       };
     }
   }
-  return { error: 'upstream_error', message, retriable: false, account };
+  // Passthrough floor: still emit a hint so no envelope leaves the mapper
+  // without a next step. A 400 here is a request Google parsed and rejected.
+  return {
+    error: 'upstream_error',
+    message,
+    hint:
+      status === 400
+        ? 'Google rejected the request as malformed: an argument is likely wrong or missing. Check IDs, enum values and formats against the tool description before retrying.'
+        : 'Unclassified error: the message above is the best signal. Retry only if it reads as transient; otherwise change the request rather than repeating it.',
+    retriable: false,
+    account,
+  };
 }
 
 export function handleGoogleApiError(error: any, account: Account, forbiddenHint?: string, scopeContext?: () => { hint: string; retriable: boolean } | null) {
