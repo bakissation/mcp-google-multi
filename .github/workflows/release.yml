@@ -58,6 +58,54 @@ jobs:
   # option: releases are immutable, so assets cannot be uploaded after publish
   # (a chained job 422s), and there is no backfill for already-published tags.
 
+  # Publishes STABLE releases to the official MCP Registry via GitHub OIDC
+  # (metadata only; npm hosts the package, and the npm tarball's mcpName field
+  # is the ownership proof). Prereleases are skipped on purpose: a prerelease
+  # published after its stable is never marked latest, so there is no listing
+  # benefit. The registry is in preview and may reset; this job makes a reset
+  # a non-event. A failure here never un-publishes npm/GHCR; re-run the job.
+  registry:
+    needs: release
+    if: >-
+      !cancelled() && needs.release.result == 'success' &&
+      needs.release.outputs.version != '' &&
+      needs.release.outputs.channel == 'latest'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: v${{ needs.release.outputs.version }}
+
+      - name: Install mcp-publisher
+        run: curl -fsSL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz mcp-publisher
+
+      - name: Stamp server.json with the released version and bundle digest
+        run: |
+          curl -fsSL -o mcp-google-multi.mcpb "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/mcp-google-multi.mcpb"
+          SHA256=$(sha256sum mcp-google-multi.mcpb | cut -d' ' -f1)
+          VERSION="$VERSION" SHA256="$SHA256" node -e '
+            const fs = require("node:fs");
+            const v = process.env.VERSION;
+            const s = JSON.parse(fs.readFileSync("server.json", "utf8"));
+            s.version = v;
+            for (const p of s.packages) {
+              if ("version" in p) p.version = v;
+              p.identifier = p.identifier.replaceAll("0.0.0", v);
+              if (p.registryType === "mcpb") p.fileSha256 = process.env.SHA256;
+            }
+            fs.writeFileSync("server.json", JSON.stringify(s, null, 2) + "\n");
+          '
+
+      - name: Publish to the MCP Registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
+
   # Publishes the released version as a multi-arch image on GHCR. Chained here
   # (not `on: push: tags`) because tags pushed with GITHUB_TOKEN never trigger
   # other workflows. workflow_dispatch backfills an image for an existing tag.
