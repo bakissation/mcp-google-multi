@@ -66,6 +66,33 @@ describe('mapGoogleError', () => {
     expect(mapGoogleError({ code: 404, message: 'x' }, acc).error).toBe('not_found');
   });
 
+  it('every branch carries a hint (upstream passthroughs included)', () => {
+    const cases = [
+      { code: 403, message: 'Forbidden' }, // forbidden, no service hint
+      { code: 400, message: 'invalid_scope: bad' },
+      { code: 404, message: 'x' },
+      { code: 503, message: 'unavailable' }, // 5xx upstream_error
+      { code: 400, message: 'Invalid value for field' }, // 400 fallback
+      { message: 'something odd' }, // statusless fallback
+    ];
+    for (const c of cases) {
+      const e = mapGoogleError(c, acc);
+      expect(e.hint, `no hint for ${JSON.stringify(c)}`).toBeTruthy();
+    }
+  });
+
+  it('the 400 fallback hint points at the arguments, not at retrying', () => {
+    const e = mapGoogleError({ code: 400, message: 'Invalid value for maxResults' }, acc);
+    expect(e.error).toBe('upstream_error');
+    expect(e.retriable).toBe(false);
+    expect(e.hint).toContain('malformed');
+  });
+
+  it('not_found hints at the account-specific ID trap', () => {
+    const e = mapGoogleError({ code: 404, message: 'File not found' }, acc);
+    expect(e.hint).toContain('account-specific');
+  });
+
   it('429 → rate_limited, retriable, with Retry-After', () => {
     const e = mapGoogleError(
       { code: 429, message: 'quota', response: { headers: { 'retry-after': '30' } } },
