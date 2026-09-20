@@ -328,23 +328,21 @@ describe('storage discipline', () => {
     const dir = tmp();
     const logs: string[] = [];
     const m = make(dir, { log: (l) => logs.push(l) });
-    fs.chmodSync(path.join(dir, 'agg'), 0o500);
-    fs.chmodSync(dir, 0o500);
-    try {
-      const w = m.wrap(entry('gmail_search'), async () => okResult());
-      for (let i = 0; i < 4; i++) {
-        await w({});
-        m.flush();
-      }
-      await expect(w({})).resolves.toEqual(okResult());
-      expect(logs.some((l) => l.includes('disabled for this process'))).toBe(true);
-    } finally {
-      fs.chmodSync(dir, 0o700);
-      fs.chmodSync(path.join(dir, 'agg'), 0o700);
+    // Replace the metrics dir with a plain FILE: every flush path (lock mkdir,
+    // atomic write, event append) then fails on every platform.
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.writeFileSync(dir, 'not a directory');
+    const w = m.wrap(entry('gmail_search'), async () => okResult());
+    for (let i = 0; i < 4; i++) {
+      await w({});
+      m.flush();
     }
+    await expect(w({})).resolves.toEqual(okResult());
+    expect(logs.some((l) => l.includes('disabled for this process'))).toBe(true);
   });
 
-  it('a pre-existing group-readable dir warns once and is never chmodded', () => {
+  // POSIX-only by nature: Windows has no 0700-style mode semantics to warn about.
+  it.skipIf(process.platform === 'win32')('a pre-existing group-readable dir warns once and is never chmodded', () => {
     const dir = tmp();
     fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
     const logs: string[] = [];
