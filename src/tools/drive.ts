@@ -146,8 +146,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         query: z.string().describe('A plain keyword (full-text search) or Drive query syntax, e.g. "name contains \'MoU\'"'),
-        maxResults: z.number().min(1).max(100).default(20).optional()
-          .describe('Max results to return (default: 20)'),
+        maxResults: z.number().min(1).max(100).default(10).optional()
+          .describe('Max results to return (default: 10, max: 100)'),
         driveId: z.string().optional().describe('Optional shared drive ID'),
       },
     },
@@ -158,7 +158,7 @@ export function registerDriveTools(server: ToolRegistry): void {
 
         const params: any = {
           q: normalizeDriveQuery(query),
-          pageSize: maxResults ?? 20,
+          pageSize: maxResults ?? 10,
           fields: 'files(id,name,mimeType,modifiedTime,webViewLink,size,parents,driveId)',
           supportsAllDrives: true,
           includeItemsFromAllDrives: true,
