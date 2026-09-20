@@ -40,6 +40,11 @@ jobs:
       - name: Test
         run: npm test
 
+      # Lazy mode's promise is a small context footprint; growth past the
+      # budget is a regression. Baseline: tests/fixtures/lazy-bytes-baseline.json.
+      - name: Lazy tools/list byte budget
+        run: node scripts/measure-tools.mjs --check
+
   # Separate job on purpose: branch protection requires the check literally named
   # "ci" — a version matrix would rename it to "ci (...)". This is the only leg
   # exercising the declared engines floor (BV-7); the main job stays on 24.
