@@ -7,6 +7,7 @@ import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFan
 import { MAX_RESPONSE_CHARS } from './executor.js';
 import type { ArgKind, ArgShape } from './arg-normalize.js';
 import type { Metrics } from './usage-metrics.js';
+import { suggestKeys } from './arg-strict.js';
 
 // Client-side result budget advertised for tools that do not declare their own
 // (fat readers do; see trim.ts). ~50k chars stays well inside a default client
@@ -295,6 +296,45 @@ export class ToolRegistry {
     for (const [key, field] of Object.entries(entry.inputShape)) shape.set(key, scalarKindOf(field));
     this.argShapeCache.set(name, shape);
     return shape;
+  }
+
+  /** Declared argument keys for a tool, in declaration order; undefined when
+   * the tool is not registered. Backs unknown-argument screening, which needs
+   * the full key list rather than argShape's scalar-kind subset view. */
+  declaredKeys(name: string): readonly string[] | undefined {
+    const entry = this.tools.find((t) => t.name === name);
+    return entry ? Object.keys(entry.inputShape) : undefined;
+  }
+
+  /** Keys spelling a similar concept elsewhere in the same service, for the
+   * hint on a call whose key matched nothing. Kept only when a key is declared
+   * by at least two tools in the service or by a curated one, so one-off
+   * generated parameters do not become advice. */
+  siblingSpellings(tool: string, unknownKeys: string[]): Array<{ key: string; tools: string[] }> {
+    const self = this.tools.find((t) => t.name === tool);
+    if (!self) return [];
+    const declared = new Set(Object.keys(self.inputShape));
+    const byKey = new Map<string, { tools: string[]; curated: boolean }>();
+    for (const t of this.tools) {
+      if (t.service !== self.service || t.name === tool) continue;
+      for (const key of Object.keys(t.inputShape)) {
+        if (declared.has(key)) continue;
+        const e = byKey.get(key) ?? { tools: [], curated: false };
+        e.tools.push(t.name);
+        if (!t.generated) e.curated = true;
+        byKey.set(key, e);
+      }
+    }
+    const candidates = [...byKey.entries()].filter(([, e]) => e.tools.length >= 2 || e.curated);
+    // Reuse the tiered matcher rather than a substring test: the motivating
+    // case (parentId against parentFolderId) fails containment and edit
+    // distance alike, which is the whole reason that matcher exists.
+    const keys = candidates.map(([key]) => key);
+    const hits = new Set(unknownKeys.flatMap((k) => suggestKeys(k, keys)));
+    return candidates
+      .filter(([key]) => hits.has(key))
+      .slice(0, 2)
+      .map(([key, e]) => ({ key, tools: e.tools }));
   }
 
   catalog(service: string, query?: string): CatalogOperation[] {

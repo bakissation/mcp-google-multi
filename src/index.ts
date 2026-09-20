@@ -22,7 +22,8 @@ import { isAllowed, describePolicy } from './write-control.js';
 import { buildIdentityContext, type IdentityContext } from './identity.js';
 import { registerSetupPrompt } from './setup-prompt.js';
 import { applyNetTuning } from './net-tuning.js';
-import { argNormalizationEnabled, withArgNormalization } from './arg-normalize.js';
+import { argNormalizationEnabled, withArgNormalization, type StrictArgOptions } from './arg-normalize.js';
+import { unknownArgMode } from './arg-strict.js';
 import { envValueSource } from './env-load.js';
 import { loadConfigFile } from './config-file.js';
 import { initUsageMetrics, resolveUsageMetrics, sourceLabel, type Metrics } from './usage-metrics.js';
@@ -31,6 +32,19 @@ applyNetTuning();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
+
+/** Unknown-argument screening options, or undefined when the feature is off.
+ * Shared by both transports so a mistyped argument behaves identically. */
+function strictArgOptions(registry: ToolRegistry, metrics: Metrics | null): StrictArgOptions | undefined {
+  const mode = unknownArgMode();
+  if (mode === 'off') return undefined;
+  return {
+    mode,
+    declaredFor: (tool) => registry.declaredKeys(tool),
+    siblingsFor: (tool, keys) => registry.siblingSpellings(tool, keys),
+    onDrop: metrics ? (tool, keys) => metrics.recordArgDrop(tool, keys) : undefined,
+  };
+}
 
 function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: DiscoveryMode, metrics: Metrics | null = null): ToolRegistry {
   const policy = ctx.policy;
@@ -268,9 +282,16 @@ async function main() {
       const { tapUsageMetrics } = await import('./metrics-tap.js');
       transport = tapUsageMetrics(transport, stdioMetrics, (n) => registry.hasTool(n));
     }
+    const strictStdio = strictArgOptions(registry, stdioMetrics);
     await server.connect(
-      argNormalizationEnabled()
-        ? withArgNormalization(transport, (n) => registry.argShape(n), undefined, stdioMetrics ? (tool, n) => stdioMetrics.recordArgFix(tool, n) : undefined)
+      argNormalizationEnabled() || strictStdio
+        ? withArgNormalization(
+            transport,
+            (n) => registry.argShape(n),
+            undefined,
+            stdioMetrics ? (tool, n) => stdioMetrics.recordArgFix(tool, n) : undefined,
+            strictStdio,
+          )
         : transport,
     );
   }
@@ -379,6 +400,7 @@ async function main() {
       argShapeFor: argNormalizationEnabled() ? (n) => registry.argShape(n) : undefined,
       metricsTap: httpTap,
       onArgRename: httpMetrics ? (tool: string, n: number) => httpMetrics.recordArgFix(tool, n) : undefined,
+      strictArgs: strictArgOptions(registry, httpMetrics),
     });
     await host.start();
     process.stderr.write(`HTTP transport listening on http://${httpCfg.host}:${httpCfg.port} (public ${httpCfg.publicUrl})\n`);

@@ -312,7 +312,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'List files in a Google Drive folder or root',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        folderId: z.string().optional().describe('Folder ID (omit for root)'),
+        folderId: z.string().optional().describe('Folder ID to list, omit for root. Named folderId here, not parentFolderId'),
         maxResults: z.number().min(1).max(100).default(50).optional()
           .describe('Max results to return (default: 50)'),
       },
@@ -353,7 +353,7 @@ export function registerDriveTools(server: ToolRegistry): void {
         filename: z.string().describe('Name as it appears in Drive'),
         mimeType: z.string().optional().describe('Source MIME type of the local file (inferred from extension if omitted). With `convertTo`, this is the format Drive imports from.'),
         convertTo: z.enum(CONVERT_TO_VALUES).optional().describe('Convert the upload into this native Google Workspace type on import: "document" | "spreadsheet" | "presentation" | "drawing" (full application/vnd.google-apps.* ids also accepted). E.g. upload .md/.html/.docx/.txt with convertTo=document to get a real Google Doc. Source must be an importable format. Omit to store the file as-is.'),
-        parentFolderId: z.string().optional().describe('Parent folder ID (defaults to My Drive root)'),
+        parentFolderId: z.string().optional().describe('Parent folder ID, not parentId. Defaults to My Drive root'),
       },
     },
     async ({ account, localPath, filename, mimeType: mimeTypeArg, convertTo, parentFolderId }) => {
@@ -474,7 +474,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         name: z.string().describe('Folder name'),
-        parentFolderId: z.string().optional().describe('Parent folder ID (defaults to My Drive root)'),
+        parentFolderId: z.string().optional().describe('Parent folder ID, not parentId. Defaults to My Drive root'),
       },
     },
     async ({ account, name, parentFolderId }) => {
@@ -507,7 +507,7 @@ export function registerDriveTools(server: ToolRegistry): void {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().describe('Google Drive file ID'),
         newName: z.string().optional().describe('New filename'),
-        newParentFolderId: z.string().optional().describe('Move to this folder'),
+        newParentFolderId: z.string().optional().describe('Move to this folder, named newParentFolderId here, not parentFolderId'),
         localPath: z.string().optional().describe('Replace file content with this local file (path on the machine running the server)'),
         mimeType: z.string().optional().describe('MIME type of the replacement file (required if localPath is provided)'),
         convertTo: z.enum(CONVERT_TO_VALUES).optional().describe('When replacing content via localPath, convert the new content into this native Google Workspace type on import: "document" | "spreadsheet" | "presentation" | "drawing" (full application/vnd.google-apps.* ids also accepted).'),
@@ -664,7 +664,7 @@ export function registerDriveTools(server: ToolRegistry): void {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().describe('Google Drive file ID to copy'),
         newName: z.string().optional().describe('Name for the copy (default: "Copy of <original>")'),
-        parentFolderId: z.string().optional().describe('Where to put the copy (default: same folder)'),
+        parentFolderId: z.string().optional().describe('Where to put the copy, not parentId. Default: same folder'),
       },
     },
     async ({ account, fileId, newName, parentFolderId }) => {
@@ -696,7 +696,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().describe('Google Drive file ID'),
-        newParentFolderId: z.string().describe('Destination folder ID'),
+        newParentFolderId: z.string().describe('Destination folder ID, named newParentFolderId here, not parentFolderId'),
       },
     },
     async ({ account, fileId, newParentFolderId }) => {
@@ -1399,7 +1399,7 @@ export function registerDriveTools(server: ToolRegistry): void {
         fromAccount: requiredAccountEnum.describe('Source account alias'),
         toAccount: requiredAccountEnum.describe('Target account alias'),
         fileId: z.string().describe('File ID in the source account (folders are not supported)'),
-        parentFolderId: z.string().optional().describe('Target folder ID (default: target My Drive root)'),
+        parentFolderId: z.string().optional().describe('Target folder ID, not parentId. Default: target My Drive root'),
         newName: z.string().optional().describe('Rename the copy (default: keep the source name)'),
         move: coerceBoolean.optional().describe('Trash the source after a successful copy (delete-gated)'),
       },

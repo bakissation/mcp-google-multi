@@ -34,6 +34,9 @@ const CHARS_BOUNDS = [64, 256, 1024, 4096, 16384, 65536] as const;
 const METHOD_ID_RE = /^[a-z][a-zA-Z0-9]*(\.[a-zA-Z0-9]+)+$/;
 const METHOD_ID_MAX = 128;
 const TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,63}$/;
+// Declared argument keys are camelCase identifiers, some dotted
+// (groupKey.id, debugOptions.enableDebugging).
+const ARG_KEY_RE = /^[A-Za-z][A-Za-z0-9_.]{0,63}$/;
 
 /** Union of every `error:` slug literal emitted anywhere in src/ (kept honest
  * by a set-equality grep test). Anything outside buckets to `other`. */
@@ -45,7 +48,7 @@ export const KNOWN_ERROR_SLUGS: ReadonlySet<string> = new Set([
   'invalid_grant', 'invalid_params', 'invalid_query', 'invalid_request',
   'invalid_scope', 'network_error', 'not_found', 'rate_limited',
   'reauth_required', 'recipient_not_allowed', 'too_large', 'toolset_disabled', 'unknown_api',
-  'unknown_method', 'unsupported_grant_type', 'unsupported_type',
+  'unknown_argument', 'unknown_method', 'unsupported_grant_type', 'unsupported_type',
   'untrusted_host', 'upstream_error', 'validation_error', 'write_disabled',
 ]);
 
@@ -142,6 +145,8 @@ interface ToolAgg {
   lat: Record<string, number>;
   fanout?: { calls: number } & Record<string, number>;
   argfix?: number;
+  /** undeclared keys, counted by the DECLARED key they resolve to */
+  argdrop?: Record<string, number>;
 }
 
 export interface DayAgg {
@@ -202,6 +207,7 @@ export function mergeDay(a: DayAgg, b: DayAgg): DayAgg {
     if (x?.fanout || y?.fanout) t.fanout = map(x?.fanout as Record<string, number>, y?.fanout as Record<string, number>) as ToolAgg['fanout'];
     const argfix = num(x?.argfix, y?.argfix);
     if (argfix > 0) t.argfix = argfix;
+    if (x?.argdrop || y?.argdrop) t.argdrop = map(x?.argdrop, y?.argdrop);
     out.tools[name] = t;
   }
   const slugSet = new Set([...Object.keys(a.hints), ...Object.keys(b.hints)]);
@@ -245,7 +251,10 @@ function applyCaps(day: DayAgg): DayAgg {
     else kept.other = (kept.other ?? 0) + dropped;
     return kept;
   };
-  for (const t of Object.values(day.tools)) t.err = cap(t.err, ERR_SLUG_CAP);
+  for (const t of Object.values(day.tools)) {
+    t.err = cap(t.err, ERR_SLUG_CAP);
+    if (t.argdrop) t.argdrop = cap(t.argdrop, ERR_SLUG_CAP);
+  }
   // Bounded by the registered tool set via the tap's membership test, but
   // capped anyway: this map is the only one fed by a wire-supplied key.
   day.validation = cap(day.validation, VALIDATION_CAP);
@@ -460,6 +469,26 @@ export class Metrics {
       this.rolloverIfNeeded();
       if (resolvedApis === null) this.deltas.escape.unknown_api += 1;
       else for (const k of resolvedApis) addInto(this.deltas.escape.apis_searched, k);
+      this.dirty = true;
+    } catch { /* never throws outward */ }
+  }
+
+  /**
+   * Undeclared argument keys seen on a call. `resolvedKeys` carries only the
+   * SUGGESTED (declared) key or the literal `_unmatched`, never the caller's
+   * key, so the closed-vocabulary guarantee holds: a client cannot write an
+   * invented string to disk through this path.
+   */
+  recordArgDrop(tool: string, resolvedKeys: string[]): void {
+    try {
+      this.rolloverIfNeeded();
+      if (!TOOL_NAME_RE.test(tool)) return;
+      const t = (this.deltas.tools[tool] ??= { n: 0, err: {}, hint: 0, lat: {} });
+      const map = (t.argdrop ??= {});
+      for (const key of resolvedKeys) {
+        if (key !== '_unmatched' && !ARG_KEY_RE.test(key)) continue;
+        addInto(map, key);
+      }
       this.dirty = true;
     } catch { /* never throws outward */ }
   }
