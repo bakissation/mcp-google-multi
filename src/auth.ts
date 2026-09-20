@@ -1,6 +1,3 @@
-import { OAuth2Client } from 'googleapis-common';
-import http from 'node:http';
-import { URL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { openUrl } from './open-url.js';
 import { ACCOUNTS, getAccountSet } from './accounts.js';
@@ -8,6 +5,7 @@ import { ADMIN_SCOPES, BUNDLE_CATALOG, closestBundle, resolveBundleAliases } fro
 import { resolveMasterKey } from './master-key.js';
 import type { ScopeProfile } from './scope-catalog.js';
 import { writeToken } from './token-store.js';
+import { buildConsentClient, openLoopbackConsent, TESTING_MODE_WARNING } from './oauth-consent.js';
 
 // Personal (non-Workspace) accounts 403 on admin scopes; ADMIN_SCOPES stays per-account opt-in, never granted by default.
 
@@ -157,11 +155,11 @@ export async function runAuthFlow(args: string[]): Promise<void> {
   // resolves eagerly so a provisioning failure surfaces before the browser opens.
   resolveMasterKey();
 
-  const oauth2Client = new OAuth2Client(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    'http://localhost:4242/oauth2callback',
-  );
+  // Shared ephemeral-port loopback flow (oauth-consent.ts): listen first, then
+  // build the auth URL from the assigned redirect. CLI gets a patient timeout;
+  // errors propagate to main()'s fatal handler like every other CLI failure.
+  const loop = await openLoopbackConsent({ timeoutMs: 10 * 60_000 });
+  const oauth2Client = buildConsentClient(loop.redirect);
 
   // CSRF protection for the OAuth callback (RFC 6749 §10.12).
   const expectedState = randomBytes(32).toString('hex');
@@ -179,83 +177,15 @@ export async function runAuthFlow(args: string[]): Promise<void> {
   if (getAdminAccounts().includes(alias)) {
     console.log('  ⚠ Admin scopes included — this account will be granted Workspace admin access.');
   }
-  console.log(`Opening browser for authorization...`);
+  // Always print the URL first: the browser launch is best-effort and
+  // silently does nothing on headless/SSH sessions.
+  console.log(`Opening your browser to authorize "${alias}". If nothing opens, visit:\n${authorizeUrl}`);
+  openUrl(authorizeUrl);
 
-  return new Promise((resolve, reject) => {
-    const server = http
-      .createServer(async (req, res) => {
-        try {
-          if (req.url && req.url.startsWith('/oauth2callback')) {
-            const qs = new URL(req.url, 'http://localhost:4242').searchParams;
+  const tokens = await loop.finish(oauth2Client, expectedState);
+  writeToken(alias, tokens);
 
-            const error = qs.get('error');
-            if (error) {
-              res.writeHead(400, { 'Content-Type': 'text/plain' });
-              res.end(`Authorization denied: ${error}`);
-              server.close();
-              server.closeAllConnections();
-              reject(new Error(`Authorization denied: ${error}`));
-              return;
-            }
-
-            const code = qs.get('code');
-            if (!code) {
-              res.writeHead(400, { 'Content-Type': 'text/plain' });
-              res.end('No authorization code received.');
-              server.close();
-              server.closeAllConnections();
-              reject(new Error('No authorization code received'));
-              return;
-            }
-
-            const returnedState = qs.get('state');
-            if (returnedState !== expectedState) {
-              res.writeHead(400, { 'Content-Type': 'text/plain' });
-              res.end('State mismatch — possible CSRF attempt. Aborting.');
-              server.close();
-              server.closeAllConnections();
-              reject(new Error('OAuth state token mismatch'));
-              return;
-            }
-
-            const { tokens } = await oauth2Client.getToken(code);
-
-            writeToken(alias, tokens);
-
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(
-              '<h2>Authentication successful!</h2><p>You can close this tab.</p>',
-            );
-            server.close();
-            server.closeAllConnections();
-
-            console.log(`Token saved (encrypted) for ${alias}.`);
-            console.log('Next: authenticate your other aliases, then verify with: mcp-google-multi config check');
-            resolve();
-          }
-        } catch (e) {
-          res.writeHead(500, { 'Content-Type': 'text/plain' });
-          res.end('Internal error during authentication.');
-          server.close();
-          server.closeAllConnections();
-          reject(e);
-        }
-      })
-      // Bind to loopback only — never expose the OAuth callback to the local network.
-      .listen(4242, '127.0.0.1', () => {
-        // Always print the URL first: the browser launch is best-effort and
-        // silently does nothing on headless/SSH sessions.
-        console.log(`Opening your browser to authorize "${alias}". If nothing opens, visit:\n${authorizeUrl}`);
-        openUrl(authorizeUrl);
-      });
-
-
-    server.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error('Port 4242 is already in use. Close the process using it and retry.');
-        process.exit(1);
-      }
-      reject(err);
-    });
-  });
+  console.log(`Token saved (encrypted) for ${alias}.`);
+  console.log(TESTING_MODE_WARNING);
+  console.log('Next: authenticate your other aliases, then verify with: mcp-google-multi config check');
 }

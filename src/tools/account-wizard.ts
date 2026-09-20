@@ -7,8 +7,9 @@ import { writeToken } from '../token-store.js';
 import { resolveScopesForAccount } from '../auth.js';
 import { BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from '../scope-catalog.js';
 import { openUrl } from '../open-url.js';
+import { coerceBoolean } from './_coerce.js';
 import {
-  buildConsentClient, awaitLoopbackConsent, hasClientCredentials,
+  buildConsentClient, openLoopbackConsent, hasClientCredentials, TESTING_MODE_WARNING,
 } from '../oauth-consent.js';
 import {
   detectClients, buildServerEntry, renderInstruction, applyFileEntry, resolveMode,
@@ -98,6 +99,19 @@ export function validateAddForm(input: Partial<AddForm>, existingAliases: string
   return { ok: true, alias, email, bundles, admin: input.admin === true };
 }
 
+/** Map direct tool arguments onto the elicitation form shape: the argument-
+ * mode fallback for clients without form elicitation. All bundle picks travel
+ * through otherBundles, which validateAddForm resolves and validates. Pure. */
+export function argsToAddForm(a: { alias?: string; email?: string; bundles?: string; allBundles?: boolean; admin?: boolean }): Partial<AddForm> {
+  return {
+    alias: a.alias ?? '',
+    email: a.email ?? '',
+    allBundles: a.allBundles === true,
+    otherBundles: a.bundles ?? '',
+    admin: a.admin === true,
+  };
+}
+
 /** Scopes requested by the profile but NOT granted at consent (granular
  * consent / unchecked bundles). Pure. */
 export function scopeGrantDiff(requested: string[], grantedScope: string | undefined): string[] {
@@ -132,14 +146,15 @@ async function runConsent(server: McpServer, alias: string): Promise<{ ok: true;
   const { randomBytes } = await import('node:crypto');
   const cfg = getAccountSet().configs[alias];
   if (!cfg) return { ok: false, text: `E_VALIDATION: account "${alias}" is not in the live registry (env-sourced accounts are not editable here).` };
-  const client = buildConsentClient();
+  // Bind the ephemeral loopback listener BEFORE building the auth URL: the
+  // redirect URI needs the assigned port, and listening first means the
+  // callback can't race the browser.
+  const loop = await openLoopbackConsent();
+  const client = buildConsentClient(loop.redirect);
   const expectedState = randomBytes(32).toString('hex');
   const scopes = resolveScopesForAccount(alias);
   const url = client.generateAuthUrl({ access_type: 'offline', prompt: 'consent', scope: scopes, login_hint: cfg.email, state: expectedState });
-
-  // Start the loopback listener BEFORE opening the browser so it can't miss the
-  // redirect. Any startup error (e.g. port in use) surfaces synchronously.
-  const consent = awaitLoopbackConsent(client, expectedState);
+  const consent = loop.finish(client, expectedState);
 
   const caps = server.server.getClientCapabilities?.();
   let opened = false;
@@ -147,6 +162,7 @@ async function runConsent(server: McpServer, alias: string): Promise<{ ok: true;
     try {
       const r = await server.server.elicitInput({ mode: 'url', message: `Authorize the "${alias}" Google account in your browser.`, url } as never);
       if ((r as { action?: string }).action !== 'accept') {
+        loop.close();
         return { ok: false, text: 'confirmation_declined: consent was cancelled; the account row was kept but no token was stored (doctor will show it as "missing").' };
       }
       opened = true;
@@ -169,8 +185,10 @@ async function runConsent(server: McpServer, alias: string): Promise<{ ok: true;
 }
 
 function s4Text(alias: string, missing: string[]): string {
-  if (missing.length === 0) return `✔ "${alias}" authenticated; all requested scopes granted. It is now usable without a restart.`;
-  return `⚠ "${alias}" authenticated, but ${missing.length} requested scope(s) were NOT granted (E_SCOPE_NOT_GRANTED) — you may have unchecked some on the consent screen. Re-run account_reauth to grant them. The account is usable for the granted scopes.`;
+  const outcome = missing.length === 0
+    ? `✔ "${alias}" authenticated; all requested scopes granted. It is now usable without a restart.`
+    : `⚠ "${alias}" authenticated, but ${missing.length} requested scope(s) were NOT granted (E_SCOPE_NOT_GRANTED) — you may have unchecked some on the consent screen. Re-run account_reauth to grant them. The account is usable for the granted scopes.`;
+  return `${outcome}\n${TESTING_MODE_WARNING}`;
 }
 
 const REQUIRES_INTERACTION = { 'anthropic/requiresUserInteraction': true };
@@ -190,10 +208,16 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
     {
       _meta: REQUIRES_INTERACTION,
       annotations: { openWorldHint: true },
-      description: 'Add a new Google account interactively: collects alias/email/scope bundles via a form, writes the registry, and runs Google consent in the browser — no file editing or restart needed. Requires GOOGLE_CLIENT_ID/SECRET (run the `setup` prompt first if missing).',
-      inputSchema: {},
+      description: 'Add a new Google account: pass alias + email directly (plus optional bundles/allBundles/admin), or pass nothing for an interactive form where the client supports elicitation. Writes the registry and runs Google consent in the browser — no file editing or restart needed. Requires GOOGLE_CLIENT_ID/SECRET (run the `setup` prompt first if missing).',
+      inputSchema: {
+        alias: z.string().optional().describe('Account alias (letters, digits, _ or -). Pass with email to add directly, skipping the form.'),
+        email: z.string().optional().describe("The account's Google address (used as the login hint)"),
+        bundles: z.string().optional().describe('Optional scope bundles, comma-separated (e.g. "forms,chat"); blank = base scopes only'),
+        allBundles: coerceBoolean.optional().describe('Grant every optional bundle (biggest consent screen); overrides bundles'),
+        admin: coerceBoolean.optional().describe('Grant Workspace admin scopes (super-admin accounts only)'),
+      },
     },
-    async () => {
+    async (args: unknown) => {
       try {
         // Env-sourced registry: GOOGLE_ACCOUNTS is the exclusive source and
         // config.json accounts are ignored, so a wizard add would be a phantom
@@ -204,17 +228,25 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
         if (!hasClientCredentials()) {
           return textResult('E_CLIENT_CREDENTIALS_MISSING: GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET are not set. Run the `setup` prompt (/mcp__google-multi__setup) to create an OAuth client, then set them.', true);
         }
-        const caps = server.server.getClientCapabilities?.() as { elicitation?: { form?: boolean } } | undefined;
-        if (!caps?.elicitation?.form) {
-          return textResult('This client does not support form elicitation. Add the account from the CLI instead: `npx mcp-google-multi account add --alias <alias> --email <email> [--profile a,b] [--admin]`.', true);
+        // S1: collect the registry row. Arguments win over the form so the
+        // wizard still works in clients without form elicitation (where the
+        // interactive path used to dead-end).
+        const a = (args ?? {}) as { alias?: string; email?: string; bundles?: string; allBundles?: boolean; admin?: boolean };
+        let input: Partial<AddForm>;
+        if (a.alias?.trim() || a.email?.trim()) {
+          input = argsToAddForm(a);
+        } else {
+          const caps = server.server.getClientCapabilities?.() as { elicitation?: { form?: boolean } } | undefined;
+          if (!caps?.elicitation?.form) {
+            return textResult('E_NO_FORM_ELICITATION: this client does not support the interactive form. Call account_add again with arguments instead, e.g. {"alias": "work", "email": "you@example.com"} (optional: "bundles" as a comma-separated list, "allBundles": true, "admin": true).', true);
+          }
+          const form = await server.server.elicitInput({ message: 'Add a Google account', requestedSchema: addFormSchema() } as never);
+          if ((form as { action?: string }).action !== 'accept') {
+            return textResult('confirmation_declined: no account was added.');
+          }
+          input = (form as { content?: Partial<AddForm> }).content ?? {};
         }
-
-        // S1: collect the registry row.
-        const form = await server.server.elicitInput({ message: 'Add a Google account', requestedSchema: addFormSchema() } as never);
-        if ((form as { action?: string }).action !== 'accept') {
-          return textResult('confirmation_declined: no account was added.');
-        }
-        const validated = validateAddForm((form as { content?: Partial<AddForm> }).content ?? {}, getAccountSet().aliases);
+        const validated = validateAddForm(input, getAccountSet().aliases);
         if (!validated.ok) return textResult(`${validated.slug}: ${validated.message}`, true);
 
         // S2: atomic write + make the alias callable without a restart (BR3).

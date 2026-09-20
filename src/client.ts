@@ -22,10 +22,12 @@ export async function getClient(account: Account) {
     );
   }
 
+  // Redirect URI is unused on the refresh-token grant; consent flows bind an
+  // ephemeral loopback port at auth time (oauth-consent.ts).
   const oauth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    'http://localhost:4242/oauth2callback',
+    'http://localhost/oauth2callback',
   );
 
   const tokenData = readToken(account);
