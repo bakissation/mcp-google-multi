@@ -191,7 +191,13 @@ export const CURATED_METHOD_IDS: string[] = [
 // keeps the single coerceJson body arg even when the schema is flat; 'typed'
 // lifts the property-count cap (flatness stays mandatory — the generator
 // throws if a forced method has nested/$ref props).
-export const BODY_OVERRIDES: Record<string, 'typed' | 'opaque'> = {};
+export const BODY_OVERRIDES: Record<string, 'typed' | 'opaque'> = {
+  // 63 flat props each: typed params would cost more context than they save,
+  // so the cap already routes both to opaque. Recorded here so the choice is
+  // explicit intent, not an emergent property of MAX_TYPED_BODY_PROPS.
+  'groupsSettings.groups.patch': 'opaque',
+  'groupsSettings.groups.update': 'opaque',
+};
 
 // Corrections where HTTP-verb inference misreads a method's effect.
 export const CUD_OVERRIDES: Record<string, Cud> = {
