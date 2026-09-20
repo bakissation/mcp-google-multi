@@ -1,5 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { ListToolsResult, McpServer } from "@modelcontextprotocol/server";
 import { z } from 'zod';
 import { type Policy, isAllowed, writeDisabledResult, IRREVERSIBLE_TOOLS } from './write-control.js';
 import { getAccountSet, refreshAccountSetIfStale } from './accounts.js';
@@ -384,8 +383,12 @@ export class ToolRegistry {
     if (this.tools.length === 0) {
       throw new Error('installListHandler() requires at least one registered tool');
     }
-    this.server.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: this.tools.filter((t) => this.isVisible(t)).map((t) => this.toToolJson(t)),
+    this.server.server.setRequestHandler('tools/list', async () => ({
+      // The wire Tool is hand-built because the SDK's own types drop the
+      // anthropic/* _meta keys honoring clients read. z.toJSONSchema emits a
+      // valid draft-7 object schema by construction, which the SDK's recursive
+      // JSON-Schema type cannot infer from our cached `unknown`.
+      tools: this.tools.filter((t) => this.isVisible(t)).map((t) => this.toToolJson(t)) as ListToolsResult['tools'],
     }));
   }
 

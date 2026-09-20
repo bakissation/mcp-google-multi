@@ -1,5 +1,4 @@
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { JSONRPCMessage, MessageExtraInfo } from '@modelcontextprotocol/sdk/types.js';
+import type { Transport, JSONRPCMessage, MessageExtraInfo } from "@modelcontextprotocol/server";
 import type { Metrics } from './usage-metrics.js';
 
 // Pre-handler failure tap (metrics spec section 3), following the
@@ -17,6 +16,17 @@ import type { Metrics } from './usage-metrics.js';
 type OnMessage = (<T extends JSONRPCMessage>(message: T, extra?: MessageExtraInfo) => void) | undefined;
 
 const PENDING_CAP = 1_000;
+
+// The SDK synthesizes input-validation failures as isError RESULTS, skipping
+// the handler entirely, so neither the registry wrapper nor the error-frame
+// path sees them. The text is prose in both SDK eras (v1 prefixed it with
+// "MCP error -32602: ", v2 dropped that prefix), while handler envelopes are
+// always JSON starting with "{" — so this can never double count one.
+const SCHEMA_VALIDATION_TEXT = /^(MCP error -32602: )?Input validation error:/;
+
+export function isSchemaValidationText(text: string): boolean {
+  return SCHEMA_VALIDATION_TEXT.test(text);
+}
 
 export function tapUsageMetrics(transport: Transport, metrics: Metrics): Transport {
   const pending = new Map<string | number, string>();
@@ -40,14 +50,9 @@ export function tapUsageMetrics(transport: Transport, metrics: Metrics): Transpo
               metrics.recordRpc(m.error.code);
             }
           } else if (m.result?.isError === true) {
-            // SDK 1.x synthesizes input-validation failures as isError RESULTS
-            // ("MCP error -32602: ..."), skipping the handler entirely, so the
-            // registry wrapper never sees them either. Handler envelopes are
-            // JSON text and never carry this prefix, so nothing double counts.
             const first = m.result.content?.[0]?.text;
-            if (typeof first === 'string' && first.startsWith('MCP error -32602:')) {
-              if (/tool \S+ not found|unknown tool/i.test(first)) metrics.recordRpc('tool_not_found');
-              else metrics.recordRpc('schema_validation', tool);
+            if (typeof first === 'string' && isSchemaValidationText(first)) {
+              metrics.recordRpc('schema_validation', tool);
             }
           }
         }

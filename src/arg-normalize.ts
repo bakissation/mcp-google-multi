@@ -1,5 +1,4 @@
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { JSONRPCMessage, MessageExtraInfo } from '@modelcontextprotocol/sdk/types.js';
+import type { Transport, JSONRPCMessage, MessageExtraInfo } from "@modelcontextprotocol/server";
 
 // Wire-level tools/call argument normalization. Clients (LLMs) recurringly
 // snake_case a camelCase parameter (thread_id for threadId) and burn a retry

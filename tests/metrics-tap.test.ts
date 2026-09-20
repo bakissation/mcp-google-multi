@@ -2,9 +2,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
-import { tapUsageMetrics } from '../src/metrics-tap.js';
+import type { Transport, JSONRPCMessage } from "@modelcontextprotocol/server";
+import { isSchemaValidationText, tapUsageMetrics } from '../src/metrics-tap.js';
 import { Metrics } from '../src/usage-metrics.js';
 import { normalizeMessage } from '../src/arg-normalize.js';
 
@@ -82,16 +81,27 @@ describe('tapUsageMetrics', () => {
     expect(readDay(dir).rpc).toEqual({ 'rpc_error_-32601': 1, rpc_error_other: 1 });
   });
 
-  it('an SDK-synthesized -32602 isError RESULT counts as schema_validation (SDK 1.x shape)', async () => {
+  // Wire-captured from both SDK eras: v1 prefixed the prose with
+  // "MCP error -32602: ", v2 emits it bare. Both must count.
+  it.each([
+    ['v1 prefixed', 'MCP error -32602: Input validation error: Invalid arguments for tool tasks_update'],
+    ['v2 bare', 'Input validation error: Invalid arguments for tool tasks_update: tasklistId: Invalid input: expected string, received undefined'],
+  ])('an SDK-synthesized validation isError RESULT counts as schema_validation (%s)', async (_label, text) => {
     const { m, dir } = makeMetrics();
     const { tapped, inbound } = drive(m);
     inbound(call(7, 'tasks_update'));
     await tapped.send({
       jsonrpc: '2.0', id: 7,
-      result: { isError: true, content: [{ type: 'text', text: 'MCP error -32602: Input validation error: Invalid arguments for tool tasks_update' }] },
+      result: { isError: true, content: [{ type: 'text', text }] },
     } as unknown as JSONRPCMessage);
     m.flush();
     expect(readDay(dir).validation).toEqual({ tasks_update: 1 });
+  });
+
+  it('isSchemaValidationText never matches a handler JSON envelope', () => {
+    expect(isSchemaValidationText('{"error":"invalid_params","message":"Input validation error: x"}')).toBe(false);
+    expect(isSchemaValidationText('Input validation error: Invalid arguments for tool x')).toBe(true);
+    expect(isSchemaValidationText('MCP error -32602: Input validation error: x')).toBe(true);
   });
 
   it('a handler isError envelope on the send path counts nothing here', async () => {
