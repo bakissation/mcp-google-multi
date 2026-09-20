@@ -3,8 +3,13 @@ import * as path from 'path';
 
 // path.basename() is a traversal guard — a caller-supplied filename must never escape savePath.
 export function prepareLocalDest(savePath: string, filename: string): string {
-  const dest = path.join(savePath, path.basename(filename));
-  fs.mkdirSync(savePath, { recursive: true });
+  const name = path.basename(filename);
+  // Agents routinely pass the intended FILE path as savePath and repeat the
+  // name in `filename`; a blind join would mkdir a directory named like the
+  // file and bury the download inside it, so strip the duplicated leaf.
+  const dir = path.basename(savePath) === name ? path.dirname(savePath) : savePath;
+  const dest = path.join(dir, name);
+  fs.mkdirSync(dir, { recursive: true });
   return dest;
 }
 
