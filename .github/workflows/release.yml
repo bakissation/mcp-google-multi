@@ -53,6 +53,69 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx semantic-release
 
+  # Packs the MCPB bundle (dist + production node_modules per .mcpbignore) and
+  # attaches it to the GitHub release, so desktop clients install without npm.
+  # Chained like docker below; workflow_dispatch backfills the asset for an
+  # existing tag.
+  mcpb:
+    needs: release
+    if: >-
+      !cancelled() &&
+      (github.event_name == 'workflow_dispatch' ||
+       (needs.release.result == 'success' && needs.release.outputs.version != ''))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Resolve version
+        id: rel
+        env:
+          EVT: ${{ github.event_name }}
+          IN_VERSION: ${{ inputs.version }}
+          REL_VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          if [ "$EVT" = "workflow_dispatch" ]; then version="$IN_VERSION"; else version="$REL_VERSION"; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: v${{ steps.rel.outputs.version }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+
+      # Prune BEFORE stamping: npm ci verifies package.json against the lock,
+      # and the stamped version exists only in this workspace, never in git.
+      - name: Prune to production dependencies
+        run: npm ci --omit=dev
+
+      - name: Stamp the released version into manifest.json and package.json
+        env:
+          VERSION: ${{ steps.rel.outputs.version }}
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            for (const f of ["manifest.json", "package.json"]) {
+              const j = JSON.parse(fs.readFileSync(f, "utf8"));
+              j.version = process.env.VERSION;
+              fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
+            }'
+
+      - name: Pack
+        run: npx --yes @anthropic-ai/mcpb@^2.1.2 pack . mcp-google-multi.mcpb
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "v${{ steps.rel.outputs.version }}" mcp-google-multi.mcpb --clobber
+
   # Publishes the released version as a multi-arch image on GHCR. Chained here
   # (not `on: push: tags`) because tags pushed with GITHUB_TOKEN never trigger
   # other workflows. workflow_dispatch backfills an image for an existing tag.

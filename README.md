@@ -20,6 +20,8 @@ New to all this? It's written for someone who just installed Claude Code and has
    npm install -g mcp-google-multi
    ```
 
+   Claude Desktop user? You can skip npm entirely: download the `mcp-google-multi.mcpb` bundle from the [latest release](https://github.com/bakissation/mcp-google-multi/releases/latest), double-click it (or drag it into Claude Desktop → Settings → Extensions), and fill in the values from step 2 when prompted.
+
 2. **Make your Google key** (the one manual part, a few minutes, because Google has no way to script it). Follow the step-by-step [Google Cloud setup](./docs/google-cloud-setup.md), or just ask Claude Code: *"walk me through creating a Google OAuth Desktop client for mcp-google-multi."* You finish with two values, a **Client ID** and a **Client Secret**. It's free and private to you.
 
 3. **Put them in a file.** In the folder you'll run from, make a file named `.env` and paste this, filling in your values:
