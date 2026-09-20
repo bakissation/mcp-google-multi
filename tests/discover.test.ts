@@ -34,6 +34,38 @@ describe('registerDiscoverTools', () => {
     expect(gmail.config.description).toContain('search, send');
   });
 
+  it('caps the description vocabulary: curated listed up to the cap, generated grouped (RQ2 token diet)', () => {
+    const registered: { name: string; config: { description: string } }[] = [];
+    const server = {
+      registerTool: (name: string, config: never, handler: never) => {
+        registered.push({ name, config });
+        void handler;
+        return 'ok';
+      },
+      sendToolListChanged: vi.fn(),
+      server: { setRequestHandler: () => {} },
+    };
+    const registry = new ToolRegistry(server as never, POLICY);
+    for (let i = 0; i < 15; i++) {
+      registry.registerTool(`big_op${i}`, { description: 'x', inputSchema: { account: z.string() } }, () => {});
+    }
+    for (let i = 0; i < 30; i++) {
+      registry.registerTool(
+        `big_res${i % 5}_m${i}`,
+        { description: 'x', inputSchema: { account: z.string() }, cud: 'read' } as never,
+        () => {},
+      );
+    }
+    registerDiscoverTools(registry, POLICY);
+    const big = registered.find((r) => r.name === 'big_discover')!;
+    // 15 curated ops, cap 10 shown; 30 generated ops compressed to groups.
+    expect(big.config.description).toContain('+5 more');
+    expect(big.config.description).toContain('30 generated ops:');
+    expect(big.config.description).toContain('res0');
+    expect(big.config.description).not.toContain('m29');
+    expect(big.config.description.length).toBeLessThan(600);
+  });
+
   it('discover returns the catalog, reveals the service, and notifies once', async () => {
     const { registry, registered, server } = setup();
     const gmail = registered.find((r) => r.name === 'gmail_discover')!;
