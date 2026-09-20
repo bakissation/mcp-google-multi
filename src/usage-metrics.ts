@@ -32,6 +32,7 @@ const CHARS_BOUNDS = [64, 256, 1024, 4096, 16384, 65536] as const;
 // arbitrary strings into recorded values (spec section 1).
 const METHOD_ID_RE = /^[a-z][a-zA-Z0-9]*(\.[a-zA-Z0-9]+)+$/;
 const METHOD_ID_MAX = 128;
+const TOOL_NAME_RE = /^[a-z][a-z0-9_]{0,63}$/;
 
 /** Union of every `error:` slug literal emitted anywhere in src/ (kept honest
  * by a set-equality grep test). Anything outside buckets to `other`. */
@@ -459,11 +460,12 @@ export class Metrics {
     } catch { /* never throws outward */ }
   }
 
-  recordArgFix(tool: string): void {
+  recordArgFix(tool: string, by = 1): void {
     try {
       this.rolloverIfNeeded();
+      if (!TOOL_NAME_RE.test(tool)) return;
       const t = (this.deltas.tools[tool] ??= { n: 0, err: {}, hint: 0, lat: {} });
-      t.argfix = (t.argfix ?? 0) + 1;
+      t.argfix = (t.argfix ?? 0) + by;
       this.dirty = true;
     } catch { /* never throws outward */ }
   }
@@ -473,7 +475,9 @@ export class Metrics {
     try {
       this.rolloverIfNeeded();
       if (kind === 'schema_validation') {
-        if (tool) addInto(this.deltas.validation, tool);
+        // The tap's name came off the wire; the shape gate keeps a weird
+        // -32602 from writing free text (registered names always pass).
+        if (tool && TOOL_NAME_RE.test(tool)) addInto(this.deltas.validation, tool);
       } else if (kind === 'tool_not_found') {
         addInto(this.deltas.rpc, 'tool_not_found');
       } else {
@@ -482,7 +486,8 @@ export class Metrics {
       this.events.push(JSON.stringify({
         ts: new Date(this.now()).toISOString().slice(0, 16) + ':00Z',
         boot: this.bootId, seq: this.seq++,
-        tool: tool ?? 'other', ok: false, ms: 0, chars: 'le64', src: 'rpc',
+        tool: tool && TOOL_NAME_RE.test(tool) ? tool : 'other',
+        ok: false, ms: 0, chars: 'le64', src: 'rpc',
       }));
       this.dirty = true;
     } catch { /* never throws outward */ }
@@ -561,6 +566,28 @@ export class Metrics {
       return this.dir;
     }
   }
+}
+
+/** Read-only description of the metrics dir for doctor/diagnose status lines
+ * (never creates anything; safe to call with the feature off). */
+export function describeMetricsDir(env: NodeJS.ProcessEnv = process.env): { dir: string; files: number; kb: number } {
+  const dir = env.USAGE_METRICS_PATH ?? path.join(stateDir(env), METRICS_DIR_NAME);
+  let files = 0;
+  let bytes = 0;
+  try {
+    const candidates = [
+      ...fs.readdirSync(path.join(dir, 'agg')).map((f) => path.join(dir, 'agg', f)),
+      path.join(dir, 'events.jsonl'),
+      path.join(dir, 'events.1.jsonl'),
+    ];
+    for (const f of candidates) {
+      try {
+        bytes += fs.statSync(f).size;
+        files += 1;
+      } catch { /* absent */ }
+    }
+  } catch { /* dir absent: zeros */ }
+  return { dir, files, kb: Math.round(bytes / 1024) };
 }
 
 /**

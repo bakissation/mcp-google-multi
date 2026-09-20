@@ -311,6 +311,11 @@ export class ToolRegistry {
       }));
   }
 
+  /** The metrics recorder, for hook sites (escape hatch); null when off. */
+  get usageMetrics(): Metrics | null {
+    return this.metrics;
+  }
+
   /** Op-name vocabulary for a service, split by provenance so the capped
    * discover descriptions can list curated ops and only summarize the
    * generated long tail. */

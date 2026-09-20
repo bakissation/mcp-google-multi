@@ -6,7 +6,9 @@ import { getAccountSet } from './accounts.js';
 import { deriveAccountHealth, type AccountHealth } from './tools/accounts-tool.js';
 import { peekMasterKeyProvenance, deleteMasterKeyMaterial } from './master-key.js';
 import { hasToken } from './token-store.js';
-import { configDir } from './config-file.js';
+import { configDir, loadConfigFile } from './config-file.js';
+import { envValueSource } from './env-load.js';
+import { describeMetricsDir, resolveUsageMetrics, sourceLabel } from './usage-metrics.js';
 import { probeApiEnablement } from './api-probe.js';
 import { resolveHttpConfig, HttpConfigError, type HttpConfig } from './http-config.js';
 import { parseOwnerEmails } from './http-transport.js';
@@ -183,7 +185,23 @@ function sectionConfig(deps: DiagnosticsDeps, set: ReturnType<typeof getAccountS
     }
   }
 
+  lines.push(usageMetricsStatusLine(deps.env));
+
   return { id: 2, title: 'Config', verdict, lines, ...(hint ? { hint } : {}), ...(slug ? { slug } : {}) };
+}
+
+/** One line, state AND source, so the people being measured can see both
+ * here and in `diagnose` (metrics spec section 2). Read-only. */
+export function usageMetricsStatusLine(env: Record<string, string | undefined>): string {
+  const envSrc = envValueSource('GOOGLE_USAGE_METRICS');
+  let configValue: boolean | undefined;
+  try {
+    configValue = loadConfigFile(undefined, 'throw')?.usageMetrics;
+  } catch { /* invalid config is section 2's business, not this line's */ }
+  const state = resolveUsageMetrics(env, configValue, envSrc?.kind === 'file' ? envSrc.file : undefined);
+  if (!state.enabled) return `local usage metrics: off ${sourceLabel(state.source)}`;
+  const d = describeMetricsDir(env);
+  return `local usage metrics: on ${sourceLabel(state.source)} -> ${d.dir} (${d.files} files, ${d.kb} KB)`;
 }
 
 function sectionKeys(deps: DiagnosticsDeps, aliases: string[]): DiagnosticSection {

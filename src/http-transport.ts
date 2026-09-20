@@ -9,6 +9,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HttpConfig } from './http-config.js';
 import { withArgNormalization, type ArgShape } from './arg-normalize.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 export type AuthOutcome =
   | { ok: true }
@@ -37,6 +38,10 @@ export interface HttpHostOptions {
   dispatchTimeoutMs?: number;
   /** tools/call argument-key normalization lookup (arg-normalize.ts); absent = off. */
   argShapeFor?: (tool: string) => ArgShape | undefined;
+  /** Usage-metrics transport tap (metrics-tap.ts); absent = off. */
+  metricsTap?: (t: Transport) => Transport;
+  /** Usage-metrics argfix observer, forwarded into arg normalization. */
+  onArgRename?: (tool: string, renames: number) => void;
 }
 
 // A hung handler that keeps the connection open would otherwise hold the global
@@ -228,8 +233,9 @@ export class HttpTransportHost {
         timer = setTimeout(() => resolve('timeout'), deadlineMs);
         timer.unref?.();
       });
+      const tapped = this.opts.metricsTap ? this.opts.metricsTap(transport) : transport;
       await this.opts.server.connect(
-        this.opts.argShapeFor ? withArgNormalization(transport, this.opts.argShapeFor, this.opts.log) : transport,
+        this.opts.argShapeFor ? withArgNormalization(tapped, this.opts.argShapeFor, this.opts.log, this.opts.onArgRename) : tapped,
       );
       // Reflect the dispatch into a non-rejecting arm: if the deadline wins the
       // race, an orphaned handler settling later must not surface as an unhandled

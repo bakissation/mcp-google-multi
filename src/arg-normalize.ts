@@ -59,6 +59,7 @@ export function normalizeMessage(
   msg: JSONRPCMessage,
   shapeFor: (tool: string) => ArgShape | undefined,
   log: (line: string) => void = (l) => process.stderr.write(`${l}\n`),
+  onRename?: (tool: string, renames: number) => void,
 ): JSONRPCMessage {
   const m = msg as ToolCallLike;
   if (m.method !== 'tools/call' || typeof m.params?.name !== 'string') return msg;
@@ -70,6 +71,7 @@ export function normalizeMessage(
   if (renamed.length === 0) return msg;
   // Key names only — argument VALUES never reach the log.
   log(`[args] ${m.params.name}: ${renamed.map(([f, t]) => `${f} -> ${t}`).join(', ')}`);
+  try { onRename?.(m.params.name, renamed.length); } catch { /* observers never break dispatch */ }
   return {
     ...(msg as Record<string, unknown>),
     params: { ...(m.params as Record<string, unknown>), arguments: normalized },
@@ -86,6 +88,7 @@ export function withArgNormalization(
   transport: Transport,
   shapeFor: (tool: string) => ArgShape | undefined,
   log?: (line: string) => void,
+  onRename?: (tool: string, renames: number) => void,
 ): Transport {
   const wrapper = {
     start: () => transport.start(),
@@ -96,7 +99,7 @@ export function withArgNormalization(
     get: () => transport.onmessage,
     set: (handler: OnMessage) => {
       transport.onmessage = handler
-        ? (message, extra) => handler(normalizeMessage(message, shapeFor, log), extra)
+        ? (message, extra) => handler(normalizeMessage(message, shapeFor, log, onRename), extra)
         : undefined;
     },
   });

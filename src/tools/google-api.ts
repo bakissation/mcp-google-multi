@@ -114,11 +114,14 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       if (api) {
         requested = resolveApiAliases(api);
         if (!requested) {
+          registry.usageMetrics?.recordSearchApi(null);
           return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false }, true);
         }
         const enabled = requested.filter(apiEnabled);
         if (enabled.length === 0) return toolsetDisabled(requested[0]);
         requested = enabled;
+        // Post-resolution SUPPORTED_APIS keys only (closed vocabulary).
+        registry.usageMetrics?.recordSearchApi(requested);
       }
       const apis = requested ?? enabledApis;
       const unavailable: string[] = [];
@@ -209,6 +212,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         }
       }
       if (!method) {
+        registry.usageMetrics?.recordEscapeMethod(null);
         const near = nearestMethodIds(String(methodId), index);
         return jsonResult(
           {
@@ -224,6 +228,8 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         );
       }
 
+      // The RESOLVED index id only, never the caller's methodId argument.
+      registry.usageMetrics?.recordEscapeMethod(method.id);
       const cud = cudFromMethod(method);
       const policyService = serviceForAlias(apiKey);
       const lastSegment = method.id.split('.').pop() ?? method.id;
