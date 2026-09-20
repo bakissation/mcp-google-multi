@@ -1,0 +1,77 @@
+{
+  "comment": "Tier-2 agent eval tasks (read-only by design; safe under GOOGLE_PROFILE=read-only). expectFirst = acceptable FIRST tool calls (selection metric); successTools = at least one non-error result from this set makes the run a success. Derived from the WS3 transcript task mix.",
+  "tasks": [
+    {
+      "id": "unread-count",
+      "prompt": "Using my Google tools, how many unread emails are in my inbox right now? Reply with just the number.",
+      "expectFirst": ["gmail_search"],
+      "successTools": ["gmail_search"]
+    },
+    {
+      "id": "find-file",
+      "prompt": "Search my Google Drive for the most recently modified file whose name contains the word 'report' (any case) and tell me its exact file name.",
+      "expectFirst": ["drive_search"],
+      "successTools": ["drive_search"]
+    },
+    {
+      "id": "today-events",
+      "prompt": "List the titles of today's events on my primary Google calendar. If there are none, say 'none'.",
+      "expectFirst": ["calendar_list_events"],
+      "successTools": ["calendar_list_events"]
+    },
+    {
+      "id": "account-roster",
+      "prompt": "Which Google account aliases are configured on this server, and which one is the default?",
+      "expectFirst": ["account_list"],
+      "successTools": ["account_list"]
+    },
+    {
+      "id": "contact-search",
+      "prompt": "Search my Google contacts for anyone whose email is on gmail.com and give me one matching name.",
+      "expectFirst": ["contacts_search", "contacts_list"],
+      "successTools": ["contacts_search", "contacts_list"]
+    },
+    {
+      "id": "gsc-sites",
+      "prompt": "List the site properties registered in my Google Search Console.",
+      "expectFirst": ["searchconsole_sites_list"],
+      "successTools": ["searchconsole_sites_list"]
+    },
+    {
+      "id": "ga4-summaries",
+      "prompt": "List my Google Analytics (GA4) account summaries: account and property names.",
+      "expectFirst": ["analytics_account_summaries"],
+      "successTools": ["analytics_account_summaries"]
+    },
+    {
+      "id": "escape-discovery",
+      "prompt": "Is there a Google API method to list the revisions of a Drive file? Find its Discovery method id. Do NOT call the method itself, just find the id.",
+      "expectFirst": ["google_api_search"],
+      "successTools": ["google_api_search"]
+    },
+    {
+      "id": "fanout-unread",
+      "prompt": "Across ALL of my configured Google accounts at once, how many unread emails does each account have? Use a single fan-out call with account \"*\".",
+      "expectFirst": ["gmail_search"],
+      "successTools": ["gmail_search"]
+    },
+    {
+      "id": "attachment-name",
+      "prompt": "Find the most recent email in my inbox that has an attachment and tell me the attachment's filename. Do not download it.",
+      "expectFirst": ["gmail_search"],
+      "successTools": ["gmail_read"]
+    },
+    {
+      "id": "tasklists",
+      "prompt": "List the names of my Google Tasks task lists.",
+      "expectFirst": ["tasks_lists_list"],
+      "successTools": ["tasks_lists_list"]
+    },
+    {
+      "id": "doc-first-line",
+      "prompt": "Find my most recently modified Google Doc in Drive and quote its first line of text.",
+      "expectFirst": ["drive_search"],
+      "successTools": ["drive_read", "docs_get"]
+    }
+  ]
+}

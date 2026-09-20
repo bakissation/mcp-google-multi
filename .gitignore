@@ -5,3 +5,4 @@ tokens/
 .env
 discovery/
 *.mcpb
+eval/tier2/out/
