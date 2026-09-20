@@ -293,6 +293,20 @@ export class ToolRegistry {
       }));
   }
 
+  /** Op-name vocabulary for a service, split by provenance so the capped
+   * discover descriptions can list curated ops and only summarize the
+   * generated long tail. */
+  opNames(service: string): { curated: string[]; generated: string[] } {
+    const strip = (n: string) => (n.startsWith(`${service}_`) ? n.slice(service.length + 1) : n);
+    const curated: string[] = [];
+    const generated: string[] = [];
+    for (const t of this.tools) {
+      if (t.meta || t.service !== service) continue;
+      (t.generated ? generated : curated).push(strip(t.name));
+    }
+    return { curated: [...new Set(curated)], generated: [...new Set(generated)] };
+  }
+
   reveal(service: string): boolean {
     if (this.revealed.has(service)) return false;
     this.revealed.add(service);
