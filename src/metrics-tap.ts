@@ -24,7 +24,11 @@ export function tapUsageMetrics(transport: Transport, metrics: Metrics): Transpo
     start: () => transport.start(),
     send: (message: JSONRPCMessage, options?: Parameters<Transport['send']>[1]) => {
       try {
-        const m = message as { id?: string | number; error?: { code?: number; message?: string } };
+        const m = message as {
+          id?: string | number;
+          error?: { code?: number; message?: string };
+          result?: { isError?: boolean; content?: { text?: string }[] };
+        };
         if (m.id !== undefined) {
           const tool = pending.get(m.id);
           pending.delete(m.id);
@@ -34,6 +38,16 @@ export function tapUsageMetrics(transport: Transport, metrics: Metrics): Transpo
               else metrics.recordRpc('schema_validation', tool);
             } else {
               metrics.recordRpc(m.error.code);
+            }
+          } else if (m.result?.isError === true) {
+            // SDK 1.x synthesizes input-validation failures as isError RESULTS
+            // ("MCP error -32602: ..."), skipping the handler entirely, so the
+            // registry wrapper never sees them either. Handler envelopes are
+            // JSON text and never carry this prefix, so nothing double counts.
+            const first = m.result.content?.[0]?.text;
+            if (typeof first === 'string' && first.startsWith('MCP error -32602:')) {
+              if (/tool \S+ not found|unknown tool/i.test(first)) metrics.recordRpc('tool_not_found');
+              else metrics.recordRpc('schema_validation', tool);
             }
           }
         }
