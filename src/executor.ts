@@ -3,6 +3,7 @@ import { getClient } from './client.js';
 import { expandPath, isGoogleApiUrl } from './discovery-client.js';
 import { handleGoogleApiError } from './tools/_errors.js';
 import { scopeHintForMethod } from './scope-observability.js';
+import { checkOutboundForMethod } from './outbound-allowlist.js';
 
 export const MAX_RESPONSE_CHARS = 100_000;
 
@@ -56,6 +57,10 @@ export function resolveRequestBody(httpMethod: string, body: unknown): unknown {
 }
 
 export async function executeApiMethod(method: ApiMethodRef, args: ExecuteArgs, deps: ExecuteDeps = {}) {
+  // Outbound allowlist: no-op when off; with it active, structured bodies are
+  // inspected for recipient fields and raw-compose methods are refused.
+  const outbound = checkOutboundForMethod(method.id, args.body, args.account);
+  if (outbound) return outbound;
   if (args.queryParams?.alt === 'media') {
     return jsonResult(
       {
