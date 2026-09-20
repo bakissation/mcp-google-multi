@@ -45,6 +45,12 @@ jobs:
       - name: Lazy tools/list byte budget
         run: node scripts/measure-tools.mjs --check
 
+      # Deterministic, network-free tool-surface contract (see eval/README.md).
+      - name: Contract suite (promptfoo)
+        env:
+          PROMPTFOO_DISABLE_UPDATE: '1'
+        run: npm run eval:contract
+
   # Separate job on purpose: branch protection requires the check literally named
   # "ci" — a version matrix would rename it to "ci (...)". This is the only leg
   # exercising the declared engines floor (BV-7); the main job stays on 24.

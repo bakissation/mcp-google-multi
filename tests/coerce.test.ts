@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { coerceArray, coerceJson, coerceBoolean } from '../src/tools/_coerce.js';
+import { coerceArray, coerceJson, coerceBoolean, coerceNumber } from '../src/tools/_coerce.js';
 
 describe('coerceArray', () => {
   const s = coerceArray(z.string());
@@ -38,4 +38,21 @@ describe('coerceBoolean', () => {
     for (const v of ['false', '0', 'no', 'N']) expect(coerceBoolean.parse(v)).toBe(false);
   });
   it('rejects nonsense', () => expect(coerceBoolean.safeParse('maybe').success).toBe(false));
+});
+
+describe('coerceNumber', () => {
+  const schema = coerceNumber(z.number().min(1).max(100));
+  it('passes numbers through', () => expect(schema.parse(5)).toBe(5));
+  it('coerces numeric strings (stdio has no arg-normalization layer)', () => {
+    expect(schema.parse('5')).toBe(5);
+    expect(schema.parse(' 20 ')).toBe(20);
+  });
+  it('still enforces the inner bounds after coercion', () => {
+    expect(schema.safeParse('0').success).toBe(false);
+    expect(schema.safeParse('101').success).toBe(false);
+  });
+  it('rejects non-numeric strings and empty strings', () => {
+    expect(schema.safeParse('five').success).toBe(false);
+    expect(schema.safeParse('').success).toBe(false);
+  });
 });
