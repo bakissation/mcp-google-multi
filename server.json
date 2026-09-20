@@ -1,0 +1,85 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.bakissation/mcp-google-multi",
+  "title": "Google Workspace (multi-account)",
+  "description": "Multi-account Google Workspace MCP server: 940 tools, 29 services, discover-first, BYO OAuth.",
+  "repository": {
+    "url": "https://github.com/bakissation/mcp-google-multi.git",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/bakissation/mcp-google-multi#readme",
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "mcp-google-multi",
+      "version": "0.0.0",
+      "runtimeHint": "npx",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "GOOGLE_CLIENT_ID",
+          "description": "OAuth 2.0 Desktop client ID from your own Google Cloud project (docs/google-cloud-setup.md).",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "GOOGLE_CLIENT_SECRET",
+          "description": "OAuth 2.0 Desktop client secret paired with GOOGLE_CLIENT_ID.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "GOOGLE_ACCOUNTS",
+          "description": "Comma-separated alias:email pairs, e.g. work:you@company.com,personal:you@gmail.com.",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "MASTER_KEY",
+          "description": "Base64 32-byte key encrypting the local token store; auto-generated and stored for you when unset.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    },
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/bakissation/mcp-google-multi:0.0.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "GOOGLE_CLIENT_ID",
+          "description": "OAuth 2.0 Desktop client ID from your own Google Cloud project.",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "GOOGLE_CLIENT_SECRET",
+          "description": "OAuth 2.0 Desktop client secret paired with GOOGLE_CLIENT_ID.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "GOOGLE_ACCOUNTS",
+          "description": "Comma-separated alias:email pairs, e.g. work:you@company.com,personal:you@gmail.com.",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "MASTER_KEY",
+          "description": "Base64 32-byte key encrypting the local token store.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/bakissation/mcp-google-multi/releases/download/v0.0.0/mcp-google-multi.mcpb",
+      "version": "0.0.0",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "transport": { "type": "stdio" }
+    }
+  ]
+}

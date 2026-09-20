@@ -1,6 +1,7 @@
 {
   "name": "mcp-google-multi",
   "version": "0.0.0-semantically-released",
+  "mcpName": "io.github.bakissation/mcp-google-multi",
   "description": "Local MCP server for Google Workspace (Gmail, Drive, Calendar, Sheets, Docs, Contacts, Tasks, Meet, Search Console, +Forms/Chat/Admin) across multiple accounts — OAuth-only, encrypted token storage, deny-by-default writes.",
   "type": "module",
   "license": "MIT",
