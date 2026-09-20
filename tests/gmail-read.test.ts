@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMessage } from '../src/tools/gmail.js';
+import { compactMessageRow, parseMessage } from '../src/tools/gmail.js';
 
 const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64url');
 
@@ -194,5 +194,25 @@ describe('parseMessage attachments', () => {
     expect(parseMessage(msg(payload)).attachments).toEqual([
       { filename: 'f.bin', attachmentId: 'a1', mimeType: 'application/octet-stream' },
     ]);
+  });
+});
+
+describe('compactMessageRow (search response shaping)', () => {
+  const base = {
+    id: 'm1', threadId: 't1', subject: 'Hello', from: 'a@b.c', to: 'x@y.z',
+    date: 'Mon, 1 Jan 2026 10:00:00 +0000', snippet: 'line one\n  line   two', labelIds: ['INBOX'],
+  };
+
+  it('keeps only the selection signal and flattens the snippet to one line', () => {
+    expect(compactMessageRow(base)).toEqual({
+      id: 'm1', from: 'a@b.c', subject: 'Hello',
+      date: 'Mon, 1 Jan 2026 10:00:00 +0000', snippet: 'line one line two',
+    });
+  });
+
+  it('bounds the snippet at 120 chars with an ellipsis', () => {
+    const row = compactMessageRow({ ...base, snippet: 'x'.repeat(300) });
+    expect(row.snippet.length).toBe(120);
+    expect(row.snippet.endsWith('…')).toBe(true);
   });
 });

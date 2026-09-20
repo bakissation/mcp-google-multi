@@ -473,19 +473,35 @@ export async function readBatch(
   return [...entries, summary];
 }
 
+/** Compact gmail_search row: just the pick-one-message selection signal, with
+ * the snippet flattened to one bounded line. Pure. */
+export function compactMessageRow(m: GmailMessageHeader): { id: string; from: string; subject: string; date: string; snippet: string } {
+  const snippet = m.snippet.replace(/\s+/g, ' ').trim();
+  return {
+    id: m.id,
+    from: m.from,
+    subject: m.subject,
+    date: m.date,
+    snippet: snippet.length > 120 ? `${snippet.slice(0, 119)}…` : snippet,
+  };
+}
+
 export function registerGmailTools(server: ToolRegistry): void {
   server.registerTool(
     'gmail_search',
     {
-      description: 'Search messages in a Gmail account',
+      description:
+        'Search messages in a Gmail account. Returns compact rows (id, from, subject, date, snippet); ' +
+        'pass full=true for threadId, to, labelIds and the untruncated snippet.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         query: z.string().describe('Gmail search syntax, e.g. "from:monaam is:unread"'),
         maxResults: z.number().min(1).max(100).default(20).optional()
           .describe('Max results to return (default: 20, max: 100)'),
+        full: coerceBoolean.optional().describe('Return the full row shape instead of the compact default'),
       },
     },
-    async ({ account, query, maxResults }) => {
+    async ({ account, query, maxResults, full }) => {
       try {
         const auth = await getClient(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
@@ -525,8 +541,12 @@ export function registerGmailTools(server: ToolRegistry): void {
           }
         }
 
+        // Search is a pick-one-message step ~always followed by gmail_read;
+        // the compact row is the selection signal, the rest was measured burn
+        // (p90 14.4k chars per call). full=true restores the pre-6.0 shape.
+        const rows = full === true ? results : results.map(compactMessageRow);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(rows, null, 2) }],
         };
       } catch (error: any) {
         const mapped = composeErrorResult(error, account as Account);
