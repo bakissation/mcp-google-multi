@@ -1,4 +1,10 @@
 import type { Transport, JSONRPCMessage, MessageExtraInfo } from "@modelcontextprotocol/server";
+import {
+  screenArguments,
+  unknownArgEnvelope,
+  type SiblingSpelling,
+  type UnknownArgMode,
+} from './arg-strict.js';
 
 // Wire-level tools/call argument normalization. Clients (LLMs) recurringly
 // snake_case a camelCase parameter (thread_id for threadId) and burn a retry
@@ -77,6 +83,76 @@ export function normalizeMessage(
   } as unknown as JSONRPCMessage;
 }
 
+export interface StrictArgOptions {
+  mode: UnknownArgMode;
+  /** full declared key list for a tool, in declaration order */
+  declaredFor: (tool: string) => readonly string[] | undefined;
+  /** sibling spellings of a concept elsewhere in the same service */
+  siblingsFor?: (tool: string, keys: string[]) => SiblingSpelling[];
+  onDrop?: (tool: string, resolvedKeys: string[]) => void;
+}
+
+export type ScreenOutcome =
+  | { action: 'forward'; msg: JSONRPCMessage }
+  | { action: 'reject'; response: JSONRPCMessage };
+
+/**
+ * Screen a normalized tools/call for undeclared keys. `warn` forwards exactly
+ * as before and only reports; `reject` answers with the taxonomy envelope and
+ * never reaches the handler, so nothing is sent to Google on a guess.
+ */
+export function screenMessage(
+  msg: JSONRPCMessage,
+  opts: StrictArgOptions,
+  log: (line: string) => void = (l) => process.stderr.write(`${l}\n`),
+): ScreenOutcome {
+  if (opts.mode === 'off') return { action: 'forward', msg };
+  const m = msg as ToolCallLike & { id?: string | number };
+  if (m.method !== 'tools/call' || typeof m.params?.name !== 'string') return { action: 'forward', msg };
+  const args = m.params.arguments;
+  if (!args || typeof args !== 'object' || Array.isArray(args)) return { action: 'forward', msg };
+  const tool = m.params.name;
+  const declared = opts.declaredFor(tool);
+  // Unregistered tool: leave it to the SDK's own "not found".
+  if (!declared) return { action: 'forward', msg };
+
+  const screened = screenArguments(tool, args as Record<string, unknown>, declared);
+  if (screened.unknown.length === 0 && screened.redundant.length === 0) return { action: 'forward', msg };
+
+  const all = [...screened.unknown.map((u) => u.sent), ...screened.redundant];
+  // Key names only; argument VALUES never reach the log.
+  log(`[args] ${tool}: undeclared ${all.join(', ')}${opts.mode === 'warn' ? ' (dropped)' : ' (rejected)'}`);
+  try {
+    // Only ever a DECLARED key or the literal placeholder, so the metrics
+    // closed-vocabulary rule holds: the caller's key is never persisted.
+    opts.onDrop?.(tool, screened.unknown.map((u) => u.suggestions[0] ?? '_unmatched'));
+  } catch { /* observers never break dispatch */ }
+
+  if (opts.mode === 'warn' || screened.unknown.length === 0) return { action: 'forward', msg };
+  // Nothing to answer (a malformed notification): dispatch as before.
+  if (m.id === undefined) return { action: 'forward', msg };
+
+  const account = (args as { account?: unknown }).account;
+  const siblings = screened.unknown.some((u) => u.suggestions.length > 0)
+    ? []
+    : (opts.siblingsFor?.(tool, screened.unknown.map((u) => u.sent)) ?? []);
+  const envelope = unknownArgEnvelope(
+    tool,
+    screened.unknown,
+    declared,
+    typeof account === 'string' ? account : undefined,
+    siblings,
+  );
+  return {
+    action: 'reject',
+    response: {
+      jsonrpc: '2.0',
+      id: m.id,
+      result: { content: [{ type: 'text', text: JSON.stringify(envelope) }], isError: true },
+    } as unknown as JSONRPCMessage,
+  };
+}
+
 type OnMessage = (<T extends JSONRPCMessage>(message: T, extra?: MessageExtraInfo) => void) | undefined;
 
 /** Wrap a server-side transport so tools/call argument keys are normalized
@@ -88,6 +164,7 @@ export function withArgNormalization(
   shapeFor: (tool: string) => ArgShape | undefined,
   log?: (line: string) => void,
   onRename?: (tool: string, renames: number) => void,
+  strict?: StrictArgOptions,
 ): Transport {
   const wrapper = {
     start: () => transport.start(),
@@ -98,7 +175,23 @@ export function withArgNormalization(
     get: () => transport.onmessage,
     set: (handler: OnMessage) => {
       transport.onmessage = handler
-        ? (message, extra) => handler(normalizeMessage(message, shapeFor, log, onRename), extra)
+        ? (message, extra) => {
+            // Rename FIRST: a snake_case twin of a declared key is a fix, not
+            // an unknown argument, so it must never reach the screen.
+            const normalized = normalizeMessage(message, shapeFor, log, onRename);
+            if (!strict) return handler(normalized, extra);
+            const outcome = screenMessage(normalized, strict, log);
+            if (outcome.action === 'forward') return handler(outcome.msg as typeof message, extra);
+            try {
+              // Answer on the INNER transport so the metrics tap still sees the
+              // frame and clears its pending id.
+              void transport.send(outcome.response);
+            } catch {
+              // Last-resort: dispatch as before rather than hang the caller.
+              // The stderr line and the counter already fired above.
+              handler(normalized as typeof message, extra);
+            }
+          }
         : undefined;
     },
   });

@@ -9,7 +9,7 @@ import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import type { HttpConfig } from './http-config.js';
-import { withArgNormalization, type ArgShape } from './arg-normalize.js';
+import { withArgNormalization, type ArgShape, type StrictArgOptions } from './arg-normalize.js';
 export type AuthOutcome =
   | { ok: true }
   | { ok: false; status: number; body: string; headers?: Record<string, string> };
@@ -41,6 +41,8 @@ export interface HttpHostOptions {
   metricsTap?: (t: Transport) => Transport;
   /** Usage-metrics argfix observer, forwarded into arg normalization. */
   onArgRename?: (tool: string, renames: number) => void;
+  /** Unknown-argument screening (arg-strict.ts); absent = off. */
+  strictArgs?: StrictArgOptions;
 }
 
 // A hung handler that keeps the connection open would otherwise hold the global
@@ -234,7 +236,9 @@ export class HttpTransportHost {
       });
       const tapped = this.opts.metricsTap ? this.opts.metricsTap(transport) : transport;
       await this.opts.server.connect(
-        this.opts.argShapeFor ? withArgNormalization(tapped, this.opts.argShapeFor, this.opts.log, this.opts.onArgRename) : tapped,
+        this.opts.argShapeFor || this.opts.strictArgs
+          ? withArgNormalization(tapped, this.opts.argShapeFor ?? (() => undefined), this.opts.log, this.opts.onArgRename, this.opts.strictArgs)
+          : tapped,
       );
       // Reflect the dispatch into a non-rejecting arm: if the deadline wins the
       // race, an orphaned handler settling later must not surface as an unhandled
