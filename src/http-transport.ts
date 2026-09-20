@@ -1,16 +1,15 @@
 // B12: the Streamable HTTP transport host (cc-transport-hosting T2/T3). Owns the
+import type { McpServer, Transport } from "@modelcontextprotocol/server";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+
 // node:http server, the route table, the front guard (Host / Origin / DNS-rebind),
 // and the stateless per-request /mcp dispatch. The OAuth AS endpoints and Bearer
 // verification are a seam filled by B13 (oauth-authorization-server); B12 ships a
 // loopback-owner authenticator so the local-HTTP model works before the AS lands.
 
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HttpConfig } from './http-config.js';
 import { withArgNormalization, type ArgShape } from './arg-normalize.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-
 export type AuthOutcome =
   | { ok: true }
   | { ok: false; status: number; body: string; headers?: Record<string, string> };
@@ -211,7 +210,7 @@ export class HttpTransportHost {
     // the mounted AS routes), so the SDK's own DNS-rebind guard is disabled: its
     // exact-Host match is stricter than the front guard and would 403 valid
     // Hosts (double enforcement, differing rules).
-    const transport = new StreamableHTTPServerTransport({
+    const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
       enableDnsRebindingProtection: false,

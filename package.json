@@ -81,7 +81,8 @@
     "@googleapis/slides": "^10.0.0",
     "@googleapis/tasks": "^17.0.0",
     "@googleapis/webmasters": "^9.0.0",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "googleapis-common": "^9.0.0",
     "jose": "^6.2.8",
     "markdown-it": "15.0.0",
@@ -115,7 +116,6 @@
   },
   "overrides": {
     "tmp": "^0.2.4",
-    "fast-uri": "^3.1.6",
     "hono": "^4.13.5",
     "qs": "^6.16.0"
   }

@@ -6,9 +6,9 @@ import { assertServerAccountsConfigured } from './accounts.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
+import { McpServer } from "@modelcontextprotocol/server";
+import type { Transport } from "@modelcontextprotocol/server";
 import { GENERATED_SERVICES } from './tools/generated/index.js';
 import { GENERATED_GATES, SERVICES } from './services.js';
 import { ToolRegistry, resolveDiscoveryMode, type DiscoveryMode } from './registry.js';
@@ -266,7 +266,7 @@ async function main() {
     let transport: Transport = new StdioServerTransport();
     if (stdioMetrics) {
       const { tapUsageMetrics } = await import('./metrics-tap.js');
-      transport = tapUsageMetrics(transport, stdioMetrics);
+      transport = tapUsageMetrics(transport, stdioMetrics, (n) => registry.hasTool(n));
     }
     await server.connect(
       argNormalizationEnabled()
@@ -366,7 +366,7 @@ async function main() {
     let httpTap: ((t: Transport) => Transport) | undefined;
     if (httpMetrics) {
       const { tapUsageMetrics } = await import('./metrics-tap.js');
-      httpTap = (t) => tapUsageMetrics(t, httpMetrics);
+      httpTap = (t) => tapUsageMetrics(t, httpMetrics, (n) => registry.hasTool(n));
     }
     const host = new HttpTransportHost({
       server: httpServer,

@@ -4,12 +4,13 @@ import { createHash, randomBytes } from 'node:crypto';
 import { rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from "@modelcontextprotocol/server";
 import { resolveHttpConfig } from '../src/http-config.js';
 import { HttpTransportHost } from '../src/http-transport.js';
 import { buildAuthServer, redirectAllowed, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServerDeps } from '../src/oauth-as.js';
 import { jwtSecretFrom } from '../src/mcp-token.js';
 import { SsrfBlockedError } from '../src/ssrf-guard.js';
+import { z } from "zod";
 
 const BASE = 'https://mcp.test';
 const CLIENT_ID = 'https://claude.ai/oauth/mcp-client';
@@ -56,7 +57,7 @@ async function start(depOverrides: Partial<AuthServerDeps> = {}): Promise<number
     deps,
   );
   const server = new McpServer({ name: 'as-test', version: '0' });
-  server.registerTool('ping', { description: 'p', inputSchema: {} }, async () => ({ content: [{ type: 'text' as const, text: 'pong' }] }));
+  server.registerTool('ping', { description: 'p', inputSchema: z.object({}) }, async () => ({ content: [{ type: 'text' as const, text: 'pong' }] }));
   const host = new HttpTransportHost({ server, config: cfg, version: '0', ownerConfigured: true, authenticate: as.authenticate, routes: as.routes, log: deps.log });
   await host.start();
   hosts.push(host);

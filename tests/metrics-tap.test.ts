@@ -2,9 +2,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
-import { tapUsageMetrics } from '../src/metrics-tap.js';
+import type { Transport, JSONRPCMessage } from "@modelcontextprotocol/server";
+import { isSchemaValidationText, tapUsageMetrics } from '../src/metrics-tap.js';
 import { Metrics } from '../src/usage-metrics.js';
 import { normalizeMessage } from '../src/arg-normalize.js';
 
@@ -42,9 +41,11 @@ const call = (id: number, name: string): JSONRPCMessage =>
 const errFrame = (id: number, code: number, message: string): JSONRPCMessage =>
   ({ jsonrpc: '2.0', id, error: { code, message } }) as JSONRPCMessage;
 
-function drive(m: Metrics) {
+const KNOWN = new Set(['tasks_update', 'gmail_search']);
+
+function drive(m: Metrics, isKnownTool: (n: string) => boolean = (n) => KNOWN.has(n)) {
   const { t } = fakeTransport();
-  const tapped = tapUsageMetrics(t, m);
+  const tapped = tapUsageMetrics(t, m, isKnownTool);
   const seen: JSONRPCMessage[] = [];
   tapped.onmessage = (msg: JSONRPCMessage) => seen.push(msg);
   const inbound = (msg: JSONRPCMessage) => (t as unknown as { onmessage: (m: JSONRPCMessage) => void }).onmessage(msg);
@@ -82,16 +83,27 @@ describe('tapUsageMetrics', () => {
     expect(readDay(dir).rpc).toEqual({ 'rpc_error_-32601': 1, rpc_error_other: 1 });
   });
 
-  it('an SDK-synthesized -32602 isError RESULT counts as schema_validation (SDK 1.x shape)', async () => {
+  // Wire-captured from both SDK eras: v1 prefixed the prose with
+  // "MCP error -32602: ", v2 emits it bare. Both must count.
+  it.each([
+    ['v1 prefixed', 'MCP error -32602: Input validation error: Invalid arguments for tool tasks_update'],
+    ['v2 bare', 'Input validation error: Invalid arguments for tool tasks_update: tasklistId: Invalid input: expected string, received undefined'],
+  ])('an SDK-synthesized validation isError RESULT counts as schema_validation (%s)', async (_label, text) => {
     const { m, dir } = makeMetrics();
     const { tapped, inbound } = drive(m);
     inbound(call(7, 'tasks_update'));
     await tapped.send({
       jsonrpc: '2.0', id: 7,
-      result: { isError: true, content: [{ type: 'text', text: 'MCP error -32602: Input validation error: Invalid arguments for tool tasks_update' }] },
+      result: { isError: true, content: [{ type: 'text', text }] },
     } as unknown as JSONRPCMessage);
     m.flush();
     expect(readDay(dir).validation).toEqual({ tasks_update: 1 });
+  });
+
+  it('isSchemaValidationText never matches a handler JSON envelope', () => {
+    expect(isSchemaValidationText('{"error":"invalid_params","message":"Input validation error: x"}')).toBe(false);
+    expect(isSchemaValidationText('Input validation error: Invalid arguments for tool x')).toBe(true);
+    expect(isSchemaValidationText('MCP error -32602: Input validation error: x')).toBe(true);
   });
 
   it('a handler isError envelope on the send path counts nothing here', async () => {
@@ -141,5 +153,69 @@ describe('normalizeMessage onRename observer', () => {
     let fired = 0;
     normalizeMessage(msg({ maxResults: 5 }), () => shape, () => {}, () => { fired += 1; });
     expect(fired).toBe(0);
+  });
+});
+
+describe('closed vocabulary: only REGISTERED tool names may be persisted', () => {
+  // The name on a tools/call frame is client-supplied. A shape check alone
+  // would let a shape-valid invented name reach disk, which is exactly what
+  // the metrics privacy guarantee forbids.
+  it('a shape-valid but UNREGISTERED name is never written; it counts as not-found', async () => {
+    const { m, dir } = makeMetrics();
+    const { tapped, inbound } = drive(m);
+    inbound(call(20, 'totally_made_up_tool'));
+    await tapped.send({
+      jsonrpc: '2.0', id: 20,
+      result: { isError: true, content: [{ type: 'text', text: 'Input validation error: Invalid arguments for tool totally_made_up_tool' }] },
+    } as unknown as JSONRPCMessage);
+    m.flush();
+    const day = readDay(dir);
+    expect(day.validation).toEqual({});
+    expect(day.rpc.tool_not_found).toBe(1);
+    expect(JSON.stringify(day)).not.toContain('totally_made_up');
+  });
+
+  it('the same path via a -32602 ERROR frame is equally guarded', async () => {
+    const { m, dir } = makeMetrics();
+    const { tapped, inbound } = drive(m);
+    inbound(call(21, 'invented_name_here'));
+    await tapped.send(errFrame(21, -32602, 'Invalid arguments'));
+    m.flush();
+    const day = readDay(dir);
+    expect(day.validation).toEqual({});
+    expect(JSON.stringify(day)).not.toContain('invented_name');
+  });
+
+  it('a REGISTERED tool still attributes normally', async () => {
+    const { m, dir } = makeMetrics();
+    const { tapped, inbound } = drive(m);
+    inbound(call(22, 'tasks_update'));
+    await tapped.send({
+      jsonrpc: '2.0', id: 22,
+      result: { isError: true, content: [{ type: 'text', text: 'Input validation error: Invalid arguments for tool tasks_update' }] },
+    } as unknown as JSONRPCMessage);
+    m.flush();
+    expect(readDay(dir).validation).toEqual({ tasks_update: 1 });
+  });
+});
+
+describe('v2 transport member forwarding', () => {
+  it('forwards setSupportedProtocolVersions through the tap to the inner transport', () => {
+    const { m } = makeMetrics();
+    const seen: string[][] = [];
+    const inner = {
+      start: async () => {}, send: async () => {}, close: async () => {},
+      onmessage: undefined,
+      setSupportedProtocolVersions: (v: string[]) => seen.push(v),
+    } as unknown as Transport;
+    const tapped = tapUsageMetrics(inner, m);
+    tapped.setSupportedProtocolVersions?.(['2025-11-25', '2026-07-28']);
+    expect(seen).toEqual([['2025-11-25', '2026-07-28']]);
+  });
+
+  it('stays absent when the inner transport does not implement it', () => {
+    const { m } = makeMetrics();
+    const { t } = fakeTransport();
+    expect(tapUsageMetrics(t, m).setSupportedProtocolVersions).toBeUndefined();
   });
 });

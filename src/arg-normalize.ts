@@ -1,9 +1,8 @@
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { JSONRPCMessage, MessageExtraInfo } from '@modelcontextprotocol/sdk/types.js';
+import type { Transport, JSONRPCMessage, MessageExtraInfo } from "@modelcontextprotocol/server";
 
 // Wire-level tools/call argument normalization. Clients (LLMs) recurringly
 // snake_case a camelCase parameter (thread_id for threadId) and burn a retry
-// on the -32602. A schema-level fix is off the table: SDK 1.x advertises an
+// on the -32602. A schema-level fix is off the table: the SDK advertises an
 // EMPTY input schema for any non-object wrapper (pipe/preprocess), so the
 // only seam that keeps tools/list intact is the JSON-RPC message itself —
 // which is versioned MCP spec, stabler than any SDK internal. The rename is
@@ -114,6 +113,13 @@ export function withArgNormalization(
   Object.defineProperty(wrapper, 'sessionId', { get: () => transport.sessionId });
   if (transport.setProtocolVersion) {
     wrapper.setProtocolVersion = (v: string) => transport.setProtocolVersion!(v);
+  }
+  // v2-only, called by Protocol.connect() before start(). A no-op today (both
+  // sides default to the same exported constant), but a proxy that silently
+  // eats a member the SDK calls is a bug waiting for the first caller that
+  // passes supportedProtocolVersions explicitly.
+  if (transport.setSupportedProtocolVersions) {
+    wrapper.setSupportedProtocolVersions = (v: string[]) => transport.setSupportedProtocolVersions!(v);
   }
   return wrapper;
 }
