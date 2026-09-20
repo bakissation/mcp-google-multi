@@ -58,6 +58,7 @@
     "gen:discovery": "tsx scripts/fetch-discovery.ts",
     "gen:tools": "tsx scripts/gen-tools.ts",
     "gen:coverage": "tsx scripts/gen-coverage.ts",
+    "eval:contract": "npx --yes promptfoo@0.123.1 eval -c eval/contract/promptfooconfig.yaml --no-progress-bar",
     "measure:lazy": "node scripts/measure-tools.mjs",
     "pack:mcpb": "mcpb pack . mcp-google-multi.mcpb",
     "bundle": "esbuild dist/index.js --bundle --platform=node --format=esm --outfile=bundle/index.js --external:@napi-rs/keyring --banner:js=\"import{createRequire as __dockerCR}from'node:module';var require=__dockerCR(import.meta.url);\" --log-level=warning"
