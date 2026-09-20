@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { GENERATED_SERVICES } from './tools/generated/index.js';
 import { GENERATED_GATES, SERVICES } from './services.js';
 import { ToolRegistry, resolveDiscoveryMode, type DiscoveryMode } from './registry.js';
@@ -240,12 +241,21 @@ async function main() {
   // never rebuilt per request); `both` runs the two concurrently.
   if (wantStdio) {
     const server = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
-    const registry = buildRegistry(server, buildIdentityContext(process.env, { transport: 'stdio' }), undefined, initMetricsFor('stdio', resolveDiscoveryMode()));
+    const stdioMetrics = initMetricsFor('stdio', resolveDiscoveryMode());
+    const registry = buildRegistry(server, buildIdentityContext(process.env, { transport: 'stdio' }), undefined, stdioMetrics);
     registry.installListHandler();
     registerSetupPrompt(server);
-    const stdioTransport = new StdioServerTransport();
+    // Tap sits under arg normalization at the same wrap site; it only counts
+    // outbound JSON-RPC error frames (no handler ran) plus id->tool names.
+    let transport: Transport = new StdioServerTransport();
+    if (stdioMetrics) {
+      const { tapUsageMetrics } = await import('./metrics-tap.js');
+      transport = tapUsageMetrics(transport, stdioMetrics);
+    }
     await server.connect(
-      argNormalizationEnabled() ? withArgNormalization(stdioTransport, (n) => registry.argShape(n)) : stdioTransport,
+      argNormalizationEnabled()
+        ? withArgNormalization(transport, (n) => registry.argShape(n), undefined, stdioMetrics ? (tool, n) => stdioMetrics.recordArgFix(tool, n) : undefined)
+        : transport,
     );
   }
 
@@ -266,7 +276,8 @@ async function main() {
       process.stderr.write(`GOOGLE_DISCOVERY="${configuredMode}" is ignored over HTTP; the stateless transport forces "curated".\n`);
     }
     const httpServer = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
-    const registry = buildRegistry(httpServer, buildIdentityContext(process.env, { transport: 'http' }), 'curated', initMetricsFor('http', 'curated'));
+    const httpMetrics = initMetricsFor('http', 'curated');
+    const registry = buildRegistry(httpServer, buildIdentityContext(process.env, { transport: 'http' }), 'curated', httpMetrics);
     registry.installListHandler();
     registerSetupPrompt(httpServer);
 
@@ -336,6 +347,11 @@ async function main() {
     const { setHttpReauthBase } = await import('./reauth-hint.js');
     setHttpReauthBase(httpCfg.publicUrl);
 
+    let httpTap: ((t: Transport) => Transport) | undefined;
+    if (httpMetrics) {
+      const { tapUsageMetrics } = await import('./metrics-tap.js');
+      httpTap = (t) => tapUsageMetrics(t, httpMetrics);
+    }
     const host = new HttpTransportHost({
       server: httpServer,
       config: httpCfg,
@@ -345,6 +361,8 @@ async function main() {
       routes: authServer.routes,
       log: (l) => process.stderr.write(`[http] ${l}\n`),
       argShapeFor: argNormalizationEnabled() ? (n) => registry.argShape(n) : undefined,
+      metricsTap: httpTap,
+      onArgRename: httpMetrics ? (tool: string, n: number) => httpMetrics.recordArgFix(tool, n) : undefined,
     });
     await host.start();
     process.stderr.write(`HTTP transport listening on http://${httpCfg.host}:${httpCfg.port} (public ${httpCfg.publicUrl})\n`);
