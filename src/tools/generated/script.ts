@@ -85,7 +85,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"description","api":"description"},{"field":"manifestFileName","api":"manifestFileName"},{"field":"scriptId_","api":"scriptId"},{"field":"versionNumber","api":"versionNumber"}],
     shape: {
       account: accountField(),
-      scriptId: z.string().describe("The script project's Drive ID."),
+      scriptId: z.string().min(1).describe("The script project's Drive ID."),
       description: z.string().describe("The description for this deployment.").optional(),
       manifestFileName: z.string().describe("The manifest file name for this deployment.").optional(),
       scriptId_: z.string().describe("The script project's Drive ID.").optional(),
@@ -102,8 +102,8 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      deploymentId: z.string().describe("The deployment ID to be undeployed."),
-      scriptId: z.string().describe("The script project's Drive ID."),
+      deploymentId: z.string().min(1).describe("The deployment ID to be undeployed."),
+      scriptId: z.string().min(1).describe("The script project's Drive ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -116,8 +116,8 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      deploymentId: z.string().describe("The deployment ID."),
-      scriptId: z.string().describe("The script project's Drive ID."),
+      deploymentId: z.string().min(1).describe("The deployment ID."),
+      scriptId: z.string().min(1).describe("The script project's Drive ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -130,7 +130,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      scriptId: z.string().describe("The script project's Drive ID."),
+      scriptId: z.string().min(1).describe("The script project's Drive ID."),
       pageSize: z.number().describe("The maximum number of deployments on each returned page. Defaults to 50.").optional(),
       pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of `nextPageToken` from a previous response.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -145,8 +145,8 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      deploymentId: z.string().describe("The deployment ID for this deployment."),
-      scriptId: z.string().describe("The script project's Drive ID."),
+      deploymentId: z.string().min(1).describe("The deployment ID for this deployment."),
+      scriptId: z.string().min(1).describe("The script project's Drive ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("UpdateDeploymentRequest JSON request body. Top-level fields: deploymentConfig."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -160,7 +160,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      scriptId: z.string().describe("The script project's Drive ID."),
+      scriptId: z.string().min(1).describe("The script project's Drive ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -173,7 +173,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      scriptId: z.string().describe("The script project's Drive ID."),
+      scriptId: z.string().min(1).describe("The script project's Drive ID."),
       versionNumber: z.number().describe("The version number of the project to retrieve. If not provided, the project's HEAD version is returned.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -187,7 +187,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      scriptId: z.string().describe("Required field indicating the script to get metrics for."),
+      scriptId: z.string().min(1).describe("Required field indicating the script to get metrics for."),
       "metricsFilter.deploymentId": z.string().describe("Optional field indicating a specific deployment to retrieve metrics from.").optional(),
       metricsGranularity: z.enum(["UNSPECIFIED_GRANULARITY","WEEKLY","DAILY"]).describe("Required field indicating what granularity of metrics are returned.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -202,7 +202,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      scriptId: z.string().describe("The script project's Drive ID."),
+      scriptId: z.string().min(1).describe("The script project's Drive ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Content JSON request body. Top-level fields: files, scriptId."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -217,7 +217,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"createTime","api":"createTime"},{"field":"description","api":"description"},{"field":"scriptId_","api":"scriptId"},{"field":"versionNumber","api":"versionNumber"}],
     shape: {
       account: accountField(),
-      scriptId: z.string().describe("The script project's Drive ID."),
+      scriptId: z.string().min(1).describe("The script project's Drive ID."),
       createTime: z.string().describe("When the version was created.").optional(),
       description: z.string().describe("The description for this version.").optional(),
       scriptId_: z.string().describe("The script project's Drive ID.").optional(),
@@ -234,7 +234,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      scriptId: z.string().describe("The script project's Drive ID."),
+      scriptId: z.string().min(1).describe("The script project's Drive ID."),
       versionNumber: z.number().describe("The version number."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -248,7 +248,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      scriptId: z.string().describe("The script project's Drive ID."),
+      scriptId: z.string().min(1).describe("The script project's Drive ID."),
       pageSize: z.number().describe("The maximum number of versions on each returned page. Defaults to 50.").optional(),
       pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of `nextPageToken` from a previous response.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -263,7 +263,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      scriptId: z.string().describe("The script ID of the script to be executed. Find the script ID on the **Project settings** page under \"IDs.\" As multiple executable APIs can be deployed in new IDE for same script, this field should b"),
+      scriptId: z.string().min(1).describe("The script ID of the script to be executed. Find the script ID on the **Project settings** page under \"IDs.\" As multiple executable APIs can be deployed in new IDE for same script, this field should b"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ExecutionRequest JSON request body. Top-level fields: devMode, function, parameters, sessionState."),
       fields: z.string().optional().describe('Response field mask.'),
     },

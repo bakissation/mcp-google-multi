@@ -21,7 +21,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the participant."),
+      name: z.string().min(1).describe("Required. Resource name of the participant."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -34,7 +34,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. Format: `conferenceRecords/{conference_record}`"),
+      parent: z.string().min(1).describe("Required. Format: `conferenceRecords/{conference_record}`"),
       filter: z.string().describe("Optional. User specified filtering condition in [EBNF format](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form). The following are the filterable fields: * `earliest_start_time` * `late").optional(),
       pageSize: z.number().describe("Maximum number of participants to return. The service might return fewer than this value. If unspecified, at most 100 participants are returned. The maximum value is 250; values above 250 are coerced ").optional(),
       pageToken: z.string().describe("Page token returned from previous List Call.").optional(),
@@ -50,7 +50,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the participant."),
+      name: z.string().min(1).describe("Required. Resource name of the participant."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -63,7 +63,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. Format: `conferenceRecords/{conference_record}/participants/{participant}`"),
+      parent: z.string().min(1).describe("Required. Format: `conferenceRecords/{conference_record}/participants/{participant}`"),
       filter: z.string().describe("Optional. User specified filtering condition in [EBNF format](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form). The following are the filterable fields: * `start_time` * `end_time` For").optional(),
       pageSize: z.number().describe("Optional. Maximum number of participant sessions to return. The service might return fewer than this value. If unspecified, at most 100 participants are returned. The maximum value is 250; values abov").optional(),
       pageToken: z.string().describe("Optional. Page token returned from previous List Call.").optional(),
@@ -79,7 +79,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the recording."),
+      name: z.string().min(1).describe("Required. Resource name of the recording."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -92,7 +92,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the smart note. Format: conferenceRecords/{conference_record}/smartNotes/{smart_note}"),
+      name: z.string().min(1).describe("Required. Resource name of the smart note. Format: conferenceRecords/{conference_record}/smartNotes/{smart_note}"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -105,7 +105,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. Format: `conferenceRecords/{conference_record}`"),
+      parent: z.string().min(1).describe("Required. Format: `conferenceRecords/{conference_record}`"),
       pageSize: z.number().describe("Optional. Maximum number of smart notes to return. The service might return fewer than this value. If unspecified, at most 10 smart notes are returned. The maximum value is 100; values above 100 are c").optional(),
       pageToken: z.string().describe("Optional. Page token returned from previous List Call.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -120,7 +120,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the `TranscriptEntry`."),
+      name: z.string().min(1).describe("Required. Resource name of the `TranscriptEntry`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -133,7 +133,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the transcript."),
+      name: z.string().min(1).describe("Required. Resource name of the transcript."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -160,7 +160,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [],
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the space. Format: `spaces/{space}`. `{space}` is the resource identifier for the space. It's a unique, server-generated ID and is case sensitive. For example, `jQCFfuBOdN5z"),
+      name: z.string().min(1).describe("Required. Resource name of the space. Format: `spaces/{space}`. `{space}` is the resource identifier for the space. It's a unique, server-generated ID and is case sensitive. For example, `jQCFfuBOdN5z"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -173,7 +173,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the space. Format: `spaces/{space}` or `spaces/{meetingCode}`. `{space}` is the resource identifier for the space. It's a unique, server-generated ID and is case sensitive. "),
+      name: z.string().min(1).describe("Required. Resource name of the space. Format: `spaces/{space}` or `spaces/{meetingCode}`. `{space}` is the resource identifier for the space. It's a unique, server-generated ID and is case sensitive. "),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -186,7 +186,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("Immutable. Resource name of the space. Format: `spaces/{space}`. `{space}` is the resource identifier for the space. It's a unique, server-generated ID and is case sensitive. For example, `jQCFfuBOdN5"),
+      name: z.string().min(1).describe("Immutable. Resource name of the space. Format: `spaces/{space}`. `{space}` is the resource identifier for the space. It's a unique, server-generated ID and is case sensitive. For example, `jQCFfuBOdN5"),
       updateMask: z.string().describe("Optional. Field mask used to specify the fields to be updated in the space. If update_mask isn't provided(not set, set with empty paths, or only has \"\" as paths), it defaults to update all fields prov").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Space JSON request body. Top-level fields: activeConference, config, gatewaySipAccess, meetingCode, meetingUri, name, phoneAccess."),
       fields: z.string().optional().describe('Response field mask.'),

@@ -19,7 +19,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     shape: {
       account: accountField(),
       metadataId: z.number().describe("The ID of the developer metadata to retrieve."),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet to retrieve metadata from."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet to retrieve metadata from."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -32,7 +32,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet to retrieve metadata from."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet to retrieve metadata from."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchDeveloperMetadataRequest JSON request body. Top-level fields: dataFilters."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -46,7 +46,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      spreadsheetId: z.string().describe("The spreadsheet to request."),
+      spreadsheetId: z.string().min(1).describe("The spreadsheet to request."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GetSpreadsheetByDataFilterRequest JSON request body. Top-level fields: dataFilters, excludeTablesInBandedRanges, includeGridData."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -62,7 +62,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     shape: {
       account: accountField(),
       sheetId: z.number().describe("The ID of the sheet to copy."),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet containing the sheet to copy."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet containing the sheet to copy."),
       destinationSpreadsheetId: z.string().describe("The ID of the spreadsheet to copy the sheet to.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -76,7 +76,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet to update."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet to update."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchClearValuesByDataFilterRequest JSON request body. Top-level fields: dataFilters."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -90,7 +90,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet to retrieve data from."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet to retrieve data from."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchGetValuesByDataFilterRequest JSON request body. Top-level fields: dataFilters, dateTimeRenderOption, majorDimension, valueRenderOption."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -104,7 +104,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet to update."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet to update."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchUpdateValuesByDataFilterRequest JSON request body. Top-level fields: data, includeValuesInResponse, responseDateTimeRenderOption, responseValueRenderOption, valueInputOption."),
       fields: z.string().optional().describe('Response field mask.'),
     },

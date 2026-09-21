@@ -133,7 +133,14 @@ function paramZod(name: string, param: DiscoveryParam, looseParams: string[], co
   let inner: string;
   switch (p.type) {
     case 'string':
-      inner = Array.isArray(p.enum) && p.enum.length > 0 ? `z.enum(${JSON.stringify(p.enum)})` : 'z.string()';
+      // A path param is a path SEGMENT: an empty value collapses it and the
+      // request addresses the collection instead of the resource. Declare the
+      // constraint so the client sees it; expandPath still enforces it.
+      inner = Array.isArray(p.enum) && p.enum.length > 0
+        ? `z.enum(${JSON.stringify(p.enum)})`
+        : p.location === 'path'
+          ? 'z.string().min(1)'
+          : 'z.string()';
       break;
     case 'integer':
     case 'number':

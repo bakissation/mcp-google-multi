@@ -24,7 +24,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("Item name, format: datasources/{source_id}/items/{item_id}"),
+      name: z.string().min(1).describe("Item name, format: datasources/{source_id}/items/{item_id}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Principal JSON request body. Top-level fields: groupResourceName, gsuitePrincipal, userResourceName."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -39,7 +39,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("Source name, format: datasources/{source_id}"),
+      name: z.string().min(1).describe("Source name, format: datasources/{source_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchItemsByViewUrlRequest JSON request body. Top-level fields: debugOptions, pageToken, viewUrl."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -53,7 +53,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("The name of the item, in the following format: datasources/{source_id}/items/{ID}"),
+      parent: z.string().min(1).describe("The name of the item, in the following format: datasources/{source_id}/items/{ID}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       pageSize: z.number().describe("Maximum number of items to fetch in a request. Defaults to 100.").optional(),
       pageToken: z.string().describe("The next_page_token value returned from a previous List request, if any.").optional(),
@@ -69,7 +69,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("The name of the identity source, in the following format: identitysources/{source_id}}"),
+      parent: z.string().min(1).describe("The name of the identity source, in the following format: identitysources/{source_id}}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       groupResourceName: z.string().optional(),
       pageSize: z.number().describe("Maximum number of items to fetch in a request. Defaults to 100.").optional(),
@@ -87,7 +87,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("The name of the identity source, in the following format: identitysources/{source_id}"),
+      parent: z.string().min(1).describe("The name of the identity source, in the following format: identitysources/{source_id}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       pageSize: z.number().describe("Maximum number of items to fetch in a request. Defaults to 100.").optional(),
       pageToken: z.string().describe("The next_page_token value returned from a previous List request, if any.").optional(),
@@ -104,7 +104,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the data source to delete Schema. Format: datasources/{source_id}"),
+      name: z.string().min(1).describe("The name of the data source to delete Schema. Format: datasources/{source_id}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -118,7 +118,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the data source to get Schema. Format: datasources/{source_id}"),
+      name: z.string().min(1).describe("The name of the data source to get Schema. Format: datasources/{source_id}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -132,7 +132,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The name of the item to delete. Format: datasources/{source_id}/items/{item_id}"),
+      name: z.string().min(1).describe("Required. The name of the item to delete. Format: datasources/{source_id}/items/{item_id}"),
       connectorName: z.string().describe("The name of connector making this call. Format: datasources/{source_id}/connectors/{ID}").optional(),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       mode: z.enum(["UNSPECIFIED","SYNCHRONOUS","ASYNCHRONOUS"]).describe("Required. The RequestMode for this request.").optional(),
@@ -149,7 +149,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the Data Source to delete items in a queue. Format: datasources/{source_id}"),
+      name: z.string().min(1).describe("The name of the Data Source to delete items in a queue. Format: datasources/{source_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("DeleteQueueItemsRequest JSON request body. Top-level fields: connectorName, debugOptions, queue."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -163,7 +163,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the item to get info. Format: datasources/{source_id}/items/{item_id}"),
+      name: z.string().min(1).describe("The name of the item to get info. Format: datasources/{source_id}/items/{item_id}"),
       connectorName: z.string().describe("The name of connector making this call. Format: datasources/{source_id}/connectors/{ID}").optional(),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -178,7 +178,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the Item. Format: datasources/{source_id}/items/{item_id} This is a required field. The maximum length is 1536 characters."),
+      name: z.string().min(1).describe("The name of the Item. Format: datasources/{source_id}/items/{item_id} This is a required field. The maximum length is 1536 characters."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("IndexItemRequest JSON request body. Top-level fields: connectorName, debugOptions, indexItemOptions, item, mode."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -192,7 +192,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the Data Source to list Items. Format: datasources/{source_id}"),
+      name: z.string().min(1).describe("The name of the Data Source to list Items. Format: datasources/{source_id}"),
       brief: coerceBoolean.describe("When set to true, the indexing system only populates the following fields: name, version, queue. metadata.hash, metadata.title, metadata.sourceRepositoryURL, metadata.objectType, metadata.createTime, ").optional(),
       connectorName: z.string().describe("The name of connector making this call. Format: datasources/{source_id}/connectors/{ID}").optional(),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
@@ -210,7 +210,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the Data Source to poll items. Format: datasources/{source_id}"),
+      name: z.string().min(1).describe("The name of the Data Source to poll items. Format: datasources/{source_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("PollItemsRequest JSON request body. Top-level fields: connectorName, debugOptions, limit, queue, statusCodes."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -224,7 +224,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the item to push into the indexing queue. Format: datasources/{source_id}/items/{ID} This is a required field. The maximum length is 1536 characters."),
+      name: z.string().min(1).describe("The name of the item to push into the indexing queue. Format: datasources/{source_id}/items/{ID} This is a required field. The maximum length is 1536 characters."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("PushItemRequest JSON request body. Top-level fields: connectorName, debugOptions, item."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -238,7 +238,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the Data Source to unreserve all items. Format: datasources/{source_id}"),
+      name: z.string().min(1).describe("The name of the Data Source to unreserve all items. Format: datasources/{source_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("UnreserveItemsRequest JSON request body. Top-level fields: connectorName, debugOptions, queue."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -252,7 +252,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the Item to start a resumable upload. Format: datasources/{source_id}/items/{item_id}. The maximum length is 1536 bytes."),
+      name: z.string().min(1).describe("The name of the Item to start a resumable upload. Format: datasources/{source_id}/items/{item_id}. The maximum length is 1536 bytes."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("StartUploadItemRequest JSON request body. Top-level fields: connectorName, debugOptions."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -266,7 +266,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the data source to update Schema. Format: datasources/{source_id}"),
+      name: z.string().min(1).describe("The name of the data source to update Schema. Format: datasources/{source_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("UpdateSchemaRequest JSON request body. Top-level fields: debugOptions, schema, validateOnly."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -294,7 +294,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     bodyParams: [{"field":"resourceName_","api":"resourceName"}],
     shape: {
       account: accountField(),
-      resourceName: z.string().describe("Name of the media that is being downloaded. See ReadRequest.resource_name."),
+      resourceName: z.string().min(1).describe("Name of the media that is being downloaded. See ReadRequest.resource_name."),
       resourceName_: z.string().describe("Name of the media resource.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -308,7 +308,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the operation resource."),
+      name: z.string().min(1).describe("The name of the operation resource."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -321,7 +321,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the operation's parent resource."),
+      name: z.string().min(1).describe("The name of the operation's parent resource."),
       filter: z.string().describe("The standard list filter.").optional(),
       pageSize: z.number().describe("The standard list page size.").optional(),
       pageToken: z.string().describe("The standard list page token.").optional(),
@@ -409,7 +409,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the datasource. Format: datasources/{source_id}."),
+      name: z.string().min(1).describe("The name of the datasource. Format: datasources/{source_id}."),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -423,7 +423,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the datasource resource. Format: datasources/{source_id}."),
+      name: z.string().min(1).describe("The name of the datasource resource. Format: datasources/{source_id}."),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -452,7 +452,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the datasource resource. Format: datasources/{source_id}. The name is ignored when creating a datasource."),
+      name: z.string().min(1).describe("The name of the datasource resource. Format: datasources/{source_id}. The name is ignored when creating a datasource."),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       updateMask: z.string().describe("Only applies to [`settings.datasources.patch`](https://developers.google.com/workspace/cloud-search/docs/reference/rest/v1/settings.datasources/patch). Update mask to control which fields to update. E").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("DataSource JSON request body. Top-level fields: disableModifications, disableServing, displayName, indexingServiceAccounts, itemsVisibility, name, operationIds, returnThumbnailUrls, shortName."),
@@ -468,7 +468,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the datasource resource. Format: datasources/{source_id}. The name is ignored when creating a datasource."),
+      name: z.string().min(1).describe("The name of the datasource resource. Format: datasources/{source_id}. The name is ignored when creating a datasource."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("UpdateDataSourceRequest JSON request body. Top-level fields: debugOptions, source, updateMask."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -507,7 +507,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the search application to be deleted. Format: applications/{application_id}."),
+      name: z.string().min(1).describe("The name of the search application to be deleted. Format: applications/{application_id}."),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -521,7 +521,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the search application. Format: searchapplications/{application_id}."),
+      name: z.string().min(1).describe("The name of the search application. Format: searchapplications/{application_id}."),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -550,7 +550,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the Search Application. Format: searchapplications/{application_id}."),
+      name: z.string().min(1).describe("The name of the Search Application. Format: searchapplications/{application_id}."),
       updateMask: z.string().describe("Only applies to [`settings.searchapplications.patch`](https://developers.google.com/workspace/cloud-search/docs/reference/rest/v1/settings.searchapplications/patch). Update mask to control which field").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchApplication JSON request body. Top-level fields: dataSourceRestrictions, defaultFacetOptions, defaultSortOptions, displayName, enableAuditLog, name, operationIds, queryInterpretationConfig, returnResultThumbnailUrls, scoringConfig, sourceConfig."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -565,7 +565,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the search application to be reset. Format: applications/{application_id}."),
+      name: z.string().min(1).describe("The name of the search application to be reset. Format: applications/{application_id}."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ResetSearchApplicationRequest JSON request body. Top-level fields: debugOptions."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -579,7 +579,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the Search Application. Format: searchapplications/{application_id}."),
+      name: z.string().min(1).describe("The name of the Search Application. Format: searchapplications/{application_id}."),
       updateMask: z.string().describe("Only applies to [`settings.searchapplications.patch`](https://developers.google.com/workspace/cloud-search/docs/reference/rest/v1/settings.searchapplications/patch). Update mask to control which field").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchApplication JSON request body. Top-level fields: dataSourceRestrictions, defaultFacetOptions, defaultSortOptions, displayName, enableAuditLog, name, operationIds, queryInterpretationConfig, returnResultThumbnailUrls, scoringConfig, sourceConfig."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -698,7 +698,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The resource id of the data source to retrieve statistics for, in the following format: \"datasources/{source_id}\""),
+      name: z.string().min(1).describe("The resource id of the data source to retrieve statistics for, in the following format: \"datasources/{source_id}\""),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
       "fromDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
@@ -717,7 +717,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The resource id of the search application query stats, in the following format: searchapplications/{application_id}"),
+      name: z.string().min(1).describe("The resource id of the search application query stats, in the following format: searchapplications/{application_id}"),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
       "fromDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
@@ -736,7 +736,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The resource id of the search application session stats, in the following format: searchapplications/{application_id}"),
+      name: z.string().min(1).describe("The resource id of the search application session stats, in the following format: searchapplications/{application_id}"),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
       "fromDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
@@ -755,7 +755,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The resource id of the search application session stats, in the following format: searchapplications/{application_id}"),
+      name: z.string().min(1).describe("The resource id of the search application session stats, in the following format: searchapplications/{application_id}"),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
       "fromDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),

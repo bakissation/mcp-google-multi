@@ -32,8 +32,8 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
-      ruleId: z.string().describe("ACL rule identifier."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      ruleId: z.string().min(1).describe("ACL rule identifier."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -46,8 +46,8 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
-      ruleId: z.string().describe("ACL rule identifier."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      ruleId: z.string().min(1).describe("ACL rule identifier."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -60,7 +60,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       sendNotifications: coerceBoolean.describe("Whether to send notifications about the calendar sharing change. Optional. The default is True.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AclRule JSON request body. Top-level fields: etag, id, kind, role, scope."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -75,7 +75,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       maxResults: z.number().describe("Maximum number of entries returned on one result page. By default the value is 100 entries. The page size can never be larger than 250 entries. Optional.").optional(),
       pageToken: z.string().describe("Token specifying which result page to return. Optional.").optional(),
       showDeleted: coerceBoolean.describe("Whether to include deleted ACLs in the result. Deleted ACLs are represented by role equal to \"none\". Deleted ACLs will always be included if syncToken is provided. Optional. The default is False.").optional(),
@@ -92,8 +92,8 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
-      ruleId: z.string().describe("ACL rule identifier."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      ruleId: z.string().min(1).describe("ACL rule identifier."),
       sendNotifications: coerceBoolean.describe("Whether to send notifications about the calendar sharing change. Note that there are no notifications on access removal. Optional. The default is True.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AclRule JSON request body. Top-level fields: etag, id, kind, role, scope."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -108,8 +108,8 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
-      ruleId: z.string().describe("ACL rule identifier."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      ruleId: z.string().min(1).describe("ACL rule identifier."),
       sendNotifications: coerceBoolean.describe("Whether to send notifications about the calendar sharing change. Note that there are no notifications on access removal. Optional. The default is True.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AclRule JSON request body. Top-level fields: etag, id, kind, role, scope."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -124,7 +124,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       maxResults: z.number().describe("Maximum number of entries returned on one result page. By default the value is 100 entries. The page size can never be larger than 250 entries. Optional.").optional(),
       pageToken: z.string().describe("Token specifying which result page to return. Optional.").optional(),
       showDeleted: coerceBoolean.describe("Whether to include deleted ACLs in the result. Deleted ACLs are represented by role equal to \"none\". Deleted ACLs will always be included if syncToken is provided. Optional. The default is False.").optional(),
@@ -142,7 +142,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -155,7 +155,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -182,7 +182,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       colorRgbFormat: coerceBoolean.describe("Whether to use the foregroundColor and backgroundColor fields to write the calendar colors (RGB). If this feature is used, the index-based colorId field will be set to the best matching option automat").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CalendarListEntry JSON request body. Top-level fields: accessRole, autoAcceptInvitations, backgroundColor, colorId, conferenceProperties, dataOwner, defaultReminders, deleted, description, etag, foregroundColor, hidden, +9 more."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -197,7 +197,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       colorRgbFormat: coerceBoolean.describe("Whether to use the foregroundColor and backgroundColor fields to write the calendar colors (RGB). If this feature is used, the index-based colorId field will be set to the best matching option automat").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CalendarListEntry JSON request body. Top-level fields: accessRole, autoAcceptInvitations, backgroundColor, colorId, conferenceProperties, dataOwner, defaultReminders, deleted, description, etag, foregroundColor, hidden, +9 more."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -232,7 +232,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -245,7 +245,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -258,7 +258,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -271,7 +271,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Calendar JSON request body. Top-level fields: autoAcceptInvitations, conferenceProperties, dataOwner, description, etag, id, kind, labelProperties, location, summary, timeZone."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -285,7 +285,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs, call the calendarList.list method."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs, call the calendarList.list method."),
       newDataOwner: z.string().describe("The email address of a user who will become the data owner of the calendar."),
       useAdminAccess: coerceBoolean.describe("When true, the method runs using the user's Google Workspace administrator privileges. The calling user must be a Google Workspace administrator with the Manage Calendars privilege. This method curren"),
       fields: z.string().optional().describe('Response field mask.'),
@@ -300,7 +300,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Calendar JSON request body. Top-level fields: autoAcceptInvitations, conferenceProperties, dataOwner, description, etag, id, kind, labelProperties, location, summary, timeZone."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -339,7 +339,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       conferenceDataVersion: z.number().describe("Version number of conference data supported by the API client. Version 0 assumes no conference data support and ignores conference data in the event's body. Version 1 enables support for copying of Co").optional(),
       eventLabelVersion: z.number().describe("Version number of the event label feature supported by the API client. Version 0 assumes no event label support and processes the colorId field for color management. Version 1 enables support for even").optional(),
       supportsAttachments: coerceBoolean.describe("Whether API client performing operation supports event attachments. Optional. The default is False.").optional(),
@@ -356,8 +356,8 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
-      eventId: z.string().describe("Event identifier."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      eventId: z.string().min(1).describe("Event identifier."),
       alwaysIncludeEmail: coerceBoolean.describe("Deprecated and ignored. A value will always be returned in the email field for the organizer, creator and attendees, even if no real email address is available (i.e. a generated, non-working value wil").optional(),
       conferenceDataVersion: z.number().describe("Version number of conference data supported by the API client. Version 0 assumes no conference data support and ignores conference data in the event's body. Version 1 enables support for copying of Co").optional(),
       eventLabelVersion: z.number().describe("Version number of the event label feature supported by the API client. Version 0 assumes no event label support and processes the colorId field for color management. Version 1 enables support for even").optional(),
@@ -378,7 +378,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarId: z.string().describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
+      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       alwaysIncludeEmail: coerceBoolean.describe("Deprecated and ignored.").optional(),
       eventTypes: coerceArray(z.enum(["birthday","default","focusTime","fromGmail","outOfOffice","workingLocation"])).describe("Event types to return. Optional. This parameter can be repeated multiple times to return events of different types. If unset, returns all event types.").optional(),
       iCalUID: z.string().describe("Specifies an event ID in the iCalendar format to be provided in the response. Optional. Use this if you want to search for an event by its iCalendar ID.").optional(),
@@ -410,7 +410,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      setting: z.string().describe("The id of the user setting."),
+      setting: z.string().min(1).describe("The id of the user setting."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

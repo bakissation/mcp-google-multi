@@ -17,8 +17,8 @@ export function registerAppsmarketGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      applicationId: z.string().describe("The ID of the application."),
-      customerId: z.string().describe("The ID of the customer."),
+      applicationId: z.string().min(1).describe("The ID of the application."),
+      customerId: z.string().min(1).describe("The ID of the customer."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -31,8 +31,8 @@ export function registerAppsmarketGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      applicationId: z.string().describe("The ID of the application."),
-      userId: z.string().describe("The ID of the user."),
+      applicationId: z.string().min(1).describe("The ID of the application."),
+      userId: z.string().min(1).describe("The ID of the user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

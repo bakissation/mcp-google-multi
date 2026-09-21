@@ -19,7 +19,7 @@ export function registerTasksGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"etag","api":"etag"},{"field":"id","api":"id"},{"field":"kind","api":"kind"},{"field":"selfLink","api":"selfLink"},{"field":"title","api":"title"},{"field":"updated","api":"updated"}],
     shape: {
       account: accountField(),
-      tasklist: z.string().describe("Task list identifier."),
+      tasklist: z.string().min(1).describe("Task list identifier."),
       etag: z.string().describe("ETag of the resource.").optional(),
       id: z.string().describe("Task list identifier.").optional(),
       kind: z.string().describe("Output only. Type of the resource. This is always \"tasks#taskList\".").optional(),
@@ -38,8 +38,8 @@ export function registerTasksGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      task: z.string().describe("Task identifier."),
-      tasklist: z.string().describe("Task list identifier."),
+      task: z.string().min(1).describe("Task identifier."),
+      tasklist: z.string().min(1).describe("Task list identifier."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Task JSON request body. Top-level fields: assignmentInfo, completed, deleted, due, etag, hidden, id, kind, links, notes, parent, position, +5 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },

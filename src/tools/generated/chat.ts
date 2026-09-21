@@ -61,7 +61,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the custom emoji to delete. Format: `customEmojis/{customEmoji}` You can use the emoji name as an alias for `{customEmoji}`. For example, `customEmojis/:example-emoji:` wher"),
+      name: z.string().min(1).describe("Required. Resource name of the custom emoji to delete. Format: `customEmojis/{customEmoji}` You can use the emoji name as an alias for `{customEmoji}`. For example, `customEmojis/:example-emoji:` wher"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -74,7 +74,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the custom emoji. Format: `customEmojis/{customEmoji}` You can use the emoji name as an alias for `{customEmoji}`. For example, `customEmojis/:example-emoji:` where `:exampl"),
+      name: z.string().min(1).describe("Required. Resource name of the custom emoji. Format: `customEmojis/{customEmoji}` You can use the emoji name as an alias for `{customEmoji}`. For example, `customEmojis/:example-emoji:` where `:exampl"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -102,7 +102,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      resourceName: z.string().describe("Name of the media that is being downloaded. See ReadRequest.resource_name."),
+      resourceName: z.string().min(1).describe("Name of the media that is being downloaded. See ReadRequest.resource_name."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -116,7 +116,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"filename","api":"filename"}],
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. Resource name of the Chat space in which the attachment is uploaded. Format \"spaces/{space}\"."),
+      parent: z.string().min(1).describe("Required. Resource name of the Chat space in which the attachment is uploaded. Format \"spaces/{space}\"."),
       filename: z.string().describe("Required. The filename of the attachment, including the file extension.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -131,7 +131,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [],
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the import mode space. Format: `spaces/{space}`"),
+      name: z.string().min(1).describe("Required. Resource name of the import mode space. Format: `spaces/{space}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -158,7 +158,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the space to delete. Format: `spaces/{space}`"),
+      name: z.string().min(1).describe("Required. Resource name of the space to delete. Format: `spaces/{space}`"),
       useAdminAccess: coerceBoolean.describe("Optional. When `true`, the method runs using the user's Google Workspace administrator privileges. The calling user must be a Google Workspace administrator with the [manage chat and spaces conversati").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -201,7 +201,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The resource name of the space for which to create the membership. Format: spaces/{space}"),
+      parent: z.string().min(1).describe("Required. The resource name of the space for which to create the membership. Format: spaces/{space}"),
       useAdminAccess: coerceBoolean.describe("Optional. When `true`, the method runs using the user's Google Workspace administrator privileges. The calling user must be a Google Workspace administrator with the [manage chat and spaces conversati").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Membership JSON request body. Top-level fields: affiliation, createTime, deleteTime, groupMember, member, name, role, state."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -216,7 +216,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the membership to delete. Chat apps can delete human users' or their own memberships. Chat apps can't delete other apps' memberships. When deleting a human membership, requi"),
+      name: z.string().min(1).describe("Required. Resource name of the membership to delete. Chat apps can delete human users' or their own memberships. Chat apps can't delete other apps' memberships. When deleting a human membership, requi"),
       useAdminAccess: coerceBoolean.describe("Optional. When `true`, the method runs using the user's Google Workspace administrator privileges. The calling user must be a Google Workspace administrator with the [manage chat and spaces conversati").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -230,7 +230,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the membership to retrieve. To get the app's own membership [by using user authentication](https://developers.google.com/workspace/chat/authenticate-authorize-chat-user), yo"),
+      name: z.string().min(1).describe("Required. Resource name of the membership to retrieve. To get the app's own membership [by using user authentication](https://developers.google.com/workspace/chat/authenticate-authorize-chat-user), yo"),
       useAdminAccess: coerceBoolean.describe("Optional. When `true`, the method runs using the user's Google Workspace administrator privileges. The calling user must be a Google Workspace administrator with the [manage chat and spaces conversati").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -244,7 +244,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The resource name of the space for which to fetch a membership list. Format: spaces/{space}"),
+      parent: z.string().min(1).describe("Required. The resource name of the space for which to fetch a membership list. Format: spaces/{space}"),
       filter: z.string().describe("Optional. A query filter. You can filter memberships by a member's role ([`role`](https://developers.google.com/workspace/chat/api/reference/rest/v1/spaces.members#membershiprole)) and type ([`member.").optional(),
       pageSize: z.number().describe("Optional. The maximum number of memberships to return. The service might return fewer than this value. If unspecified, at most 100 memberships are returned. The maximum value is 1000. If you use a val").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous call to list memberships. Provide this parameter to retrieve the subsequent page. When paginating, all other parameters provided should match the call ").optional(),
@@ -263,7 +263,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("Identifier. Resource name of the membership, assigned by the server. Format: `spaces/{space}/members/{member}`"),
+      name: z.string().min(1).describe("Identifier. Resource name of the membership, assigned by the server. Format: `spaces/{space}/members/{member}`"),
       updateMask: z.string().describe("Required. The field paths to update. Separate multiple values with commas or use `*` to update all field paths. Currently supported field paths: - `role`").optional(),
       useAdminAccess: coerceBoolean.describe("Optional. When `true`, the method runs using the user's Google Workspace administrator privileges. The calling user must be a Google Workspace administrator with the [manage chat and spaces conversati").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Membership JSON request body. Top-level fields: affiliation, createTime, deleteTime, groupMember, member, name, role, state."),
@@ -279,7 +279,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the attachment, in the form `spaces/{space}/messages/{message}/attachments/{attachment}`."),
+      name: z.string().min(1).describe("Required. Resource name of the attachment, in the form `spaces/{space}/messages/{message}/attachments/{attachment}`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -292,7 +292,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the message. Format: `spaces/{space}/messages/{message}` If you've set a custom ID for your message, you can use the value from the `clientAssignedMessageId` field for `{mes"),
+      name: z.string().min(1).describe("Required. Resource name of the message. Format: `spaces/{space}/messages/{message}` If you've set a custom ID for your message, you can use the value from the `clientAssignedMessageId` field for `{mes"),
       force: coerceBoolean.describe("Optional. When `true`, deleting a message also deletes its threaded replies. When `false`, if a message has threaded replies, deletion fails. Only applies when [authenticating as a user](https://devel").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -306,7 +306,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the message. Format: `spaces/{space}/messages/{message}` If you've set a custom ID for your message, you can use the value from the `clientAssignedMessageId` field for `{mes"),
+      name: z.string().min(1).describe("Required. Resource name of the message. Format: `spaces/{space}/messages/{message}` If you've set a custom ID for your message, you can use the value from the `clientAssignedMessageId` field for `{mes"),
       markupSyntax: z.enum(["MARKUP_SYNTAX_UNSPECIFIED","MARKUP_SYNTAX_CHAT","MARKUP_SYNTAX_MARKDOWN"]).describe("Optional. Specifies the desired output syntax for the Chat message `formatted_text` field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -320,7 +320,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("Identifier. Resource name of the message. Format: `spaces/{space}/messages/{message}` Where `{space}` is the ID of the space where the message is posted and `{message}` is a system-assigned ID for the"),
+      name: z.string().min(1).describe("Identifier. Resource name of the message. Format: `spaces/{space}/messages/{message}` Where `{space}` is the ID of the space where the message is posted and `{message}` is a system-assigned ID for the"),
       allowMissing: coerceBoolean.describe("Optional. If `true` and the message isn't found, a new message is created and `updateMask` is ignored. The specified message ID must be [client-assigned](https://developers.google.com/workspace/chat/c").optional(),
       updateMask: z.string().describe("Required. The field paths to update. Separate multiple values with commas or use `*` to update all field paths. Currently supported field paths: - `text` - `attachment` - `cards` (Requires [app authen").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Message JSON request body. Top-level fields: accessoryWidgets, actionResponse, annotations, argumentText, attachedGifs, attachment, cards, cardsV2, clientAssignedMessageId, createTime, deleteTime, deletionMetadata, +16 more."),
@@ -336,7 +336,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The message where the reaction is created. Format: `spaces/{space}/messages/{message}`"),
+      parent: z.string().min(1).describe("Required. The message where the reaction is created. Format: `spaces/{space}/messages/{message}`"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Reaction JSON request body. Top-level fields: emoji, name, user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -350,7 +350,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Name of the reaction to delete. Format: `spaces/{space}/messages/{message}/reactions/{reaction}`"),
+      name: z.string().min(1).describe("Required. Name of the reaction to delete. Format: `spaces/{space}/messages/{message}/reactions/{reaction}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -363,7 +363,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The message users reacted to. Format: `spaces/{space}/messages/{message}`"),
+      parent: z.string().min(1).describe("Required. The message users reacted to. Format: `spaces/{space}/messages/{message}`"),
       filter: z.string().describe("Optional. A query filter. You can filter reactions by [emoji](https://developers.google.com/workspace/chat/api/reference/rest/v1/Emoji) (either `emoji.unicode` or `emoji.custom_emoji.uid`) and [user](").optional(),
       pageSize: z.number().describe("Optional. The maximum number of reactions returned. The service can return fewer reactions than this value. If unspecified, the default value is 25. The maximum value is 200; values above 200 are chan").optional(),
       pageToken: z.string().describe("Optional. (If resuming from a previous query.) A page token received from a previous list reactions call. Provide this to retrieve the subsequent page. When paginating, the filter value should match t").optional(),
@@ -380,7 +380,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"filter","api":"filter"},{"field":"markupSyntax","api":"markupSyntax"},{"field":"orderBy","api":"orderBy"},{"field":"pageSize","api":"pageSize"},{"field":"pageToken","api":"pageToken"},{"field":"view","api":"view"}],
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The resource name of the space to search within. To search across all spaces the user has access to, set this field to `spaces/-`. Using any other value for `parent` results in an `INVALID_A"),
+      parent: z.string().min(1).describe("Required. The resource name of the space to search within. To search across all spaces the user has access to, set this field to `spaces/-`. Using any other value for `parent` results in an `INVALID_A"),
       filter: z.string().describe("Required. A search query. The query can specify one or more search keywords, which are used to filter the results, You can also filter the results using the following message fields: - `create_time`: ").optional(),
       markupSyntax: z.enum(["MARKUP_SYNTAX_UNSPECIFIED","MARKUP_SYNTAX_CHAT","MARKUP_SYNTAX_MARKDOWN"]).describe("Optional. Specifies the desired output syntax for the Chat message `formatted_text` field.").optional(),
       orderBy: z.string().describe("Optional. How the results list is ordered. Supported attributes to order by are: - `create_time`: Sorts the results by the time of the message creation. Default value. - `relevance`: Sorts the results").optional(),
@@ -399,7 +399,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("Identifier. Resource name of the message. Format: `spaces/{space}/messages/{message}` Where `{space}` is the ID of the space where the message is posted and `{message}` is a system-assigned ID for the"),
+      name: z.string().min(1).describe("Identifier. Resource name of the message. Format: `spaces/{space}/messages/{message}` Where `{space}` is the ID of the space where the message is posted and `{message}` is a system-assigned ID for the"),
       allowMissing: coerceBoolean.describe("Optional. If `true` and the message isn't found, a new message is created and `updateMask` is ignored. The specified message ID must be [client-assigned](https://developers.google.com/workspace/chat/c").optional(),
       updateMask: z.string().describe("Required. The field paths to update. Separate multiple values with commas or use `*` to update all field paths. Currently supported field paths: - `text` - `attachment` - `cards` (Requires [app authen").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Message JSON request body. Top-level fields: accessoryWidgets, actionResponse, annotations, argumentText, attachedGifs, attachment, cards, cardsV2, clientAssignedMessageId, createTime, deleteTime, deletionMetadata, +16 more."),
@@ -415,7 +415,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("Identifier. Resource name of the space. Format: `spaces/{space}` Where `{space}` represents the system-assigned ID for the space. You can obtain the space ID by calling the [`spaces.list()`](https://d"),
+      name: z.string().min(1).describe("Identifier. Resource name of the space. Format: `spaces/{space}` Where `{space}` represents the system-assigned ID for the space. You can obtain the space ID by calling the [`spaces.list()`](https://d"),
       updateMask: z.string().describe("Required. The updated field paths, comma separated if there are multiple. You can update the following fields for a space: `space_details`: Updates the space's description and guidelines. You must pas").optional(),
       useAdminAccess: coerceBoolean.describe("Optional. When `true`, the method runs using the user's Google Workspace administrator privileges. The calling user must be a Google Workspace administrator with the [manage chat and spaces conversati").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Space JSON request body. Top-level fields: accessSettings, adminInstalled, createTime, customer, displayName, externalUserAllowed, importMode, importModeExpireTime, lastActiveTime, membershipCount, name, permissionSettings, +9 more."),
@@ -461,7 +461,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The resource name of the space event. Format: `spaces/{space}/spaceEvents/{spaceEvent}`"),
+      name: z.string().min(1).describe("Required. The resource name of the space event. Format: `spaces/{space}/spaceEvents/{spaceEvent}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -474,7 +474,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. Resource name of the [Google Chat space](https://developers.google.com/workspace/chat/api/reference/rest/v1/spaces) where the events occurred. Format: `spaces/{space}`."),
+      parent: z.string().min(1).describe("Required. Resource name of the [Google Chat space](https://developers.google.com/workspace/chat/api/reference/rest/v1/spaces) where the events occurred. Format: `spaces/{space}`."),
       filter: z.string().describe("Required. A query filter. You must specify at least one event type (`event_type`) using the has `:` operator. To filter by multiple event types, use the `OR` operator. Omit batch event types in your f").optional(),
       pageSize: z.number().describe("Optional. The maximum number of space events returned. The service might return fewer than this value. Negative values return an `INVALID_ARGUMENT` error.").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous list space events call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to list space events must match th").optional(),
@@ -490,7 +490,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The resource name of the availability to retrieve. Format: users/{user}/availability `{user}` is the id for the Person in the People API or Admin SDK directory API. For example, `users/12345"),
+      name: z.string().min(1).describe("Required. The resource name of the availability to retrieve. Format: users/{user}/availability `{user}` is the id for the Person in the People API or Admin SDK directory API. For example, `users/12345"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -504,7 +504,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"expireTime","api":"expireTime"},{"field":"ttl","api":"ttl"}],
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The resource name of the availability to mark as active. Format: users/{user}/availability `{user}` is the id for the Person in the People API or Admin SDK directory API. For example, `users"),
+      name: z.string().min(1).describe("Required. The resource name of the availability to mark as active. Format: users/{user}/availability `{user}` is the id for the Person in the People API or Admin SDK directory API. For example, `users"),
       expireTime: z.string().describe("The absolute timestamp when the ACTIVE state expires.").optional(),
       ttl: z.string().describe("The duration from the current time until the ACTIVE state expires. Using a short TTL can effectively reset the user's state to be based on activity after this brief duration.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -520,7 +520,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [],
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The resource name of the availability to mark as away. Format: users/{user}/availability `{user}` is the id for the Person in the People API or Admin SDK directory API. For example, `users/1"),
+      name: z.string().min(1).describe("Required. The resource name of the availability to mark as away. Format: users/{user}/availability `{user}` is the id for the Person in the People API or Admin SDK directory API. For example, `users/1"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -534,7 +534,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"expireTime","api":"expireTime"},{"field":"ttl","api":"ttl"}],
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The resource name of the availability to mark as Do Not Disturb. Format: users/{user}/availability `{user}` is the id for the Person in the People API or Admin SDK directory API. For example"),
+      name: z.string().min(1).describe("Required. The resource name of the availability to mark as Do Not Disturb. Format: users/{user}/availability `{user}` is the id for the Person in the People API or Admin SDK directory API. For example"),
       expireTime: z.string().describe("The absolute timestamp when the DND state expires.").optional(),
       ttl: z.string().describe("The duration from the current time until the DND state expires.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -549,7 +549,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("Identifier. Resource name of the user's availability. Format: `users/{user}/availability` `{user}` is the id for the Person in the People API or Admin SDK directory API. For example, `users/123456789`"),
+      name: z.string().min(1).describe("Identifier. Resource name of the user's availability. Format: `users/{user}/availability` `{user}` is the id for the Person in the People API or Admin SDK directory API. For example, `users/123456789`"),
       updateMask: z.string().describe("Required. The list of fields to update. The only field that can be updated is `custom_status`.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Availability JSON request body. Top-level fields: customStatus, doNotDisturbMetadata, name, state."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -565,7 +565,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"displayName","api":"displayName"},{"field":"name","api":"name"},{"field":"sortOrder","api":"sortOrder"},{"field":"type","api":"type"}],
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The parent resource name where the section is created. Format: `users/{user}`"),
+      parent: z.string().min(1).describe("Required. The parent resource name where the section is created. Format: `users/{user}`"),
       displayName: z.string().describe("Optional. The section's display name. Only populated for sections of type `CUSTOM_SECTION`. Supports up to 80 characters. Required when creating a `CUSTOM_SECTION`.").optional(),
       name: z.string().describe("Identifier. Resource name of the section. For system sections, the section ID is a constant string: - DEFAULT_DIRECT_MESSAGES: `users/{user}/sections/default-direct-messages` - DEFAULT_SPACES: `users/").optional(),
       sortOrder: z.number().describe("Output only. The order of the section in relation to other sections. Sections with a lower `sort_order` value appear before sections with a higher value.").optional(),
@@ -582,7 +582,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The name of the section to delete. Format: `users/{user}/sections/{section}`"),
+      name: z.string().min(1).describe("Required. The name of the section to delete. Format: `users/{user}/sections/{section}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -595,7 +595,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The parent, which is the section resource name that owns this collection of section items. Only supports listing section items for the calling user. When you're filtering by space, use the w"),
+      parent: z.string().min(1).describe("Required. The parent, which is the section resource name that owns this collection of section items. Only supports listing section items for the calling user. When you're filtering by space, use the w"),
       filter: z.string().describe("Optional. A query filter. Currently only supports filtering by space. For example, `space = spaces/{space}`. Invalid queries are rejected with an `INVALID_ARGUMENT` error.").optional(),
       pageSize: z.number().describe("Optional. The maximum number of section items to return. The service may return fewer than this value. If unspecified, at most 10 section items will be returned. The maximum value is 100. If you use a").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous list section items call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided should match the call that provid").optional(),
@@ -612,7 +612,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"targetSection","api":"targetSection"}],
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The resource name of the section item to move. Format: `users/{user}/sections/{section}/items/{item}`"),
+      name: z.string().min(1).describe("Required. The resource name of the section item to move. Format: `users/{user}/sections/{section}/items/{item}`"),
       targetSection: z.string().describe("Required. The resource name of the section to move the section item to. Format: `users/{user}/sections/{section}`").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -626,7 +626,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The parent, which is the user resource name that owns this collection of sections. Only supports listing sections for the calling user. To refer to the calling user, set one of the following"),
+      parent: z.string().min(1).describe("Required. The parent, which is the user resource name that owns this collection of sections. Only supports listing sections for the calling user. To refer to the calling user, set one of the following"),
       pageSize: z.number().describe("Optional. The maximum number of sections to return. The service may return fewer than this value. If unspecified, at most 10 sections will be returned. The maximum value is 100. If you use a value mor").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous list sections call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided should match the call that provided th").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -642,7 +642,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"displayName","api":"displayName"},{"field":"name_","api":"name"},{"field":"sortOrder","api":"sortOrder"},{"field":"type","api":"type"}],
     shape: {
       account: accountField(),
-      name: z.string().describe("Identifier. Resource name of the section. For system sections, the section ID is a constant string: - DEFAULT_DIRECT_MESSAGES: `users/{user}/sections/default-direct-messages` - DEFAULT_SPACES: `users/"),
+      name: z.string().min(1).describe("Identifier. Resource name of the section. For system sections, the section ID is a constant string: - DEFAULT_DIRECT_MESSAGES: `users/{user}/sections/default-direct-messages` - DEFAULT_SPACES: `users/"),
       updateMask: z.string().describe("Required. The mask to specify which fields to update. Currently supported field paths: - `display_name`").optional(),
       displayName: z.string().describe("Optional. The section's display name. Only populated for sections of type `CUSTOM_SECTION`. Supports up to 80 characters. Required when creating a `CUSTOM_SECTION`.").optional(),
       name_: z.string().describe("Identifier. Resource name of the section. For system sections, the section ID is a constant string: - DEFAULT_DIRECT_MESSAGES: `users/{user}/sections/default-direct-messages` - DEFAULT_SPACES: `users/").optional(),
@@ -661,7 +661,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"relativePosition","api":"relativePosition"},{"field":"sortOrder","api":"sortOrder"}],
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The resource name of the section to position. Format: `users/{user}/sections/{section}`"),
+      name: z.string().min(1).describe("Required. The resource name of the section to position. Format: `users/{user}/sections/{section}`"),
       relativePosition: z.enum(["POSITION_UNSPECIFIED","START","END"]).describe("Optional. The relative position of the section in the list of sections.").optional(),
       sortOrder: z.number().describe("Optional. The absolute position of the section in the list of sections. The position must be greater than 0. If the position is greater than the number of sections, the section will be appended to the").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -676,7 +676,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the space read state to retrieve. Only supports getting read state for the calling user. To refer to the calling user, set one of the following: - The `me` alias. For exampl"),
+      name: z.string().min(1).describe("Required. Resource name of the space read state to retrieve. Only supports getting read state for the calling user. To refer to the calling user, set one of the following: - The `me` alias. For exampl"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -689,7 +689,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Format: users/{user}/spaces/{space}/spaceNotificationSetting - `users/me/spaces/{space}/spaceNotificationSetting`, OR - `users/user@example.com/spaces/{space}/spaceNotificationSetting`, OR -"),
+      name: z.string().min(1).describe("Required. Format: users/{user}/spaces/{space}/spaceNotificationSetting - `users/me/spaces/{space}/spaceNotificationSetting`, OR - `users/user@example.com/spaces/{space}/spaceNotificationSetting`, OR -"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -703,7 +703,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"muteSetting","api":"muteSetting"},{"field":"name_","api":"name"},{"field":"notificationSetting","api":"notificationSetting"}],
     shape: {
       account: accountField(),
-      name: z.string().describe("Identifier. The resource name of the space notification setting. Format: `users/{user}/spaces/{space}/spaceNotificationSetting`."),
+      name: z.string().min(1).describe("Identifier. The resource name of the space notification setting. Format: `users/{user}/spaces/{space}/spaceNotificationSetting`."),
       updateMask: z.string().describe("Required. Supported field paths: - `notification_setting` - `mute_setting`").optional(),
       muteSetting: z.enum(["MUTE_SETTING_UNSPECIFIED","UNMUTED","MUTED"]).describe("The space notification mute setting.").optional(),
       name_: z.string().describe("Identifier. The resource name of the space notification setting. Format: `users/{user}/spaces/{space}/spaceNotificationSetting`.").optional(),
@@ -720,7 +720,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the thread read state to retrieve. Only supports getting read state for the calling user. To refer to the calling user, set one of the following: - The `me` alias. For examp"),
+      name: z.string().min(1).describe("Required. Resource name of the thread read state to retrieve. Only supports getting read state for the calling user. To refer to the calling user, set one of the following: - The `me` alias. For examp"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -734,7 +734,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"lastReadTime","api":"lastReadTime"},{"field":"name_","api":"name"}],
     shape: {
       account: accountField(),
-      name: z.string().describe("Resource name of the space read state. Format: `users/{user}/spaces/{space}/spaceReadState`"),
+      name: z.string().min(1).describe("Resource name of the space read state. Format: `users/{user}/spaces/{space}/spaceReadState`"),
       updateMask: z.string().describe("Required. The field paths to update. Currently supported field paths: - `last_read_time` When the `last_read_time` is before the latest message create time, the space appears as unread in the UI. To m").optional(),
       lastReadTime: z.string().describe("Optional. The time when the user's space read state was updated. Usually this corresponds with either the timestamp of the last read message, or a timestamp specified by the user to mark the last read").optional(),
       name_: z.string().describe("Resource name of the space read state. Format: `users/{user}/spaces/{space}/spaceReadState`").optional(),

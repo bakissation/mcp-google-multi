@@ -18,7 +18,7 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): vo
     hasBody: false,
     shape: {
       account: accountField(),
-      groupUniqueId: z.string().describe("The group's email address."),
+      groupUniqueId: z.string().min(1).describe("The group's email address."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -31,7 +31,7 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): vo
     hasBody: true,
     shape: {
       account: accountField(),
-      groupUniqueId: z.string().describe("The group's email address."),
+      groupUniqueId: z.string().min(1).describe("The group's email address."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Groups JSON request body. Top-level fields: allowExternalMembers, allowGoogleCommunication, allowWebPosting, archiveOnly, customFooterText, customReplyTo, customRolesEnabledForSettingsToBeMerged, defaultMessageDenyNotificationText, default_sender, description, email, enableCollaborativeInbox, +51 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -45,7 +45,7 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): vo
     hasBody: true,
     shape: {
       account: accountField(),
-      groupUniqueId: z.string().describe("The group's email address."),
+      groupUniqueId: z.string().min(1).describe("The group's email address."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Groups JSON request body. Top-level fields: allowExternalMembers, allowGoogleCommunication, allowWebPosting, archiveOnly, customFooterText, customReplyTo, customRolesEnabledForSettingsToBeMerged, defaultMessageDenyNotificationText, default_sender, description, email, enableCollaborativeInbox, +51 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },

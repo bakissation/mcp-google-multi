@@ -19,7 +19,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      applicationId: z.string().describe("ID of the application resource to be retrieved."),
+      applicationId: z.string().min(1).describe("ID of the application resource to be retrieved."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -47,7 +47,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      dataTransferId: z.string().describe("ID of the resource to be retrieved. This is returned in the response from the insert method."),
+      dataTransferId: z.string().min(1).describe("ID of the resource to be retrieved. This is returned in the response from the insert method."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -138,7 +138,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"changeChromeOsDeviceStatusAction","api":"changeChromeOsDeviceStatusAction"},{"field":"deprovisionReason","api":"deprovisionReason"},{"field":"deviceIds","api":"deviceIds"}],
     shape: {
       account: accountField(),
-      customerId: z.string().describe("Required. Immutable ID of the Google Workspace account."),
+      customerId: z.string().min(1).describe("Required. Immutable ID of the Google Workspace account."),
       changeChromeOsDeviceStatusAction: z.enum(["CHANGE_CHROME_OS_DEVICE_STATUS_ACTION_UNSPECIFIED","CHANGE_CHROME_OS_DEVICE_STATUS_ACTION_DEPROVISION","CHANGE_CHROME_OS_DEVICE_STATUS_ACTION_DISABLE","CHANGE_CHROME_OS_DEVICE_STATUS_ACTION_REENABLE"]).describe("Required. The action to take on the ChromeOS device in order to change its status.").optional(),
       deprovisionReason: z.enum(["DEPROVISION_REASON_UNSPECIFIED","DEPROVISION_REASON_SAME_MODEL_REPLACEMENT","DEPROVISION_REASON_UPGRADE","DEPROVISION_REASON_DOMAIN_MOVE","DEPROVISION_REASON_SERVICE_EXPIRATION","DEPROVISION_REASON_OTHER","DEPROVISION_REASON_DIFFERENT_MODEL_REPLACEMENT","DEPROVISION_REASON_RETIRING_DEVICE","DEPROVISION_REASON_UPGRADE_TRANSFER","DEPROVISION_REASON_NOT_REQUIRED","DEPROVISION_REASON_REPAIR_CENTER"]).describe("Optional. The reason behind a device deprovision. Must be provided if 'changeChromeOsDeviceStatusAction' is set to 'CHANGE_CHROME_OS_DEVICE_STATUS_ACTION_DEPROVISION'. Otherwise, omit this field.").optional(),
       deviceIds: coerceArray(z.string()).describe("Required. List of the IDs of the ChromeOS devices to change. Maximum 50.").optional(),
@@ -154,9 +154,9 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      commandId: z.string().describe("Immutable. ID of Chrome OS Device Command."),
-      customerId: z.string().describe("Immutable. ID of the Google Workspace account."),
-      deviceId: z.string().describe("Immutable. ID of Chrome OS Device."),
+      commandId: z.string().min(1).describe("Immutable. ID of Chrome OS Device Command."),
+      customerId: z.string().min(1).describe("Immutable. ID of the Google Workspace account."),
+      deviceId: z.string().min(1).describe("Immutable. ID of Chrome OS Device."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -169,7 +169,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("Required. Immutable ID of the Google Workspace account."),
+      customerId: z.string().min(1).describe("Required. Immutable ID of the Google Workspace account."),
       filter: z.string().describe("Optional. Search string in the format given at [List query operators](https://developers.google.com/workspace/admin/directory/v1/list-query-operators).").optional(),
       includeChildOrgunits: coerceBoolean.describe("Optional. Return devices from all child orgunits, as well as the specified org unit. If this is set to true, 'orgUnitPath' must be provided.").optional(),
       orgUnitPath: z.string().describe("Optional. The full path of the organizational unit (minus the leading `/`) or its unique ID.").optional(),
@@ -186,8 +186,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"commandType","api":"commandType"},{"field":"payload","api":"payload"}],
     shape: {
       account: accountField(),
-      customerId: z.string().describe("Immutable. ID of the Google Workspace account."),
-      deviceId: z.string().describe("Immutable. ID of Chrome OS Device."),
+      customerId: z.string().min(1).describe("Immutable. ID of the Google Workspace account."),
+      deviceId: z.string().min(1).describe("Immutable. ID of Chrome OS Device."),
       commandType: z.enum(["COMMAND_TYPE_UNSPECIFIED","REBOOT","TAKE_A_SCREENSHOT","SET_VOLUME","WIPE_USERS","REMOTE_POWERWASH","DEVICE_START_CRD_SESSION","CAPTURE_LOGS","FETCH_CRD_AVAILABILITY_INFO","FETCH_SUPPORT_PACKET"]).describe("The type of command.").optional(),
       payload: z.string().describe("The payload for the command, provide it only if command supports it. The following commands support adding payload: * `SET_VOLUME`: Payload is a stringified JSON object in the form: { \"volume\": 50 }. ").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -202,7 +202,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The name of the customer. Format: customers/{customer_id}"),
+      parent: z.string().min(1).describe("Required. The name of the customer. Format: customers/{customer_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchCreatePrintersRequest JSON request body. Top-level fields: requests."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -217,7 +217,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"printerIds","api":"printerIds"}],
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The name of the customer. Format: customers/{customer_id}"),
+      parent: z.string().min(1).describe("Required. The name of the customer. Format: customers/{customer_id}"),
       printerIds: coerceArray(z.string()).describe("A list of Printer.id that should be deleted. Max 100 at a time.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -231,7 +231,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The name of the customer. Format: customers/{customer_id}"),
+      parent: z.string().min(1).describe("Required. The name of the customer. Format: customers/{customer_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Printer JSON request body. Top-level fields: auxiliaryMessages, createTime, description, displayName, id, makeAndModel, name, orgUnitId, uri, useDriverlessConfig."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -245,7 +245,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The name of the printer to be updated. Format: customers/{customer_id}/chrome/printers/{printer_id}"),
+      name: z.string().min(1).describe("Required. The name of the printer to be updated. Format: customers/{customer_id}/chrome/printers/{printer_id}"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -258,7 +258,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The name of the printer to retrieve. Format: customers/{customer_id}/chrome/printers/{printer_id}"),
+      name: z.string().min(1).describe("Required. The name of the printer to retrieve. Format: customers/{customer_id}/chrome/printers/{printer_id}"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -271,7 +271,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The name of the customer who owns this collection of printers. Format: customers/{customer_id}"),
+      parent: z.string().min(1).describe("Required. The name of the customer who owns this collection of printers. Format: customers/{customer_id}"),
       filter: z.string().describe("Search query. Search syntax is shared between this api and Admin Console printers pages.").optional(),
       orderBy: z.string().describe("The order to sort results by. Must be one of display_name, description, make_and_model, or create_time. Default order is ascending, but descending order can be returned by appending \"desc\" to the orde").optional(),
       orgUnitId: z.string().describe("Organization Unit that we want to list the printers for. When org_unit is not present in the request then all printers of the customer are returned (or filtered). When org_unit is present in the reque").optional(),
@@ -289,7 +289,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The name of the customer who owns this collection of printers. Format: customers/{customer_id}"),
+      parent: z.string().min(1).describe("Required. The name of the customer who owns this collection of printers. Format: customers/{customer_id}"),
       filter: z.string().describe("Filer to list only models by a given manufacturer in format: \"manufacturer:Brother\". Search syntax is shared between this api and Admin Console printers pages.").optional(),
       pageSize: z.number().describe("The maximum number of objects to return. The service may return fewer than this value.").optional(),
       pageToken: z.string().describe("A page token, received from a previous call.").optional(),
@@ -305,7 +305,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("Identifier. The resource name of the Printer object, in the format customers/{customer-id}/printers/{printer-id} (During printer creation leave empty)"),
+      name: z.string().min(1).describe("Identifier. The resource name of the Printer object, in the format customers/{customer-id}/printers/{printer-id} (During printer creation leave empty)"),
       clearMask: z.string().describe("The list of fields to be cleared. Note, some of the fields are read only and cannot be updated. Values for not specified fields will be patched.").optional(),
       updateMask: z.string().describe("The list of fields to be updated. Note, some of the fields are read only and cannot be updated. Values for not specified fields will be patched.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Printer JSON request body. Top-level fields: auxiliaryMessages, createTime, description, displayName, id, makeAndModel, name, orgUnitId, uri, useDriverlessConfig."),
@@ -321,7 +321,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The [unique ID](https://developers.google.com/workspace/admin/directory/reference/rest/v1/customers) of the customer's Google Workspace account. Format: `customers/{id}`"),
+      parent: z.string().min(1).describe("Required. The [unique ID](https://developers.google.com/workspace/admin/directory/reference/rest/v1/customers) of the customer's Google Workspace account. Format: `customers/{id}`"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchCreatePrintServersRequest JSON request body. Top-level fields: requests."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -336,7 +336,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"printServerIds","api":"printServerIds"}],
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The [unique ID](https://developers.google.com/workspace/admin/directory/reference/rest/v1/customers) of the customer's Google Workspace account. Format: `customers/{customer.id}`"),
+      parent: z.string().min(1).describe("Required. The [unique ID](https://developers.google.com/workspace/admin/directory/reference/rest/v1/customers) of the customer's Google Workspace account. Format: `customers/{customer.id}`"),
       printServerIds: coerceArray(z.string()).describe("A list of print server IDs that should be deleted (max `100` per batch).").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -351,7 +351,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"createTime","api":"createTime"},{"field":"description","api":"description"},{"field":"displayName","api":"displayName"},{"field":"id","api":"id"},{"field":"name","api":"name"},{"field":"orgUnitId","api":"orgUnitId"},{"field":"uri","api":"uri"}],
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The [unique ID](https://developers.google.com/workspace/admin/directory/reference/rest/v1/customers) of the customer's Google Workspace account. Format: `customers/{id}`"),
+      parent: z.string().min(1).describe("Required. The [unique ID](https://developers.google.com/workspace/admin/directory/reference/rest/v1/customers) of the customer's Google Workspace account. Format: `customers/{id}`"),
       createTime: z.string().describe("Output only. Time when the print server was created.").optional(),
       description: z.string().describe("Editable. Description of the print server (as shown in the Admin console).").optional(),
       displayName: z.string().describe("Editable. Display name of the print server (as shown in the Admin console).").optional(),
@@ -371,7 +371,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The name of the print server to be deleted. Format: `customers/{customer.id}/chrome/printServers/{print_server.id}`"),
+      name: z.string().min(1).describe("Required. The name of the print server to be deleted. Format: `customers/{customer.id}/chrome/printServers/{print_server.id}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -384,7 +384,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The [unique ID](https://developers.google.com/workspace/admin/directory/reference/rest/v1/customers) of the customer's Google Workspace account. Format: `customers/{id}`"),
+      name: z.string().min(1).describe("Required. The [unique ID](https://developers.google.com/workspace/admin/directory/reference/rest/v1/customers) of the customer's Google Workspace account. Format: `customers/{id}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -397,7 +397,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The [unique ID](https://developers.google.com/workspace/admin/directory/reference/rest/v1/customers) of the customer's Google Workspace account. Format: `customers/{id}`"),
+      parent: z.string().min(1).describe("Required. The [unique ID](https://developers.google.com/workspace/admin/directory/reference/rest/v1/customers) of the customer's Google Workspace account. Format: `customers/{id}`"),
       filter: z.string().describe("Search query in [Common Expression Language syntax](https://github.com/google/cel-spec). Supported filters are `display_name`, `description`, and `uri`. Example: `printServer.displayName=='marketing-q").optional(),
       orderBy: z.string().describe("Sort order for results. Supported values are `display_name`, `description`, or `create_time`. Default order is ascending, but descending order can be returned by appending \"desc\" to the `order_by` fie").optional(),
       orgUnitId: z.string().describe("If `org_unit_id` is present in the request, only print servers owned or inherited by the organizational unit (OU) are returned. If the `PrintServer` resource's `org_unit_id` matches the one in the req").optional(),
@@ -416,7 +416,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"createTime","api":"createTime"},{"field":"description","api":"description"},{"field":"displayName","api":"displayName"},{"field":"id","api":"id"},{"field":"name_","api":"name"},{"field":"orgUnitId","api":"orgUnitId"},{"field":"uri","api":"uri"}],
     shape: {
       account: accountField(),
-      name: z.string().describe("Identifier. Resource name of the print server. Leave empty when creating. Format: `customers/{customer.id}/printServers/{print_server.id}`"),
+      name: z.string().min(1).describe("Identifier. Resource name of the print server. Leave empty when creating. Format: `customers/{customer.id}/printServers/{print_server.id}`"),
       updateMask: z.string().describe("The list of fields to update. Some fields are read-only and cannot be updated. Values for unspecified fields are patched.").optional(),
       createTime: z.string().describe("Output only. Time when the print server was created.").optional(),
       description: z.string().describe("Editable. Description of the print server (as shown in the Admin console).").optional(),
@@ -438,7 +438,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     shape: {
       account: accountField(),
       codeId: z.number().describe("The unique ID of the ASP to be deleted."),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -452,7 +452,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     shape: {
       account: accountField(),
       codeId: z.number().describe("The unique ID of the ASP."),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -465,7 +465,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -479,8 +479,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"action","api":"action"},{"field":"deprovisionReason","api":"deprovisionReason"}],
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      resourceId: z.string().describe("The unique ID of the device. The `resourceId`s are returned in the response from the [chromeosdevices.list](https://developers.google.com/workspace/admin/directory/v1/reference/chromeosdevices/list) m"),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      resourceId: z.string().min(1).describe("The unique ID of the device. The `resourceId`s are returned in the response from the [chromeosdevices.list](https://developers.google.com/workspace/admin/directory/v1/reference/chromeosdevices/list) m"),
       action: z.string().describe("Action to be taken on the Chrome OS device."),
       deprovisionReason: z.string().describe("Only used when the action is `deprovision`. With the `deprovision` action, this field is required. *Note*: The deprovision reason is audited because it might have implications on licenses for perpetua").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -495,8 +495,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      deviceId: z.string().describe("The unique ID of the device. The `deviceId`s are returned in the response from the [chromeosdevices.list](https://developers.google.com/workspace/admin/directory/v1/reference/chromeosdevices/list) met"),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      deviceId: z.string().min(1).describe("The unique ID of the device. The `deviceId`s are returned in the response from the [chromeosdevices.list](https://developers.google.com/workspace/admin/directory/v1/reference/chromeosdevices/list) met"),
       projection: z.enum(["BASIC","FULL"]).describe("Determines whether the response contains the full list of properties or only a subset.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -510,7 +510,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
       includeChildOrgunits: coerceBoolean.describe("Return devices from all child orgunits, as well as the specified org unit. If this is set to true, 'orgUnitPath' must be provided.").optional(),
       maxResults: z.number().describe("Maximum number of results to return. Value should not exceed 300.").optional(),
       orderBy: z.enum(["annotatedLocation","annotatedUser","lastSync","notes","serialNumber","status"]).describe("Device property to use for sorting results.").optional(),
@@ -532,7 +532,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"deviceIds","api":"deviceIds"}],
     shape: {
       account: accountField(),
-      customerId: z.string().describe("Immutable. ID of the Google Workspace account"),
+      customerId: z.string().min(1).describe("Immutable. ID of the Google Workspace account"),
       orgUnitPath: z.string().describe("Full path of the target organizational unit or its ID"),
       deviceIds: coerceArray(z.string()).describe("Chrome OS devices to be moved to OU"),
       fields: z.string().optional().describe('Response field mask.'),
@@ -547,8 +547,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      deviceId: z.string().describe("The unique ID of the device. The `deviceId`s are returned in the response from the [chromeosdevices.list](https://developers.google.com/workspace/admin/v1/reference/chromeosdevices/list) method."),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      deviceId: z.string().min(1).describe("The unique ID of the device. The `deviceId`s are returned in the response from the [chromeosdevices.list](https://developers.google.com/workspace/admin/v1/reference/chromeosdevices/list) method."),
       projection: z.enum(["BASIC","FULL"]).describe("Determines whether the response contains the full list of properties or only a subset.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ChromeOsDevice JSON request body. Top-level fields: activeTimeRanges, annotatedAssetId, annotatedLocation, annotatedUser, autoUpdateExpiration, autoUpdateThrough, backlightInfo, bluetoothAdapterInfo, bootMode, chromeOsType, cpuInfo, cpuStatusReports, +42 more."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -563,8 +563,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      deviceId: z.string().describe("The unique ID of the device. The `deviceId`s are returned in the response from the [chromeosdevices.list](https://developers.google.com/workspace/admin/v1/reference/chromeosdevices/list) method."),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      deviceId: z.string().min(1).describe("The unique ID of the device. The `deviceId`s are returned in the response from the [chromeosdevices.list](https://developers.google.com/workspace/admin/v1/reference/chromeosdevices/list) method."),
       projection: z.enum(["BASIC","FULL"]).describe("Determines whether the response contains the full list of properties or only a subset.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ChromeOsDevice JSON request body. Top-level fields: activeTimeRanges, annotatedAssetId, annotatedLocation, annotatedUser, autoUpdateExpiration, autoUpdateThrough, backlightInfo, bluetoothAdapterInfo, bootMode, chromeOsType, cpuInfo, cpuStatusReports, +42 more."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -579,7 +579,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerKey: z.string().describe("Id of the customer to be retrieved"),
+      customerKey: z.string().min(1).describe("Id of the customer to be retrieved"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -592,7 +592,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customerKey: z.string().describe("Id of the customer to be updated"),
+      customerKey: z.string().min(1).describe("Id of the customer to be updated"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Customer JSON request body. Top-level fields: alternateEmail, customerCreationTime, customerDomain, etag, id, kind, language, phoneNumber, postalAddress."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -606,7 +606,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customerKey: z.string().describe("Id of the customer to be updated"),
+      customerKey: z.string().min(1).describe("Id of the customer to be updated"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Customer JSON request body. Top-level fields: alternateEmail, customerCreationTime, customerDomain, etag, id, kind, language, phoneNumber, postalAddress."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -620,8 +620,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("Immutable ID of the Google Workspace account."),
-      domainAliasName: z.string().describe("Name of domain alias to be retrieved."),
+      customer: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
+      domainAliasName: z.string().min(1).describe("Name of domain alias to be retrieved."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -634,8 +634,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
-      domainAliasName: z.string().describe("Name of domain alias to be retrieved."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
+      domainAliasName: z.string().min(1).describe("Name of domain alias to be retrieved."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -649,7 +649,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"creationTime","api":"creationTime"},{"field":"domainAliasName","api":"domainAliasName"},{"field":"etag","api":"etag"},{"field":"kind","api":"kind"},{"field":"parentDomainName","api":"parentDomainName"},{"field":"verified","api":"verified"}],
     shape: {
       account: accountField(),
-      customer: z.string().describe("Immutable ID of the Google Workspace account."),
+      customer: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
       creationTime: z.string().describe("The creation time of the domain alias. (Read-only).").optional(),
       domainAliasName: z.string().describe("The domain alias name.").optional(),
       etag: z.string().describe("ETag of the resource.").optional(),
@@ -668,7 +668,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
       parentDomainName: z.string().describe("Name of the parent domain for which domain aliases are to be fetched.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -682,8 +682,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("Immutable ID of the Google Workspace account."),
-      domainName: z.string().describe("Name of domain to be deleted"),
+      customer: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
+      domainName: z.string().min(1).describe("Name of domain to be deleted"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -696,8 +696,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
-      domainName: z.string().describe("Name of domain to be retrieved"),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
+      domainName: z.string().min(1).describe("Name of domain to be retrieved"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -710,7 +710,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customer: z.string().describe("Immutable ID of the Google Workspace account."),
+      customer: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Domains JSON request body. Top-level fields: creationTime, domainAliases, domainName, etag, isPrimary, kind, verified."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -724,7 +724,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -737,8 +737,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      alias: z.string().describe("The alias to be removed"),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      alias: z.string().min(1).describe("The alias to be removed"),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -752,7 +752,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"alias","api":"alias"},{"field":"etag","api":"etag"},{"field":"id","api":"id"},{"field":"kind","api":"kind"},{"field":"primaryEmail","api":"primaryEmail"}],
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
       alias: z.string().optional(),
       etag: z.string().optional(),
       id: z.string().optional(),
@@ -770,7 +770,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -783,7 +783,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -796,7 +796,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -822,7 +822,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Group JSON request body. Top-level fields: adminCreated, aliases, description, directMembersCount, email, etag, externalIds, id, kind, name, nonEditableAliases."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -836,7 +836,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Group JSON request body. Top-level fields: adminCreated, aliases, description, directMembersCount, email, etag, externalIds, id, kind, name, nonEditableAliases."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -850,8 +850,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
-      memberKey: z.string().describe("Identifies the group member in the API request. A group member can be a user or another group. The value can be the member's (group or user) primary email address, alias, or unique ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      memberKey: z.string().min(1).describe("Identifies the group member in the API request. A group member can be a user or another group. The value can be the member's (group or user) primary email address, alias, or unique ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -864,8 +864,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
-      memberKey: z.string().describe("Identifies the group member in the API request. A group member can be a user or another group. The value can be the member's (group or user) primary email address, alias, or unique ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      memberKey: z.string().min(1).describe("Identifies the group member in the API request. A group member can be a user or another group. The value can be the member's (group or user) primary email address, alias, or unique ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -878,8 +878,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
-      memberKey: z.string().describe("Identifies the user member in the API request. The value can be the user's primary email address, alias, or unique ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      memberKey: z.string().min(1).describe("Identifies the user member in the API request. The value can be the user's primary email address, alias, or unique ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -893,7 +893,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"delivery_settings","api":"delivery_settings"},{"field":"email","api":"email"},{"field":"etag","api":"etag"},{"field":"id","api":"id"},{"field":"kind","api":"kind"},{"field":"role","api":"role"},{"field":"status","api":"status"},{"field":"type","api":"type"}],
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
       delivery_settings: z.string().describe("Defines mail delivery preferences of member. This field is only supported by `insert`, `update`, and `get` methods.").optional(),
       email: z.string().describe("The member's email address. A member can be a user or another group. This property is required when adding a member to a group. The `email` must be unique and cannot be an alias of another group. If t").optional(),
       etag: z.string().describe("ETag of the resource.").optional(),
@@ -915,8 +915,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"delivery_settings","api":"delivery_settings"},{"field":"email","api":"email"},{"field":"etag","api":"etag"},{"field":"id","api":"id"},{"field":"kind","api":"kind"},{"field":"role","api":"role"},{"field":"status","api":"status"},{"field":"type","api":"type"}],
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
-      memberKey: z.string().describe("Identifies the group member in the API request. A group member can be a user or another group. The value can be the member's (group or user) primary email address, alias, or unique ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      memberKey: z.string().min(1).describe("Identifies the group member in the API request. A group member can be a user or another group. The value can be the member's (group or user) primary email address, alias, or unique ID."),
       delivery_settings: z.string().describe("Defines mail delivery preferences of member. This field is only supported by `insert`, `update`, and `get` methods.").optional(),
       email: z.string().describe("The member's email address. A member can be a user or another group. This property is required when adding a member to a group. The `email` must be unique and cannot be an alias of another group. If t").optional(),
       etag: z.string().describe("ETag of the resource.").optional(),
@@ -938,8 +938,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"delivery_settings","api":"delivery_settings"},{"field":"email","api":"email"},{"field":"etag","api":"etag"},{"field":"id","api":"id"},{"field":"kind","api":"kind"},{"field":"role","api":"role"},{"field":"status","api":"status"},{"field":"type","api":"type"}],
     shape: {
       account: accountField(),
-      groupKey: z.string().describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
-      memberKey: z.string().describe("Identifies the group member in the API request. A group member can be a user or another group. The value can be the member's (group or user) primary email address, alias, or unique ID."),
+      groupKey: z.string().min(1).describe("Identifies the group in the API request. The value can be the group's email address, group alias, or the unique group ID."),
+      memberKey: z.string().min(1).describe("Identifies the group member in the API request. A group member can be a user or another group. The value can be the member's (group or user) primary email address, alias, or unique ID."),
       delivery_settings: z.string().describe("Defines mail delivery preferences of member. This field is only supported by `insert`, `update`, and `get` methods.").optional(),
       email: z.string().describe("The member's email address. A member can be a user or another group. This property is required when adding a member to a group. The `email` must be unique and cannot be an alias of another group. If t").optional(),
       etag: z.string().describe("ETag of the resource.").optional(),
@@ -961,8 +961,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"action","api":"action"}],
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      resourceId: z.string().describe("The unique ID the API service uses to identify the mobile device."),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      resourceId: z.string().min(1).describe("The unique ID the API service uses to identify the mobile device."),
       action: z.string().describe("The action to be performed on the device."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -976,8 +976,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      resourceId: z.string().describe("The unique ID the API service uses to identify the mobile device."),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      resourceId: z.string().min(1).describe("The unique ID the API service uses to identify the mobile device."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -990,8 +990,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      resourceId: z.string().describe("The unique ID the API service uses to identify the mobile device."),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      resourceId: z.string().min(1).describe("The unique ID the API service uses to identify the mobile device."),
       projection: z.enum(["BASIC","FULL"]).describe("Restrict information returned to a set of selected fields.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1005,7 +1005,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
       maxResults: z.number().describe("Maximum number of results to return. Max allowed value is 100.").optional(),
       orderBy: z.enum(["deviceId","email","lastSync","model","name","os","status","type"]).describe("Device property to use for sorting results.").optional(),
       pageToken: z.string().describe("Token to specify next page in the list").optional(),
@@ -1024,8 +1024,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      orgUnitPath: z.string().describe("The full path of the organizational unit (minus the leading `/`) or its unique ID."),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      orgUnitPath: z.string().min(1).describe("The full path of the organizational unit (minus the leading `/`) or its unique ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1038,8 +1038,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      orgUnitPath: z.string().describe("The full path of the organizational unit (minus the leading `/`) or its unique ID."),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      orgUnitPath: z.string().min(1).describe("The full path of the organizational unit (minus the leading `/`) or its unique ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1053,7 +1053,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"name","api":"name"},{"field":"blockInheritance","api":"blockInheritance"},{"field":"description","api":"description"},{"field":"etag","api":"etag"},{"field":"kind","api":"kind"},{"field":"orgUnitId","api":"orgUnitId"},{"field":"orgUnitPath","api":"orgUnitPath"},{"field":"parentOrgUnitId","api":"parentOrgUnitId"},{"field":"parentOrgUnitPath","api":"parentOrgUnitPath"}],
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
       name: z.string().describe("The organizational unit's path name. For example, an organizational unit's name within the /corp/support/sales_support parent path is sales_support. Required."),
       blockInheritance: coerceBoolean.describe("This field is deprecated and setting its value has no effect.").optional(),
       description: z.string().describe("Description of the organizational unit.").optional(),
@@ -1075,7 +1075,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
       orgUnitPath: z.string().describe("The full path to the organizational unit or its unique ID. Returns the children of the specified organizational unit.").optional(),
       type: z.enum(["all","children","allIncludingParent"]).describe("Whether to return all sub-organizations or just immediate children.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1091,8 +1091,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"blockInheritance","api":"blockInheritance"},{"field":"description","api":"description"},{"field":"etag","api":"etag"},{"field":"kind","api":"kind"},{"field":"name","api":"name"},{"field":"orgUnitId","api":"orgUnitId"},{"field":"orgUnitPath_","api":"orgUnitPath"},{"field":"parentOrgUnitId","api":"parentOrgUnitId"},{"field":"parentOrgUnitPath","api":"parentOrgUnitPath"}],
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      orgUnitPath: z.string().describe("The full path of the organizational unit (minus the leading `/`) or its unique ID."),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      orgUnitPath: z.string().min(1).describe("The full path of the organizational unit (minus the leading `/`) or its unique ID."),
       blockInheritance: coerceBoolean.describe("This field is deprecated and setting its value has no effect.").optional(),
       description: z.string().describe("Description of the organizational unit.").optional(),
       etag: z.string().describe("ETag of the resource.").optional(),
@@ -1115,8 +1115,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"blockInheritance","api":"blockInheritance"},{"field":"description","api":"description"},{"field":"etag","api":"etag"},{"field":"kind","api":"kind"},{"field":"name","api":"name"},{"field":"orgUnitId","api":"orgUnitId"},{"field":"orgUnitPath_","api":"orgUnitPath"},{"field":"parentOrgUnitId","api":"parentOrgUnitId"},{"field":"parentOrgUnitPath","api":"parentOrgUnitPath"}],
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      orgUnitPath: z.string().describe("The full path of the organizational unit (minus the leading `/`) or its unique ID."),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
+      orgUnitPath: z.string().min(1).describe("The full path of the organizational unit (minus the leading `/`) or its unique ID."),
       blockInheritance: coerceBoolean.describe("This field is deprecated and setting its value has no effect.").optional(),
       description: z.string().describe("Description of the organizational unit.").optional(),
       etag: z.string().describe("ETag of the resource.").optional(),
@@ -1138,7 +1138,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1151,8 +1151,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      buildingId: z.string().describe("The id of the building to delete."),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      buildingId: z.string().min(1).describe("The id of the building to delete."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1165,8 +1165,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      buildingId: z.string().describe("The unique ID of the building to retrieve."),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      buildingId: z.string().min(1).describe("The unique ID of the building to retrieve."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1179,7 +1179,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       coordinatesSource: z.enum(["CLIENT_SPECIFIED","RESOLVED_FROM_ADDRESS","SOURCE_UNSPECIFIED"]).describe("Source from which Building.coordinates are derived.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Building JSON request body. Top-level fields: address, buildingId, buildingName, coordinates, description, etags, floorNames, kind."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1194,7 +1194,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       maxResults: z.number().describe("Maximum number of results to return.").optional(),
       pageToken: z.string().describe("Token to specify the next page in the list.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1209,8 +1209,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      buildingId: z.string().describe("The id of the building to update."),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      buildingId: z.string().min(1).describe("The id of the building to update."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       coordinatesSource: z.enum(["CLIENT_SPECIFIED","RESOLVED_FROM_ADDRESS","SOURCE_UNSPECIFIED"]).describe("Source from which Building.coordinates are derived.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Building JSON request body. Top-level fields: address, buildingId, buildingName, coordinates, description, etags, floorNames, kind."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1225,8 +1225,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      buildingId: z.string().describe("The id of the building to update."),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      buildingId: z.string().min(1).describe("The id of the building to update."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       coordinatesSource: z.enum(["CLIENT_SPECIFIED","RESOLVED_FROM_ADDRESS","SOURCE_UNSPECIFIED"]).describe("Source from which Building.coordinates are derived.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Building JSON request body. Top-level fields: address, buildingId, buildingName, coordinates, description, etags, floorNames, kind."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1241,8 +1241,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      calendarResourceId: z.string().describe("The unique ID of the calendar resource to delete."),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      calendarResourceId: z.string().min(1).describe("The unique ID of the calendar resource to delete."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1255,8 +1255,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      calendarResourceId: z.string().describe("The unique ID of the calendar resource to retrieve."),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      calendarResourceId: z.string().min(1).describe("The unique ID of the calendar resource to retrieve."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1269,7 +1269,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CalendarResource JSON request body. Top-level fields: buildingId, capacity, etags, featureInstances, floorName, floorSection, generatedResourceName, kind, resourceCategory, resourceDescription, resourceEmail, resourceId, +3 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1283,7 +1283,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       maxResults: z.number().describe("Maximum number of results to return.").optional(),
       orderBy: z.string().describe("Field(s) to sort results by in either ascending or descending order. Supported fields include `resourceId`, `resourceName`, `capacity`, `buildingId`, and `floorName`. If no order is specified, default").optional(),
       pageToken: z.string().describe("Token to specify the next page in the list.").optional(),
@@ -1300,8 +1300,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarResourceId: z.string().describe("The unique ID of the calendar resource to update."),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      calendarResourceId: z.string().min(1).describe("The unique ID of the calendar resource to update."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CalendarResource JSON request body. Top-level fields: buildingId, capacity, etags, featureInstances, floorName, floorSection, generatedResourceName, kind, resourceCategory, resourceDescription, resourceEmail, resourceId, +3 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1315,8 +1315,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      calendarResourceId: z.string().describe("The unique ID of the calendar resource to update."),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      calendarResourceId: z.string().min(1).describe("The unique ID of the calendar resource to update."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CalendarResource JSON request body. Top-level fields: buildingId, capacity, etags, featureInstances, floorName, floorSection, generatedResourceName, kind, resourceCategory, resourceDescription, resourceEmail, resourceId, +3 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1330,8 +1330,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
-      featureKey: z.string().describe("The unique ID of the feature to delete."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      featureKey: z.string().min(1).describe("The unique ID of the feature to delete."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1344,8 +1344,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
-      featureKey: z.string().describe("The unique ID of the feature to retrieve."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      featureKey: z.string().min(1).describe("The unique ID of the feature to retrieve."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1359,7 +1359,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"name","api":"name"},{"field":"etags","api":"etags"},{"field":"kind","api":"kind"}],
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       name: z.string().describe("The name of the feature."),
       etags: z.string().describe("ETag of the resource.").optional(),
       kind: z.string().describe("Kind of resource this is.").optional(),
@@ -1375,7 +1375,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       maxResults: z.number().describe("Maximum number of results to return.").optional(),
       pageToken: z.string().describe("Token to specify the next page in the list.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1391,8 +1391,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"etags","api":"etags"},{"field":"kind","api":"kind"},{"field":"name","api":"name"}],
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
-      featureKey: z.string().describe("The unique ID of the feature to update."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      featureKey: z.string().min(1).describe("The unique ID of the feature to update."),
       etags: z.string().describe("ETag of the resource.").optional(),
       kind: z.string().describe("Kind of resource this is.").optional(),
       name: z.string().describe("The name of the feature.").optional(),
@@ -1409,8 +1409,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"newName","api":"newName"}],
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
-      oldName: z.string().describe("The unique ID of the feature to rename."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      oldName: z.string().min(1).describe("The unique ID of the feature to rename."),
       newName: z.string().describe("New name of the feature."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1425,8 +1425,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"etags","api":"etags"},{"field":"kind","api":"kind"},{"field":"name","api":"name"}],
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
-      featureKey: z.string().describe("The unique ID of the feature to update."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
+      featureKey: z.string().min(1).describe("The unique ID of the feature to update."),
       etags: z.string().describe("ETag of the resource.").optional(),
       kind: z.string().describe("Kind of resource this is.").optional(),
       name: z.string().describe("The name of the feature.").optional(),
@@ -1442,8 +1442,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("Immutable ID of the Google Workspace account."),
-      roleAssignmentId: z.string().describe("Immutable ID of the role assignment."),
+      customer: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
+      roleAssignmentId: z.string().min(1).describe("Immutable ID of the role assignment."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1456,8 +1456,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
-      roleAssignmentId: z.string().describe("Immutable ID of the role assignment."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
+      roleAssignmentId: z.string().min(1).describe("Immutable ID of the role assignment."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1471,7 +1471,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"assignedTo","api":"assignedTo"},{"field":"assigneeType","api":"assigneeType"},{"field":"condition","api":"condition"},{"field":"etag","api":"etag"},{"field":"kind","api":"kind"},{"field":"orgUnitId","api":"orgUnitId"},{"field":"roleAssignmentId","api":"roleAssignmentId"},{"field":"roleId","api":"roleId"},{"field":"scopeType","api":"scopeType"}],
     shape: {
       account: accountField(),
-      customer: z.string().describe("Immutable ID of the Google Workspace account."),
+      customer: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
       assignedTo: z.string().describe("The unique ID of the entity this role is assigned to—either the `user_id` of a user, the `group_id` of a group, or the `uniqueId` of a service account as defined in [Identity and Access Management (IA").optional(),
       assigneeType: z.enum(["user","group"]).describe("Output only. The type of the assignee (`USER` or `GROUP`).").optional(),
       condition: z.string().describe("Optional. The condition associated with this role assignment. Note: Feature is available to Enterprise Standard, Enterprise Plus, Google Workspace for Education Plus and Cloud Identity Premium custome").optional(),
@@ -1493,7 +1493,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
       includeIndirectRoleAssignments: coerceBoolean.describe("When set to `true`, fetches indirect role assignments (i.e. role assignment via a group) as well as direct ones. Defaults to `false`. You must specify `user_key` or the indirect role assignments will ").optional(),
       maxResults: z.number().describe("Maximum number of results to return.").optional(),
       pageToken: z.string().describe("Token to specify the next page in the list.").optional(),
@@ -1511,8 +1511,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("Immutable ID of the Google Workspace account."),
-      roleId: z.string().describe("Immutable ID of the role."),
+      customer: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
+      roleId: z.string().min(1).describe("Immutable ID of the role."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1525,8 +1525,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
-      roleId: z.string().describe("Immutable ID of the role."),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
+      roleId: z.string().min(1).describe("Immutable ID of the role."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1539,7 +1539,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customer: z.string().describe("Immutable ID of the Google Workspace account."),
+      customer: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Role JSON request body. Top-level fields: etag, isSuperAdminRole, isSystemRole, kind, roleDescription, roleId, roleName, rolePrivileges."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1553,7 +1553,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customer: z.string().describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
+      customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
       maxResults: z.number().describe("Maximum number of results to return.").optional(),
       pageToken: z.string().describe("Token to specify the next page in the list.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1568,8 +1568,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customer: z.string().describe("Immutable ID of the Google Workspace account."),
-      roleId: z.string().describe("Immutable ID of the role."),
+      customer: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
+      roleId: z.string().min(1).describe("Immutable ID of the role."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Role JSON request body. Top-level fields: etag, isSuperAdminRole, isSystemRole, kind, roleDescription, roleId, roleName, rolePrivileges."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1583,8 +1583,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customer: z.string().describe("Immutable ID of the Google Workspace account."),
-      roleId: z.string().describe("Immutable ID of the role."),
+      customer: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
+      roleId: z.string().min(1).describe("Immutable ID of the role."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Role JSON request body. Top-level fields: etag, isSuperAdminRole, isSystemRole, kind, roleDescription, roleId, roleName, rolePrivileges."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1598,8 +1598,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("Immutable ID of the Google Workspace account."),
-      schemaKey: z.string().describe("Name or immutable ID of the schema."),
+      customerId: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
+      schemaKey: z.string().min(1).describe("Name or immutable ID of the schema."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1612,8 +1612,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
-      schemaKey: z.string().describe("Name or immutable ID of the schema."),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
+      schemaKey: z.string().min(1).describe("Name or immutable ID of the schema."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1626,7 +1626,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("Immutable ID of the Google Workspace account."),
+      customerId: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Schema JSON request body. Top-level fields: displayName, etag, fields, kind, schemaId, schemaName."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1640,7 +1640,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
+      customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. In case of a multi-domain account, to fetch all groups for a customer, use this field instead of `domain`. You can also use the `my_customer`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1653,8 +1653,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("Immutable ID of the Google Workspace account."),
-      schemaKey: z.string().describe("Name or immutable ID of the schema."),
+      customerId: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
+      schemaKey: z.string().min(1).describe("Name or immutable ID of the schema."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Schema JSON request body. Top-level fields: displayName, etag, fields, kind, schemaId, schemaName."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1668,8 +1668,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("Immutable ID of the Google Workspace account."),
-      schemaKey: z.string().describe("Name or immutable ID of the schema."),
+      customerId: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
+      schemaKey: z.string().min(1).describe("Name or immutable ID of the schema."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Schema JSON request body. Top-level fields: displayName, etag, fields, kind, schemaId, schemaName."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1683,8 +1683,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      clientId: z.string().describe("The Client ID of the application the token is issued to."),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      clientId: z.string().min(1).describe("The Client ID of the application the token is issued to."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1697,8 +1697,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      clientId: z.string().describe("The Client ID of the application the token is issued to."),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      clientId: z.string().min(1).describe("The Client ID of the application the token is issued to."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1711,7 +1711,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1724,7 +1724,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1737,8 +1737,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      alias: z.string().describe("The alias to be removed."),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      alias: z.string().min(1).describe("The alias to be removed."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1752,7 +1752,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"alias","api":"alias"},{"field":"etag","api":"etag"},{"field":"id","api":"id"},{"field":"kind","api":"kind"},{"field":"primaryEmail","api":"primaryEmail"}],
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       alias: z.string().optional(),
       etag: z.string().optional(),
       id: z.string().optional(),
@@ -1770,7 +1770,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       event: z.enum(["add","delete"]).describe("Events to watch for.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1784,7 +1784,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Email or immutable ID of the user"),
+      userKey: z.string().min(1).describe("Email or immutable ID of the user"),
       event: z.enum(["add","delete"]).describe("Events to watch for.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Channel JSON request body. Top-level fields: address, expiration, id, kind, params, payload, resourceId, resourceUri, token, type."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1814,7 +1814,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1842,7 +1842,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"status","api":"status"}],
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       status: coerceBoolean.describe("Indicates the administrator status of the user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1856,7 +1856,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1869,7 +1869,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1883,7 +1883,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"etag","api":"etag"},{"field":"height","api":"height"},{"field":"id","api":"id"},{"field":"kind","api":"kind"},{"field":"mimeType","api":"mimeType"},{"field":"photoData","api":"photoData"},{"field":"primaryEmail","api":"primaryEmail"},{"field":"width","api":"width"}],
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       etag: z.string().describe("ETag of the resource.").optional(),
       height: z.number().describe("Height of the photo in pixels.").optional(),
       id: z.string().describe("The ID the API uses to uniquely identify the user.").optional(),
@@ -1905,7 +1905,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"photoData","api":"photoData"},{"field":"etag","api":"etag"},{"field":"height","api":"height"},{"field":"id","api":"id"},{"field":"kind","api":"kind"},{"field":"mimeType","api":"mimeType"},{"field":"primaryEmail","api":"primaryEmail"},{"field":"width","api":"width"}],
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       photoData: z.string().describe("The user photo's upload data in [web-safe Base64](https://en.wikipedia.org/wiki/Base64#URL_applications) format in bytes. This means: * The slash (/) character is replaced with the underscore (_) char"),
       etag: z.string().describe("ETag of the resource.").optional(),
       height: z.number().describe("Height of the photo in pixels.").optional(),
@@ -1926,7 +1926,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the target user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the target user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1940,7 +1940,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"orgUnitPath","api":"orgUnitPath"}],
     shape: {
       account: accountField(),
-      userKey: z.string().describe("The immutable id of the user"),
+      userKey: z.string().min(1).describe("The immutable id of the user"),
       orgUnitPath: z.string().describe("OrgUnit of User").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1954,7 +1954,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("User JSON request body. Top-level fields: addresses, agreedToTerms, aliases, archivalTime, archived, changePasswordAtNextLogin, creationTime, customSchemas, customerId, deletionTime, emails, etag, +38 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1993,7 +1993,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Email or immutable ID of the user"),
+      userKey: z.string().min(1).describe("Email or immutable ID of the user"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -2006,7 +2006,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Email or immutable ID of the user"),
+      userKey: z.string().min(1).describe("Email or immutable ID of the user"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -2019,7 +2019,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userKey: z.string().describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
+      userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -2038,7 +2038,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     shape: {
       account: accountField(),
       applicationName: z.enum(["access_transparency","admin","calendar","chat","drive","gcp","gplus","groups","groups_enterprise","jamboard","login","meet","mobile","rules","saml","token","user_accounts","context_aware_access","chrome","data_studio","keep","classroom"]).describe("Application name for which the events are to be retrieved."),
-      userKey: z.string().describe("Represents the profile ID or the user email for which the data should be filtered. Can be `all` for all information, or `userKey` for a user's unique Google Workspace profile ID or their primary email"),
+      userKey: z.string().min(1).describe("Represents the profile ID or the user email for which the data should be filtered. Can be `all` for all information, or `userKey` for a user's unique Google Workspace profile ID or their primary email"),
       actorIpAddress: z.string().describe("The Internet Protocol (IP) Address of host where the event was performed. This is an additional way to filter a report's summary using the IP address of the user whose activity is being reported. This").optional(),
       customerId: z.string().describe("The unique ID of the customer to retrieve data for.").optional(),
       endTime: z.string().describe("Sets the end of the range of time shown in the report. The date is in the RFC 3339 format, for example 2010-10-28T10:26:35.000Z. The default value is the approximate time of the API request. An API re").optional(),
@@ -2062,7 +2062,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      date: z.string().describe("Represents the date the usage occurred, based on UTC-8:00 (Pacific Standard Time). The timestamp is in the [ISO 8601 format](https://en.wikipedia.org/wiki/ISO_8601), `yyyy-mm-dd`."),
+      date: z.string().min(1).describe("Represents the date the usage occurred, based on UTC-8:00 (Pacific Standard Time). The timestamp is in the [ISO 8601 format](https://en.wikipedia.org/wiki/ISO_8601), `yyyy-mm-dd`."),
       customerId: z.string().describe("The unique ID of the customer to retrieve data for.").optional(),
       pageToken: z.string().describe("Token to specify next page. A report with multiple pages has a `nextPageToken` property in the response. For your follow-on requests getting all of the report's pages, enter the `nextPageToken` value ").optional(),
       parameters: z.string().describe("The `parameters` query string is a comma-separated list of event parameters that refine a report's results. The parameter is associated with a specific application. The application values for the Cust").optional(),
@@ -2078,8 +2078,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      date: z.string().describe("Represents the date the usage occurred, based on UTC-8:00 (Pacific Standard Time). The timestamp is in the [ISO 8601 format](https://en.wikipedia.org/wiki/ISO_8601), `yyyy-mm-dd`."),
-      entityKey: z.string().describe("Represents the key of the object to filter the data with. It is a string which can take the value `all` to get activity events for all users, or any other value for an app-specific entity. For details"),
+      date: z.string().min(1).describe("Represents the date the usage occurred, based on UTC-8:00 (Pacific Standard Time). The timestamp is in the [ISO 8601 format](https://en.wikipedia.org/wiki/ISO_8601), `yyyy-mm-dd`."),
+      entityKey: z.string().min(1).describe("Represents the key of the object to filter the data with. It is a string which can take the value `all` to get activity events for all users, or any other value for an app-specific entity. For details"),
       entityType: z.enum(["gplus_communities"]).describe("Represents the type of entity for the report."),
       customerId: z.string().describe("The unique ID of the customer to retrieve data for.").optional(),
       filters: z.string().describe("The `filters` query string is a comma-separated list of an application's event parameters where the parameter's value is manipulated by a relational operator. The `filters` query string includes the n").optional(),
@@ -2098,8 +2098,8 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      date: z.string().describe("Represents the date the usage occurred, based on UTC-8:00 (Pacific Standard Time). The timestamp is in the [ISO 8601 format](https://en.wikipedia.org/wiki/ISO_8601), `yyyy-mm-dd`."),
-      userKey: z.string().describe("Represents the profile ID or the user email for which the data should be filtered. Can be `all` for all information, or `userKey` for a user's unique Google Workspace profile ID or their primary email"),
+      date: z.string().min(1).describe("Represents the date the usage occurred, based on UTC-8:00 (Pacific Standard Time). The timestamp is in the [ISO 8601 format](https://en.wikipedia.org/wiki/ISO_8601), `yyyy-mm-dd`."),
+      userKey: z.string().min(1).describe("Represents the profile ID or the user email for which the data should be filtered. Can be `all` for all information, or `userKey` for a user's unique Google Workspace profile ID or their primary email"),
       customerId: z.string().describe("The unique ID of the customer to retrieve data for.").optional(),
       filters: z.string().describe("The `filters` query string is a comma-separated list of an application's event parameters where the parameter's value is manipulated by a relational operator. The `filters` query string includes the n").optional(),
       groupIdFilter: z.string().describe("Comma separated group ids (obfuscated) on which user activities are filtered, i.e. the response will contain activities for only those users that are a part of at least one of the group ids mentioned ").optional(),

@@ -30,8 +30,8 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      fileId: z.string().describe("Required. The ID of the item the request is on."),
-      proposalId: z.string().describe("Required. The ID of the access proposal to resolve."),
+      fileId: z.string().min(1).describe("Required. The ID of the item the request is on."),
+      proposalId: z.string().min(1).describe("Required. The ID of the access proposal to resolve."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -45,8 +45,8 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"message","api":"message"}],
     shape: {
       account: accountField(),
-      approvalId: z.string().describe("Required. The ID of the approval to approve."),
-      fileId: z.string().describe("Required. The ID of the file that the approval is on."),
+      approvalId: z.string().min(1).describe("Required. The ID of the approval to approve."),
+      fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       message: z.string().describe("Optional. A message to accompany the reviewer response on the approval. This message is included in notifications for the action and in the approval activity log.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -61,8 +61,8 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"message","api":"message"}],
     shape: {
       account: accountField(),
-      approvalId: z.string().describe("Required. The ID of the approval to cancel."),
-      fileId: z.string().describe("Required. The ID of the file that the approval is on."),
+      approvalId: z.string().min(1).describe("Required. The ID of the approval to cancel."),
+      fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       message: z.string().describe("Optional. A message to accompany the cancellation of the approval. This message is included in notifications for the action and in the approval activity log.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -77,8 +77,8 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"message","api":"message"}],
     shape: {
       account: accountField(),
-      approvalId: z.string().describe("Required. The ID of the approval to comment on."),
-      fileId: z.string().describe("Required. The ID of the file that the approval is on."),
+      approvalId: z.string().min(1).describe("Required. The ID of the approval to comment on."),
+      fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       message: z.string().describe("Required. A message to comment on the approval. This message is included in notifications for the action and in the approval activity log.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -93,8 +93,8 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"message","api":"message"}],
     shape: {
       account: accountField(),
-      approvalId: z.string().describe("Required. The ID of the approval to decline."),
-      fileId: z.string().describe("Required. The ID of the file that the approval is on."),
+      approvalId: z.string().min(1).describe("Required. The ID of the approval to decline."),
+      fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       message: z.string().describe("Optional. A message to accompany the reviewer response on the approval. This message is included in notifications for the action and in the approval activity log.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -108,8 +108,8 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      approvalId: z.string().describe("Required. The ID of the approval."),
-      fileId: z.string().describe("Required. The ID of the file that the approval is on."),
+      approvalId: z.string().min(1).describe("Required. The ID of the approval."),
+      fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -122,7 +122,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      fileId: z.string().describe("Required. The ID of the file that the approval is on."),
+      fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       pageSize: z.number().describe("The maximum number of approvals to return. When not set, at most 100 approvals are returned.").optional(),
       pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of `nextPageToken` from a previous response.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -137,8 +137,8 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      approvalId: z.string().describe("Required. The ID of the approval to reassign."),
-      fileId: z.string().describe("Required. The ID of the file that the approval is on."),
+      approvalId: z.string().min(1).describe("Required. The ID of the approval to reassign."),
+      fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ReassignApprovalRequest JSON request body. Top-level fields: addReviewers, message, replaceReviewers."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -153,7 +153,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"dueTime","api":"dueTime"},{"field":"fileContentChangeBehavior","api":"fileContentChangeBehavior"},{"field":"lockFile","api":"lockFile"},{"field":"message","api":"message"},{"field":"reviewerEmails","api":"reviewerEmails"}],
     shape: {
       account: accountField(),
-      fileId: z.string().describe("Required. The ID of the file that the approval is created on."),
+      fileId: z.string().min(1).describe("Required. The ID of the file that the approval is created on."),
       dueTime: z.string().describe("Optional. The time that the approval is due.").optional(),
       fileContentChangeBehavior: z.enum(["FILE_CONTENT_CHANGE_BEHAVIOR_UNSPECIFIED","RESET_APPROVAL","NO_APPROVAL_ACTION"]).describe("Optional. The behavior of the approval when the file content changes.").optional(),
       lockFile: coerceBoolean.describe("Optional. Whether to lock the file when starting the approval.").optional(),
@@ -171,7 +171,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      appId: z.string().describe("The ID of the app."),
+      appId: z.string().min(1).describe("The ID of the app."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -295,7 +295,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      driveId: z.string().describe("The ID of the shared drive."),
+      driveId: z.string().min(1).describe("The ID of the shared drive."),
       allowItemDeletion: coerceBoolean.describe("Whether any items inside the shared drive should also be deleted. This option is only supported when `useDomainAdminAccess` is also set to `true`.").optional(),
       useDomainAdminAccess: coerceBoolean.describe("Issue the request as a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the shared drive belongs.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -310,7 +310,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      driveId: z.string().describe("The ID of the shared drive."),
+      driveId: z.string().min(1).describe("The ID of the shared drive."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -323,7 +323,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      driveId: z.string().describe("The ID of the shared drive."),
+      driveId: z.string().min(1).describe("The ID of the shared drive."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -336,7 +336,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      driveId: z.string().describe("The ID of the shared drive."),
+      driveId: z.string().min(1).describe("The ID of the shared drive."),
       useDomainAdminAccess: coerceBoolean.describe("Issue the request as a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the shared drive belongs.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Drive JSON request body. Top-level fields: backgroundImageFile, backgroundImageLink, capabilities, colorRgb, createdTime, hidden, id, kind, name, orgUnitId, restrictions, themeId."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -351,7 +351,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      fileId: z.string().describe("Required. The ID of the file to download."),
+      fileId: z.string().min(1).describe("Required. The ID of the file to download."),
       mimeType: z.string().describe("Optional. The MIME type the file should be downloaded as. This field can only be set when downloading Google Workspace documents. For a list of supported MIME types, see [Export MIME types for Google ").optional(),
       revisionId: z.string().describe("Optional. The revision ID of the file to download. This field can only be set when downloading blob files, Google Docs, and Google Sheets. Returns `INVALID_ARGUMENT` if downloading a specific revision").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -395,7 +395,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      fileId: z.string().describe("The ID for the file."),
+      fileId: z.string().min(1).describe("The ID for the file."),
       maxResults: z.number().describe("The maximum number of labels to return per page. When not set, defaults to 100.").optional(),
       pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of `nextPageToken` from the previous response.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -410,7 +410,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      fileId: z.string().describe("The ID of the file to which the labels belong."),
+      fileId: z.string().min(1).describe("The ID of the file to which the labels belong."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ModifyLabelsRequest JSON request body. Top-level fields: kind, labelModifications."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -424,7 +424,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      fileId: z.string().describe("The ID of the file."),
+      fileId: z.string().min(1).describe("The ID of the file."),
       acknowledgeAbuse: coerceBoolean.describe("Whether the user is acknowledging the risk of downloading known malware or other abusive files. This is only applicable when the `alt` parameter is set to `media` and the user is the owner of the file").optional(),
       includeLabels: z.string().describe("A comma-separated list of IDs of labels to include in the `labelInfo` part of the response.").optional(),
       includePermissionsForView: z.string().describe("Specifies which additional view's permissions to include in the response. Only `published` is supported.").optional(),
@@ -443,7 +443,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the operation resource."),
+      name: z.string().min(1).describe("The name of the operation resource."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -456,8 +456,8 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      fileId: z.string().describe("The ID of the file."),
-      permissionId: z.string().describe("The ID of the permission."),
+      fileId: z.string().min(1).describe("The ID of the file."),
+      permissionId: z.string().min(1).describe("The ID of the permission."),
       supportsAllDrives: coerceBoolean.describe("Whether the requesting application supports both My Drives and shared drives.").optional(),
       supportsTeamDrives: coerceBoolean.describe("Deprecated: Use `supportsAllDrives` instead.").optional(),
       useDomainAdminAccess: coerceBoolean.describe("Issue the request as a domain administrator. If set to `true`, and if the following additional conditions are met, the requester is granted access: 1. The file ID parameter refers to a shared drive. 2").optional(),
@@ -473,9 +473,9 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      commentId: z.string().describe("The ID of the comment."),
-      fileId: z.string().describe("The ID of the file."),
-      replyId: z.string().describe("The ID of the reply."),
+      commentId: z.string().min(1).describe("The ID of the comment."),
+      fileId: z.string().min(1).describe("The ID of the file."),
+      replyId: z.string().min(1).describe("The ID of the reply."),
       includeDeleted: coerceBoolean.describe("Whether to return deleted replies. Deleted replies don't include their original content.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -489,8 +489,8 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      fileId: z.string().describe("The ID of the file."),
-      revisionId: z.string().describe("The ID of the revision."),
+      fileId: z.string().min(1).describe("The ID of the file."),
+      revisionId: z.string().min(1).describe("The ID of the revision."),
       acknowledgeAbuse: coerceBoolean.describe("Whether the user is acknowledging the risk of downloading known malware or other abusive files. This is only applicable when the `alt` parameter is set to `media` and the user is the owner of the file").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -518,7 +518,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      teamDriveId: z.string().describe("The ID of the Team Drive"),
+      teamDriveId: z.string().min(1).describe("The ID of the Team Drive"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -531,7 +531,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      teamDriveId: z.string().describe("The ID of the Team Drive"),
+      teamDriveId: z.string().min(1).describe("The ID of the Team Drive"),
       useDomainAdminAccess: coerceBoolean.describe("Issue the request as a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the Team Drive belongs.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -561,7 +561,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      teamDriveId: z.string().describe("The ID of the Team Drive"),
+      teamDriveId: z.string().min(1).describe("The ID of the Team Drive"),
       useDomainAdminAccess: coerceBoolean.describe("Issue the request as a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the Team Drive belongs.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("TeamDrive JSON request body. Top-level fields: backgroundImageFile, backgroundImageLink, capabilities, colorRgb, createdTime, id, kind, name, orgUnitId, restrictions, themeId."),
       fields: z.string().optional().describe('Response field mask.'),
