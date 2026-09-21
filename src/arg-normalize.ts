@@ -89,6 +89,10 @@ export interface StrictArgOptions {
   declaredFor: (tool: string) => readonly string[] | undefined;
   /** sibling spellings of a concept elsewhere in the same service */
   siblingsFor?: (tool: string, keys: string[]) => SiblingSpelling[];
+  /** Replacement text for the SDK's bare "Tool X not found". Still answered as
+   * a JSON-RPC error, which is what the spec prescribes for an unknown tool;
+   * only the message improves. */
+  unknownTool?: (tool: string) => string;
   onDrop?: (tool: string, resolvedKeys: string[]) => void;
 }
 
@@ -113,8 +117,22 @@ export function screenMessage(
   if (!args || typeof args !== 'object' || Array.isArray(args)) return { action: 'forward', msg };
   const tool = m.params.name;
   const declared = opts.declaredFor(tool);
-  // Unregistered tool: leave it to the SDK's own "not found".
-  if (!declared) return { action: 'forward', msg };
+  // Unregistered tool. The spec keeps this a PROTOCOL error (unknown tool is
+  // not something the model can fix by adjusting arguments), so the channel
+  // stays a JSON-RPC error; only the message gets the did-you-mean and the
+  // gated-service next step. Without `unknownTool`, or on a notification,
+  // the SDK's own "not found" still answers.
+  if (!declared) {
+    if (!opts.unknownTool || m.id === undefined) return { action: 'forward', msg };
+    return {
+      action: 'reject',
+      response: {
+        jsonrpc: '2.0',
+        id: m.id,
+        error: { code: -32602, message: opts.unknownTool(tool) },
+      } as unknown as JSONRPCMessage,
+    };
+  }
 
   const screened = screenArguments(tool, args as Record<string, unknown>, declared);
   if (screened.unknown.length === 0 && screened.redundant.length === 0) return { action: 'forward', msg };

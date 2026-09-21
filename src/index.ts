@@ -10,7 +10,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { McpServer } from "@modelcontextprotocol/server";
 import type { Transport } from "@modelcontextprotocol/server";
 import { GENERATED_SERVICES } from './tools/generated/index.js';
-import { GENERATED_GATES, SERVICES } from './services.js';
+import { GENERATED_GATES, SERVICES, unknownToolMessage } from './services.js';
 import { ToolRegistry, resolveDiscoveryMode, type DiscoveryMode } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
@@ -42,6 +42,7 @@ function strictArgOptions(registry: ToolRegistry, metrics: Metrics | null): Stri
     mode,
     declaredFor: (tool) => registry.declaredKeys(tool),
     siblingsFor: (tool, keys) => registry.siblingSpellings(tool, keys),
+    unknownTool: (name) => unknownToolMessage(registry, name),
     onDrop: metrics ? (tool, keys) => metrics.recordArgDrop(tool, keys) : undefined,
   };
 }
