@@ -104,6 +104,12 @@ describe('argsToAddForm (argument-mode fallback)', () => {
     if (!v.ok) expect(v.slug).toBe('E_VALIDATION');
   });
 
+  // Every other tool in the server spells this `account`, so both are accepted.
+  it('accepts `account` as a synonym for `alias`, and `alias` wins when both are sent', () => {
+    expect(argsToAddForm({ account: 'work', email: 'a@b.c' }).alias).toBe('work');
+    expect(argsToAddForm({ alias: 'real', account: 'other', email: 'a@b.c' }).alias).toBe('real');
+  });
+
   it('an unknown bundle still gets the did-you-mean', () => {
     const v = validateAddForm(argsToAddForm({ alias: 'work', email: 'a@b.c', bundles: 'form' }), []);
     expect(v.ok).toBe(false);

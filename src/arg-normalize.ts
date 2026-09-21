@@ -182,14 +182,17 @@ export function withArgNormalization(
             if (!strict) return handler(normalized, extra);
             const outcome = screenMessage(normalized, strict, log);
             if (outcome.action === 'forward') return handler(outcome.msg as typeof message, extra);
+            // Last-resort fallback: dispatch as before rather than hang the
+            // caller. The stderr line and the counter already fired above.
+            // `send` is async, so a rejected promise needs catching too: a
+            // bare `void` left the client waiting for a frame that never came.
+            const fallback = () => handler(normalized as typeof message, extra);
             try {
               // Answer on the INNER transport so the metrics tap still sees the
               // frame and clears its pending id.
-              void transport.send(outcome.response);
+              void Promise.resolve(transport.send(outcome.response)).catch(fallback);
             } catch {
-              // Last-resort: dispatch as before rather than hang the caller.
-              // The stderr line and the counter already fired above.
-              handler(normalized as typeof message, extra);
+              fallback();
             }
           }
         : undefined;

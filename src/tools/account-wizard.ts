@@ -117,9 +117,9 @@ export function urlElicitationParams(alias: string, url: string, elicitationId: 
 /** Map direct tool arguments onto the elicitation form shape: the argument-
  * mode fallback for clients without form elicitation. All bundle picks travel
  * through otherBundles, which validateAddForm resolves and validates. Pure. */
-export function argsToAddForm(a: { alias?: string; email?: string; bundles?: string; allBundles?: boolean; admin?: boolean }): Partial<AddForm> {
+export function argsToAddForm(a: { alias?: string; account?: string; email?: string; bundles?: string; allBundles?: boolean; admin?: boolean }): Partial<AddForm> {
   return {
-    alias: a.alias ?? '',
+    alias: a.alias ?? a.account ?? '',
     email: a.email ?? '',
     allBundles: a.allBundles === true,
     otherBundles: a.bundles ?? '',
@@ -235,6 +235,7 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
       description: 'Add a new Google account: pass alias + email directly (plus optional bundles/allBundles/admin), or pass nothing for an interactive form where the client supports elicitation. Writes the registry and runs Google consent in the browser — no file editing or restart needed. Requires GOOGLE_CLIENT_ID/SECRET (run the `setup` prompt first if missing).',
       inputSchema: {
         alias: z.string().optional().describe('Account alias (letters, digits, _ or -). Pass with email to add directly, skipping the form.'),
+        account: z.string().optional().describe('Alias for the new account (same as `alias`; every other tool spells it `account`)'),
         email: z.string().optional().describe("The account's Google address (used as the login hint)"),
         bundles: z.string().optional().describe('Optional scope bundles, comma-separated (e.g. "forms,chat"); blank = base scopes only'),
         allBundles: coerceBoolean.optional().describe('Grant every optional bundle (biggest consent screen); overrides bundles'),
@@ -255,9 +256,9 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
         // S1: collect the registry row. Arguments win over the form so the
         // wizard still works in clients without form elicitation (where the
         // interactive path used to dead-end).
-        const a = (args ?? {}) as { alias?: string; email?: string; bundles?: string; allBundles?: boolean; admin?: boolean };
+        const a = (args ?? {}) as { alias?: string; account?: string; email?: string; bundles?: string; allBundles?: boolean; admin?: boolean };
         let input: Partial<AddForm>;
-        if (a.alias?.trim() || a.email?.trim()) {
+        if (a.alias?.trim() || a.account?.trim() || a.email?.trim()) {
           input = argsToAddForm(a);
         } else {
           // Modes are advertised as PRESENT objects, not booleans.
@@ -300,12 +301,18 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
       inputSchema: {
         // Plain string (NOT the account enum) so this never joins the
         // multi-account fan-out path; validated against the registry below.
-        alias: z.string().describe('Existing account alias to re-authenticate'),
+        alias: z.string().min(1).optional().describe('Existing account alias to re-authenticate'),
+        // Every other tool in the server spells this `account`, so that is
+        // what a caller reaches for. Accepting both removes a dead end that
+        // no did-you-mean can rescue: `account` is 5 edits from `alias`, so
+        // the matcher cannot bridge them.
+        account: z.string().min(1).optional().describe('Alias of the account to re-authenticate (same as `alias`)'),
       },
     },
     async (args: unknown) => {
       try {
-        const alias = (args as { alias?: string }).alias ?? '';
+        const a = args as { alias?: string; account?: string };
+        const alias = a.alias ?? a.account ?? '';
         if (!hasClientCredentials()) {
           return textResult('E_CLIENT_CREDENTIALS_MISSING: GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET are not set.', true);
         }

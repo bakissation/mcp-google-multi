@@ -287,7 +287,11 @@ async function main() {
       argNormalizationEnabled() || strictStdio
         ? withArgNormalization(
             transport,
-            (n) => registry.argShape(n),
+            // Gated exactly as the HTTP leg gates `argShapeFor`. Passing the
+            // shape unconditionally made stdio rename keys while
+            // GOOGLE_ARG_NORMALIZE=off, so the same call succeeded on stdio
+            // and failed on HTTP once screening rejects.
+            argNormalizationEnabled() ? (n) => registry.argShape(n) : () => undefined,
             undefined,
             stdioMetrics ? (tool, n) => stdioMetrics.recordArgFix(tool, n) : undefined,
             strictStdio,

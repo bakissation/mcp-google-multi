@@ -316,7 +316,11 @@ export class ToolRegistry {
     const declared = new Set(Object.keys(self.inputShape));
     const byKey = new Map<string, { tools: string[]; curated: boolean }>();
     for (const t of this.tools) {
-      if (t.service !== self.service || t.name === tool) continue;
+      // Only tools the agent can actually see in tools/list. A hint naming a
+      // registered-but-unadvertised generated tool turns a recoverable error
+      // into a dead end: in curated mode 353 tools are registered and 181 are
+      // advertised, and the hint used to reach for any of them.
+      if (t.service !== self.service || t.name === tool || !this.isVisible(t)) continue;
       for (const key of Object.keys(t.inputShape)) {
         if (declared.has(key)) continue;
         const e = byKey.get(key) ?? { tools: [], curated: false };

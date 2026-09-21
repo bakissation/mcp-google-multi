@@ -35,11 +35,24 @@ const DEFAULT_MODE: UnknownArgMode = 'warn';
  * of queryParams/body, never in its six fixed top-level keys. */
 export const STRICT_EXEMPT_TOOLS: ReadonlySet<string> = new Set<string>();
 
+/** Keys a CLIENT adds on its own, not keys the model chose. `random_string`
+ * is the long-standing probe some clients send to a tool they read as taking
+ * no arguments; the others are call-plumbing that bridges and proxies have
+ * been observed to fold into `arguments` instead of `params._meta`, where the
+ * spec puts them. Rejecting these would fail a call the model got right.
+ * Measured against the full 978-tool surface: none is a declared key. */
+const CLIENT_ARTIFACT_KEYS: ReadonlySet<string> = new Set([
+  'random_string',
+  'toolCallId',
+  'tool_call_id',
+  'tool_call_description',
+]);
+
 /** Metadata a client may legitimately attach. Measured against all registered
  * tools: no declared key starts with `_` or contains `/`, so neither rule can
  * shadow a real parameter. */
 export function isExemptKey(key: string): boolean {
-  return key.startsWith('_') || key.includes('/');
+  return key.startsWith('_') || key.includes('/') || CLIENT_ARTIFACT_KEYS.has(key);
 }
 
 /** Generic words that must never be offered as a suggestion on containment
