@@ -1,5 +1,6 @@
 import type { Transport, JSONRPCMessage, MessageExtraInfo } from "@modelcontextprotocol/server";
 import type { Metrics } from './usage-metrics.js';
+import { isSchemaValidationText } from './arg-normalize.js';
 
 // Pre-handler failure tap (metrics spec section 3), following the
 // withArgNormalization proxy shape at the same two wrap sites. Inbound:
@@ -17,16 +18,12 @@ type OnMessage = (<T extends JSONRPCMessage>(message: T, extra?: MessageExtraInf
 
 const PENDING_CAP = 1_000;
 
-// The SDK synthesizes input-validation failures as isError RESULTS, skipping
-// the handler entirely, so neither the registry wrapper nor the error-frame
-// path sees them. The text is prose in both SDK eras (v1 prefixed it with
-// "MCP error -32602: ", v2 dropped that prefix), while handler envelopes are
-// always JSON starting with "{" — so this can never double count one.
-const SCHEMA_VALIDATION_TEXT = /^(MCP error -32602: )?Input validation error:/;
-
-export function isSchemaValidationText(text: string): boolean {
-  return SCHEMA_VALIDATION_TEXT.test(text);
-}
+// The detector lives next to the rewriter that consumes the same frames, so
+// the two can never drift apart. This tap sees the ORIGINAL prose:
+// withValidationEnvelope sits BELOW it and converts that same frame into an
+// envelope for the client, so classification here and the contract on the wire
+// stay independent.
+export { isSchemaValidationText };
 
 /**
  * @param isKnownTool membership test against the REGISTERED tool set. The
@@ -50,7 +47,9 @@ export function tapUsageMetrics(transport: Transport, metrics: Metrics, isKnownT
           error?: { code?: number; message?: string };
           result?: { isError?: boolean; content?: { text?: string }[] };
         };
-        if (m.id !== undefined) {
+        // Responses only: a server-initiated REQUEST carries an id from a
+        // different id space, and evicting on it would drop a real pending call.
+        if (m.id !== undefined && (message as { method?: unknown }).method === undefined) {
           const tool = pending.get(m.id);
           pending.delete(m.id);
           if (m.error && typeof m.error.code === 'number') {

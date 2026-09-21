@@ -43,7 +43,7 @@ const ARG_KEY_RE = /^[A-Za-z][A-Za-z0-9_.]{0,63}$/;
 export const KNOWN_ERROR_SLUGS: ReadonlySet<string> = new Set([
   'E_CIMD_INVALID', 'E_MCP_TOKEN_INVALID', 'E_NO_DEFAULT_ACCOUNT', 'ambiguous',
   'api_not_enabled', 'auth_required', 'bad_request', 'binary', 'binary_unsupported',
-  'diagnose_failed', 'discovery_unavailable', 'dispatch_timeout', 'forbidden',
+  'diagnose_failed', 'discovery_unavailable', 'dispatch_timeout', 'fanout_failed', 'forbidden',
   'insufficient_scope', 'internal', 'invalid_client', 'invalid_client_metadata',
   'invalid_grant', 'invalid_params', 'invalid_query', 'invalid_request',
   'invalid_scope', 'network_error', 'not_found', 'rate_limited',

@@ -7,6 +7,7 @@ import {
   normalizeMessage,
   screenMessage,
   withArgNormalization,
+  withValidationEnvelope,
   type ScreenOutcome,
   type StrictArgOptions,
 } from '../src/arg-normalize.js';
@@ -315,5 +316,80 @@ describe('withArgNormalization strict wiring', () => {
     inner.onmessage!(bad);
     await new Promise((r) => setImmediate(r));
     expect(received).toHaveLength(1);
+  });
+});
+
+// The SDK validates tool input itself and answers with bare prose: no handler
+// of ours runs, so no envelope exists and the client gets free text.
+describe('withValidationEnvelope (outbound)', () => {
+  function harness(opts = { isKnownTool: () => true, defaultAccount: () => 'work' as string | undefined }) {
+    const sent: JSONRPCMessage[] = [];
+    const inner = {
+      start: vi.fn(async () => {}),
+      send: vi.fn(async (m: JSONRPCMessage) => { sent.push(m); }),
+      close: vi.fn(async () => {}),
+    } as unknown as Transport;
+    const wrapped = withValidationEnvelope(inner, opts);
+    wrapped.onmessage = () => {};
+    return { inner, wrapped, sent };
+  }
+  const call = (id: number, name: string, args: Record<string, unknown> = {}) =>
+    ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } }) as JSONRPCMessage;
+  const isErrorText = (id: number, text: string) =>
+    ({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text }], isError: true } }) as unknown as JSONRPCMessage;
+  const body = (m: JSONRPCMessage) =>
+    (m as never as { result: { content: { text: string }[] } }).result.content[0].text;
+
+  it('converts the SDK validation prose into the 6.0.0 envelope', async () => {
+    const { inner, wrapped, sent } = harness();
+    inner.onmessage!(call(1, 'gmail_search', { account: 'work' }));
+    await wrapped.send(isErrorText(1, 'Input validation error: Invalid arguments for tool gmail_search: account: Unknown account alias. Valid: work'));
+    const env = JSON.parse(body(sent[0]));
+    expect(env.error).toBe('validation_error');
+    expect(env.message).toContain('Unknown account alias');
+    expect(env.hint).toBeTruthy();
+    expect(env.retriable).toBe(false);
+    expect(env.account).toBe('work');
+  });
+
+  it('recovers the account from the REQUEST, which validation never got past', async () => {
+    const { inner, wrapped, sent } = harness();
+    inner.onmessage!(call(2, 'gmail_search', { account: 'other' }));
+    await wrapped.send(isErrorText(2, 'Input validation error: Invalid arguments for tool gmail_search: query: expected string'));
+    expect(JSON.parse(body(sent[0])).account).toBe('other');
+  });
+
+  it('leaves a handler-authored envelope alone', async () => {
+    const { inner, wrapped, sent } = harness();
+    const envelope = JSON.stringify({ error: 'not_found', message: 'gone', retriable: false, account: 'work' });
+    inner.onmessage!(call(3, 'gmail_read'));
+    await wrapped.send(isErrorText(3, envelope));
+    expect(body(sent[0])).toBe(envelope);
+  });
+
+  // The account wizard answers in prose today; rewriting it would relabel a
+  // configuration refusal as a server fault.
+  it('leaves handler-authored PROSE alone', async () => {
+    const { inner, wrapped, sent } = harness();
+    inner.onmessage!(call(4, 'account_add'));
+    await wrapped.send(isErrorText(4, 'E_ENV_ACCOUNTS_MODE: accounts are defined by env'));
+    expect(body(sent[0])).toBe('E_ENV_ACCOUNTS_MODE: accounts are defined by env');
+  });
+
+  it('never puts a client-invented tool name into an envelope', async () => {
+    const { inner, wrapped, sent } = harness({ isKnownTool: () => false, defaultAccount: () => undefined });
+    inner.onmessage!(call(5, 'made_up_tool'));
+    await wrapped.send(isErrorText(5, 'Input validation error: Invalid arguments for tool made_up_tool: x'));
+    expect(body(sent[0])).toContain('Input validation error');
+  });
+
+  it('ignores successful results and non-response frames', async () => {
+    const { wrapped, sent } = harness();
+    const okResult = { jsonrpc: '2.0', id: 6, result: { content: [{ type: 'text', text: 'fine' }] } } as unknown as JSONRPCMessage;
+    await wrapped.send(okResult);
+    expect(sent[0]).toBe(okResult);
+    const request = { jsonrpc: '2.0', id: 7, method: 'elicitation/create', params: {} } as JSONRPCMessage;
+    await wrapped.send(request);
+    expect(sent[1]).toBe(request);
   });
 });

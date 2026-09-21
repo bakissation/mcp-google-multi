@@ -83,6 +83,13 @@ tests:
     assert:
       - { type: javascript, value: 'file://asserts.mjs:unknownAccountFailsValidation' }
 
+  # Same mistake on a NON-fanout tool, which keeps the bare enum: one user
+  # error used to have four different presentations depending on the tool.
+  - description: an unknown alias on a non-fanout tool gives the same envelope
+    vars: { prompt: '{"tool": "tasks_update", "args": {"account": "nope", "tasklistId": "x", "taskId": "y"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:unknownAccountFailsValidation' }
+
   # ── coercion (clients send string-encoded scalars) ───────────────────────
   - description: string maxResults coerces instead of failing validation
     vars: { prompt: '{"tool": "gmail_search", "args": {"account": "example", "query": "x", "maxResults": "5"}}' }

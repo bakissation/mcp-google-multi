@@ -374,6 +374,16 @@ export function isAccountSetStale(): boolean {
  * rebuilt after a mutation (account_add, later slice). */
 export const ACCOUNTS = current.aliases;
 
+/** One message for a mistyped alias, shared by every account schema. `aliases`
+ * is the SCHEMA's own snapshot, not the live registry: those are the values the
+ * enum actually accepts, and naming a runtime-added alias as valid while
+ * rejecting it would be a lie. */
+export function unknownAliasMessage(aliases: readonly string[], selectors = false): string {
+  const all = selectors ? '; "*" for all accounts' : '';
+  const csv = selectors && aliases.length > 1 ? `; or a CSV subset like "${aliases.slice(0, 2).join(',')}"` : '';
+  return `Unknown account alias. Valid: ${aliases.join(', ')}${all}${csv}. Run account_list if accounts changed since this server started.`;
+}
+
 /**
  * The `account` param schema, empty-registry-safe. A `z.enum` requires at least
  * one value, so a fresh install (zero aliases) would throw at schema-build time
@@ -382,7 +392,9 @@ export const ACCOUNTS = current.aliases;
  * are no aliases: no alias exists to enumerate, the server refuses to boot empty
  * anyway, and dispatch validates the account against the live set. */
 export function accountAliasSchemaFor(aliases: readonly string[]): z.ZodType<string> {
-  return aliases.length > 0 ? z.enum(aliases as [string, ...string[]]) : z.string();
+  return aliases.length > 0
+    ? z.enum(aliases as [string, ...string[]], { error: () => unknownAliasMessage(aliases) })
+    : z.string();
 }
 
 /** Shared, load-time snapshot used by every tool's `account` field. */

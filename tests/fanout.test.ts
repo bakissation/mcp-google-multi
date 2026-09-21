@@ -35,8 +35,14 @@ describe('parseAccountSelector', () => {
     });
   });
 
-  it('a CSV that dedupes to one alias is not a fan-out', () => {
-    expect(parseAccountSelector('alpha,alpha', ACCOUNTS)).toEqual({ ok: true, fanout: false, aliases: ['alpha'] });
+  // Keyed on the CSV FORM, not the deduped count: the caller asked in fan-out
+  // syntax, so the shape of the answer must not depend on repeating an alias.
+  it('a CSV that dedupes to one alias still fans out', () => {
+    expect(parseAccountSelector('alpha,alpha', ACCOUNTS)).toEqual({ ok: true, fanout: true, aliases: ['alpha'] });
+  });
+
+  it('a single unknown alias is rejected here, not left to getClient', () => {
+    expect(parseAccountSelector('bogus', ACCOUNTS)).toEqual({ ok: false, invalid: ['bogus'] });
   });
 
   it('rejects unknown aliases with the bad tokens listed', () => {

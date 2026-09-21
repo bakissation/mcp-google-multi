@@ -72,17 +72,30 @@ export function curatedToolResolves(output) {
   return s.length > 0 ? ok(s.slice(0, 120)) : fail('empty output');
 }
 
+/** A schema rejection is an ENVELOPE like every other failure. It used to be
+ * bare SDK prose with no slug, hint or retriable, which is the free-text
+ * contract break the hint floor exists to prevent. */
 export function validationVisible(output) {
   const s = text(output);
-  return /invalid|required|-32602|expected/i.test(s) ? ok(s.slice(0, 160)) : fail(s.slice(0, 160));
+  let j;
+  try { j = JSON.parse(s); } catch { return fail('not JSON: ' + s.slice(0, 160)); }
+  if (j.error !== 'validation_error') return fail('slug: ' + String(j.error));
+  if (!j.hint) return fail('no hint: ' + s.slice(0, 160));
+  if (j.retriable !== false) return fail('retriable: ' + String(j.retriable));
+  return ok(s.slice(0, 160));
 }
 
-/** A single unknown alias fails at the SDK schema (the alias union), so the
- * contract is a VISIBLE validation error naming the account field; the
- * friendly alias list belongs to the CSV/fan-out path (invalidAccountsResult). */
+/** A single unknown alias must name the VALID aliases. It used to leak the
+ * CSV regex, implying a comma was required, and never named one. */
 export function unknownAccountFailsValidation(output) {
   const s = text(output);
-  return /-32602|invalid/i.test(s) && /account/i.test(s) ? ok(s.slice(0, 160)) : fail(s.slice(0, 160));
+  let j;
+  try { j = JSON.parse(s); } catch { return fail('not JSON: ' + s.slice(0, 160)); }
+  if (j.error !== 'validation_error') return fail('slug: ' + String(j.error));
+  if (!/account/i.test(s)) return fail('does not name the field: ' + s.slice(0, 160));
+  if (!/Valid: /.test(s)) return fail('does not name the valid aliases: ' + s.slice(0, 160));
+  if (/must match pattern|\^\[a-zA-Z0-9_-\]/.test(s)) return fail('leaks the CSV regex: ' + s.slice(0, 160));
+  return ok(s.slice(0, 160));
 }
 
 export function coercesNotValidationError(output) {
