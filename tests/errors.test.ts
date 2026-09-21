@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapGoogleError } from '../src/tools/_errors.js';
+import { mapGoogleError, stringifyEnvelope } from '../src/tools/_errors.js';
 
 const acc = 'work';
 
@@ -19,10 +19,35 @@ describe('mapGoogleError', () => {
     expect(e.error).toBe('insufficient_scope');
   });
 
-  it('403 generic → forbidden, passes the hint through', () => {
+  // One hint slot used to serve both meanings, which is how a pure resource
+  // denial came back telling the caller to add a scope bundle they already had.
+  it('403 generic → forbidden, and a bare service hint no longer lands there', () => {
     const e = mapGoogleError({ code: 403, message: 'forbidden' }, acc, 'enable admin writes');
     expect(e.error).toBe('forbidden');
-    expect(e.hint).toBe('enable admin writes');
+    expect(e.hint).not.toBe('enable admin writes');
+    expect(e.hint).toContain('shared with this account');
+  });
+
+  it('a bare service hint is the SCOPE hint, and only fires on the scope reason', () => {
+    const scoped = mapGoogleError(
+      { code: 403, errors: [{ reason: 'insufficientPermissions' }], message: 'Insufficient Permission' },
+      acc,
+      'enable admin writes',
+    );
+    expect(scoped.error).toBe('insufficient_scope');
+    expect(scoped.hint).toBe('enable admin writes');
+  });
+
+  it('a resource hint fires only on a resource denial', () => {
+    const denied = mapGoogleError({ code: 403, message: 'forbidden' }, acc, { resource: 'share the file first' });
+    expect(denied.hint).toBe('share the file first');
+    const scoped = mapGoogleError(
+      { code: 403, errors: [{ reason: 'insufficientPermissions' }], message: 'Insufficient Permission' },
+      acc,
+      { resource: 'share the file first' },
+    );
+    expect(scoped.error).toBe('insufficient_scope');
+    expect(scoped.hint).not.toBe('share the file first');
   });
 
   // B10 noob-proofing hints
@@ -81,11 +106,19 @@ describe('mapGoogleError', () => {
     }
   });
 
-  it('the 400 fallback hint points at the arguments, not at retrying', () => {
+  // A caller-side 4xx and a Google outage used to share `upstream_error`.
+  it('a caller-side 400 is bad_request, not upstream_error', () => {
     const e = mapGoogleError({ code: 400, message: 'Invalid value for maxResults' }, acc);
-    expect(e.error).toBe('upstream_error');
+    expect(e.error).toBe('bad_request');
     expect(e.retriable).toBe(false);
-    expect(e.hint).toContain('malformed');
+    expect(e.hint).toContain('argument');
+  });
+
+  it('other caller-side 4xx keep the slug and name the status', () => {
+    const conflict = mapGoogleError({ code: 409, message: 'conflict' }, acc);
+    expect(conflict.error).toBe('bad_request');
+    expect(conflict.retriable).toBe(false);
+    expect(conflict.hint).toContain('409');
   });
 
   it('not_found hints at the account-specific ID trap', () => {
@@ -171,8 +204,17 @@ describe('mapGoogleError', () => {
     expect(e.retriable).toBe(true);
   });
 
-  it('statusless error without a network code stays upstream_error', () => {
+  // A throw with no gaxios shape never left this process, so blaming Google
+  // for it is how an empty messageId surfaced as an upstream failure.
+  it('a statusless throw with no request shape is internal, not upstream', () => {
     const e = mapGoogleError({ message: 'something odd' }, acc);
+    expect(e.error).toBe('internal');
+    expect(e.retriable).toBe(false);
+    expect(e.hint).toContain('inside the MCP server');
+  });
+
+  it('a statusless error that DID leave the process stays upstream_error', () => {
+    const e = mapGoogleError({ message: 'socket hang up', config: { url: 'https://x' } }, acc);
     expect(e.error).toBe('upstream_error');
     expect(e.retriable).toBe(false);
   });
@@ -217,5 +259,125 @@ describe('mapGoogleError local-filesystem paths', () => {
   it('numeric Google statuses are untouched by the local-fs branch', () => {
     const e = mapGoogleError({ code: 404, message: 'File not found: abc' }, acc);
     expect(e.error).toBe('not_found');
+  });
+});
+
+// gaxios copies the ENTIRE response body into error.message when the body is a
+// string, which is how 8.5 KB of Google's HTML front-end page ended up inside
+// a JSON error envelope.
+describe('non-JSON bodies never reach the envelope', () => {
+  const acc = 'work' as never;
+  const htmlPage = `<!DOCTYPE html><html><head><title>Error 404</title></head><body>${'x'.repeat(9000)}</body></html>`;
+
+  it('suppresses an HTML body and says what was suppressed', () => {
+    const e = mapGoogleError(
+      { code: 404, message: htmlPage, response: { status: 404, headers: { 'content-type': 'text/html; charset=utf-8' }, data: htmlPage } },
+      acc,
+    );
+    expect(e.message).not.toContain('<html');
+    expect(e.message).toContain('HTML error page');
+    expect(e.message).toContain('chars suppressed');
+    expect(e.message.length).toBeLessThan(200);
+  });
+
+  it('detects markup with no Content-Type, including a bare tag', () => {
+    for (const body of ['<h1>Server Error</h1>', '<div>oops</div>', '<!-- nope -->', '<?xml version="1.0"?><Error/>']) {
+      const e = mapGoogleError({ code: 500, message: body }, acc);
+      expect(e.message, body).toContain('non-JSON error body');
+    }
+  });
+
+  it('does not mistake a normal sentence containing < for markup', () => {
+    const e = mapGoogleError({ code: 400, message: 'value must be < 100' }, acc);
+    expect(e.message).toBe('value must be < 100');
+  });
+
+  it('prefers the structured Google message over the raw body', () => {
+    const body = JSON.stringify({ error: { code: 400, message: 'Invalid value for orgUnitId' } });
+    const e = mapGoogleError(
+      { code: 400, message: body, response: { status: 400, headers: { 'content-type': 'application/json' }, data: body } },
+      acc,
+    );
+    expect(e.message).toBe('Invalid value for orgUnitId');
+  });
+
+  it('caps a very long plain-text message instead of passing it through', () => {
+    const e = mapGoogleError({ code: 400, message: 'z'.repeat(50_000) }, acc);
+    expect(e.message.length).toBeLessThan(1200);
+    expect(e.message).toContain('50000 chars total');
+  });
+
+  it('bounds the SERIALIZED envelope, hint included', () => {
+    const text = stringifyEnvelope({
+      error: 'forbidden',
+      message: 'm'.repeat(50_000),
+      hint: 'h'.repeat(50_000),
+      retriable: false,
+      account: 'work',
+    });
+    expect(text.length).toBeLessThanOrEqual(4000);
+    expect(JSON.parse(text).error).toBe('forbidden');
+  });
+});
+
+describe('AIP-193 details[] classification', () => {
+  const acc = 'work' as never;
+  const withInfo = (status: number, reason: string, metadata?: Record<string, string>) => ({
+    code: status,
+    message: 'denied',
+    response: {
+      status,
+      headers: { 'content-type': 'application/json' },
+      data: { error: { code: status, status: 'PERMISSION_DENIED', message: 'denied', details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason, domain: 'googleapis.com', ...(metadata ? { metadata } : {}) }] } },
+    },
+  });
+
+  it('reads the scope reason out of details[], where modern APIs put it', () => {
+    const e = mapGoogleError(withInfo(403, 'ACCESS_TOKEN_SCOPE_INSUFFICIENT'), acc);
+    expect(e.error).toBe('insufficient_scope');
+  });
+
+  it('a bare PERMISSION_DENIED is a resource denial, NOT a scope problem', () => {
+    const e = mapGoogleError(
+      { code: 403, message: 'The caller does not have permission', response: { status: 403, headers: { 'content-type': 'application/json' }, data: { error: { code: 403, status: 'PERMISSION_DENIED', message: 'The caller does not have permission' } } } },
+      acc,
+    );
+    expect(e.error).toBe('forbidden');
+    expect(e.hint).not.toMatch(/scope bundle|re-auth/i);
+  });
+
+  it('SERVICE_DISABLED deep-links using the metadata, not a message scrape', () => {
+    const e = mapGoogleError(withInfo(403, 'SERVICE_DISABLED', { service: 'chat.googleapis.com', consumer: 'projects/12345' }), acc);
+    expect(e.error).toBe('api_not_enabled');
+    expect(e.hint).toContain('chat.googleapis.com');
+    expect(e.hint).toContain('project=12345');
+  });
+
+  it('a 403 that is really a quota answers rate_limited, not forbidden', () => {
+    const e = mapGoogleError({ code: 403, errors: [{ reason: 'userRateLimitExceeded' }], message: 'Rate Limit Exceeded' }, acc);
+    expect(e.error).toBe('rate_limited');
+    expect(e.retriable).toBe(true);
+  });
+
+  it('routes wrong-file-type 403s to the sibling tool instead of blaming permissions', () => {
+    const dl = mapGoogleError({ code: 403, errors: [{ reason: 'fileNotDownloadable' }], message: 'Only files with binary content can be downloaded.' }, acc);
+    expect(dl.error).toBe('binary_unsupported');
+    expect(dl.hint).toContain('drive_export');
+    const ex = mapGoogleError({ code: 403, errors: [{ reason: 'fileNotExportable' }], message: 'Export only supports Docs Editors files.' }, acc);
+    expect(ex.error).toBe('binary_unsupported');
+    expect(ex.hint).toContain('drive_download');
+  });
+});
+
+describe('local preconditions are not Google failures', () => {
+  const acc = 'work' as never;
+  it.each([
+    ['E_NO_TOKEN', 'auth_required'],
+    ['E_UNKNOWN_ACCOUNT', 'validation_error'],
+    ['E_NO_OAUTH_CLIENT', 'invalid_client'],
+  ])('%s maps to %s', (code, slug) => {
+    const e = mapGoogleError(Object.assign(new Error('nope'), { code }), acc);
+    expect(e.error).toBe(slug);
+    expect(e.retriable).toBe(false);
   });
 });

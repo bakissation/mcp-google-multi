@@ -1,5 +1,6 @@
 import type { Account } from './accounts.js';
 import { getClient } from './client.js';
+import { sliceEncoded } from './trim.js';
 import { expandPath, isGoogleApiUrl } from './discovery-client.js';
 import { handleGoogleApiError } from './tools/_errors.js';
 import { scopeHintForMethod } from './scope-observability.js';
@@ -129,10 +130,14 @@ export async function executeApiMethod(method: ApiMethodRef, args: ExecuteArgs, 
     });
     const text = JSON.stringify(res.data ?? null);
     if (text.length > MAX_RESPONSE_CHARS) {
+      // Budget the ENCODED head: jsonResult re-stringifies it, so every quote
+      // and backslash inside doubles. Slicing raw characters made the emitted
+      // result exceed the cap this tool advertises, by up to 15 percent on a
+      // quote-dense listing.
       return jsonResult({
         truncated: true,
         totalChars: text.length,
-        head: text.slice(0, MAX_RESPONSE_CHARS),
+        head: sliceEncoded(text, MAX_RESPONSE_CHARS),
         hint: 'Narrow the request (fields mask, pageSize) to get complete JSON.',
       });
     }

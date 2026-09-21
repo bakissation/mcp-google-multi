@@ -296,6 +296,11 @@ function handleAnalyticsError(error: any, account: Account) {
   return handleGoogleApiError(
     error,
     account,
-    'Needs the "analytics" bundle on this account (add it to the scope profile, then re-auth), and the Google account must have access to this GA4 property.',
+    {
+      scope: 'Needs the "analytics" bundle on this account: add it to the scope profile, then re-auth.',
+      // GA4 answers PERMISSION_DENIED for a property ACL too, and the old
+      // combined hint sent those callers to re-auth a scope they already had.
+      resource: 'The scope is not the problem: this Google account has no access to that GA4 property. Grant it in GA4 Admin > Property Access Management, or call analytics_account_summaries to see the properties it can read.',
+    },
   );
 }

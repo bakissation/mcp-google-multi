@@ -5,7 +5,7 @@ import { drive as driveClient, type drive_v3 } from '@googleapis/drive';
 import { accountAliasSchema, getAccountSet } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import { handleGoogleApiError } from './_errors.js';
+import { handleGoogleApiError, safeMessage, stringifyEnvelope } from './_errors.js';
 import { openLocalReadStream, prepareLocalDest } from './_local-files.js';
 import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
@@ -176,14 +176,16 @@ export function registerDriveTools(server: ToolRegistry): void {
         };
       } catch (error: any) {
         if (isDriveInvalidQuery(error)) {
-          const message = error?.response?.data?.error?.message ?? error?.message ?? 'Invalid Value';
+          // Through safeMessage and stringifyEnvelope like every other
+          // envelope: this path used to read the upstream body directly, so a
+          // non-JSON response landed here uncapped.
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify({
+            content: [{ type: 'text' as const, text: stringifyEnvelope({
               error: 'invalid_query',
-              message,
+              message: safeMessage(error),
               hint: DRIVE_QUERY_HINT,
               retriable: false,
-              account,
+              account: account as Account,
             }) }],
             isError: true as const,
           };

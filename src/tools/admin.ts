@@ -251,5 +251,6 @@ export function registerAdminTools(server: ToolRegistry): void {
 }
 
 function handleAdminError(error: any, account: Account) {
-  return handleGoogleApiError(error, account, "Admin tools require Workspace super-admin privileges AND the account must be listed in GOOGLE_ADMIN_ACCOUNTS (then re-authenticated). Personal Gmail accounts cannot use these endpoints.");
+  const admin = 'Admin tools require Workspace super-admin privileges AND the account must be listed as an admin account (then re-authenticated). Personal Gmail accounts cannot use these endpoints.';
+  return handleGoogleApiError(error, account, { scope: admin, resource: admin });
 }

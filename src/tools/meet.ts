@@ -156,5 +156,8 @@ export function registerMeetTools(server: ToolRegistry): void {
 }
 
 function handleMeetError(error: any, account: Account) {
-  return handleGoogleApiError(error, account, "Meet API requires the meetings.space.readonly scope and the Google Meet API enabled in Cloud Console. Confirm both for this account.");
+  return handleGoogleApiError(error, account, {
+    scope: 'Meet needs the meetings.space.readonly scope and the Google Meet API enabled in Cloud Console. Confirm both for this account.',
+    resource: `Meet denied this conference record to "${account}". Meet exposes records only to the organizer or a participant, so check which account hosted the meeting.`,
+  });
 }

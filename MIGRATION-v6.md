@@ -39,6 +39,7 @@ Existing encrypted tokens keep decrypting — upgrading alone never forces a re-
 | 13 | Auth | OAuth redirect URI now configurable | none (default preserved) | — |
 | 14 | Security | CRLF header-injection closed in email compose | none (input hardening) | — |
 | 15 | Behavior | an undeclared tool argument is now refused, not dropped | none for a correct caller; see [§4.3](#43-undeclared-arguments-are-refused-not-dropped) | `unknown_argument` |
+| 16 | Errors | caller-side 4xx split out of `upstream_error` | rebranch if you keyed on the slug; see [§4.4](#44-error-slugs-are-narrower) | `bad_request`, `internal` |
 
 Rows 1, 3–6, 10–11 need action; rows 7–9, 12–15 are safe defaults, opt-in, or transparent fixes.
 
@@ -198,6 +199,26 @@ Nothing else changes. These are never screened, in any mode:
 - a snake_case twin of a declared key, which is renamed before screening rather than refused
 
 **To keep the old behavior:** `GOOGLE_ARG_UNKNOWN=warn` logs the drop to stderr and dispatches as 5.x did. `GOOGLE_ARG_UNKNOWN=off` restores the silent drop with no log. A misspelled value falls back to `warn`, not to the default.
+
+
+### 4.4 Error slugs are narrower
+
+`upstream_error` used to mean three different things. It now means one.
+
+| Condition | Was | Now |
+|---|---|---|
+| Google returned 5xx | `upstream_error`, `retriable: true` | unchanged |
+| Google returned a caller-side 4xx (400, 409, 412, 413, 415, 422) | `upstream_error`, `retriable: false` | **`bad_request`**, `retriable: false` |
+| The server threw before sending anything (a bug, a missing key, an unknown alias) | `upstream_error`, hint "Unclassified error" | **`internal`**, or a precise slug: `auth_required`, `validation_error`, `invalid_client` |
+
+A consumer branching on `error === 'upstream_error'` to decide whether to retry was previously getting both "Google is having a bad minute, retry" and "your request is wrong, never retry" under one name. If you branch on the slug, add the new cases; `retriable` already distinguished them and is unchanged.
+
+Two related narrowings, same release:
+
+- A 403 that is really a quota (`rateLimitExceeded`, `userRateLimitExceeded`, `dailyLimitExceeded`) is now `rate_limited` with `retriable: true`, instead of `forbidden` with a sharing hint.
+- A 403 that is really the wrong tool for the file type (`fileNotDownloadable` on `drive_download`, `fileNotExportable` on `drive_export`) is now `binary_unsupported` and names the sibling tool, instead of `forbidden` with a permissions hint.
+
+**Error messages are now capped** at 1000 characters, and the serialized envelope at 4000. A non-JSON response body (Google serves an HTML page whenever a request fails to route, most often because a path parameter was empty) is replaced by a one-line summary saying what was suppressed, rather than being embedded whole. Up to 8.5 KB of markup used to travel inside the `message` field.
 
 ---
 
