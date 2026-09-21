@@ -200,7 +200,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Read the content of a Google Drive file: Workspace docs and textual types (text/*, JSON/XML/SVG and similar) inline; other binaries return error:binary (returns up to maxChars characters per call; non-Google-native files over 2MB return too_large)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
         maxChars: z.number().min(1).max(2_000_000).default(100_000).optional()
           .describe('Max characters of content to return (default: 100000)'),
         offset: z.number().min(0).default(0).optional()
@@ -349,7 +349,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Upload a local file to Google Drive. Pass `convertTo` to import it as a native, editable Google Doc/Sheet/Slides/Drawing instead of storing the raw bytes.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        localPath: z.string().describe('Absolute path of the SOURCE file on disk to upload (on the machine running the server; this is not savePath)'),
+        localPath: z.string().min(1).describe('Absolute path of the SOURCE file on disk to upload (on the machine running the server; this is not savePath)'),
         filename: z.string().describe('Name as it appears in Drive'),
         mimeType: z.string().optional().describe('Source MIME type of the local file (inferred from extension if omitted). With `convertTo`, this is the format Drive imports from.'),
         convertTo: z.enum(CONVERT_TO_VALUES).optional().describe('Convert the upload into this native Google Workspace type on import: "document" | "spreadsheet" | "presentation" | "drawing" (full application/vnd.google-apps.* ids also accepted). E.g. upload .md/.html/.docx/.txt with convertTo=document to get a real Google Doc. Source must be an importable format. Omit to store the file as-is.'),
@@ -393,8 +393,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Download a binary file from Drive to local disk. For Google Workspace formats (Docs, Sheets, Slides), use drive_export instead.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        savePath: z.string().describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server); the file name comes from `filename`'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        savePath: z.string().min(1).describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server); the file name comes from `filename`'),
         filename: z.string().optional().describe('Filename to save as (defaults to the file name in Drive)'),
       },
     },
@@ -431,9 +431,9 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Export a Google Workspace document (Doc, Sheet, Slide) to a standard format and save to disk. Supported: PDF, DOCX, XLSX, PPTX, TXT, CSV, Markdown (text/markdown for Docs).',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
         mimeType: z.string().describe('Target export MIME type (e.g. "application/pdf", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")'),
-        savePath: z.string().describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server); the file name comes from `filename`'),
+        savePath: z.string().min(1).describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server); the file name comes from `filename`'),
         filename: z.string().optional().describe('Filename to save as (defaults to the Drive name plus the extension implied by mimeType)'),
       },
     },
@@ -505,7 +505,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Rename, move, or replace content of a Drive file. Any combination in one call. For untrash, use drive_untrash.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
         newName: z.string().optional().describe('New filename'),
         newParentFolderId: z.string().optional().describe('Move to this folder, named newParentFolderId here, not parentFolderId'),
         localPath: z.string().optional().describe('Replace file content with this local file (path on the machine running the server)'),
@@ -560,7 +560,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Permanently delete a file or folder from Google Drive. Irreversible. Use drive_trash for recoverable deletion.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
       },
     },
     async ({ account, fileId }) => {
@@ -583,7 +583,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Move a file to Google Drive trash. Recoverable from Drive UI or via drive_untrash.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
       },
     },
     async ({ account, fileId }) => {
@@ -610,7 +610,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Restore a trashed file from Google Drive trash back to its previous location.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
       },
     },
     async ({ account, fileId }) => {
@@ -662,7 +662,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Duplicate a file in Google Drive (does not work on folders)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID to copy'),
+        fileId: z.string().min(1).describe('Google Drive file ID to copy'),
         newName: z.string().optional().describe('Name for the copy (default: "Copy of <original>")'),
         parentFolderId: z.string().optional().describe('Where to put the copy, not parentId. Default: same folder'),
       },
@@ -695,8 +695,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Move a file between folders by replacing its parents. To move to multiple parents, list all of them.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        newParentFolderId: z.string().describe('Destination folder ID, named newParentFolderId here, not parentFolderId'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        newParentFolderId: z.string().min(1).describe('Destination folder ID, named newParentFolderId here, not parentFolderId'),
       },
     },
     async ({ account, fileId, newParentFolderId }) => {
@@ -728,7 +728,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Share a file or folder with a user, group, domain, or anyone with the link',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
         type: z.enum(['user', 'group', 'domain', 'anyone']).describe('Permission type'),
         role: z.enum(['reader', 'commenter', 'writer', 'fileOrganizer', 'organizer', 'owner']).describe('Permission role'),
         emailAddress: z.string().optional().describe('Required when type is "user" or "group"'),
@@ -787,7 +787,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'List all people and groups who have access to a Drive file or folder',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
       },
     },
     async ({ account, fileId }) => {
@@ -814,8 +814,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Change the role and/or expirationTime of an existing permission without removing it. Use "removeExpiration=true" to clear an existing expirationTime.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        permissionId: z.string().describe('Permission ID from drive_list_permissions'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        permissionId: z.string().min(1).describe('Permission ID from drive_list_permissions'),
         role: z.enum(['reader', 'commenter', 'writer', 'fileOrganizer', 'organizer', 'owner']).optional()
           .describe('New role'),
         expirationTime: z.string().optional()
@@ -858,8 +858,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Revoke access to a Drive file for a specific permission',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        permissionId: z.string().describe('Permission ID from drive_list_permissions'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        permissionId: z.string().min(1).describe('Permission ID from drive_list_permissions'),
       },
     },
     async ({ account, fileId, permissionId }) => {
@@ -884,7 +884,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Create a comment on a Drive file. Works on Docs, Sheets, Slides, PDFs, and any Drive file. The optional anchor is a JSON string describing the document region (see Drive "Manage comments" guide).',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
         content: z.string().describe('Plain text comment content'),
         anchor: z.string().optional().describe('Region anchor (JSON string). Optional.'),
         quotedFileContent: z.object({
@@ -921,7 +921,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'List comments on a Drive file with pagination',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
         includeDeleted: coerceBoolean.optional().describe('Include deleted comments (default: false)'),
         pageSize: z.number().min(1).max(100).optional().describe('Max comments per page (default: 20)'),
         pageToken: z.string().optional().describe('Token from a previous page'),
@@ -955,8 +955,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Get a single comment by ID',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        commentId: z.string().describe('Comment ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        commentId: z.string().min(1).describe('Comment ID'),
         includeDeleted: coerceBoolean.optional(),
       },
     },
@@ -985,8 +985,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Edit the content of an existing comment (PATCH semantics)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        commentId: z.string().describe('Comment ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        commentId: z.string().min(1).describe('Comment ID'),
         content: z.string().describe('New plain text content'),
       },
     },
@@ -1015,8 +1015,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Delete a comment from a Drive file',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        commentId: z.string().describe('Comment ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        commentId: z.string().min(1).describe('Comment ID'),
       },
     },
     async ({ account, fileId, commentId }) => {
@@ -1041,8 +1041,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Reply to a comment. Optionally close or reopen the thread by setting action to "resolve" or "reopen".',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        commentId: z.string().describe('Parent comment ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        commentId: z.string().min(1).describe('Parent comment ID'),
         content: z.string().describe('Reply content (required even when only changing action)'),
         action: z.enum(['resolve', 'reopen']).optional()
           .describe('Optional action to apply to the thread on this reply'),
@@ -1076,8 +1076,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'List replies on a comment with pagination',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        commentId: z.string().describe('Parent comment ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        commentId: z.string().min(1).describe('Parent comment ID'),
         includeDeleted: coerceBoolean.optional(),
         pageSize: z.number().min(1).max(100).optional(),
         pageToken: z.string().optional(),
@@ -1110,9 +1110,9 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Edit the content of an existing reply',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        commentId: z.string().describe('Parent comment ID'),
-        replyId: z.string().describe('Reply ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        commentId: z.string().min(1).describe('Parent comment ID'),
+        replyId: z.string().min(1).describe('Reply ID'),
         content: z.string().describe('New plain text content'),
       },
     },
@@ -1142,9 +1142,9 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Delete a reply from a comment thread',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        commentId: z.string().describe('Parent comment ID'),
-        replyId: z.string().describe('Reply ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        commentId: z.string().min(1).describe('Parent comment ID'),
+        replyId: z.string().min(1).describe('Reply ID'),
       },
     },
     async ({ account, fileId, commentId, replyId }) => {
@@ -1169,7 +1169,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'List version history of a Drive file',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
         pageSize: z.number().min(1).max(200).optional(),
         pageToken: z.string().optional(),
       },
@@ -1199,8 +1199,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Pin a revision (keepForever=true) against the 200-version cap, or change its published state for Docs.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        revisionId: z.string().describe('Revision ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        revisionId: z.string().min(1).describe('Revision ID'),
         keepForever: coerceBoolean.optional().describe('Pin this revision indefinitely'),
         published: coerceBoolean.optional().describe('Toggle published state (Docs only)'),
         publishAuto: coerceBoolean.optional().describe('Auto-publish subsequent revisions'),
@@ -1238,8 +1238,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Delete a specific revision of a file',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        revisionId: z.string().describe('Revision ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        revisionId: z.string().min(1).describe('Revision ID'),
       },
     },
     async ({ account, fileId, revisionId }) => {
@@ -1264,7 +1264,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'List pending "Request access" proposals on a file. Useful for programmatic triage of share requests from external collaborators.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
         pageSize: z.number().min(1).max(100).optional(),
         pageToken: z.string().optional(),
       },
@@ -1293,8 +1293,8 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Resolve a pending access proposal. Action ACCEPT requires a role array (e.g. ["reader"]).',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().describe('Google Drive file ID'),
-        proposalId: z.string().describe('Access proposal ID'),
+        fileId: z.string().min(1).describe('Google Drive file ID'),
+        proposalId: z.string().min(1).describe('Access proposal ID'),
         action: z.enum(['ACCEPT', 'DENY']).describe('Whether to accept or deny the proposal'),
         role: coerceArray(z.enum(['reader', 'commenter', 'writer', 'fileOrganizer'])).optional()
           .describe('Required when action is ACCEPT'),
@@ -1364,7 +1364,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       description: 'Get metadata for a specific shared drive',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        driveId: z.string().describe('Shared drive ID'),
+        driveId: z.string().min(1).describe('Shared drive ID'),
       },
     },
     async ({ account, driveId }) => {
@@ -1398,7 +1398,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       inputSchema: {
         fromAccount: requiredAccountEnum.describe('Source account alias'),
         toAccount: requiredAccountEnum.describe('Target account alias'),
-        fileId: z.string().describe('File ID in the source account (folders are not supported)'),
+        fileId: z.string().min(1).describe('File ID in the source account (folders are not supported)'),
         parentFolderId: z.string().optional().describe('Target folder ID, not parentId. Default: target My Drive root'),
         newName: z.string().optional().describe('Rename the copy (default: keep the source name)'),
         move: coerceBoolean.optional().describe('Trash the source after a successful copy (delete-gated)'),

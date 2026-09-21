@@ -45,7 +45,7 @@ export function registerChatTools(server: ToolRegistry): void {
       description: 'Get details about a single Chat space',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        name: z.string().describe('Space resource name, format: spaces/{space}'),
+        name: z.string().min(1).describe('Space resource name, format: spaces/{space}'),
       },
     },
     async ({ account, name }) => {

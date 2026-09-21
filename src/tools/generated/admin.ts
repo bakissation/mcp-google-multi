@@ -481,7 +481,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
       account: accountField(),
       customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
       resourceId: z.string().min(1).describe("The unique ID of the device. The `resourceId`s are returned in the response from the [chromeosdevices.list](https://developers.google.com/workspace/admin/directory/v1/reference/chromeosdevices/list) m"),
-      action: z.string().describe("Action to be taken on the Chrome OS device."),
+      action: z.string().min(1).describe("Action to be taken on the Chrome OS device."),
       deprovisionReason: z.string().describe("Only used when the action is `deprovision`. With the `deprovision` action, this field is required. *Note*: The deprovision reason is audited because it might have implications on licenses for perpetua").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -533,7 +533,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     shape: {
       account: accountField(),
       customerId: z.string().min(1).describe("Immutable. ID of the Google Workspace account"),
-      orgUnitPath: z.string().describe("Full path of the target organizational unit or its ID"),
+      orgUnitPath: z.string().min(1).describe("Full path of the target organizational unit or its ID"),
       deviceIds: coerceArray(z.string()).describe("Chrome OS devices to be moved to OU"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -963,7 +963,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
       account: accountField(),
       customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
       resourceId: z.string().min(1).describe("The unique ID the API service uses to identify the mobile device."),
-      action: z.string().describe("The action to be performed on the device."),
+      action: z.string().min(1).describe("The action to be performed on the device."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1054,7 +1054,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     shape: {
       account: accountField(),
       customerId: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's `customerId`. The `customerId` is also retu"),
-      name: z.string().describe("The organizational unit's path name. For example, an organizational unit's name within the /corp/support/sales_support parent path is sales_support. Required."),
+      name: z.string().min(1).describe("The organizational unit's path name. For example, an organizational unit's name within the /corp/support/sales_support parent path is sales_support. Required."),
       blockInheritance: coerceBoolean.describe("This field is deprecated and setting its value has no effect.").optional(),
       description: z.string().describe("Description of the organizational unit.").optional(),
       etag: z.string().describe("ETag of the resource.").optional(),
@@ -1360,7 +1360,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     shape: {
       account: accountField(),
       customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
-      name: z.string().describe("The name of the feature."),
+      name: z.string().min(1).describe("The name of the feature."),
       etags: z.string().describe("ETag of the resource.").optional(),
       kind: z.string().describe("Kind of resource this is.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1411,7 +1411,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
       account: accountField(),
       customer: z.string().min(1).describe("The unique ID for the customer's Google Workspace account. As an account administrator, you can also use the `my_customer` alias to represent your account's customer ID."),
       oldName: z.string().min(1).describe("The unique ID of the feature to rename."),
-      newName: z.string().describe("New name of the feature."),
+      newName: z.string().min(1).describe("New name of the feature."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1906,7 +1906,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
     shape: {
       account: accountField(),
       userKey: z.string().min(1).describe("Identifies the user in the API request. The value can be the user's primary email address, alias email address, or unique user ID."),
-      photoData: z.string().describe("The user photo's upload data in [web-safe Base64](https://en.wikipedia.org/wiki/Base64#URL_applications) format in bytes. This means: * The slash (/) character is replaced with the underscore (_) char"),
+      photoData: z.string().min(1).describe("The user photo's upload data in [web-safe Base64](https://en.wikipedia.org/wiki/Base64#URL_applications) format in bytes. This means: * The slash (/) character is replaced with the underscore (_) char"),
       etag: z.string().describe("ETag of the resource.").optional(),
       height: z.number().describe("Height of the photo in pixels.").optional(),
       id: z.string().describe("The ID the API uses to uniquely identify the user.").optional(),

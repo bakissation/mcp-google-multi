@@ -562,7 +562,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Read a full Gmail message by ID (body capped at 50k chars unless full=true)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageId: z.string().describe('Gmail message ID'),
+        messageId: z.string().min(1).describe('Gmail message ID'),
         full: coerceBoolean.optional().describe('Return the entire body without the character cap'),
         rawHtml: coerceBoolean.optional()
           .describe('Return the HTML body unconverted instead of the plain-text rendering (HTML-only messages)'),
@@ -596,7 +596,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Read all messages in a Gmail thread (bodies capped at 50k chars each unless full=true). mode=summary returns headers + snippets only.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        threadId: z.string().describe('Gmail thread ID'),
+        threadId: z.string().min(1).describe('Gmail thread ID'),
         full: coerceBoolean.optional().describe('Return entire bodies without the character cap'),
         rawHtml: coerceBoolean.optional()
           .describe('Return HTML bodies unconverted instead of the plain-text rendering (HTML-only messages)'),
@@ -776,10 +776,10 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Download an email attachment to local disk. Use gmail_read first to get the attachmentId.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageId: z.string().describe('The Gmail message ID'),
-        attachmentId: z.string().describe('The attachment ID from gmail_read response'),
+        messageId: z.string().min(1).describe('The Gmail message ID'),
+        attachmentId: z.string().min(1).describe('The attachment ID from gmail_read response'),
         filename: z.string().describe('Filename to save as (e.g. report.xlsx)'),
-        savePath: z.string().describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server), e.g. /home/user/Downloads; the file name comes from `filename`'),
+        savePath: z.string().min(1).describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server), e.g. /home/user/Downloads; the file name comes from `filename`'),
       },
     },
     async ({ account, messageId, attachmentId, filename, savePath }) => {
@@ -916,7 +916,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Add or remove labels on a Gmail message. Use system label IDs like STARRED, UNREAD, INBOX, TRASH, or custom label IDs from gmail_list_labels.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageId: z.string().describe('Gmail message ID'),
+        messageId: z.string().min(1).describe('Gmail message ID'),
         addLabelIds: coerceArray(z.string()).optional().describe('Label IDs to add'),
         removeLabelIds: coerceArray(z.string()).optional().describe('Label IDs to remove'),
       },
@@ -949,7 +949,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Move a Gmail message to Trash (recoverable)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageId: z.string().describe('Gmail message ID'),
+        messageId: z.string().min(1).describe('Gmail message ID'),
       },
     },
     async ({ account, messageId }) => {
@@ -973,7 +973,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Permanently and irreversibly delete a Gmail message. No recovery possible.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageId: z.string().describe('Gmail message ID'),
+        messageId: z.string().min(1).describe('Gmail message ID'),
       },
     },
     async ({ account, messageId }) => {
@@ -1087,7 +1087,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Read the full content of a specific Gmail draft',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        draftId: z.string().describe('Draft ID'),
+        draftId: z.string().min(1).describe('Draft ID'),
       },
     },
     async ({ account, draftId }) => {
@@ -1115,7 +1115,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Send an existing Gmail draft by its draft ID',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        draftId: z.string().describe('Draft ID to send'),
+        draftId: z.string().min(1).describe('Draft ID to send'),
       },
     },
     async ({ account, draftId }) => {
@@ -1200,7 +1200,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Permanently delete a Gmail label and remove it from all messages',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        labelId: z.string().describe('Label ID to delete'),
+        labelId: z.string().min(1).describe('Label ID to delete'),
       },
     },
     async ({ account, labelId }) => {
@@ -1247,7 +1247,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Get all mailbox changes since a given historyId. Useful for detecting new emails since last check.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        startHistoryId: z.string().describe('History ID from a previous gmail_get_profile or gmail_read response'),
+        startHistoryId: z.string().min(1).describe('History ID from a previous gmail_get_profile or gmail_read response'),
         maxResults: z.number().min(1).max(500).default(100).optional()
           .describe('Max results to return (default: 100)'),
         historyTypes: coerceArray(z.enum(['messageAdded', 'messageDeleted', 'labelAdded', 'labelRemoved'])).optional()

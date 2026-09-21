@@ -114,7 +114,7 @@ export function registerAdminTools(server: ToolRegistry): void {
       description: 'Get a single Workspace user by email or user ID',
       inputSchema: {
         account: accountEnum.describe('Google account alias (must be a Workspace admin)'),
-        userKey: z.string().describe('User email or ID'),
+        userKey: z.string().min(1).describe('User email or ID'),
         projection: z.enum(['basic', 'custom', 'full']).optional(),
       },
     },
@@ -141,7 +141,7 @@ export function registerAdminTools(server: ToolRegistry): void {
       description: 'Update a Workspace user (PATCH semantics). Gated by write-control (a CUD tool).',
       inputSchema: {
         account: accountEnum.describe('Google account alias (must be a Workspace admin)'),
-        userKey: z.string().describe('User email or ID'),
+        userKey: z.string().min(1).describe('User email or ID'),
         givenName: z.string().optional(),
         familyName: z.string().optional(),
         suspended: coerceBoolean.optional(),
@@ -222,7 +222,7 @@ export function registerAdminTools(server: ToolRegistry): void {
       description: 'List members of a Workspace group',
       inputSchema: {
         account: accountEnum.describe('Google account alias (must be a Workspace admin)'),
-        groupKey: z.string().describe('Group email or ID'),
+        groupKey: z.string().min(1).describe('Group email or ID'),
         roles: z.string().optional().describe('Comma-separated roles to include (OWNER, MANAGER, MEMBER)'),
         includeDerivedMembership: coerceBoolean.optional(),
         maxResults: z.number().min(1).max(200).optional(),

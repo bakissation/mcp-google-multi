@@ -46,7 +46,7 @@ export function registerMeetTools(server: ToolRegistry): void {
       description: 'Get a single conference record by resource name (e.g. conferenceRecords/abc123)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        name: z.string().describe('Resource name, format: conferenceRecords/{conference_record}'),
+        name: z.string().min(1).describe('Resource name, format: conferenceRecords/{conference_record}'),
       },
     },
     async ({ account, name }) => {

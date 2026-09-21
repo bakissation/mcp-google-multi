@@ -98,7 +98,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
       description: 'Get a single Google Calendar event by ID',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        eventId: z.string().describe('Calendar event ID'),
+        eventId: z.string().min(1).describe('Calendar event ID'),
         calendarId: z.string().default('primary').optional()
           .describe('Calendar ID (default: primary)'),
       },
@@ -189,7 +189,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
       description: 'Update a Google Calendar event',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        eventId: z.string().describe('Calendar event ID'),
+        eventId: z.string().min(1).describe('Calendar event ID'),
         summary: z.string().optional().describe('New event title'),
         start: z.string().optional().describe('New start time (ISO 8601)'),
         end: z.string().optional().describe('New end time (ISO 8601)'),
@@ -258,7 +258,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
       description: 'Delete a Google Calendar event',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        eventId: z.string().describe('Calendar event ID'),
+        eventId: z.string().min(1).describe('Calendar event ID'),
         calendarId: z.string().default('primary').optional()
           .describe('Calendar ID (default: primary)'),
       },
@@ -318,9 +318,9 @@ export function registerCalendarTools(server: ToolRegistry): void {
       description: 'Move an event from one calendar to another',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        calendarId: z.string().describe('Source calendar ID'),
-        eventId: z.string().describe('Event ID to move'),
-        destinationCalendarId: z.string().describe('Destination calendar ID'),
+        calendarId: z.string().min(1).describe('Source calendar ID'),
+        eventId: z.string().min(1).describe('Event ID to move'),
+        destinationCalendarId: z.string().min(1).describe('Destination calendar ID'),
         sendNotifications: coerceBoolean.optional().describe('Send notifications (default: false)'),
       },
     },
@@ -351,7 +351,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
         account: accountEnum.describe('Google account alias'),
         calendarId: z.string().default('primary').optional()
           .describe('Calendar ID (default: primary)'),
-        eventId: z.string().describe('ID of the recurring event series'),
+        eventId: z.string().min(1).describe('ID of the recurring event series'),
         timeMin: z.string().optional().describe('ISO 8601 — filter instances after this time'),
         timeMax: z.string().optional().describe('ISO 8601 — filter instances before this time'),
         maxResults: z.number().min(1).max(250).default(25).optional()

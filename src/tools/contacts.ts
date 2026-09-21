@@ -239,7 +239,7 @@ export function registerContactsTools(server: ToolRegistry): void {
       description: 'Get a single contact by resource name',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        resourceName: z.string().describe('Contact resource name (e.g. "people/c1234567890")'),
+        resourceName: z.string().min(1).describe('Contact resource name (e.g. "people/c1234567890")'),
       },
     },
     async ({ account, resourceName }) => {
@@ -360,7 +360,7 @@ export function registerContactsTools(server: ToolRegistry): void {
       description: 'Update an existing contact (reads current etag automatically)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        resourceName: z.string().describe('Contact resource name (e.g. "people/c1234567890")'),
+        resourceName: z.string().min(1).describe('Contact resource name (e.g. "people/c1234567890")'),
         givenName: z.string().optional().describe('Updated first name'),
         familyName: z.string().optional().describe('Updated last name'),
         email: z.string().optional().describe('Updated email address'),
@@ -441,7 +441,7 @@ export function registerContactsTools(server: ToolRegistry): void {
       description: 'Delete a contact (permanent, cannot be undone)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        resourceName: z.string().describe('Contact resource name (e.g. "people/c1234567890")'),
+        resourceName: z.string().min(1).describe('Contact resource name (e.g. "people/c1234567890")'),
       },
     },
     async ({ account, resourceName }) => {
@@ -499,7 +499,7 @@ export function registerContactsTools(server: ToolRegistry): void {
       description: 'List members of a contact group',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        groupResourceName: z.string().describe('Contact group resource name (e.g. "contactGroups/abc123")'),
+        groupResourceName: z.string().min(1).describe('Contact group resource name (e.g. "contactGroups/abc123")'),
         maxMembers: z.number().min(1).max(1000).default(100).optional()
           .describe('Max member resource names to return (default: 100)'),
       },

@@ -215,7 +215,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of 'nextPageToken' from the previous response or to the response from the getStartPageToken method."),
+      pageToken: z.string().min(1).describe("The token for continuing a previous list request on the next page. This should be set to the value of 'nextPageToken' from the previous response or to the response from the getStartPageToken method."),
       driveId: z.string().describe("The shared drive from which changes will be returned. If specified the change IDs will be reflective of the shared drive; use the combined drive ID and change ID as an identifier.").optional(),
       includeCorpusRemovals: coerceBoolean.describe("Whether changes should include the file resource if the file is still accessible by the user at the time of the request, even when a file was removed from the list of changes and there will be no furt").optional(),
       includeItemsFromAllDrives: coerceBoolean.describe("Whether both My Drive and shared drive items should be included in results.").optional(),
@@ -241,7 +241,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of 'nextPageToken' from the previous response or to the response from the getStartPageToken method."),
+      pageToken: z.string().min(1).describe("The token for continuing a previous list request on the next page. This should be set to the value of 'nextPageToken' from the previous response or to the response from the getStartPageToken method."),
       driveId: z.string().describe("The shared drive from which changes will be returned. If specified the change IDs will be reflective of the shared drive; use the combined drive ID and change ID as an identifier.").optional(),
       includeCorpusRemovals: coerceBoolean.describe("Whether changes should include the file resource if the file is still accessible by the user at the time of the request, even when a file was removed from the list of changes and there will be no furt").optional(),
       includeItemsFromAllDrives: coerceBoolean.describe("Whether both My Drive and shared drive items should be included in results.").optional(),
@@ -281,7 +281,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      requestId: z.string().describe("Required. An ID, such as a random UUID, which uniquely identifies this user's request for idempotent creation of a shared drive. A repeated request by the same user and with the same request ID will a"),
+      requestId: z.string().min(1).describe("Required. An ID, such as a random UUID, which uniquely identifies this user's request for idempotent creation of a shared drive. A repeated request by the same user and with the same request ID will a"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Drive JSON request body. Top-level fields: backgroundImageFile, backgroundImageLink, capabilities, colorRgb, createdTime, hidden, id, kind, name, orgUnitId, restrictions, themeId."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -504,7 +504,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      requestId: z.string().describe("Required. An ID, such as a random UUID, which uniquely identifies this user's request for idempotent creation of a Team Drive. A repeated request by the same user and with the same request ID will avo"),
+      requestId: z.string().min(1).describe("Required. An ID, such as a random UUID, which uniquely identifies this user's request for idempotent creation of a Team Drive. A repeated request by the same user and with the same request ID will avo"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("TeamDrive JSON request body. Top-level fields: backgroundImageFile, backgroundImageLink, capabilities, colorRgb, createdTime, id, kind, name, orgUnitId, restrictions, themeId."),
       fields: z.string().optional().describe('Response field mask.'),
     },

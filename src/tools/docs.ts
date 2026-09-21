@@ -213,7 +213,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Get document metadata (title, revision, named ranges). Optionally include tab content and choose a suggestionsViewMode.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         includeTabsContent: coerceBoolean.optional()
           .describe('Include full content for every tab (default: false — first tab only)'),
         suggestionsViewMode: z.enum([
@@ -254,7 +254,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Read document content as plain text with a heading index (returns up to maxChars characters per call). Pass heading or headingIndex to read one section, tabId to read a specific tab.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         heading: z.string().optional()
           .describe('Read only the section under this heading (case-insensitive; exact match first, then substring)'),
         headingIndex: z.number().int().min(0).optional()
@@ -364,7 +364,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Insert text into a document at a specific position or at the end',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         text: z.string().describe('Text to insert'),
         index: z.number().min(1).optional()
           .describe('Character index to insert at (1-based). Omit to append at the end'),
@@ -409,7 +409,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Find and replace all occurrences of text in a document',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         findText: z.string().describe('Text to search for'),
         replaceText: z.string().describe('Replacement text'),
         matchCase: coerceBoolean.default(true).optional()
@@ -450,7 +450,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Delete content in a character index range within a document',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         startIndex: z.number().min(1).describe('Start index (inclusive, 1-based)'),
         endIndex: z.number().min(2).describe('End index (exclusive)'),
       },
@@ -487,7 +487,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Update text formatting (bold, italic, underline, font, size) for a range',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         startIndex: z.number().min(1).describe('Start index (inclusive, 1-based)'),
         endIndex: z.number().min(2).describe('End index (exclusive)'),
         bold: coerceBoolean.optional().describe('Set bold'),
@@ -557,7 +557,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Insert a table into a document at a specific position',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         rows: z.number().min(1).describe('Number of rows'),
         columns: z.number().min(1).describe('Number of columns'),
         index: z.number().min(1).optional()
@@ -600,7 +600,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Tag a range of text with a name. Multiple ranges can share the same name. Used as a template anchor for docs_replace_named_range_content.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         name: z.string().describe('Name (1-256 chars). Need not be unique.'),
         startIndex: z.number().min(1).describe('Range start (inclusive)'),
         endIndex: z.number().min(2).describe('Range end (exclusive)'),
@@ -637,7 +637,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Delete a named range by its ID or by name. Removes every range matching the identifier.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         namedRangeId: z.string().optional().describe('Specific named range ID'),
         name: z.string().optional().describe('Name (deletes ALL named ranges with this name)'),
       },
@@ -672,7 +672,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Replace the content of every named range matching the identifier with the supplied text. Real mail-merge primitive — far more robust than replaceAllText for templated docs.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         namedRangeId: z.string().optional().describe('Specific named range ID'),
         namedRangeName: z.string().optional().describe('Name to match (replaces ALL ranges with this name)'),
         text: z.string().describe('Replacement text'),
@@ -710,7 +710,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Update paragraph styling (alignment, heading, indents, spacing) across a range. Only supplied fields are applied.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         startIndex: z.number().min(1),
         endIndex: z.number().min(2),
         namedStyleType: z.enum([
@@ -765,7 +765,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Update document-level styling (page size, margins, headers/footers behavior). Only supplied fields are applied.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         pageWidth: z.number().optional().describe('Page width in points (e.g. 595 = A4)'),
         pageHeight: z.number().optional().describe('Page height in points (e.g. 842 = A4)'),
         marginTop: z.number().optional().describe('Margin in points'),
@@ -816,7 +816,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Turn paragraphs in a range into a bulleted or numbered list',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         startIndex: z.number().min(1),
         endIndex: z.number().min(2),
         bulletPreset: z.enum([
@@ -868,7 +868,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Strip bullet/number formatting from paragraphs in a range',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         startIndex: z.number().min(1),
         endIndex: z.number().min(2),
       },
@@ -904,7 +904,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Insert a publicly-accessible image (PNG/JPEG/GIF, <50MB, <25MP, URL <2KB) inline at an index or at the document end',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         uri: z.string().url().describe('Public image URL'),
         index: z.number().min(1).optional().describe('Insert position; omit to append at the end'),
         width: z.number().optional().describe('Width in points (omit for natural size)'),
@@ -944,7 +944,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Insert a page break at a position or at the document end',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         index: z.number().min(1).optional().describe('Insert position; omit to append'),
       },
     },
@@ -974,7 +974,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Insert a section break at a position. CONTINUOUS keeps the same page; NEXT_PAGE starts a new page.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         index: z.number().min(1).optional(),
         sectionType: z.enum(['CONTINUOUS', 'NEXT_PAGE']).default('NEXT_PAGE').optional(),
       },
@@ -1007,7 +1007,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Create a header for the document or for a specific section. The new header is empty; insert text into it with docs_insert_text targeting its segmentId.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         sectionBreakIndex: z.number().min(1).optional().describe('Anchor to a specific section break; omit to apply to the document'),
       },
     },
@@ -1037,8 +1037,8 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Delete a header by its headerId',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
-        headerId: z.string().describe('Header ID (from docs_get or createHeader reply)'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
+        headerId: z.string().min(1).describe('Header ID (from docs_get or createHeader reply)'),
       },
     },
     async ({ account, documentId, headerId }) => {
@@ -1064,7 +1064,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Create a footer for the document or a specific section',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         sectionBreakIndex: z.number().min(1).optional(),
       },
     },
@@ -1094,8 +1094,8 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Delete a footer by its footerId',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
-        footerId: z.string().describe('Footer ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
+        footerId: z.string().min(1).describe('Footer ID'),
       },
     },
     async ({ account, documentId, footerId }) => {
@@ -1125,7 +1125,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Mutate a table by operation: insertRow, insertColumn, deleteRow, deleteColumn, mergeCells, unmergeCells. Locate the cell with tableStartIndex (the table\'s start index in the doc) plus rowIndex/columnIndex (0-based).',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         operation: z.enum(['insertRow', 'insertColumn', 'deleteRow', 'deleteColumn', 'mergeCells', 'unmergeCells']),
         tableStartIndex: z.number().min(1).describe('Start index of the table in the document'),
         rowIndex: z.number().min(0).describe('Target row (0-based)'),
@@ -1203,7 +1203,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Add a new tab to a document. Can be a top-level tab or nested as a child of an existing tab.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         title: z.string().describe('Tab title'),
         parentTabId: z.string().optional().describe('Parent tab ID (omit for top-level)'),
         index: z.number().min(0).optional().describe('Position among siblings'),
@@ -1236,8 +1236,8 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Delete a tab and all of its descendant tabs',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
-        tabId: z.string().describe('Tab ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
+        tabId: z.string().min(1).describe('Tab ID'),
       },
     },
     async ({ account, documentId, tabId }) => {
@@ -1263,8 +1263,8 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Rename a tab, change its position, or move it under a different parent',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
-        tabId: z.string().describe('Tab ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
+        tabId: z.string().min(1).describe('Tab ID'),
         title: z.string().optional(),
         index: z.number().min(0).optional(),
         parentTabId: z.string().optional(),
@@ -1312,7 +1312,7 @@ export function registerDocsTools(server: ToolRegistry): void {
       description: 'Generic documents.batchUpdate pass-through. Accepts the full Request union (40 types). See https://developers.google.com/workspace/docs/api/reference/rest/v1/documents/request',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        documentId: z.string().describe('Google Docs document ID'),
+        documentId: z.string().min(1).describe('Google Docs document ID'),
         requests: coerceJson(z.array(z.record(z.string(), z.any()))).describe('Array of Request objects, each with one request-type key'),
         writeControl: z.object({
           requiredRevisionId: z.string().optional(),

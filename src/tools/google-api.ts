@@ -159,7 +159,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       inputSchema: {
         account: accountEnum.describe('Google account alias (omit for the default account)'),
         api: z.string().describe(`API alias: ${apiList}`),
-        methodId: z.string().describe('Discovery method id, e.g. "drive.revisions.list"'),
+        methodId: z.string().min(1).describe('Discovery method id, e.g. "drive.revisions.list"'),
         pathParams: coerceJson(z.record(z.string(), z.union([z.string(), z.number()])).optional())
           .describe('Values for {placeholders} in the method path'),
         queryParams: coerceJson(

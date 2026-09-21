@@ -286,7 +286,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
     shape: {
       account: accountField(),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs, call the calendarList.list method."),
-      newDataOwner: z.string().describe("The email address of a user who will become the data owner of the calendar."),
+      newDataOwner: z.string().min(1).describe("The email address of a user who will become the data owner of the calendar."),
       useAdminAccess: coerceBoolean.describe("When true, the method runs using the user's Google Workspace administrator privileges. The calling user must be a Google Workspace administrator with the Manage Calendars privilege. This method curren"),
       fields: z.string().optional().describe('Response field mask.'),
     },
