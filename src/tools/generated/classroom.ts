@@ -646,7 +646,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "classroom_courses_course_work_student_submissions_reclaim",
-    cud: "create",
+    cud: "update",
     description: "Reclaims a student submission on behalf of the student that owns it. Reclaiming a student submission transfers ownership of attached Drive files to the student",
     method: { id: "classroom.courses.courseWork.studentSubmissions.reclaim", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:reclaim", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId","id"], scopes: S_classroom_v1[11] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -662,7 +662,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "classroom_courses_course_work_student_submissions_return",
-    cud: "create",
+    cud: "update",
     description: "Returns a student submission. Returning a student submission transfers ownership of attached Drive files to the student and may also update the submission state",
     method: { id: "classroom.courses.courseWork.studentSubmissions.return", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:return", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId","id"], scopes: S_classroom_v1[7] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -678,7 +678,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "classroom_courses_course_work_student_submissions_turn_in",
-    cud: "create",
+    cud: "update",
     description: "Turns in a student submission. Turning in a student submission transfers ownership of attached Drive files to the teacher and may also update the submission sta",
     method: { id: "classroom.courses.courseWork.studentSubmissions.turnIn", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:turnIn", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId","id"], scopes: S_classroom_v1[11] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -1454,7 +1454,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "classroom_invitations_accept",
-    cud: "create",
+    cud: "update",
     description: "Accepts an invitation, removing it and adding the invited user to the teachers or students (as appropriate) of the specified course. Only the invited user may a",
     method: { id: "classroom.invitations.accept", httpMethod: "POST", path: "v1/invitations/{id}:accept", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id"], scopes: S_classroom_v1[14] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],

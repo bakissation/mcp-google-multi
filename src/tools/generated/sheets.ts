@@ -97,7 +97,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "sheets_spreadsheets_values_batch_update_by_data_filter",
-    cud: "create",
+    cud: "update",
     description: "Sets values in one or more ranges of a spreadsheet. For more information, see [Read, write, and search metadata](https://developers.google.com/workspace/sheets/",
     method: { id: "sheets.spreadsheets.values.batchUpdateByDataFilter", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/values:batchUpdateByDataFilter", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"], scopes: S_sheets_v4[0] },
     params: [{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],

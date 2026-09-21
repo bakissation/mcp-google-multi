@@ -123,7 +123,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "chat_spaces_complete_import",
-    cud: "create",
+    cud: "update",
     description: "Completes the [import process](https://developers.google.com/workspace/chat/import-data) for the specified space and makes it visible to users. Requires [user a",
     method: { id: "chat.spaces.completeImport", httpMethod: "POST", path: "v1/{+name}:completeImport", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[4] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -496,7 +496,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "chat_users_availability_mark_as_active",
-    cud: "create",
+    cud: "update",
     description: "Marks user as `ACTIVE` in Google Chat. Sets the user's availability state to `ACTIVE`. The `ACTIVE` state lasts until the specified expiration, at which point t",
     method: { id: "chat.users.availability.markAsActive", httpMethod: "POST", path: "v1/{+name}:markAsActive", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[25] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -512,7 +512,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "chat_users_availability_mark_as_away",
-    cud: "create",
+    cud: "update",
     description: "Marks user as `AWAY` in Google Chat. Sets the user's state to away and is not affected by the user's activity. This method only updates the authenticated user's",
     method: { id: "chat.users.availability.markAsAway", httpMethod: "POST", path: "v1/{+name}:markAsAway", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[25] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -526,7 +526,7 @@ export function registerChatGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "chat_users_availability_mark_as_do_not_disturb",
-    cud: "create",
+    cud: "update",
     description: "Marks user as `DO_NOT_DISTURB` in Google Chat. Sets a user's availability state to `DO_NOT_DISTURB` until a specified expiration time. When in `DO_NOT_DISTURB`,",
     method: { id: "chat.users.availability.markAsDoNotDisturb", httpMethod: "POST", path: "v1/{+name}:markAsDoNotDisturb", baseUrl: "https://chat.googleapis.com/", requiredParams: ["name"], scopes: S_chat_v1[25] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],

@@ -230,7 +230,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "gmail_users_settings_cse_keypairs_disable",
-    cud: "create",
+    cud: "update",
     description: "Turns off a client-side encryption key pair. The authenticated user can no longer use the key pair to decrypt incoming CSE message texts or sign outgoing CSE ma",
     method: { id: "gmail.users.settings.cse.keypairs.disable", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:disable", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"], scopes: S_gmail_v1[5] },
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -245,7 +245,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "gmail_users_settings_cse_keypairs_enable",
-    cud: "create",
+    cud: "update",
     description: "Turns on a client-side encryption key pair that was turned off. The key pair becomes active again for any associated client-side encryption identities. For admi",
     method: { id: "gmail.users.settings.cse.keypairs.enable", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:enable", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"], scopes: S_gmail_v1[5] },
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -771,7 +771,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "gmail_users_stop",
-    cud: "create",
+    cud: "delete",
     description: "Turn off push notification delivery for the given user mailbox. For more information, see [Configure push notifications in Gmail API](https://developers.google.",
     method: { id: "gmail.users.stop", httpMethod: "POST", path: "gmail/v1/users/{userId}/stop", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[10] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],

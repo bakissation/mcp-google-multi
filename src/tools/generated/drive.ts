@@ -37,7 +37,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "drive_approvals_approve",
-    cud: "create",
+    cud: "update",
     description: "Approves an approval. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). This is used to update t",
     method: { id: "drive.approvals.approve", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:approve", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"], scopes: S_drive_v3[1] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -53,7 +53,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "drive_approvals_cancel",
-    cud: "create",
+    cud: "delete",
     description: "Cancels an approval. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). Updates the approval Stat",
     method: { id: "drive.approvals.cancel", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:cancel", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"], scopes: S_drive_v3[1] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -85,7 +85,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "drive_approvals_decline",
-    cud: "create",
+    cud: "update",
     description: "Declines an approval. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). This is used to update t",
     method: { id: "drive.approvals.decline", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:decline", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"], scopes: S_drive_v3[1] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -130,7 +130,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "drive_approvals_reassign",
-    cud: "create",
+    cud: "update",
     description: "Reassigns the reviewers on an approval. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). Adds o",
     method: { id: "drive.approvals.reassign", httpMethod: "POST", path: "files/{fileId}/approvals/{approvalId}:reassign", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId","approvalId"], scopes: S_drive_v3[1] },
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -261,7 +261,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "drive_channels_stop",
-    cud: "create",
+    cud: "delete",
     description: "Stops watching resources through this channel. For more information, see [Notifications for resource changes](https://developers.google.com/workspace/drive/api/",
     method: { id: "drive.channels.stop", httpMethod: "POST", path: "channels/stop", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: [], scopes: S_drive_v3[5] },
     params: [{"field":"fields","api":"fields","location":"query"}],
@@ -303,7 +303,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "drive_drives_hide",
-    cud: "create",
+    cud: "update",
     description: "Hides a shared drive from the default view. For more information, see [Manage shared drives](https://developers.google.com/workspace/drive/api/guides/manage-sha",
     method: { id: "drive.drives.hide", httpMethod: "POST", path: "drives/{driveId}/hide", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["driveId"], scopes: S_drive_v3[6] },
     params: [{"field":"driveId","api":"driveId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -316,7 +316,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "drive_drives_unhide",
-    cud: "create",
+    cud: "update",
     description: "Restores a shared drive to the default view. For more information, see [Manage shared drives](https://developers.google.com/workspace/drive/api/guides/manage-sh",
     method: { id: "drive.drives.unhide", httpMethod: "POST", path: "drives/{driveId}/unhide", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["driveId"], scopes: S_drive_v3[6] },
     params: [{"field":"driveId","api":"driveId","location":"path"},{"field":"fields","api":"fields","location":"query"}],

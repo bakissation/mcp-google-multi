@@ -26,7 +26,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "vault_matters_close",
-    cud: "create",
+    cud: "update",
     description: "Closes the specified matter. Returns the matter with updated state.",
     method: { id: "vault.matters.close", httpMethod: "POST", path: "v1/matters/{matterId}:close", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -338,7 +338,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "vault_matters_reopen",
-    cud: "create",
+    cud: "update",
     description: "Reopens the specified matter. Returns the matter with updated state.",
     method: { id: "vault.matters.reopen", httpMethod: "POST", path: "v1/matters/{matterId}:reopen", baseUrl: "https://vault.googleapis.com/", requiredParams: ["matterId"], scopes: S_vault_v1[0] },
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -437,7 +437,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "vault_operations_cancel",
-    cud: "create",
+    cud: "delete",
     description: "Starts asynchronous cancellation on a long-running operation. The server makes a best effort to cancel the operation, but success is not guaranteed. If the serv",
     method: { id: "vault.operations.cancel", httpMethod: "POST", path: "v1/{+name}:cancel", baseUrl: "https://vault.googleapis.com/", requiredParams: ["name"], scopes: S_vault_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],

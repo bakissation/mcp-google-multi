@@ -39,7 +39,7 @@ export function registerFormsGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "forms_forms_watches_renew",
-    cud: "create",
+    cud: "update",
     description: "Renew an existing watch for seven days. The state of the watch after renewal is `ACTIVE`, and the `expire_time` is seven days from the renewal. Renewing a watch",
     method: { id: "forms.forms.watches.renew", httpMethod: "POST", path: "v1/forms/{formId}/watches/{watchId}:renew", baseUrl: "https://forms.googleapis.com/", requiredParams: ["formId","watchId"], scopes: S_forms_v1[0] },
     params: [{"field":"formId","api":"formId","location":"path"},{"field":"watchId","api":"watchId","location":"path"},{"field":"fields","api":"fields","location":"query"}],

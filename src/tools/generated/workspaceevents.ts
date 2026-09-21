@@ -112,7 +112,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
   });
   registerGeneratedTool(registry, {
     name: "workspaceevents_subscriptions_reactivate",
-    cud: "create",
+    cud: "update",
     description: "Reactivates a suspended Google Workspace subscription. This method resets your subscription's `State` field to `ACTIVE`. Before you use this method, you must fi",
     method: { id: "workspaceevents.subscriptions.reactivate", httpMethod: "POST", path: "v1/{+name}:reactivate", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"], scopes: S_workspaceevents_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -126,7 +126,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
   });
   registerGeneratedTool(registry, {
     name: "workspaceevents_tasks_cancel",
-    cud: "create",
+    cud: "delete",
     description: "Cancel a task from the agent. If supported one should expect no more task updates for the task.",
     method: { id: "workspaceevents.tasks.cancel", httpMethod: "POST", path: "v1/{+name}:cancel", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],

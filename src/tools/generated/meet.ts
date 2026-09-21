@@ -152,7 +152,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "meet_spaces_end_active_conference",
-    cud: "create",
+    cud: "delete",
     description: "Ends an active conference (if there's one). For an example, see [End active conference](https://developers.google.com/workspace/meet/api/guides/meeting-spaces#e",
     method: { id: "meet.spaces.endActiveConference", httpMethod: "POST", path: "v2/{+name}:endActiveConference", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],

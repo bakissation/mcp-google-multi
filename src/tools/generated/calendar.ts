@@ -307,7 +307,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "calendar_channels_stop",
-    cud: "create",
+    cud: "delete",
     description: "Stop watching resources through this channel",
     method: { id: "calendar.channels.stop", httpMethod: "POST", path: "channels/stop", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[10] },
     params: [{"field":"fields","api":"fields","location":"query"}],

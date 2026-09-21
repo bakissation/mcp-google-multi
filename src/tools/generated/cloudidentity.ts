@@ -19,7 +19,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
   ];
   registerGeneratedTool(registry, {
     name: "cloudidentity_customers_userinvitations_cancel",
-    cud: "create",
+    cud: "delete",
     description: "Cancels a UserInvitation that was already sent.",
     method: { id: "cloudidentity.customers.userinvitations.cancel", httpMethod: "POST", path: "v1/{+name}:cancel", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -90,7 +90,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
   });
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_cancel_wipe",
-    cud: "create",
+    cud: "update",
     description: "Cancels an unfinished device wipe. This operation can be used to cancel device wipe in the gap between the wipe operation returning success and the device being",
     method: { id: "cloudidentity.devices.cancelWipe", httpMethod: "POST", path: "v1/{+name}:cancelWipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -133,7 +133,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
   });
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_approve",
-    cud: "create",
+    cud: "update",
     description: "Approves device to access user data.",
     method: { id: "cloudidentity.devices.deviceUsers.approve", httpMethod: "POST", path: "v1/{+name}:approve", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -163,7 +163,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
   });
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_cancel_wipe",
-    cud: "create",
+    cud: "update",
     description: "Cancels an unfinished user account wipe. This operation can be used to cancel device wipe in the gap between the wipe operation returning success and the device",
     method: { id: "cloudidentity.devices.deviceUsers.cancelWipe", httpMethod: "POST", path: "v1/{+name}:cancelWipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -291,7 +291,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
   });
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_wipe",
-    cud: "create",
+    cud: "delete",
     description: "Wipes the user's account on a device. Other data on the device that is not associated with the user's work account is not affected. For example, if a Gmail app",
     method: { id: "cloudidentity.devices.deviceUsers.wipe", httpMethod: "POST", path: "v1/{+name}:wipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -338,7 +338,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
   });
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_wipe",
-    cud: "create",
+    cud: "delete",
     description: "Wipes all data on the specified device.",
     method: { id: "cloudidentity.devices.wipe", httpMethod: "POST", path: "v1/{+name}:wipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],

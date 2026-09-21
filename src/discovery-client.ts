@@ -249,11 +249,22 @@ export function clearDiscoveryMemoryCache(): void {
 
 // GA4-style report execution (runReport, batchRunPivotReports, runAccessReport)
 // and check* predicates are POSTs purely for the request-body size — reads.
-const POST_READ_VERB = /^(get|list|search|query|lookup|count|batchGet|generateIds|export|download|inspect|check|(batch)?run\w*report)/i;
-const POST_UPDATE_VERB = /^(untrash|undelete|restore|modify|move|set|sort|merge|unmerge|replace|resize|publish|resolve|update|patch|write|format)/i;
+const POST_READ_VERB = /^(get|list|search|query|lookup|count|batchGet|generateIds|export|download|inspect|check|suggest|(batch)?run\w*report)/i;
+// `cancelWipe` must be matched here, BEFORE `cancel` reaches the delete list:
+// it calls off a pending wipe, which is the opposite of one. Update is tested
+// before delete for exactly that reason.
+// State transitions on something that already exists: reversible, and none of
+// them creates anything, so `create` was both wrong and the most permissive
+// class available. `(batch)?` mirrors the delete list, without which every
+// `batchUpdate*` POST fell through to `create`.
+const POST_UPDATE_VERB = /^(cancelWipe|(batch)?(untrash|undelete|restore|modify|move|set|sort|merge|unmerge|replace|resize|publish|resolve|update|patch|write|format|change|close|reopen|enable|disable|hide|unhide|accept|approve|decline|reassign|reactivate|renew|mark|turn|suspend|activate|make|return|reclaim|complete))/i;
 // archive sits with the deletes: in GA4 archiving a custom dimension/metric is
 // permanent, so the most restrictive write class is the safe classification.
-const POST_DELETE_VERB = /^(batch)?(delete|remove|trash|clear|empty|obliterate|purge|revoke|wipeout|archive)/i;
+// So do the teardown verbs: `stop` and `cancel` tear down a push channel or a
+// long-running operation, `wipe`/`invalidate`/`signOut` destroy device data,
+// codes and sessions, `reset` discards a configuration, and `end` terminates a
+// live conference. Each removes something that existed.
+const POST_DELETE_VERB = /^(batch)?(delete|remove|trash|clear|empty|obliterate|purge|revoke|wipeout|archive|wipe|invalidate|signOut|stop|cancel|unregister|unreserve|reset|end)/i;
 
 export function cudFromMethod(method: Pick<DiscoveryMethod, 'httpMethod' | 'id'>): 'read' | 'create' | 'update' | 'delete' {
   switch (method.httpMethod) {

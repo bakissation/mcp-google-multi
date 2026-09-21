@@ -117,7 +117,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
   ];
   registerGeneratedTool(registry, {
     name: "admin_channels_stop",
-    cud: "create",
+    cud: "delete",
     description: "Stops watching resources through this channel.",
     method: { id: "admin.channels.stop", httpMethod: "POST", path: "admin/directory_v1/channels/stop", baseUrl: "https://admin.googleapis.com/", requiredParams: [], scopes: S_admin_directory_v1[0] },
     params: [{"field":"fields","api":"fields","location":"query"}],
@@ -130,7 +130,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "admin_customer_devices_chromeos_batch_change_status",
-    cud: "create",
+    cud: "update",
     description: "Changes the status of a batch of ChromeOS devices. For more information about changing a ChromeOS device state [Repair, repurpose, or retire ChromeOS devices](h",
     method: { id: "admin.customer.devices.chromeos.batchChangeStatus", httpMethod: "POST", path: "admin/directory/v1/customer/{customerId}/devices/chromeos:batchChangeStatus", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customerId"], scopes: S_admin_directory_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -471,7 +471,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "admin_chromeosdevices_action",
-    cud: "create",
+    cud: "delete",
     description: "Use [BatchChangeChromeOsDeviceStatus](https://developers.google.com/workspace/admin/directory/reference/rest/v1/customer.devices.chromeos/batchChangeStatus) ins",
     method: { id: "directory.chromeosdevices.action", httpMethod: "POST", path: "admin/directory/v1/customer/{customerId}/devices/chromeos/{resourceId}/action", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customerId","resourceId"], scopes: S_admin_directory_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"resourceId","api":"resourceId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -953,7 +953,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "admin_mobiledevices_action",
-    cud: "create",
+    cud: "delete",
     description: "Takes an action that affects a mobile device. For example, remotely wiping a device.",
     method: { id: "directory.mobiledevices.action", httpMethod: "POST", path: "admin/directory/v1/customer/{customerId}/devices/mobile/{resourceId}/action", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customerId","resourceId"], scopes: S_admin_directory_v1[14] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"resourceId","api":"resourceId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -1717,7 +1717,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "admin_two_step_verification_turn_off",
-    cud: "create",
+    cud: "update",
     description: "Turns off 2-Step Verification for user.",
     method: { id: "directory.twoStepVerification.turnOff", httpMethod: "POST", path: "admin/directory/v1/users/{userKey}/twoStepVerification/turnOff", baseUrl: "https://admin.googleapis.com/", requiredParams: ["userKey"], scopes: S_admin_directory_v1[5] },
     params: [{"field":"userKey","api":"userKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -1834,7 +1834,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "admin_users_make_admin",
-    cud: "create",
+    cud: "update",
     description: "Makes a user a super administrator.",
     method: { id: "directory.users.makeAdmin", httpMethod: "POST", path: "admin/directory/v1/users/{userKey}/makeAdmin", baseUrl: "https://admin.googleapis.com/", requiredParams: ["userKey"], scopes: S_admin_directory_v1[27] },
     params: [{"field":"userKey","api":"userKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -1919,7 +1919,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "admin_users_sign_out",
-    cud: "create",
+    cud: "delete",
     description: "Signs a user out of all web and device sessions and reset their sign-in cookies. User will have to sign in by authenticating again.",
     method: { id: "directory.users.signOut", httpMethod: "POST", path: "admin/directory/v1/users/{userKey}/signOut", baseUrl: "https://admin.googleapis.com/", requiredParams: ["userKey"], scopes: S_admin_directory_v1[5] },
     params: [{"field":"userKey","api":"userKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -1999,7 +1999,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "admin_verification_codes_invalidate",
-    cud: "create",
+    cud: "delete",
     description: "Invalidates the current backup verification codes for the user.",
     method: { id: "directory.verificationCodes.invalidate", httpMethod: "POST", path: "admin/directory/v1/users/{userKey}/verificationCodes/invalidate", baseUrl: "https://admin.googleapis.com/", requiredParams: ["userKey"], scopes: S_admin_directory_v1[5] },
     params: [{"field":"userKey","api":"userKey","location":"path"},{"field":"fields","api":"fields","location":"query"}],

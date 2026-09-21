@@ -94,6 +94,45 @@ describe('cudFromMethod', () => {
     ['POST', 'analyticsadmin.properties.customDimensions.archive', 'delete'],
     ['POST', 'analyticsadmin.accounts.provisionAccountTicket', 'create'],
     ['POST', 'script.scripts.run', 'create'],
+
+    // Teardown: each one removes something that already existed, so `create`
+    // was both wrong and the most permissive class available.
+    ['POST', 'meet.spaces.endActiveConference', 'delete'],
+    ['POST', 'cloudidentity.devices.wipe', 'delete'],
+    ['POST', 'directory.users.signOut', 'delete'],
+    ['POST', 'directory.verificationCodes.invalidate', 'delete'],
+    ['POST', 'admin.channels.stop', 'delete'],
+    ['POST', 'vault.operations.cancel', 'delete'],
+    ['POST', 'cloudsearch.settings.searchapplications.reset', 'delete'],
+    ['POST', 'reseller.resellernotify.unregister', 'delete'],
+    ['POST', 'cloudsearch.indexing.datasources.items.unreserve', 'delete'],
+
+    // `cancelWipe` calls OFF a pending wipe. It must beat the `cancel` rule,
+    // which is why the update list is tested before the delete list.
+    ['POST', 'cloudidentity.devices.deviceUsers.cancelWipe', 'update'],
+
+    // State transitions on something that exists: reversible, create nothing.
+    ['POST', 'vault.matters.close', 'update'],
+    ['POST', 'vault.matters.reopen', 'update'],
+    ['POST', 'drivelabels.labels.disable', 'update'],
+    ['POST', 'drivelabels.labels.enable', 'update'],
+    ['POST', 'drive.drives.hide', 'update'],
+    ['POST', 'directory.users.makeAdmin', 'update'],
+    ['POST', 'directory.twoStepVerification.turnOff', 'update'],
+    ['POST', 'reseller.subscriptions.suspend', 'update'],
+    ['POST', 'reseller.subscriptions.activate', 'update'],
+    ['POST', 'reseller.subscriptions.changeSeats', 'update'],
+    ['POST', 'classroom.courses.courseWork.studentSubmissions.turnIn', 'update'],
+    ['POST', 'classroom.invitations.accept', 'update'],
+    ['POST', 'chat.spaces.completeImport', 'update'],
+
+    // Without `(batch)?` on the update list every batchUpdate* POST fell
+    // through to `create`, i.e. overwriting data was classified as additive.
+    ['POST', 'people.people.batchUpdateContacts', 'update'],
+    ['POST', 'sheets.spreadsheets.values.batchUpdateByDataFilter', 'update'],
+
+    // A POST purely because the request carries a body.
+    ['POST', 'cloudsearch.query.suggest', 'read'],
   ])('%s %s → %s', (httpMethod, id, expected) => {
     expect(cudFromMethod({ httpMethod, id })).toBe(expected);
   });

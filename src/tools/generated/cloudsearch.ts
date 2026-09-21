@@ -231,7 +231,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
   });
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_items_unreserve",
-    cud: "create",
+    cud: "delete",
     description: "Unreserves all items from a queue, making them all eligible to be polled. This method is useful for resetting the indexing queue after a connector has been rest",
     method: { id: "cloudsearch.indexing.datasources.items.unreserve", httpMethod: "POST", path: "v1/indexing/{+name}/items:unreserve", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -376,7 +376,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
   });
   registerGeneratedTool(registry, {
     name: "cloudsearch_query_suggest",
-    cud: "create",
+    cud: "read",
     description: "Provides suggestions for autocompleting the query. **Note:** This API requires a standard end user account to execute. A service account can't perform Query API",
     method: { id: "cloudsearch.query.suggest", httpMethod: "POST", path: "v1/query/suggest", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: [], scopes: S_cloudsearch_v1[4] },
     params: [{"field":"fields","api":"fields","location":"query"}],
@@ -558,7 +558,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
   });
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_searchapplications_reset",
-    cud: "create",
+    cud: "delete",
     description: "Resets a search application to default settings. This will return an empty response. **Note:** This API requires an admin account to execute.",
     method: { id: "cloudsearch.settings.searchapplications.reset", httpMethod: "POST", path: "v1/settings/{+name}:reset", baseUrl: "https://cloudsearch.googleapis.com/", requiredParams: ["name"], scopes: S_cloudsearch_v1[5] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],

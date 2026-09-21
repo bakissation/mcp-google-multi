@@ -151,7 +151,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "contacts_people_batch_update_contacts",
-    cud: "create",
+    cud: "update",
     description: "Update a batch of contacts and return a map of resource names to PersonResponses for the updated contacts. Mutate requests for the same user should be sent sequ",
     method: { id: "people.people.batchUpdateContacts", httpMethod: "POST", path: "v1/people:batchUpdateContacts", baseUrl: "https://people.googleapis.com/", requiredParams: [], scopes: S_people_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],

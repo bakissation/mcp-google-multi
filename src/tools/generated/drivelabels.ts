@@ -56,7 +56,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
   });
   registerGeneratedTool(registry, {
     name: "drivelabels_labels_disable",
-    cud: "create",
+    cud: "update",
     description: "Disable a published label. For more information, see [Disable, enable, and delete a label](https://developers.google.com/workspace/drive/labels/guides/disable-d",
     method: { id: "drivelabels.labels.disable", httpMethod: "POST", path: "v2/{+name}:disable", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -70,7 +70,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
   });
   registerGeneratedTool(registry, {
     name: "drivelabels_labels_enable",
-    cud: "create",
+    cud: "update",
     description: "Enable a disabled label and restore it to its published state. For more information, see [Disable, enable, and delete a label](https://developers.google.com/wor",
     method: { id: "drivelabels.labels.enable", httpMethod: "POST", path: "v2/{+name}:enable", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["name"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -149,7 +149,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
   });
   registerGeneratedTool(registry, {
     name: "drivelabels_labels_permissions_batch_update",
-    cud: "create",
+    cud: "update",
     description: "Updates label permissions. If a permission for the indicated principal doesn't exist, a label permission is created, otherwise the existing permission is update",
     method: { id: "drivelabels.labels.permissions.batchUpdate", httpMethod: "POST", path: "v2/{+parent}/permissions:batchUpdate", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -257,7 +257,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry): void 
   });
   registerGeneratedTool(registry, {
     name: "drivelabels_labels_revisions_permissions_batch_update",
-    cud: "create",
+    cud: "update",
     description: "Updates label permissions. If a permission for the indicated principal doesn't exist, a label permission is created, otherwise the existing permission is update",
     method: { id: "drivelabels.labels.revisions.permissions.batchUpdate", httpMethod: "POST", path: "v2/{+parent}/permissions:batchUpdate", baseUrl: "https://drivelabels.googleapis.com/", requiredParams: ["parent"], scopes: S_drivelabels_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
