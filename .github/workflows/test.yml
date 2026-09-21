@@ -1,13 +1,10 @@
 name: ci
 
-# v6 + v6-** are the long-lived integration branch and its stacked slices
-# (a git ref cannot nest under an existing branch, so slices use v6-NN-name):
-# they get ci but stay OUT of release.yml, so pushes there publish nothing.
 on:
   push:
-    branches: [main, staging, dev, v6, 'v6-**']
+    branches: [main, staging, dev]
   pull_request:
-    branches: [main, staging, dev, v6, 'v6-**']
+    branches: [main, staging, dev]
 
 # Least privilege: CI only checks out code + runs npm. (CodeQL: actions/missing-workflow-permissions)
 permissions:
