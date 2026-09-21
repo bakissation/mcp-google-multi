@@ -91,6 +91,12 @@ const SERVICE_OVERRIDES: Record<string, string> = {
 // read tools that write local files — same savePath fanned across accounts would clobber
 const FANOUT_EXCLUDE = new Set(['gmail_download_attachment', 'drive_download', 'drive_export']);
 
+/** Account-management tools: the `account` they take is the SUBJECT of the
+ * operation, not the identity it runs as, so injecting the configured default
+ * would silently retarget them. `account_add` would adopt the default as the
+ * new alias, and `account_reauth` would re-authenticate the wrong account. */
+const DEFAULT_ACCOUNT_EXCLUDE = new Set(['account_add', 'account_reauth']);
+
 /** Unwrap optional/default/nullable to the declared scalar kind (zod 4 defs). */
 function scalarKindOf(field: unknown): ArgKind {
   type Def = { type?: string; innerType?: unknown };
@@ -182,7 +188,7 @@ export class ToolRegistry {
       // never fan out meta tools: google_api_call infers cud=read but executes writes
       let inputShape = config.inputSchema ?? {};
       let baseHandler = handler;
-      const hasAccountField = 'account' in inputShape;
+      const hasAccountField = 'account' in inputShape && !DEFAULT_ACCOUNT_EXCLUDE.has(name);
       if (cud === 'read' && !this.registeringMeta && !FANOUT_EXCLUDE.has(name) && isAccountEnum(inputShape.account)) {
         const description = (inputShape.account as z.ZodType).description ?? 'Google account alias';
         inputShape = { ...inputShape, account: fanoutAccountField(description) };

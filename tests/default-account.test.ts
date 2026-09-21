@@ -103,6 +103,25 @@ describe('withDefaultAccount injection matrix (single dispatch site)', () => {
     expect((res as { isError: boolean }).isError).toBe(true);
   });
 
+  // The wizard tools take the account as the SUBJECT of the operation, so an
+  // injected default would adopt itself as the new alias (account_add) or
+  // re-authenticate the wrong account (account_reauth).
+  it.each(['account_add', 'account_reauth'])('%s is excluded from injection', async (name) => {
+    process.env.GOOGLE_DEFAULT_ACCOUNT = 'test';
+    invalidateAccountSet();
+    const seen: unknown[] = [];
+    let registered: (...a: unknown[]) => unknown = () => {};
+    const server = { registerTool: (_n: string, _c: never, h: never) => { registered = h as never; return 'ok'; }, sendToolListChanged: vi.fn(), server: { setRequestHandler: () => {} } };
+    const reg = new ToolRegistry(server as never, POLICY, 'lazy');
+    reg.registerMeta(
+      name,
+      { description: 'x', inputSchema: { alias: z.string().optional(), account: z.string().optional() } },
+      async (a: Record<string, unknown>) => { seen.push(a.account); return { content: [{ type: 'text' as const, text: '{}' }] }; },
+    );
+    await registered({});
+    expect(seen).toEqual([undefined]);
+  });
+
   it('tools without an account field are untouched', async () => {
     delete process.env.GOOGLE_DEFAULT_ACCOUNT;
     invalidateAccountSet();

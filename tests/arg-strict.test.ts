@@ -14,17 +14,20 @@ const DRIVE_MOVE = ['account', 'fileId', 'newParentFolderId'];
 const DRIVE_UPLOAD = ['account', 'localPath', 'filename', 'mimeType', 'convertTo', 'parentFolderId'];
 
 describe('unknownArgMode', () => {
-  it('defaults to warn (the staged rollout: observe before rejecting)', () => {
-    expect(unknownArgMode({})).toBe('warn');
-    expect(unknownArgMode({ GOOGLE_ARG_UNKNOWN: '' })).toBe('warn');
+  it('defaults to reject: a silent drop reads to the client as success', () => {
+    expect(unknownArgMode({})).toBe('reject');
+    expect(unknownArgMode({ GOOGLE_ARG_UNKNOWN: '' })).toBe('reject');
   });
   it('accepts the three modes, case-insensitively and trimmed', () => {
     expect(unknownArgMode({ GOOGLE_ARG_UNKNOWN: ' Reject ' })).toBe('reject');
     expect(unknownArgMode({ GOOGLE_ARG_UNKNOWN: 'OFF' })).toBe('off');
     expect(unknownArgMode({ GOOGLE_ARG_UNKNOWN: 'warn' })).toBe('warn');
   });
-  it('fails OPEN to warn on nonsense, since the safe state changes no behavior', () => {
+  // Deliberately NOT the default: a misspelled setting is not a request for
+  // the strict behavior, and a config typo should not start failing calls.
+  it('falls back to warn on a nonsense value, not to the default', () => {
     expect(unknownArgMode({ GOOGLE_ARG_UNKNOWN: 'maybe' })).toBe('warn');
+    expect(unknownArgMode({ GOOGLE_ARG_UNKNOWN: 'rejcet' })).toBe('warn');
   });
 });
 

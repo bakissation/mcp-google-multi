@@ -38,8 +38,9 @@ Existing encrypted tokens keep decrypting — upgrading alone never forces a re-
 | 12 | Auth (opt-in) | HTTP `/mcp` + OAuth authorization server | opt-in only | — |
 | 13 | Auth | OAuth redirect URI now configurable | none (default preserved) | — |
 | 14 | Security | CRLF header-injection closed in email compose | none (input hardening) | — |
+| 15 | Behavior | an undeclared tool argument is now refused, not dropped | none for a correct caller; see [§4.3](#43-undeclared-arguments-are-refused-not-dropped) | `unknown_argument` |
 
-Rows 1, 3–6, 10–11 need action; rows 7–9, 12–14 are safe defaults, opt-in, or transparent fixes.
+Rows 1, 3–6, 10–11 need action; rows 7–9, 12–15 are safe defaults, opt-in, or transparent fixes.
 
 ---
 
@@ -170,6 +171,33 @@ New over stdio: agent-callable **expand** (reveal all curated at once) and **col
 ### 4.2 Default account
 
 `account` used to be required on every call. It becomes **optional** when `GOOGLE_DEFAULT_ACCOUNT` (or `config.defaultAccount`) is set — the default is injected at the single dispatch point when you omit it. `*`, CSV, and explicit aliases behave exactly as before, and a bare default is never treated as `*`. This is a relaxation, so nothing breaks; set it to drop the parameter from most calls.
+
+### 4.3 Undeclared arguments are refused, not dropped
+
+`GOOGLE_ARG_UNKNOWN` now defaults to **`reject`** (it was `warn`).
+
+zod strips a key the tool does not declare before the handler runs, so in 5.x a misremembered parameter name produced a **successful** call that did something else. `drive_list` accepts eight plausible spellings of the folder argument and ignored every one of them, returning the My Drive root, byte-identical to calling it with no folder argument at all. The caller could not tell the difference.
+
+An undeclared argument now fails the call with a typed envelope that names the likely parameter:
+
+```json
+{"error":"unknown_argument",
+ "message":"drive_create_folder does not accept \"parentId\". Nothing was sent to Google.",
+ "hint":"Did you mean \"parentFolderId\"? This tool accepts: account, name, parentFolderId.",
+ "retriable":false}
+```
+
+**Who this breaks:** a client that appends the same non-namespaced key to every tool call. That is the one realistic break class, and it is a client or proxy behavior, not a model one.
+
+Nothing else changes. These are never screened, in any mode:
+
+- keys starting with `_`, and keys containing `/` (MCP and vendor metadata; the spec's own home for client metadata is `params._meta`, which sits outside `arguments` and is untouched)
+- the client artifacts `random_string`, `toolCallId`, `tool_call_id`, `tool_call_description`
+- tools that declare no arguments at all
+- a key whose declared twin the same call also sent, since that call already behaves correctly
+- a snake_case twin of a declared key, which is renamed before screening rather than refused
+
+**To keep the old behavior:** `GOOGLE_ARG_UNKNOWN=warn` logs the drop to stderr and dispatches as 5.x did. `GOOGLE_ARG_UNKNOWN=off` restores the silent drop with no log. A misspelled value falls back to `warn`, not to the default.
 
 ---
 

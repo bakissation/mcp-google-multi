@@ -15,20 +15,27 @@ import { editDistance } from './scope-catalog.js';
 export type UnknownArgMode = 'reject' | 'warn' | 'off';
 
 /**
- * `GOOGLE_ARG_UNKNOWN`: reject | warn | off. Fail-open to `warn` on a bad
- * value, because the safe state here is the one that changes no behavior.
+ * `GOOGLE_ARG_UNKNOWN`: reject | warn | off. A typo in the VALUE still falls
+ * back to `warn`, not to the default: an operator who misspells the setting
+ * has said nothing about which behavior they want, and guessing the strict
+ * one would turn a config typo into failing tool calls.
  */
 export function unknownArgMode(env: NodeJS.ProcessEnv = process.env): UnknownArgMode {
   const raw = (env.GOOGLE_ARG_UNKNOWN ?? '').trim().toLowerCase();
   if (raw === '') return DEFAULT_MODE;
   if (raw === 'reject' || raw === 'warn' || raw === 'off') return raw;
-  process.stderr.write(`GOOGLE_ARG_UNKNOWN="${raw}" is not valid (reject | warn | off); using ${DEFAULT_MODE}\n`);
-  return DEFAULT_MODE;
+  process.stderr.write(`GOOGLE_ARG_UNKNOWN="${raw}" is not valid (reject | warn | off); using warn\n`);
+  return 'warn';
 }
 
-// Staged rollout: `warn` ships first so the change is pure observability, and
-// the flip to `reject` is its own reviewable change.
-const DEFAULT_MODE: UnknownArgMode = 'warn';
+// The staged rollout is over: `warn` shipped first as pure observability, and
+// this is the flip it was staging for. An undeclared argument is dropped by
+// zod before the handler runs, so `warn` means the CLIENT sees a confident
+// success for a call the server did not perform: drive_list with a misspelled
+// folder key returned the My Drive root, byte-identical to no argument at all.
+// A wrong answer that reads as right is the failure mode agents recover from
+// worst, so the default refuses the call and says what it probably meant.
+const DEFAULT_MODE: UnknownArgMode = 'reject';
 
 /** Tools that legitimately accept open-ended top-level keys. Empty at 6.0.0:
  * the escape hatch is NOT one, because its open-endedness lives in the VALUES
