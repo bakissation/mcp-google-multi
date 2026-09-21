@@ -113,6 +113,35 @@ describe('expandPath', () => {
   it('throws on missing params', () => {
     expect(() => expandPath('users/{userId}', {})).toThrow(/userId/);
   });
+
+  // An empty id collapses its segment and Google routes the trailing-slash URL
+  // to the collection, so a `get` silently answers with a LIST.
+  it.each(['', '   '])('throws on a blank path param (%j)', (value) => {
+    expect(() => expandPath('v3/sites/{siteUrl}', { siteUrl: value })).toThrow(/"siteUrl" is empty/);
+  });
+
+  it('throws on a blank segment inside a {+param}', () => {
+    expect(() => expandPath('v1/{+name}/messages', { name: 'spaces//AAA' })).toThrow(/"name" is empty/);
+  });
+
+  // `..` survives encodeURIComponent, so without this guard one argument
+  // retargets the call at a different endpoint on the same host.
+  it.each(['.', '..'])('throws on a %j path param', (value) => {
+    expect(() => expandPath('calendars/primary/events/{eventId}', { eventId: value })).toThrow(
+      /path segment/,
+    );
+  });
+
+  it('throws on a dot segment inside a {+param}', () => {
+    expect(() => expandPath('v1/{+resourceName}', { resourceName: '../v1/contactGroups' })).toThrow(
+      /"\.\." path segment/,
+    );
+  });
+
+  it('still accepts dots inside a segment', () => {
+    expect(expandPath('v1/{+name}/x', { name: 'spaces/a.b.c' })).toBe('v1/spaces/a.b.c/x');
+    expect(expandPath('files/{fileId}', { fileId: 'my.file.txt' })).toBe('files/my.file.txt');
+  });
 });
 
 describe('searchMethods', () => {

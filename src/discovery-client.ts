@@ -283,7 +283,27 @@ export function expandPath(template: string, pathParams: Record<string, string>)
     if (value === undefined) {
       throw new Error(`Missing required path parameter "${name}"`);
     }
-    return plus ? String(value).split('/').map(encodeURIComponent).join('/') : encodeURIComponent(String(value));
+    // A blank segment collapses the path and Google routes the resulting
+    // trailing-slash URL to the COLLECTION: `sites.get` with siteUrl:"" came
+    // back as the whole site LIST, reported as success. Dot segments resolve
+    // at URL-parse time, so `../v1/contactGroups` retargets the call at a
+    // different endpoint and returns ITS response as success. Both are
+    // silent-wrong, so refuse locally rather than send a different request.
+    // `{+param}` keeps its slashes, so every segment has to be checked.
+    const segments = plus ? String(value).split('/') : [String(value)];
+    for (const segment of segments) {
+      if (segment.trim() === '') {
+        throw new Error(
+          `Path parameter "${name}" is empty. An empty value addresses the collection, not one resource, so nothing was sent to Google.`,
+        );
+      }
+      if (segment === '.' || segment === '..') {
+        throw new Error(
+          `Path parameter "${name}" contains a "${segment}" path segment, which would retarget the request at a different endpoint. Nothing was sent to Google.`,
+        );
+      }
+    }
+    return segments.map(encodeURIComponent).join('/');
   });
 }
 
