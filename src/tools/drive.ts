@@ -5,7 +5,7 @@ import { drive as driveClient, type drive_v3 } from '@googleapis/drive';
 import { accountAliasSchema, getAccountSet } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import { handleGoogleApiError, safeMessage, stringifyEnvelope } from './_errors.js';
+import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } from './_errors.js';
 import { openLocalReadStream, prepareLocalDest } from './_local-files.js';
 import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
@@ -154,6 +154,15 @@ export function registerDriveTools(server: ToolRegistry): void {
     },
     async ({ account, query, maxResults, driveId }) => {
       try {
+        // normalizeDriveQuery trims to '' and Drive reads that as "everything",
+        // so a blank query returned a raw directory listing as a search result.
+        if (query.trim() === '') {
+          return invalidParams(
+            account as Account,
+            '`query` is empty, and Drive reads an empty query as "match everything".',
+            'Pass a search term, or a structured Drive query such as "mimeType = \'application/pdf\'". To browse a folder instead, use drive_list.',
+          );
+        }
         const auth = await getClient(account as Account);
         const drive = driveClient({ version: 'v3', auth });
 

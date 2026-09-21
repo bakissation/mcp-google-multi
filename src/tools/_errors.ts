@@ -487,3 +487,16 @@ export function handleGoogleApiError(
     isError: true as const,
   };
 }
+
+/** Local argument rejection, before any Google call. Same envelope as
+ * mapGoogleError so a caller parses one shape. The slug literal stays inline
+ * because the KNOWN_ERROR_SLUGS honesty test greps for `error: '<slug>'`. */
+export function invalidParams(account: Account, message: string, hint: string) {
+  return {
+    content: [{
+      type: 'text' as const,
+      text: stringifyEnvelope({ error: 'invalid_params', message, hint, retriable: false, account }),
+    }],
+    isError: true as const,
+  };
+}

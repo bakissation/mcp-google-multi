@@ -5,7 +5,7 @@ import { gmail as gmailClient } from '@googleapis/gmail';
 import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import { handleGoogleApiError, mapGoogleError } from './_errors.js';
+import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
 import { prepareLocalDest } from './_local-files.js';
 import { checkOutbound } from '../outbound-allowlist.js';
@@ -504,6 +504,15 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, query, maxResults, full }) => {
       try {
+        // Gmail treats a blank `q` as no filter, so a caller passing an unset
+        // variable got the whole mailbox back as if it had matched.
+        if (query.trim() === '') {
+          return invalidParams(
+            account as Account,
+            '`query` is empty, and Gmail reads an empty query as "match everything".',
+            'Pass a real Gmail search term such as "is:unread" or "from:someone@example.com". Returning the whole mailbox for a blank query would look like a successful search.',
+          );
+        }
         const auth = await getClient(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
 

@@ -6,7 +6,7 @@ import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { checkOutbound } from '../outbound-allowlist.js';
-import { handleGoogleApiError } from './_errors.js';
+import { handleGoogleApiError, invalidParams } from './_errors.js';
 import { sliceClean } from '../trim.js';
 
 const accountEnum = accountAliasSchema.optional();
@@ -62,6 +62,8 @@ export function registerCalendarTools(server: ToolRegistry): void {
       },
     },
     async ({ account, calendarId, query, timeMin, timeMax, maxResults }) => {
+      const rangeError = timeRangeError(timeMin, timeMax);
+      if (rangeError) return invalidParams(account as Account, rangeError, TIME_RANGE_HINT);
       try {
         const auth = await getClient(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
@@ -359,6 +361,8 @@ export function registerCalendarTools(server: ToolRegistry): void {
       },
     },
     async ({ account, calendarId, eventId, timeMin, timeMax, maxResults }) => {
+      const rangeError = timeRangeError(timeMin, timeMax);
+      if (rangeError) return invalidParams(account as Account, rangeError, TIME_RANGE_HINT);
       try {
         const auth = await getClient(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
@@ -393,6 +397,15 @@ export function registerCalendarTools(server: ToolRegistry): void {
     },
     async ({ account, calendarIds, timeMin, timeMax, timeZone }) => {
       try {
+        if (calendarIds.length === 0) {
+          return invalidParams(
+            account as Account,
+            '`calendarIds` is empty, so there is nothing to check.',
+            'Pass at least one calendar ID, e.g. ["primary"]. Use calendar_list_calendars to see the IDs this account can read.',
+          );
+        }
+        const rangeError = timeRangeError(timeMin, timeMax);
+        if (rangeError) return invalidParams(account as Account, rangeError, TIME_RANGE_HINT);
         const auth = await getClient(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
         const res = await cal.freebusy.query({
@@ -404,7 +417,11 @@ export function registerCalendarTools(server: ToolRegistry): void {
           },
         });
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(res.data.calendars, null, 2) }],
+          // freebusy answers 200 with NO `calendars` key on an empty items
+          // list, and JSON.stringify(undefined) returns undefined, not a
+          // string: the SDK then rejected our own result with -32602. The
+          // value is a map keyed by calendar id, so the fallback is {}.
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data.calendars ?? {}, null, 2) }],
         };
       } catch (error: any) {
         return handleCalendarError(error, account as Account);
@@ -446,6 +463,26 @@ export function registerCalendarTools(server: ToolRegistry): void {
 
 const LIST_DESCRIPTION_CAP = 300;
 const TRUNCATION_MARKER = '… [truncated, use calendar_get_event]';
+
+/** Google disagrees with itself on a backwards window: events.list answers 200
+ * with [], which reads as "nothing scheduled", while freebusy.query 400s on the
+ * identical input. Decide locally so an empty list always means empty. Returns
+ * null when either bound is absent or unparseable: those stay Google's call.
+ * Date.parse is lenient, so it is used only to SKIP the check, never to accept. */
+export function timeRangeError(timeMin: string | undefined, timeMax: string | undefined): string | null {
+  if (timeMin === undefined || timeMax === undefined) return null;
+  const min = Date.parse(timeMin);
+  const max = Date.parse(timeMax);
+  if (Number.isNaN(min) || Number.isNaN(max)) return null;
+  if (min < max) return null;
+  return min === max
+    ? `timeMin and timeMax are the same instant (${timeMin}), so the window contains nothing.`
+    : `timeMin (${timeMin}) is after timeMax (${timeMax}).`;
+}
+
+export const TIME_RANGE_HINT =
+  'Swap the two values or widen the window: timeMin must be strictly earlier than timeMax. ' +
+  'An empty result from this tool then always means "nothing scheduled", never "bad range".';
 
 export function formatEvent(event: any, opts: { full?: boolean } = {}) {
   const full = opts.full ?? true;
