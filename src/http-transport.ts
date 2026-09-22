@@ -1,15 +1,15 @@
 // B12: the Streamable HTTP transport host (cc-transport-hosting T2/T3). Owns the
+import type { McpServer, Transport } from "@modelcontextprotocol/server";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+
 // node:http server, the route table, the front guard (Host / Origin / DNS-rebind),
 // and the stateless per-request /mcp dispatch. The OAuth AS endpoints and Bearer
 // verification are a seam filled by B13 (oauth-authorization-server); B12 ships a
 // loopback-owner authenticator so the local-HTTP model works before the AS lands.
 
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HttpConfig } from './http-config.js';
-import { withArgNormalization, type ArgShape } from './arg-normalize.js';
-
+import { withArgNormalization, type ArgShape, type StrictArgOptions, withValidationEnvelope, type ValidationEnvelopeOptions } from './arg-normalize.js';
 export type AuthOutcome =
   | { ok: true }
   | { ok: false; status: number; body: string; headers?: Record<string, string> };
@@ -37,6 +37,15 @@ export interface HttpHostOptions {
   dispatchTimeoutMs?: number;
   /** tools/call argument-key normalization lookup (arg-normalize.ts); absent = off. */
   argShapeFor?: (tool: string) => ArgShape | undefined;
+  /** Usage-metrics transport tap (metrics-tap.ts); absent = off. */
+  metricsTap?: (t: Transport) => Transport;
+  /** Wired identically on both transports so a schema rejection reads the same
+   * over stdio and over HTTP. */
+  validationEnvelope?: ValidationEnvelopeOptions;
+  /** Usage-metrics argfix observer, forwarded into arg normalization. */
+  onArgRename?: (tool: string, renames: number) => void;
+  /** Unknown-argument screening (arg-strict.ts); absent = off. */
+  strictArgs?: StrictArgOptions;
 }
 
 // A hung handler that keeps the connection open would otherwise hold the global
@@ -206,7 +215,7 @@ export class HttpTransportHost {
     // the mounted AS routes), so the SDK's own DNS-rebind guard is disabled: its
     // exact-Host match is stricter than the front guard and would 403 valid
     // Hosts (double enforcement, differing rules).
-    const transport = new StreamableHTTPServerTransport({
+    const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
       enableDnsRebindingProtection: false,
@@ -228,8 +237,14 @@ export class HttpTransportHost {
         timer = setTimeout(() => resolve('timeout'), deadlineMs);
         timer.unref?.();
       });
+      // Same composition as the stdio leg: the envelope rewrite is innermost,
+      // so the tap above it still classifies the original validation prose.
+      const enveloped = withValidationEnvelope(transport, this.opts.validationEnvelope ?? {});
+      const tapped = this.opts.metricsTap ? this.opts.metricsTap(enveloped) : enveloped;
       await this.opts.server.connect(
-        this.opts.argShapeFor ? withArgNormalization(transport, this.opts.argShapeFor, this.opts.log) : transport,
+        this.opts.argShapeFor || this.opts.strictArgs
+          ? withArgNormalization(tapped, this.opts.argShapeFor ?? (() => undefined), this.opts.log, this.opts.onArgRename, this.opts.strictArgs)
+          : tapped,
       );
       // Reflect the dispatch into a non-rejecting arm: if the deadline wins the
       // race, an orphaned handler settling later must not surface as an unhandled

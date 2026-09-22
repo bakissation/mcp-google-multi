@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
-export const WORKSPACE_APIS: Record<string, { id: string; version: string }> = {
+export const SUPPORTED_APIS: Record<string, { id: string; version: string }> = {
   gmail: { id: 'gmail', version: 'v1' },
   drive: { id: 'drive', version: 'v3' },
   calendar: { id: 'calendar', version: 'v3' },
@@ -21,6 +21,8 @@ export const WORKSPACE_APIS: Record<string, { id: string; version: string }> = {
   admin_reports: { id: 'admin', version: 'reports_v1' },
   admin_datatransfer: { id: 'admin', version: 'datatransfer_v1' },
   groupssettings: { id: 'groupssettings', version: 'v1' },
+  analyticsadmin: { id: 'analyticsadmin', version: 'v1beta' },
+  analyticsdata: { id: 'analyticsdata', version: 'v1beta' },
   appsmarket: { id: 'appsmarket', version: 'v2' },
   classroom: { id: 'classroom', version: 'v1' },
   cloudidentity: { id: 'cloudidentity', version: 'v1' },
@@ -34,6 +36,38 @@ export const WORKSPACE_APIS: Record<string, { id: string; version: string }> = {
   vault: { id: 'vault', version: 'v1' },
   workspaceevents: { id: 'workspaceevents', version: 'v1' },
 };
+
+// Names agents actually type for an API, mapped to real SUPPORTED_APIS keys.
+// Motivated by observed escape-hatch misses ("analytics" is two Discovery
+// APIs, the Admin SDK is three); keep entries plural-target only when the
+// split is real.
+export const API_ALIASES: Record<string, string[]> = {
+  analytics: ['analyticsadmin', 'analyticsdata'],
+  ga4: ['analyticsadmin', 'analyticsdata'],
+  googleanalytics: ['analyticsadmin', 'analyticsdata'],
+  admin: ['admin_directory', 'admin_reports', 'admin_datatransfer'],
+  adminsdk: ['admin_directory', 'admin_reports', 'admin_datatransfer'],
+  directory: ['admin_directory'],
+  webmasters: ['searchconsole'],
+  gsc: ['searchconsole'],
+  contacts: ['people'],
+  appsscript: ['script'],
+  appscript: ['script'],
+  gmailpostmastertools: ['postmaster'],
+};
+
+/**
+ * Resolve an `api` argument to real SUPPORTED_APIS keys: exact match, then
+ * case/punctuation-normalized ("Search-Console" -> searchconsole), then the
+ * alias map. null = genuinely unknown.
+ */
+export function resolveApiAliases(api: string): string[] | null {
+  if (SUPPORTED_APIS[api]) return [api];
+  const norm = api.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const direct = Object.keys(SUPPORTED_APIS).find((k) => k.replace(/[^a-z0-9]/g, '') === norm);
+  if (direct) return [direct];
+  return API_ALIASES[norm] ?? null;
+}
 
 export interface DiscoveryParam {
   location: 'path' | 'query';
@@ -145,9 +179,9 @@ export async function loadMethodIndex(api: string, deps: DiscoveryDeps = {}): Pr
   const cached = memoryCache.get(api);
   if (cached && now() < cached.refreshAfter) return cached.index;
 
-  const spec = WORKSPACE_APIS[api];
+  const spec = SUPPORTED_APIS[api];
   if (!spec) {
-    throw new Error(`Unknown api "${api}". Known: ${Object.keys(WORKSPACE_APIS).join(', ')}`);
+    throw new Error(`Unknown api "${api}". Known: ${Object.keys(SUPPORTED_APIS).join(', ')}`);
   }
   const fetchFn = deps.fetchFn ?? ((url: string) => fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }));
   const cacheDir = deps.cacheDir ?? discoveryCacheDir();
@@ -172,20 +206,34 @@ export async function loadMethodIndex(api: string, deps: DiscoveryDeps = {}): Pr
   let staleFallback = false;
   if (cacheFresh()) doc = readCache();
   if (!doc) {
-    const url = `https://www.googleapis.com/discovery/v1/apis/${spec.id}/${spec.version}/rest`;
-    try {
-      const res = await fetchFn(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      doc = (await res.json()) as DiscoveryDoc;
-      fs.mkdirSync(cacheDir, { recursive: true });
-      fs.writeFileSync(cacheFile, JSON.stringify(doc), { mode: 0o600 });
-    } catch (err) {
+    // Newer APIs (analyticsadmin/analyticsdata) are absent from the central
+    // discovery directory (404); each service's own $discovery endpoint is
+    // authoritative, so try both — same fallback as scripts/fetch-discovery.
+    const urls = [
+      `https://www.googleapis.com/discovery/v1/apis/${spec.id}/${spec.version}/rest`,
+      `https://${spec.id}.googleapis.com/$discovery/rest?version=${spec.version}`,
+    ];
+    let fetchError: Error | undefined;
+    for (const url of urls) {
+      try {
+        const res = await fetchFn(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        doc = (await res.json()) as DiscoveryDoc;
+        fs.mkdirSync(cacheDir, { recursive: true });
+        fs.writeFileSync(cacheFile, JSON.stringify(doc), { mode: 0o600 });
+        break;
+      } catch (err) {
+        fetchError = err as Error;
+        doc = undefined;
+      }
+    }
+    if (!doc) {
       doc = readCache();
       staleFallback = true;
       if (!doc) {
         throw new Error(
-          `Could not fetch the Google API Discovery document for "${api}" and no local cache exists (${(err as Error).message}). Retry when online.`,
-          { cause: err },
+          `Could not fetch the Google API Discovery document for "${api}" and no local cache exists (${fetchError?.message ?? 'fetch failed'}). Retry when online.`,
+          { cause: fetchError },
         );
       }
     }
@@ -199,9 +247,24 @@ export function clearDiscoveryMemoryCache(): void {
   memoryCache.clear();
 }
 
-const POST_READ_VERB = /^(get|list|search|query|lookup|count|batchGet|generateIds|export|download|inspect)/i;
-const POST_UPDATE_VERB = /^(untrash|undelete|restore|modify|move|set|sort|merge|unmerge|replace|resize|publish|resolve|update|patch|write|format)/i;
-const POST_DELETE_VERB = /^(batch)?(delete|remove|trash|clear|empty|obliterate|purge|revoke|wipeout)/i;
+// GA4-style report execution (runReport, batchRunPivotReports, runAccessReport)
+// and check* predicates are POSTs purely for the request-body size — reads.
+const POST_READ_VERB = /^(get|list|search|query|lookup|count|batchGet|generateIds|export|download|inspect|check|suggest|(batch)?run\w*report)/i;
+// `cancelWipe` must be matched here, BEFORE `cancel` reaches the delete list:
+// it calls off a pending wipe, which is the opposite of one. Update is tested
+// before delete for exactly that reason.
+// State transitions on something that already exists: reversible, and none of
+// them creates anything, so `create` was both wrong and the most permissive
+// class available. `(batch)?` mirrors the delete list, without which every
+// `batchUpdate*` POST fell through to `create`.
+const POST_UPDATE_VERB = /^(cancelWipe|(batch)?(untrash|undelete|restore|modify|move|set|sort|merge|unmerge|replace|resize|publish|resolve|update|patch|write|format|change|close|reopen|enable|disable|hide|unhide|accept|approve|decline|reassign|reactivate|renew|mark|turn|suspend|activate|make|return|reclaim|complete))/i;
+// archive sits with the deletes: in GA4 archiving a custom dimension/metric is
+// permanent, so the most restrictive write class is the safe classification.
+// So do the teardown verbs: `stop` and `cancel` tear down a push channel or a
+// long-running operation, `wipe`/`invalidate`/`signOut` destroy device data,
+// codes and sessions, `reset` discards a configuration, and `end` terminates a
+// live conference. Each removes something that existed.
+const POST_DELETE_VERB = /^(batch)?(delete|remove|trash|clear|empty|obliterate|purge|revoke|wipeout|archive|wipe|invalidate|signOut|stop|cancel|unregister|unreserve|reset|end)/i;
 
 export function cudFromMethod(method: Pick<DiscoveryMethod, 'httpMethod' | 'id'>): 'read' | 'create' | 'update' | 'delete' {
   switch (method.httpMethod) {
@@ -231,7 +294,27 @@ export function expandPath(template: string, pathParams: Record<string, string>)
     if (value === undefined) {
       throw new Error(`Missing required path parameter "${name}"`);
     }
-    return plus ? String(value).split('/').map(encodeURIComponent).join('/') : encodeURIComponent(String(value));
+    // A blank segment collapses the path and Google routes the resulting
+    // trailing-slash URL to the COLLECTION: `sites.get` with siteUrl:"" came
+    // back as the whole site LIST, reported as success. Dot segments resolve
+    // at URL-parse time, so `../v1/contactGroups` retargets the call at a
+    // different endpoint and returns ITS response as success. Both are
+    // silent-wrong, so refuse locally rather than send a different request.
+    // `{+param}` keeps its slashes, so every segment has to be checked.
+    const segments = plus ? String(value).split('/') : [String(value)];
+    for (const segment of segments) {
+      if (segment.trim() === '') {
+        throw new Error(
+          `Path parameter "${name}" is empty. An empty value addresses the collection, not one resource, so nothing was sent to Google.`,
+        );
+      }
+      if (segment === '.' || segment === '..') {
+        throw new Error(
+          `Path parameter "${name}" contains a "${segment}" path segment, which would retarget the request at a different endpoint. Nothing was sent to Google.`,
+        );
+      }
+    }
+    return segments.map(encodeURIComponent).join('/');
   });
 }
 

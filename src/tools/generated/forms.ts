@@ -18,7 +18,7 @@ export function registerFormsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      formId: z.string().describe("Required. ID of the Form to watch."),
+      formId: z.string().min(1).describe("Required. ID of the Form to watch."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CreateWatchRequest JSON request body. Top-level fields: watch, watchId."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -32,23 +32,23 @@ export function registerFormsGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      formId: z.string().describe("Required. The ID of the Form."),
-      watchId: z.string().describe("Required. The ID of the Watch to delete."),
+      formId: z.string().min(1).describe("Required. The ID of the Form."),
+      watchId: z.string().min(1).describe("Required. The ID of the Watch to delete."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
   registerGeneratedTool(registry, {
     name: "forms_forms_watches_renew",
-    cud: "create",
+    cud: "update",
     description: "Renew an existing watch for seven days. The state of the watch after renewal is `ACTIVE`, and the `expire_time` is seven days from the renewal. Renewing a watch",
     method: { id: "forms.forms.watches.renew", httpMethod: "POST", path: "v1/forms/{formId}/watches/{watchId}:renew", baseUrl: "https://forms.googleapis.com/", requiredParams: ["formId","watchId"], scopes: S_forms_v1[0] },
     params: [{"field":"formId","api":"formId","location":"path"},{"field":"watchId","api":"watchId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
-      formId: z.string().describe("Required. The ID of the Form."),
-      watchId: z.string().describe("Required. The ID of the Watch to renew."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("RenewWatchRequest JSON request body."),
+      formId: z.string().min(1).describe("Required. The ID of the Form."),
+      watchId: z.string().min(1).describe("Required. The ID of the Watch to renew."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

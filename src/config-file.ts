@@ -46,6 +46,10 @@ const configSchema = z.strictObject({
   defaultAccount: z.string().optional(),
   discovery: z.enum(['lazy', 'curated', 'eager']).optional(),
   toolsets: z.string().optional(),
+  // Local usage metrics (metrics-feature-spec): absent = off. Downgrade rule:
+  // a pre-6.0 build reading a config carrying this key fails E_CONFIG_INVALID
+  // (strictObject); remove the key first.
+  usageMetrics: z.boolean().optional(),
 });
 
 export interface ConfigFile {
@@ -55,6 +59,7 @@ export interface ConfigFile {
   defaultAccount?: string;
   discovery?: 'lazy' | 'curated' | 'eager';
   toolsets?: string;
+  usageMetrics?: boolean;
 }
 
 export function failStartup(slug: string, message: string): never {

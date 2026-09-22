@@ -4,10 +4,10 @@ name: docker
 # so it does not run on every slice. Non-required check (only `ci` gates merges).
 on:
   push:
-    branches: [main, staging, dev, v6, 'v6-**']
+    branches: [main, staging, dev]
     paths: [Dockerfile, .dockerignore, .github/workflows/docker.yml, 'deploy/**']
   pull_request:
-    branches: [main, staging, dev, v6, 'v6-**']
+    branches: [main, staging, dev]
     paths: [Dockerfile, .dockerignore, .github/workflows/docker.yml, 'deploy/**']
 
 permissions:

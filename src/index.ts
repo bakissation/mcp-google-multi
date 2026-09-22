@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 // First import: triggers accounts.js module load (env files + registry) before
 // anything else. Named to also pull the server-only empty-registry guard (BR-4).
-import { assertServerAccountsConfigured } from './accounts.js';
+import { assertServerAccountsConfigured, getAccountSet } from './accounts.js';
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
+import { McpServer } from "@modelcontextprotocol/server";
+import type { Transport } from "@modelcontextprotocol/server";
 import { GENERATED_SERVICES } from './tools/generated/index.js';
-import { GENERATED_GATES, SERVICES } from './services.js';
-import { ToolRegistry, type DiscoveryMode } from './registry.js';
+import { GENERATED_GATES, SERVICES, unknownToolMessage } from './services.js';
+import { ToolRegistry, resolveDiscoveryMode, type DiscoveryMode } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
 import { registerAccountTools } from './tools/accounts-tool.js';
@@ -21,16 +22,34 @@ import { isAllowed, describePolicy } from './write-control.js';
 import { buildIdentityContext, type IdentityContext } from './identity.js';
 import { registerSetupPrompt } from './setup-prompt.js';
 import { applyNetTuning } from './net-tuning.js';
-import { argNormalizationEnabled, withArgNormalization } from './arg-normalize.js';
+import { argNormalizationEnabled, withArgNormalization, withValidationEnvelope, type StrictArgOptions } from './arg-normalize.js';
+import { unknownArgMode } from './arg-strict.js';
+import { envValueSource } from './env-load.js';
+import { loadConfigFile } from './config-file.js';
+import { initUsageMetrics, resolveUsageMetrics, sourceLabel, type Metrics } from './usage-metrics.js';
 
 applyNetTuning();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
 
-function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: DiscoveryMode): ToolRegistry {
+/** Unknown-argument screening options, or undefined when the feature is off.
+ * Shared by both transports so a mistyped argument behaves identically. */
+function strictArgOptions(registry: ToolRegistry, metrics: Metrics | null): StrictArgOptions | undefined {
+  const mode = unknownArgMode();
+  if (mode === 'off') return undefined;
+  return {
+    mode,
+    declaredFor: (tool) => registry.declaredKeys(tool),
+    siblingsFor: (tool, keys) => registry.siblingSpellings(tool, keys),
+    unknownTool: (name) => unknownToolMessage(registry, name),
+    onDrop: metrics ? (tool, keys) => metrics.recordArgDrop(tool, keys) : undefined,
+  };
+}
+
+function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: DiscoveryMode, metrics: Metrics | null = null): ToolRegistry {
   const policy = ctx.policy;
-  const registry = new ToolRegistry(server, policy, mode);
+  const registry = new ToolRegistry(server, policy, mode, metrics);
   const toolsets = getToolsets();
   if (toolsets !== 'all') {
     const known = new Set([...SERVICES.map((s) => s.name), ...GENERATED_SERVICES.map((s) => s.name)]);
@@ -107,6 +126,22 @@ async function main() {
   if (process.argv.includes('reset')) {
     const { runResetCli } = await import('./doctor.js');
     process.exitCode = await runResetCli(process.argv);
+    return;
+  }
+
+  if (process.argv.includes('metrics')) {
+    const { runMetricsCli } = await import('./metrics-cli.js');
+    const { GENERATED_METHOD_TOOLS, CURATED_METHOD_IDS } = await import('./tools/generated/method-map.js');
+    const envSrc = envValueSource('GOOGLE_USAGE_METRICS');
+    let configValue: boolean | undefined;
+    try {
+      configValue = loadConfigFile(undefined, 'throw')?.usageMetrics;
+    } catch { /* an invalid config never blocks reading local metrics files */ }
+    const state = resolveUsageMetrics(process.env, configValue, envSrc?.kind === 'file' ? envSrc.file : undefined);
+    process.exitCode = runMetricsCli(process.argv, {
+      enabled: state.enabled,
+      promotion: { methodMap: GENERATED_METHOD_TOOLS, curatedIds: CURATED_METHOD_IDS },
+    });
     return;
   }
 
@@ -199,16 +234,76 @@ async function main() {
   const wantStdio = httpCfg.transport === 'stdio' || httpCfg.transport === 'both';
   const wantHttp = transportIncludesHttp(httpCfg.transport);
 
+  // Local usage metrics: fail-closed resolve, self-announcing source, null
+  // when off (no wrapper, no dir, nothing initializes). One instance per
+  // transport so `boots` keys stay honest under `both`.
+  const envSrc = envValueSource('GOOGLE_USAGE_METRICS');
+  const metricsState = resolveUsageMetrics(
+    process.env,
+    loadConfigFile()?.usageMetrics,
+    envSrc?.kind === 'file' ? envSrc.file : undefined,
+  );
+  if (metricsState.warning) process.stderr.write(metricsState.warning);
+  const metricsInstances: Metrics[] = [];
+  const initMetricsFor = (transport: string, mode: string): Metrics | null => {
+    const m = initUsageMetrics(metricsState, { version: pkg.version as string, mode, transport });
+    if (m) {
+      metricsInstances.push(m);
+      process.stderr.write(`local usage metrics: on ${sourceLabel(metricsState.source)} -> ${m.statusLine()}\n`);
+    }
+    return m;
+  };
+  if (!metricsState.enabled && metricsState.source.kind !== 'default') {
+    process.stderr.write(`local usage metrics: off ${sourceLabel(metricsState.source)}\n`);
+  }
+  const flushMetrics = () => { for (const m of metricsInstances) m.shutdown(); };
+  process.on('exit', flushMetrics);
+  if (metricsState.enabled) {
+    for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+      process.once(sig, () => {
+        flushMetrics();
+        // stdio has no other signal handler; preserve terminate-on-signal.
+        if (!wantHttp) process.exit(sig === 'SIGINT' ? 130 : 143);
+      });
+    }
+  }
+
   // Build one McpServer + registry per transport at boot (P1 / BV gap #4:
   // never rebuilt per request); `both` runs the two concurrently.
   if (wantStdio) {
     const server = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
-    const registry = buildRegistry(server, buildIdentityContext(process.env, { transport: 'stdio' }));
+    const stdioMetrics = initMetricsFor('stdio', resolveDiscoveryMode());
+    const registry = buildRegistry(server, buildIdentityContext(process.env, { transport: 'stdio' }), undefined, stdioMetrics);
     registry.installListHandler();
     registerSetupPrompt(server);
-    const stdioTransport = new StdioServerTransport();
+    // Outbound runs outermost-first, so the composition is deliberate: the
+    // envelope rewrite is INNERMOST (last to touch the frame), the tap sits
+    // above it (classifying the ORIGINAL validation prose), arg normalization
+    // outermost. The tap only counts outbound JSON-RPC error frames (no
+    // handler ran) plus id->tool names.
+    let transport: Transport = withValidationEnvelope(new StdioServerTransport(), {
+      isKnownTool: (n) => registry.hasTool(n),
+      defaultAccount: () => getAccountSet().defaultAccount,
+    });
+    if (stdioMetrics) {
+      const { tapUsageMetrics } = await import('./metrics-tap.js');
+      transport = tapUsageMetrics(transport, stdioMetrics, (n) => registry.hasTool(n));
+    }
+    const strictStdio = strictArgOptions(registry, stdioMetrics);
     await server.connect(
-      argNormalizationEnabled() ? withArgNormalization(stdioTransport, (n) => registry.argShape(n)) : stdioTransport,
+      argNormalizationEnabled() || strictStdio
+        ? withArgNormalization(
+            transport,
+            // Gated exactly as the HTTP leg gates `argShapeFor`. Passing the
+            // shape unconditionally made stdio rename keys while
+            // GOOGLE_ARG_NORMALIZE=off, so the same call succeeded on stdio
+            // and failed on HTTP once screening rejects.
+            argNormalizationEnabled() ? (n) => registry.argShape(n) : () => undefined,
+            undefined,
+            stdioMetrics ? (tool, n) => stdioMetrics.recordArgFix(tool, n) : undefined,
+            strictStdio,
+          )
+        : transport,
     );
   }
 
@@ -229,7 +324,8 @@ async function main() {
       process.stderr.write(`GOOGLE_DISCOVERY="${configuredMode}" is ignored over HTTP; the stateless transport forces "curated".\n`);
     }
     const httpServer = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
-    const registry = buildRegistry(httpServer, buildIdentityContext(process.env, { transport: 'http' }), 'curated');
+    const httpMetrics = initMetricsFor('http', 'curated');
+    const registry = buildRegistry(httpServer, buildIdentityContext(process.env, { transport: 'http' }), 'curated', httpMetrics);
     registry.installListHandler();
     registerSetupPrompt(httpServer);
 
@@ -299,6 +395,11 @@ async function main() {
     const { setHttpReauthBase } = await import('./reauth-hint.js');
     setHttpReauthBase(httpCfg.publicUrl);
 
+    let httpTap: ((t: Transport) => Transport) | undefined;
+    if (httpMetrics) {
+      const { tapUsageMetrics } = await import('./metrics-tap.js');
+      httpTap = (t) => tapUsageMetrics(t, httpMetrics, (n) => registry.hasTool(n));
+    }
     const host = new HttpTransportHost({
       server: httpServer,
       config: httpCfg,
@@ -308,6 +409,13 @@ async function main() {
       routes: authServer.routes,
       log: (l) => process.stderr.write(`[http] ${l}\n`),
       argShapeFor: argNormalizationEnabled() ? (n) => registry.argShape(n) : undefined,
+      metricsTap: httpTap,
+      validationEnvelope: {
+        isKnownTool: (n: string) => registry.hasTool(n),
+        defaultAccount: () => getAccountSet().defaultAccount,
+      },
+      onArgRename: httpMetrics ? (tool: string, n: number) => httpMetrics.recordArgFix(tool, n) : undefined,
+      strictArgs: strictArgOptions(registry, httpMetrics),
     });
     await host.start();
     process.stderr.write(`HTTP transport listening on http://${httpCfg.host}:${httpCfg.port} (public ${httpCfg.publicUrl})\n`);

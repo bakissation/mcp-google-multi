@@ -2,11 +2,34 @@ import { z } from 'zod';
 import type { ToolRegistry } from './registry.js';
 import { describePolicy, type Policy } from './write-control.js';
 
+// The description budget is the whole point of lazy mode: a full op list per
+// service put lazy tools/list at ~11.5k tokens (RQ2), so descriptions carry a
+// CAPPED vocabulary and the complete catalog stays in this tool's RESULT.
+const CURATED_OPS_CAP = 10;
+const GENERATED_GROUPS_CAP = 6;
+
 function opVocabulary(registry: ToolRegistry, service: string): string {
-  const ops = registry.catalog(service).map((o) =>
-    o.tool.startsWith(`${service}_`) ? o.tool.slice(service.length + 1) : o.tool,
-  );
-  return [...new Set(ops)].join(', ');
+  const { curated, generated } = registry.opNames(service);
+  const parts: string[] = [];
+  if (curated.length > 0) {
+    const shown = curated.slice(0, CURATED_OPS_CAP);
+    const more = curated.length - shown.length;
+    parts.push(`${shown.join(', ')}${more > 0 ? ` +${more} more` : ''}`);
+  }
+  if (generated.length > 0) {
+    // The generated long tail compresses to its resource groups: denser and
+    // more selective than any truncated name list.
+    const counts = new Map<string, number>();
+    for (const op of generated) {
+      const group = op.split('_')[0];
+      counts.set(group, (counts.get(group) ?? 0) + 1);
+    }
+    const groups = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    const shown = groups.slice(0, GENERATED_GROUPS_CAP).map(([g]) => g);
+    const more = groups.length - shown.length;
+    parts.push(`${generated.length} generated ops: ${shown.join(', ')}${more > 0 ? ` +${more} areas` : ''}`);
+  }
+  return parts.join('; ');
 }
 
 // SDK ToolAnnotations is a closed type; anthropic/* client hints ride through
@@ -28,9 +51,8 @@ export function registerDiscoverTools(registry: ToolRegistry, policy: Policy): v
     'discover_all',
     {
       description:
-        'Reveal ALL curated Google tools at once (instead of per-service discovery). ' +
-        'Use when starting substantial Google work so the shaped, high-quality tools are ' +
-        'directly callable; prefer them over google_api_call. Pair with discover_reset when done.',
+        'Reveal ALL curated Google tools at once (instead of per-service discovery). Use when ' +
+        'starting substantial Google work; prefer these over google_api_call. Pair with discover_reset.',
       inputSchema: {},
       _meta: { 'anthropic/alwaysLoad': true },
     },
@@ -58,9 +80,8 @@ export function registerDiscoverTools(registry: ToolRegistry, policy: Policy): v
     'discover_reset',
     {
       description:
-        'Collapse the tool surface back to the configured default (lean meta-tools-only under the ' +
-        'default lazy mode), reclaiming context budget after heavy Google work. All tools remain ' +
-        'callable by name after collapsing.',
+        'Collapse the tool surface back to the configured default, reclaiming context budget ' +
+        'after heavy Google work. All tools remain callable by name after collapsing.',
       inputSchema: {},
       _meta: { 'anthropic/alwaysLoad': true },
     },
@@ -87,13 +108,12 @@ export function registerDiscoverTools(registry: ToolRegistry, policy: Policy): v
       `${service}_discover`,
       {
         description:
-          `List the available ${service} operations. ` +
           (registry.mode === 'lazy'
-            ? `Operational ${service} tools are hidden until discovered — call this first, then call the tool you need by name. `
-            : `Returns the ${service} catalog (and reveals any still-hidden ${service} tools). `) +
-          `Operations: ${opVocabulary(registry, service)}.`,
+            ? `Discover ${service}: lists the catalog and reveals its hidden tools; call first, then call the tool by name. `
+            : `List the ${service} catalog (reveals any still-hidden ${service} tools). `) +
+          `Ops: ${opVocabulary(registry, service)}.`,
         inputSchema: {
-          query: z.string().optional().describe('Keyword to filter the returned operations'),
+          query: z.string().optional().describe('Filter keyword'),
         },
         _meta: { 'anthropic/alwaysLoad': true },
       },

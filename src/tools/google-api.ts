@@ -8,7 +8,8 @@ import { getToolsets, toolsetEnabled, type Toolsets } from '../toolsets.js';
 import { editDistance } from '../scope-catalog.js';
 import { executeApiMethod, jsonResult, type QueryParams } from '../executor.js';
 import {
-  WORKSPACE_APIS,
+  SUPPORTED_APIS,
+  resolveApiAliases,
   type DiscoveryDeps,
   type DiscoveryMethod,
   cudFromMethod,
@@ -39,6 +40,8 @@ const SERVICE_FOR_ALIAS: Record<string, string> = {
   admin_reports: 'admin',
   admin_datatransfer: 'admin',
   groupssettings: 'groupssettings',
+  analyticsadmin: 'analytics',
+  analyticsdata: 'analytics',
 };
 
 export interface EscapeDeps extends DiscoveryDeps {
@@ -77,7 +80,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
   const apiEnabled = (alias: string): boolean => {
     return toolsetEnabled(toolsets, serviceForAlias(alias));
   };
-  const enabledApis = Object.keys(WORKSPACE_APIS).filter(apiEnabled);
+  const enabledApis = Object.keys(SUPPORTED_APIS).filter(apiEnabled);
   const apiList = enabledApis.join(', ');
   const toolsetDisabled = (alias: string) =>
     jsonResult(
@@ -105,11 +108,22 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       annotations: { openWorldHint: true },
     },
     async ({ query, api, maxResults }) => {
-      if (api && !WORKSPACE_APIS[api]) {
-        return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false }, true);
+      // Alias resolution: "analytics" fans out to both GA4 Discovery APIs
+      // instead of dead-ending on unknown_api.
+      let requested: string[] | null = null;
+      if (api) {
+        requested = resolveApiAliases(api);
+        if (!requested) {
+          registry.usageMetrics?.recordSearchApi(null);
+          return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false }, true);
+        }
+        const enabled = requested.filter(apiEnabled);
+        if (enabled.length === 0) return toolsetDisabled(requested[0]);
+        requested = enabled;
+        // Post-resolution SUPPORTED_APIS keys only (closed vocabulary).
+        registry.usageMetrics?.recordSearchApi(requested);
       }
-      if (api && !apiEnabled(api)) return toolsetDisabled(api);
-      const apis = api ? [api] : enabledApis;
+      const apis = requested ?? enabledApis;
       const unavailable: string[] = [];
       const indexes = await Promise.all(
         apis.map(async (a) => {
@@ -123,6 +137,9 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       );
       const matches = searchMethods(indexes.flat(), query as string, (maxResults as number | undefined) ?? 10);
       return jsonResult({
+        // Teach the resolved keys whenever the input wasn't already one, so the
+        // follow-up google_api_call uses a real key.
+        ...(requested && (requested.length > 1 || requested[0] !== api) ? { resolvedApi: requested } : {}),
         methods: matches.map(describeMethod),
         ...(unavailable.length > 0 ? { unavailableApis: unavailable } : {}),
         next: 'Invoke with google_api_call({account, api, methodId, pathParams, queryParams, body}).',
@@ -136,12 +153,13 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       description:
         'Invoke any Google Workspace REST method by Discovery id (escape hatch for operations without a ' +
         'dedicated tool). Find methods with google_api_search first. Subject to the same write-control ' +
-        'policy as named tools. Returns JSON only — for binary/file content (media downloads, ' +
+        'policy as named tools. On reads, pass a `fields` query param (Google partial response) to keep ' +
+        'the payload small. Returns JSON only — for binary/file content (media downloads, ' +
         'drive.files.export) use drive_download / drive_export instead.',
       inputSchema: {
         account: accountEnum.describe('Google account alias (omit for the default account)'),
         api: z.string().describe(`API alias: ${apiList}`),
-        methodId: z.string().describe('Discovery method id, e.g. "drive.revisions.list"'),
+        methodId: z.string().min(1).describe('Discovery method id, e.g. "drive.revisions.list"'),
         pathParams: coerceJson(z.record(z.string(), z.union([z.string(), z.number()])).optional())
           .describe('Values for {placeholders} in the method path'),
         queryParams: coerceJson(
@@ -165,13 +183,19 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       _meta: { 'anthropic/maxResultSizeChars': 100_000 },
     },
     async ({ account, api, methodId, pathParams, queryParams, body }) => {
-      if (!WORKSPACE_APIS[api as string]) {
+      const resolved = resolveApiAliases(api as string);
+      if (!resolved) {
         return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false, account }, true);
       }
-      if (!apiEnabled(api as string)) return toolsetDisabled(api as string);
+      if (resolved.length > 1) {
+        // A call targets exactly one Discovery doc; only search can fan out.
+        return jsonResult({ error: 'unknown_api', message: `"${api}" maps to ${resolved.length} APIs.`, hint: `Pass one of: ${resolved.join(', ')} (method ids differ per API; google_api_search({query, api: "${api}"}) finds the right one).`, retriable: false, account }, true);
+      }
+      const apiKey = resolved[0];
+      if (!apiEnabled(apiKey)) return toolsetDisabled(apiKey);
       let index: DiscoveryMethod[];
       try {
-        index = await loadMethodIndex(api as string, deps);
+        index = await loadMethodIndex(apiKey, deps);
       } catch (err) {
         return jsonResult({ error: 'discovery_unavailable', message: (err as Error).message, retriable: true, account }, true);
       }
@@ -182,20 +206,21 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         // alias, retry under the doc's own prefix before failing.
         const docPrefix = index[0]?.id.split('.')[0];
         const [head, ...rest] = String(methodId).split('.');
-        if (docPrefix && head === api && head !== docPrefix && rest.length > 0) {
+        if (docPrefix && (head === apiKey || head === api) && head !== docPrefix && rest.length > 0) {
           const swapped = [docPrefix, ...rest].join('.');
           method = index.find((m) => m.id === swapped);
         }
       }
       if (!method) {
+        registry.usageMetrics?.recordEscapeMethod(null);
         const near = nearestMethodIds(String(methodId), index);
         return jsonResult(
           {
             error: 'unknown_method',
-            message: `No method "${methodId}" in ${api}.`,
+            message: `No method "${methodId}" in ${apiKey}.`,
             hint:
               `${near.length ? `Did you mean: ${near.join(', ')}? ` : ''}` +
-              `Use google_api_search({query: "...", api: "${api}"}) to find the right method id.`,
+              `Use google_api_search({query: "...", api: "${apiKey}"}) to find the right method id.`,
             retriable: false,
             account,
           },
@@ -203,12 +228,17 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         );
       }
 
+      // The RESOLVED index id only, never the caller's methodId argument.
+      registry.usageMetrics?.recordEscapeMethod(method.id);
       const cud = cudFromMethod(method);
-      const policyService = serviceForAlias(api as string);
+      const policyService = serviceForAlias(apiKey);
       const lastSegment = method.id.split('.').pop() ?? method.id;
-      const toolRef = { name: `${policyService}_${lastSegment}`, service: policyService, cud };
+      // The escape hatch self-gates, so it needs the same scope signal the
+      // registry wrapper gets; without it a privileged method would slip past
+      // safe-writes here while its generated twin is refused.
+      const toolRef = { name: `${policyService}_${lastSegment}`, service: policyService, cud, scopes: method.scopes };
       if (cud !== 'read' && !isAllowed(toolRef, policy)) {
-        return writeDisabledResult(toolRef, policy);
+        return writeDisabledResult(toolRef, policy, account as string);
       }
 
       return executeApiMethod(

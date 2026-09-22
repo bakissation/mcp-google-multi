@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import http from 'node:http';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from "@modelcontextprotocol/server";
 import { resolveHttpConfig } from '../src/http-config.js';
 import {
   HttpTransportHost,
@@ -10,6 +10,7 @@ import {
   jsonRpcMethod,
   type Authenticator,
 } from '../src/http-transport.js';
+import { z } from "zod";
 
 // ---- pure helpers -----------------------------------------------------------
 
@@ -54,14 +55,14 @@ afterEach(async () => {
 
 function makeServer(): McpServer {
   const s = new McpServer({ name: 'test-http', version: '0.0.0' });
-  s.registerTool('ping', { description: 'ping the server', inputSchema: {} }, async () => ({
+  s.registerTool('ping', { description: 'ping the server', inputSchema: z.object({}) }, async () => ({
     content: [{ type: 'text' as const, text: 'pong' }],
   }));
-  s.registerTool('slow', { description: 'slow tool', inputSchema: {} }, async () => {
+  s.registerTool('slow', { description: 'slow tool', inputSchema: z.object({}) }, async () => {
     await new Promise((r) => setTimeout(r, 300));
     return { content: [{ type: 'text' as const, text: 'done' }] };
   });
-  s.registerTool('hang', { description: 'never settles within a test', inputSchema: {} }, async () => {
+  s.registerTool('hang', { description: 'never settles within a test', inputSchema: z.object({}) }, async () => {
     // unref so the pending timer can't keep the process alive after the test.
     await new Promise((r) => {
       const t = setTimeout(r, 5000);

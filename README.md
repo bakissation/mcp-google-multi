@@ -1,10 +1,10 @@
 # mcp-google-multi
 
-The most complete **local Google Workspace MCP server**: Gmail, Drive, Calendar, Sheets, Docs, Slides, Forms, Contacts, Tasks, Chat, Meet, Classroom, Vault, Admin and more — **every OAuth-reachable Workspace API method** as a tool, across **multiple Google accounts** at once, from Claude Code or any MCP client.
+The most complete **local Google Workspace MCP server**: Gmail, Drive, Calendar, Sheets, Docs, Slides, Forms, Contacts, Tasks, Chat, Meet, Analytics (GA4), Search Console, Classroom, Vault, Admin and more — **every OAuth-reachable API method** as a tool, across **multiple Google accounts** at once, from Claude Code or any MCP client.
 
 [![npm](https://img.shields.io/npm/v/mcp-google-multi?label=npm&color=cb3837)](https://www.npmjs.com/package/mcp-google-multi)
 
-- 🧰 **Exhaustive** — 874 tools across 28 services + an escape hatch for anything else → [COVERAGE.md](./COVERAGE.md)
+- 🧰 **Exhaustive** — 940 tools across 29 services, now including Google Analytics (GA4), + an escape hatch for anything else → [COVERAGE.md](./COVERAGE.md)
 - 🔑 **Multi-account** — drive any number of Google accounts by alias, or fan one call out across all of them
 - 🔒 **Private by design** — your own OAuth app, tokens encrypted at rest (AES-256-GCM), writes deny-by-default, no telemetry, no metering — it talks only to Google
 - 🌐 **Local or remote** — runs locally over stdio, or self-hosted over HTTP with its own built-in OAuth 2.1 server (Claude Code's `/mcp` login and the claude.ai connector, zero custom UI). Pull-and-up Docker Compose with optional automatic HTTPS → [remote setup](./docs/http-setup.md)
@@ -19,6 +19,8 @@ New to all this? It's written for someone who just installed Claude Code and has
    ```bash
    npm install -g mcp-google-multi
    ```
+
+   Claude Desktop user? You can skip npm entirely: download the `mcp-google-multi.mcpb` bundle from the [latest release](https://github.com/bakissation/mcp-google-multi/releases/latest), double-click it (or drag it into Claude Desktop → Settings → Extensions), and fill in the values from step 2 when prompted.
 
 2. **Make your Google key** (the one manual part, a few minutes, because Google has no way to script it). Follow the step-by-step [Google Cloud setup](./docs/google-cloud-setup.md), or just ask Claude Code: *"walk me through creating a Google OAuth Desktop client for mcp-google-multi."* You finish with two values, a **Client ID** and a **Client Secret**. It's free and private to you.
 
@@ -51,7 +53,7 @@ New to all this? It's written for someone who just installed Claude Code and has
 
 *On a server or from claude.ai?* Advanced path: [Remote / HTTP setup](./docs/http-setup.md). *Coming from v5?* [v6 migration guide](./MIGRATION-v6.md).
 
-**Go deeper:** [Configuration reference](./docs/configuration.md) · [What's covered](./COVERAGE.md) · [Features tour](./docs/features.md) · [Remote / HTTP setup](./docs/http-setup.md) · [Secrets in a vault](./docs/secrets.md) · [Migrating to v6](./MIGRATION-v6.md) · [Security policy](./SECURITY.md) · [Roadmap](https://github.com/bakissation/mcp-google-multi/milestones)
+**Go deeper:** [Configuration reference](./docs/configuration.md) · [What's covered](./COVERAGE.md) · [Features tour](./docs/features.md) · [Remote / HTTP setup](./docs/http-setup.md) · [Secrets in a vault](./docs/secrets.md) · [Local usage metrics](./docs/usage-metrics.md) · [Migrating to v6](./MIGRATION-v6.md) · [Security policy](./SECURITY.md) · [Roadmap](https://github.com/bakissation/mcp-google-multi/milestones)
 
 ## Maintainer & credits
 

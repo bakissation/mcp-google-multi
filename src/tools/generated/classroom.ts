@@ -39,10 +39,11 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     method: { id: "classroom.courses.aliases.create", httpMethod: "POST", path: "v1/courses/{courseId}/aliases", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId"], scopes: S_classroom_v1[0] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"alias","api":"alias"}],
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course to alias. This identifier can be either the Classroom-assigned identifier or an alias."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("CourseAlias JSON request body. Top-level fields: alias."),
+      courseId: z.string().min(1).describe("Identifier of the course to alias. This identifier can be either the Classroom-assigned identifier or an alias."),
+      alias: z.string().describe("Alias string. The format of the string indicates the desired alias scoping. * `d:` indicates a domain-scoped alias. Example: `d:math_101` * `p:` indicates a project-scoped alias. Example: `p:abc123` T").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -55,8 +56,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      alias: z.string().describe("Alias to delete. This may not be the Classroom-assigned identifier."),
-      courseId: z.string().describe("Identifier of the course whose alias should be deleted. This identifier can be either the Classroom-assigned identifier or an alias."),
+      alias: z.string().min(1).describe("Alias to delete. This may not be the Classroom-assigned identifier."),
+      courseId: z.string().min(1).describe("Identifier of the course whose alias should be deleted. This identifier can be either the Classroom-assigned identifier or an alias."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -69,7 +70,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("The identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("The identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
       pageSize: z.number().describe("Maximum number of items to return. Zero or unspecified indicates that the server may assign a maximum. The server may return fewer than the specified number of results.").optional(),
       pageToken: z.string().describe("nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -84,8 +85,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which to create the attachment. This field is required, but is not marked as such while we are migrating from post_id."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which to create the attachment. This field is required, but is not marked as such while we are migrating from post_id."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. This authorization token is required for in-Classr").optional(),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
@@ -101,9 +102,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -117,9 +118,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -133,8 +134,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` whose attachments should be enumerated. This field is required, but is not marked as such while we are migrating from post_id."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` whose attachments should be enumerated. This field is required, but is not marked as such while we are migrating from post_id."),
       pageSize: z.number().describe("The maximum number of attachments to return. The service may return fewer than this value. If unspecified, at most 20 attachments will be returned. The maximum value is 20; values above 20 will be coe").optional(),
       pageToken: z.string().describe("A page token, received from a previous `ListAddOnAttachments` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListAddOnAttachments` must match th").optional(),
       postId: z.string().describe("Optional. Identifier of the post under the course whose attachments to enumerate. Deprecated, use `item_id` instead.").optional(),
@@ -150,9 +151,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the post under which the attachment is attached."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the post under which the attachment is attached."),
       postId: z.string().describe("Required. Identifier of the post under which the attachment is attached.").optional(),
       updateMask: z.string().describe("Required. Mask that identifies which fields on the attachment to update. The update fails if invalid fields are specified. If a field supports empty values, it can be cleared by specifying it in the u").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
@@ -168,7 +169,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Announcement JSON request body. Top-level fields: alternateLink, assigneeMode, courseId, creationTime, creatorUserId, id, individualStudentsOptions, materials, scheduledTime, state, text, updateTime."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -182,8 +183,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the announcement to delete. This identifier is a Classroom-assigned identifier."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the announcement to delete. This identifier is a Classroom-assigned identifier."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -196,8 +197,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the announcement."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the announcement."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -210,8 +211,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. The authorization token is required when neither o").optional(),
       attachmentId: z.string().describe("Optional. The identifier of the attachment. This field is required for all requests except when the user is in the [Attachment Discovery iframe](https://developers.google.com/workspace/classroom/add-o").optional(),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
@@ -227,7 +228,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
       announcementStates: coerceArray(z.enum(["ANNOUNCEMENT_STATE_UNSPECIFIED","PUBLISHED","DRAFT","DELETED"])).describe("Restriction on the `state` of announcements returned. If this argument is left unspecified, the default value is `PUBLISHED`.").optional(),
       orderBy: z.string().describe("Optional sort ordering for results. A comma-separated list of fields with an optional sort direction keyword. Supported field is `updateTime`. Supported direction keywords are `asc` and `desc`. If not").optional(),
       pageSize: z.number().describe("Maximum number of items to return. Zero or unspecified indicates that the server may assign a maximum. The server may return fewer than the specified number of results.").optional(),
@@ -244,8 +245,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the announcement."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the announcement."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ModifyAnnouncementAssigneesRequest JSON request body. Top-level fields: assigneeMode, modifyIndividualStudentsOptions."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -259,8 +260,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the announcement."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the announcement."),
       updateMask: z.string().describe("Mask that identifies which fields on the announcement to update. This field is required to do an update. The update fails if invalid fields are specified. If a field supports empty values, it can be c").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Announcement JSON request body. Top-level fields: alternateLink, assigneeMode, courseId, creationTime, creatorUserId, id, individualStudentsOptions, materials, scheduledTime, state, text, updateTime."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -275,8 +276,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which to create the attachment. This field is required, but is not marked as such while we are migrating from post_id."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which to create the attachment. This field is required, but is not marked as such while we are migrating from post_id."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. This authorization token is required for in-Classr").optional(),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
@@ -292,9 +293,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -308,9 +309,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -324,8 +325,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` whose attachments should be enumerated. This field is required, but is not marked as such while we are migrating from post_id."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` whose attachments should be enumerated. This field is required, but is not marked as such while we are migrating from post_id."),
       pageSize: z.number().describe("The maximum number of attachments to return. The service may return fewer than this value. If unspecified, at most 20 attachments will be returned. The maximum value is 20; values above 20 will be coe").optional(),
       pageToken: z.string().describe("A page token, received from a previous `ListAddOnAttachments` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListAddOnAttachments` must match th").optional(),
       postId: z.string().describe("Optional. Identifier of the post under the course whose attachments to enumerate. Deprecated, use `item_id` instead.").optional(),
@@ -341,9 +342,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the post under which the attachment is attached."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the post under which the attachment is attached."),
       postId: z.string().describe("Required. Identifier of the post under which the attachment is attached.").optional(),
       updateMask: z.string().describe("Required. Mask that identifies which fields on the attachment to update. The update fails if invalid fields are specified. If a field supports empty values, it can be cleared by specifying it in the u").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
@@ -359,10 +360,10 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
-      submissionId: z.string().describe("Required. Identifier of the student’s submission."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
+      submissionId: z.string().min(1).describe("Required. Identifier of the student’s submission."),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -374,15 +375,20 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     method: { id: "classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}/studentSubmissions/{submissionId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","itemId","attachmentId","submissionId"], scopes: S_classroom_v1[2] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"submissionId","api":"submissionId","location":"path"},{"field":"postId","api":"postId","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"courseWorkSubmissionId","api":"courseWorkSubmissionId"},{"field":"id","api":"id"},{"field":"pointsEarned","api":"pointsEarned"},{"field":"postSubmissionState","api":"postSubmissionState"},{"field":"userId","api":"userId"}],
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
-      submissionId: z.string().describe("Required. Identifier of the student's submission."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
+      submissionId: z.string().min(1).describe("Required. Identifier of the student's submission."),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
       updateMask: z.string().describe("Required. Mask that identifies which fields on the attachment to update. The update fails if invalid fields are specified. If a field supports empty values, it can be cleared by specifying it in the u").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachmentStudentSubmission JSON request body. Top-level fields: courseWorkSubmissionId, id, pointsEarned, postSubmissionState, userId."),
+      courseWorkSubmissionId: z.string().describe("Output only. Identifier of the course work submission under which this attachment submission was made.").optional(),
+      id: z.string().describe("Output only. Classroom-assigned identifier for this student submission. This is unique among submissions for the relevant course work and add-on attachment combination.").optional(),
+      pointsEarned: z.number().describe("Student grade on this attachment. If unset, no grade was set.").optional(),
+      postSubmissionState: z.enum(["SUBMISSION_STATE_UNSPECIFIED","NEW","CREATED","TURNED_IN","RETURNED","RECLAIMED_BY_STUDENT"]).describe("Submission state of add-on attachment's parent post (i.e. assignment).").optional(),
+      userId: z.string().describe("Identifier for the student that owns this submission. Requires the user to be a teacher in the course and have permission to read student submissions. See [`courseWork.studentSubmissions.get`](/worksp").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -395,7 +401,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CourseWork JSON request body. Top-level fields: alternateLink, assigneeMode, assignment, associatedWithDeveloper, courseId, creationTime, creatorUserId, description, dueDate, dueTime, gradeCategory, gradingPeriodId, +12 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -409,8 +415,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the course work to delete. This identifier is a Classroom-assigned identifier."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the course work to delete. This identifier is a Classroom-assigned identifier."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -423,8 +429,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the course work."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the course work."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -437,8 +443,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. The authorization token is required when neither o").optional(),
       attachmentId: z.string().describe("Optional. The identifier of the attachment. This field is required for all requests except when the user is in the [Attachment Discovery iframe](https://developers.google.com/workspace/classroom/add-o").optional(),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
@@ -454,7 +460,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
       courseWorkStates: coerceArray(z.enum(["COURSE_WORK_STATE_UNSPECIFIED","PUBLISHED","DRAFT","DELETED"])).describe("Restriction on the work status to return. Only courseWork that matches is returned. If unspecified, items with a work status of `PUBLISHED` is returned.").optional(),
       orderBy: z.string().describe("Optional sort ordering for results. A comma-separated list of fields with an optional sort direction keyword. Supported fields are `updateTime` and `dueDate`. Supported direction keywords are `asc` an").optional(),
       pageSize: z.number().describe("Maximum number of items to return. Zero or unspecified indicates that the server may assign a maximum. The server may return fewer than the specified number of results.").optional(),
@@ -471,8 +477,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the coursework."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the coursework."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ModifyCourseWorkAssigneesRequest JSON request body. Top-level fields: assigneeMode, modifyIndividualStudentsOptions."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -486,8 +492,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the course work."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the course work."),
       updateMask: z.string().describe("Mask that identifies which fields on the course work to update. This field is required to do an update. The update fails if invalid fields are specified. If a field supports empty values, it can be cl").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CourseWork JSON request body. Top-level fields: alternateLink, assigneeMode, assignment, associatedWithDeveloper, courseId, creationTime, creatorUserId, description, dueDate, dueTime, gradeCategory, gradingPeriodId, +12 more."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -502,8 +508,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      courseWorkId: z.string().describe("Required. Identifier of the course work."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      courseWorkId: z.string().min(1).describe("Required. Identifier of the course work."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Rubric JSON request body. Top-level fields: courseId, courseWorkId, creationTime, criteria, id, sourceSpreadsheetId, updateTime."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -517,9 +523,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      courseWorkId: z.string().describe("Required. Identifier of the course work."),
-      id: z.string().describe("Required. Identifier of the rubric."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      courseWorkId: z.string().min(1).describe("Required. Identifier of the course work."),
+      id: z.string().min(1).describe("Required. Identifier of the rubric."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -532,9 +538,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      courseWorkId: z.string().describe("Required. Identifier of the course work."),
-      id: z.string().describe("Required. Identifier of the rubric."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      courseWorkId: z.string().min(1).describe("Required. Identifier of the course work."),
+      id: z.string().min(1).describe("Required. Identifier of the rubric."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -547,8 +553,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      courseWorkId: z.string().describe("Required. Identifier of the course work."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      courseWorkId: z.string().min(1).describe("Required. Identifier of the course work."),
       pageSize: z.number().describe("The maximum number of rubrics to return. If unspecified, at most 1 rubric is returned. The maximum value is 1; values above 1 are coerced to 1.").optional(),
       pageToken: z.string().describe("nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -563,9 +569,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      courseWorkId: z.string().describe("Required. Identifier of the course work."),
-      id: z.string().describe("Optional. Identifier of the rubric."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      courseWorkId: z.string().min(1).describe("Required. Identifier of the course work."),
+      id: z.string().min(1).describe("Optional. Identifier of the rubric."),
       updateMask: z.string().describe("Optional. Mask that identifies which fields on the rubric to update. This field is required to do an update. The update fails if invalid fields are specified. There are multiple options to define the ").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Rubric JSON request body. Top-level fields: courseId, courseWorkId, creationTime, criteria, id, sourceSpreadsheetId, updateTime."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -580,9 +586,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      courseWorkId: z.string().describe("Identifier of the course work."),
-      id: z.string().describe("Identifier of the student submission."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseWorkId: z.string().min(1).describe("Identifier of the course work."),
+      id: z.string().min(1).describe("Identifier of the student submission."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -595,8 +601,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      courseWorkId: z.string().describe("Identifier of the student work to request. This may be set to the string literal `\"-\"` to request student work for all course work in the specified course."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseWorkId: z.string().min(1).describe("Identifier of the student work to request. This may be set to the string literal `\"-\"` to request student work for all course work in the specified course."),
       late: z.enum(["LATE_VALUES_UNSPECIFIED","LATE_ONLY","NOT_LATE_ONLY"]).describe("Requested lateness value. If specified, returned student submissions are restricted by the requested value. If unspecified, submissions are returned regardless of `late` value.").optional(),
       pageSize: z.number().describe("Maximum number of items to return. Zero or unspecified indicates that the server may assign a maximum. The server may return fewer than the specified number of results.").optional(),
       pageToken: z.string().describe("nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this").optional(),
@@ -614,9 +620,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      courseWorkId: z.string().describe("Identifier of the course work."),
-      id: z.string().describe("Identifier of the student submission."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseWorkId: z.string().min(1).describe("Identifier of the course work."),
+      id: z.string().min(1).describe("Identifier of the student submission."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ModifyAttachmentsRequest JSON request body. Top-level fields: addAttachments."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -630,9 +636,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      courseWorkId: z.string().describe("Identifier of the course work."),
-      id: z.string().describe("Identifier of the student submission."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseWorkId: z.string().min(1).describe("Identifier of the course work."),
+      id: z.string().min(1).describe("Identifier of the student submission."),
       updateMask: z.string().describe("Mask that identifies which fields on the student submission to update. This field is required to do an update. The update fails if invalid fields are specified. The following fields may be specified b").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("StudentSubmission JSON request body. Top-level fields: alternateLink, assignedGrade, assignedRubricGrades, assignmentSubmission, associatedWithDeveloper, courseId, courseWorkId, courseWorkType, creationTime, draftGrade, draftRubricGrades, id, +7 more."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -640,49 +646,49 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "classroom_courses_course_work_student_submissions_reclaim",
-    cud: "create",
+    cud: "update",
     description: "Reclaims a student submission on behalf of the student that owns it. Reclaiming a student submission transfers ownership of attached Drive files to the student",
     method: { id: "classroom.courses.courseWork.studentSubmissions.reclaim", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:reclaim", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId","id"], scopes: S_classroom_v1[11] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      courseWorkId: z.string().describe("Identifier of the course work."),
-      id: z.string().describe("Identifier of the student submission."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("ReclaimStudentSubmissionRequest JSON request body."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseWorkId: z.string().min(1).describe("Identifier of the course work."),
+      id: z.string().min(1).describe("Identifier of the student submission."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
   registerGeneratedTool(registry, {
     name: "classroom_courses_course_work_student_submissions_return",
-    cud: "create",
+    cud: "update",
     description: "Returns a student submission. Returning a student submission transfers ownership of attached Drive files to the student and may also update the submission state",
     method: { id: "classroom.courses.courseWork.studentSubmissions.return", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:return", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId","id"], scopes: S_classroom_v1[7] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      courseWorkId: z.string().describe("Identifier of the course work."),
-      id: z.string().describe("Identifier of the student submission."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("ReturnStudentSubmissionRequest JSON request body."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseWorkId: z.string().min(1).describe("Identifier of the course work."),
+      id: z.string().min(1).describe("Identifier of the student submission."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
   registerGeneratedTool(registry, {
     name: "classroom_courses_course_work_student_submissions_turn_in",
-    cud: "create",
+    cud: "update",
     description: "Turns in a student submission. Turning in a student submission transfers ownership of attached Drive files to the teacher and may also update the submission sta",
     method: { id: "classroom.courses.courseWork.studentSubmissions.turnIn", httpMethod: "POST", path: "v1/courses/{courseId}/courseWork/{courseWorkId}/studentSubmissions/{id}:turnIn", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","courseWorkId","id"], scopes: S_classroom_v1[11] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"courseWorkId","api":"courseWorkId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      courseWorkId: z.string().describe("Identifier of the course work."),
-      id: z.string().describe("Identifier of the student submission."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("TurnInStudentSubmissionRequest JSON request body."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseWorkId: z.string().min(1).describe("Identifier of the course work."),
+      id: z.string().min(1).describe("Identifier of the student submission."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -695,8 +701,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      courseWorkId: z.string().describe("Required. Identifier of the course work."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      courseWorkId: z.string().min(1).describe("Required. Identifier of the course work."),
       id: z.string().describe("Optional. Identifier of the rubric.").optional(),
       updateMask: z.string().describe("Optional. Mask that identifies which fields on the rubric to update. This field is required to do an update. The update fails if invalid fields are specified. There are multiple options to define the ").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Rubric JSON request body. Top-level fields: courseId, courseWorkId, creationTime, criteria, id, sourceSpreadsheetId, updateTime."),
@@ -712,8 +718,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which to create the attachment. This field is required, but is not marked as such while we are migrating from post_id."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which to create the attachment. This field is required, but is not marked as such while we are migrating from post_id."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. This authorization token is required for in-Classr").optional(),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
@@ -729,9 +735,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -745,9 +751,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -761,8 +767,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` whose attachments should be enumerated. This field is required, but is not marked as such while we are migrating from post_id."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` whose attachments should be enumerated. This field is required, but is not marked as such while we are migrating from post_id."),
       pageSize: z.number().describe("The maximum number of attachments to return. The service may return fewer than this value. If unspecified, at most 20 attachments will be returned. The maximum value is 20; values above 20 will be coe").optional(),
       pageToken: z.string().describe("A page token, received from a previous `ListAddOnAttachments` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListAddOnAttachments` must match th").optional(),
       postId: z.string().describe("Optional. Identifier of the post under the course whose attachments to enumerate. Deprecated, use `item_id` instead.").optional(),
@@ -778,9 +784,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the post under which the attachment is attached."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the post under which the attachment is attached."),
       postId: z.string().describe("Required. Identifier of the post under which the attachment is attached.").optional(),
       updateMask: z.string().describe("Required. Mask that identifies which fields on the attachment to update. The update fails if invalid fields are specified. If a field supports empty values, it can be cleared by specifying it in the u").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
@@ -796,7 +802,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CourseWorkMaterial JSON request body. Top-level fields: alternateLink, assigneeMode, courseId, creationTime, creatorUserId, description, id, individualStudentsOptions, materials, scheduledTime, state, title, +2 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -810,8 +816,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the course work material to delete. This identifier is a Classroom-assigned identifier."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the course work material to delete. This identifier is a Classroom-assigned identifier."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -824,8 +830,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the course work material."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the course work material."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -838,8 +844,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. The authorization token is required when neither o").optional(),
       attachmentId: z.string().describe("Optional. The identifier of the attachment. This field is required for all requests except when the user is in the [Attachment Discovery iframe](https://developers.google.com/workspace/classroom/add-o").optional(),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
@@ -855,7 +861,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
       courseWorkMaterialStates: coerceArray(z.enum(["COURSEWORK_MATERIAL_STATE_UNSPECIFIED","PUBLISHED","DRAFT","DELETED"])).describe("Restriction on the work status to return. Only course work material that matches is returned. If unspecified, items with a work status of `PUBLISHED` is returned.").optional(),
       materialDriveId: z.string().describe("Optional filtering for course work material with at least one Drive material whose ID matches the provided string. If `material_link` is also specified, course work material must have materials matchi").optional(),
       materialLink: z.string().describe("Optional filtering for course work material with at least one link material whose URL partially matches the provided string.").optional(),
@@ -874,8 +880,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the course work material."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the course work material."),
       updateMask: z.string().describe("Mask that identifies which fields on the course work material to update. This field is required to do an update. The update fails if invalid fields are specified. If a field supports empty values, it ").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CourseWorkMaterial JSON request body. Top-level fields: alternateLink, assigneeMode, courseId, creationTime, creatorUserId, description, id, individualStudentsOptions, materials, scheduledTime, state, title, +2 more."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -903,7 +909,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("Identifier of the course to delete. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the course to delete. This identifier can be either the Classroom-assigned identifier or an alias."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -916,7 +922,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("Identifier of the course to return. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the course to return. This identifier can be either the Classroom-assigned identifier or an alias."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -929,7 +935,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. The identifier of the course."),
+      courseId: z.string().min(1).describe("Required. The identifier of the course."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -959,7 +965,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      id: z.string().describe("Identifier of the course to update. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the course to update. This identifier can be either the Classroom-assigned identifier or an alias."),
       updateMask: z.string().describe("Mask that identifies which fields on the course to update. This field is required to do an update. The update will fail if invalid fields are specified. The following fields are valid: * `courseState`").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Course JSON request body. Top-level fields: alternateLink, calendarId, courseGroupEmail, courseMaterialSets, courseState, creationTime, description, descriptionHeading, enrollmentCode, gradebookSettings, guardiansEnabled, id, +9 more."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -974,8 +980,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      postId: z.string().describe("Optional. Deprecated, use `item_id` instead."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      postId: z.string().min(1).describe("Optional. Deprecated, use `item_id` instead."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. This authorization token is required for in-Classr").optional(),
       itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which to create the attachment. This field is required, but is not marked as such while we are migrating from post_id.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
@@ -991,9 +997,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      postId: z.string().describe("Optional. Deprecated, use `item_id` instead."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      postId: z.string().min(1).describe("Optional. Deprecated, use `item_id` instead."),
       itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1007,9 +1013,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      postId: z.string().describe("Optional. Deprecated, use `item_id` instead."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      postId: z.string().min(1).describe("Optional. Deprecated, use `item_id` instead."),
       itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1023,8 +1029,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      postId: z.string().describe("Optional. Identifier of the post under the course whose attachments to enumerate. Deprecated, use `item_id` instead."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      postId: z.string().min(1).describe("Optional. Identifier of the post under the course whose attachments to enumerate. Deprecated, use `item_id` instead."),
       itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` whose attachments should be enumerated. This field is required, but is not marked as such while we are migrating from post_id.").optional(),
       pageSize: z.number().describe("The maximum number of attachments to return. The service may return fewer than this value. If unspecified, at most 20 attachments will be returned. The maximum value is 20; values above 20 will be coe").optional(),
       pageToken: z.string().describe("A page token, received from a previous `ListAddOnAttachments` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListAddOnAttachments` must match th").optional(),
@@ -1040,9 +1046,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      postId: z.string().describe("Required. Identifier of the post under which the attachment is attached."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      postId: z.string().min(1).describe("Required. Identifier of the post under which the attachment is attached."),
       itemId: z.string().describe("Identifier of the post under which the attachment is attached.").optional(),
       updateMask: z.string().describe("Required. Mask that identifies which fields on the attachment to update. The update fails if invalid fields are specified. If a field supports empty values, it can be cleared by specifying it in the u").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
@@ -1058,10 +1064,10 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      postId: z.string().describe("Optional. Deprecated, use `item_id` instead."),
-      submissionId: z.string().describe("Required. Identifier of the student’s submission."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      postId: z.string().min(1).describe("Optional. Deprecated, use `item_id` instead."),
+      submissionId: z.string().min(1).describe("Required. Identifier of the student’s submission."),
       itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1073,15 +1079,20 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     method: { id: "classroom.courses.posts.addOnAttachments.studentSubmissions.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/posts/{postId}/addOnAttachments/{attachmentId}/studentSubmissions/{submissionId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","postId","attachmentId","submissionId"], scopes: S_classroom_v1[2] },
     params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"postId","api":"postId","location":"path"},{"field":"submissionId","api":"submissionId","location":"path"},{"field":"itemId","api":"itemId","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"courseWorkSubmissionId","api":"courseWorkSubmissionId"},{"field":"id","api":"id"},{"field":"pointsEarned","api":"pointsEarned"},{"field":"postSubmissionState","api":"postSubmissionState"},{"field":"userId","api":"userId"}],
     shape: {
       account: accountField(),
-      attachmentId: z.string().describe("Required. Identifier of the attachment."),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      postId: z.string().describe("Optional. Deprecated, use `item_id` instead."),
-      submissionId: z.string().describe("Required. Identifier of the student's submission."),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      postId: z.string().min(1).describe("Optional. Deprecated, use `item_id` instead."),
+      submissionId: z.string().min(1).describe("Required. Identifier of the student's submission."),
       itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id.").optional(),
       updateMask: z.string().describe("Required. Mask that identifies which fields on the attachment to update. The update fails if invalid fields are specified. If a field supports empty values, it can be cleared by specifying it in the u").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachmentStudentSubmission JSON request body. Top-level fields: courseWorkSubmissionId, id, pointsEarned, postSubmissionState, userId."),
+      courseWorkSubmissionId: z.string().describe("Output only. Identifier of the course work submission under which this attachment submission was made.").optional(),
+      id: z.string().describe("Output only. Classroom-assigned identifier for this student submission. This is unique among submissions for the relevant course work and add-on attachment combination.").optional(),
+      pointsEarned: z.number().describe("Student grade on this attachment. If unset, no grade was set.").optional(),
+      postSubmissionState: z.enum(["SUBMISSION_STATE_UNSPECIFIED","NEW","CREATED","TURNED_IN","RETURNED","RECLAIMED_BY_STUDENT"]).describe("Submission state of add-on attachment's parent post (i.e. assignment).").optional(),
+      userId: z.string().describe("Identifier for the student that owns this submission. Requires the user to be a teacher in the course and have permission to read student submissions. See [`courseWork.studentSubmissions.get`](/worksp").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1094,8 +1105,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      postId: z.string().describe("Optional. Deprecated, use `item_id` instead."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      postId: z.string().min(1).describe("Optional. Deprecated, use `item_id` instead."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. The authorization token is required when neither o").optional(),
       attachmentId: z.string().describe("Optional. The identifier of the attachment. This field is required for all requests except when the user is in the [Attachment Discovery iframe](https://developers.google.com/workspace/classroom/add-o").optional(),
       itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id.").optional(),
@@ -1109,10 +1120,13 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     method: { id: "classroom.courses.studentGroups.create", httpMethod: "POST", path: "v1/courses/{courseId}/studentGroups", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId"], scopes: S_classroom_v1[14] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"courseId_","api":"courseId"},{"field":"id","api":"id"},{"field":"title","api":"title"}],
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. The identifier of the course."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("StudentGroup JSON request body. Top-level fields: courseId, id, title."),
+      courseId: z.string().min(1).describe("Required. The identifier of the course."),
+      courseId_: z.string().describe("The identifier of the course.").optional(),
+      id: z.string().describe("The identifier of the student group.").optional(),
+      title: z.string().describe("The title of the student group.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1125,8 +1139,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. The identifier of the course containing the student group to delete."),
-      id: z.string().describe("Required. The identifier of the student group to delete."),
+      courseId: z.string().min(1).describe("Required. The identifier of the course containing the student group to delete."),
+      id: z.string().min(1).describe("Required. The identifier of the student group to delete."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1139,7 +1153,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. The identifier of the course."),
+      courseId: z.string().min(1).describe("Required. The identifier of the course."),
       pageSize: z.number().describe("Maximum number of items to return. Zero or unspecified indicates that the server may assign a maximum, which is currently set to 75 items. The server may return fewer than the specified number of resu").optional(),
       pageToken: z.string().describe("nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1152,12 +1166,15 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     method: { id: "classroom.courses.studentGroups.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/studentGroups/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"], scopes: S_classroom_v1[14] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"courseId_","api":"courseId"},{"field":"id_","api":"id"},{"field":"title","api":"title"}],
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. Identifier of the course."),
-      id: z.string().describe("Required. Identifier of the student group."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      id: z.string().min(1).describe("Required. Identifier of the student group."),
       updateMask: z.string().describe("Required. Mask that identifies which fields on the student group to update. This field is required to do an update. The update fails if invalid fields are specified. The following fields can be specif").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("StudentGroup JSON request body. Top-level fields: courseId, id, title."),
+      courseId_: z.string().describe("The identifier of the course.").optional(),
+      id_: z.string().describe("The identifier of the student group.").optional(),
+      title: z.string().describe("The title of the student group.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1168,11 +1185,14 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     method: { id: "classroom.courses.studentGroups.studentGroupMembers.create", httpMethod: "POST", path: "v1/courses/{courseId}/studentGroups/{studentGroupId}/studentGroupMembers", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","studentGroupId"], scopes: S_classroom_v1[14] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"studentGroupId","api":"studentGroupId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"courseId_","api":"courseId"},{"field":"studentGroupId_","api":"studentGroupId"},{"field":"userId","api":"userId"}],
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. The identifier of the course."),
-      studentGroupId: z.string().describe("Required. The identifier of the student group."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("StudentGroupMember JSON request body. Top-level fields: courseId, studentGroupId, userId."),
+      courseId: z.string().min(1).describe("Required. The identifier of the course."),
+      studentGroupId: z.string().min(1).describe("Required. The identifier of the student group."),
+      courseId_: z.string().describe("The identifier of the course.").optional(),
+      studentGroupId_: z.string().describe("The identifier of the student group.").optional(),
+      userId: z.string().describe("Identifier of the student.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1185,9 +1205,9 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. The identifier of the course containing the relevant student group."),
-      studentGroupId: z.string().describe("Required. The identifier of the student group containing the student group member to delete."),
-      userId: z.string().describe("Required. The identifier of the student group member to delete."),
+      courseId: z.string().min(1).describe("Required. The identifier of the course containing the relevant student group."),
+      studentGroupId: z.string().min(1).describe("Required. The identifier of the student group containing the student group member to delete."),
+      userId: z.string().min(1).describe("Required. The identifier of the student group member to delete."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1200,8 +1220,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. The identifier of the course."),
-      studentGroupId: z.string().describe("Required. The identifier of the student group."),
+      courseId: z.string().min(1).describe("Required. The identifier of the course."),
+      studentGroupId: z.string().min(1).describe("Required. The identifier of the student group."),
       pageSize: z.number().describe("Maximum number of items to return. Zero or unspecified indicates that the server may assign a maximum. The server may return fewer than the specified number of results.").optional(),
       pageToken: z.string().describe("nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1216,7 +1236,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course to create the student in. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("Identifier of the course to create the student in. This identifier can be either the Classroom-assigned identifier or an alias."),
       enrollmentCode: z.string().describe("Enrollment code of the course to create the student in. This code is required if userId corresponds to the requesting user; it may be omitted if the requesting user has administrative permissions to c").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Student JSON request body. Top-level fields: courseId, profile, studentWorkFolder, userId."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1231,8 +1251,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      userId: z.string().describe("Identifier of the student to delete. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the reque"),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      userId: z.string().min(1).describe("Identifier of the student to delete. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the reque"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1245,8 +1265,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      userId: z.string().describe("Identifier of the student to return. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the reque"),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      userId: z.string().min(1).describe("Identifier of the student to return. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the reque"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1259,7 +1279,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
       pageSize: z.number().describe("Maximum number of items to return. The default is 30 if unspecified or `0`. The server may return fewer than the specified number of results.").optional(),
       pageToken: z.string().describe("nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1274,7 +1294,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Teacher JSON request body. Top-level fields: courseId, profile, userId."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1288,8 +1308,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      userId: z.string().describe("Identifier of the teacher to delete. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the reque"),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      userId: z.string().min(1).describe("Identifier of the teacher to delete. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the reque"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1302,8 +1322,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      userId: z.string().describe("Identifier of the teacher to return. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the reque"),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      userId: z.string().min(1).describe("Identifier of the teacher to return. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the reque"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1316,7 +1336,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
       pageSize: z.number().describe("Maximum number of items to return. The default is 30 if unspecified or `0`. The server may return fewer than the specified number of results.").optional(),
       pageToken: z.string().describe("nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1329,10 +1349,14 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     method: { id: "classroom.courses.topics.create", httpMethod: "POST", path: "v1/courses/{courseId}/topics", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId"], scopes: S_classroom_v1[18] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"courseId_","api":"courseId"},{"field":"name","api":"name"},{"field":"topicId","api":"topicId"},{"field":"updateTime","api":"updateTime"}],
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Topic JSON request body. Top-level fields: courseId, name, topicId, updateTime."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId_: z.string().describe("Identifier of the course. Read-only.").optional(),
+      name: z.string().describe("The name of the topic, generated by the user. Leading and trailing whitespaces, if any, are trimmed. Also, multiple consecutive whitespaces are collapsed into one inside the name. The result must be a").optional(),
+      topicId: z.string().describe("Unique identifier for the topic. Read-only.").optional(),
+      updateTime: z.string().describe("The time the topic was last updated by the system. Read-only.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1345,8 +1369,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the topic to delete."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the topic to delete."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1359,8 +1383,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course."),
-      id: z.string().describe("Identifier of the topic."),
+      courseId: z.string().min(1).describe("Identifier of the course."),
+      id: z.string().min(1).describe("Identifier of the topic."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1373,7 +1397,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
       pageSize: z.number().describe("Maximum number of items to return. Zero or unspecified indicates that the server may assign a maximum. The server may return fewer than the specified number of results.").optional(),
       pageToken: z.string().describe("nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1386,12 +1410,16 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     method: { id: "classroom.courses.topics.patch", httpMethod: "PATCH", path: "v1/courses/{courseId}/topics/{id}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","id"], scopes: S_classroom_v1[18] },
     params: [{"field":"courseId","api":"courseId","location":"path"},{"field":"id","api":"id","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"courseId_","api":"courseId"},{"field":"name","api":"name"},{"field":"topicId","api":"topicId"},{"field":"updateTime","api":"updateTime"}],
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
-      id: z.string().describe("Identifier of the topic."),
+      courseId: z.string().min(1).describe("Identifier of the course. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the topic."),
       updateMask: z.string().describe("Mask that identifies which fields on the topic to update. This field is required to do an update. The update fails if invalid fields are specified. If a field supports empty values, it can be cleared ").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Topic JSON request body. Top-level fields: courseId, name, topicId, updateTime."),
+      courseId_: z.string().describe("Identifier of the course. Read-only.").optional(),
+      name: z.string().describe("The name of the topic, generated by the user. Leading and trailing whitespaces, if any, are trimmed. Also, multiple consecutive whitespaces are collapsed into one inside the name. The result must be a").optional(),
+      topicId: z.string().describe("Unique identifier for the topic. Read-only.").optional(),
+      updateTime: z.string().describe("The time the topic was last updated by the system. Read-only.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1404,7 +1432,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      id: z.string().describe("Identifier of the course to update. This identifier can be either the Classroom-assigned identifier or an alias."),
+      id: z.string().min(1).describe("Identifier of the course to update. This identifier can be either the Classroom-assigned identifier or an alias."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Course JSON request body. Top-level fields: alternateLink, calendarId, courseGroupEmail, courseMaterialSets, courseState, creationTime, description, descriptionHeading, enrollmentCode, gradebookSettings, guardiansEnabled, id, +9 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -1418,7 +1446,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      courseId: z.string().describe("Required. The identifier of the course."),
+      courseId: z.string().min(1).describe("Required. The identifier of the course."),
       updateMask: z.string().describe("Mask that identifies which fields in the GradingPeriodSettings to update. The GradingPeriodSettings `grading_periods` list will be fully replaced by the grading periods specified in the update request").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GradingPeriodSettings JSON request body. Top-level fields: applyToExistingCoursework, gradingPeriods."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -1426,14 +1454,14 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "classroom_invitations_accept",
-    cud: "create",
+    cud: "update",
     description: "Accepts an invitation, removing it and adding the invited user to the teachers or students (as appropriate) of the specified course. Only the invited user may a",
     method: { id: "classroom.invitations.accept", httpMethod: "POST", path: "v1/invitations/{id}:accept", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["id"], scopes: S_classroom_v1[14] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("Identifier of the invitation to accept."),
+      id: z.string().min(1).describe("Identifier of the invitation to accept."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1444,9 +1472,13 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     method: { id: "classroom.invitations.create", httpMethod: "POST", path: "v1/invitations", baseUrl: "https://classroom.googleapis.com/", requiredParams: [], scopes: S_classroom_v1[14] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"courseId","api":"courseId"},{"field":"id","api":"id"},{"field":"role","api":"role"},{"field":"userId","api":"userId"}],
     shape: {
       account: accountField(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Invitation JSON request body. Top-level fields: courseId, id, role, userId."),
+      courseId: z.string().describe("Identifier of the course to invite the user to.").optional(),
+      id: z.string().describe("Identifier assigned by Classroom. Read-only.").optional(),
+      role: z.enum(["COURSE_ROLE_UNSPECIFIED","STUDENT","TEACHER","OWNER"]).describe("Role to invite the user to have. Must not be `COURSE_ROLE_UNSPECIFIED`.").optional(),
+      userId: z.string().describe("Identifier of the invited user. When specified as a parameter of a request, this identifier can be set to one of the following: * the numeric identifier for the user * the email address of the user * ").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1459,7 +1491,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("Identifier of the invitation to delete."),
+      id: z.string().min(1).describe("Identifier of the invitation to delete."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1472,7 +1504,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("Identifier of the invitation to return."),
+      id: z.string().min(1).describe("Identifier of the invitation to return."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1514,7 +1546,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      registrationId: z.string().describe("The `registration_id` of the `Registration` to be deleted."),
+      registrationId: z.string().min(1).describe("The `registration_id` of the `Registration` to be deleted."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1527,7 +1559,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("Identifier of the profile to return. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the reque"),
+      userId: z.string().min(1).describe("Identifier of the profile to return. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the reque"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1538,10 +1570,15 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     method: { id: "classroom.userProfiles.guardianInvitations.create", httpMethod: "POST", path: "v1/userProfiles/{studentId}/guardianInvitations", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["studentId"], scopes: S_classroom_v1[21] },
     params: [{"field":"studentId","api":"studentId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"creationTime","api":"creationTime"},{"field":"invitationId","api":"invitationId"},{"field":"invitedEmailAddress","api":"invitedEmailAddress"},{"field":"state","api":"state"},{"field":"studentId_","api":"studentId"}],
     shape: {
       account: accountField(),
-      studentId: z.string().describe("ID of the student (in standard format)"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("GuardianInvitation JSON request body. Top-level fields: creationTime, invitationId, invitedEmailAddress, state, studentId."),
+      studentId: z.string().min(1).describe("ID of the student (in standard format)"),
+      creationTime: z.string().describe("The time that this invitation was created. Read-only.").optional(),
+      invitationId: z.string().describe("Unique identifier for this invitation. Read-only.").optional(),
+      invitedEmailAddress: z.string().describe("Email address that the invitation was sent to. This field is only visible to domain administrators.").optional(),
+      state: z.enum(["GUARDIAN_INVITATION_STATE_UNSPECIFIED","PENDING","COMPLETE"]).describe("The state that this invitation is in.").optional(),
+      studentId_: z.string().describe("ID of the student (in standard format)").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1554,8 +1591,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      invitationId: z.string().describe("The `id` field of the `GuardianInvitation` being requested."),
-      studentId: z.string().describe("The ID of the student whose guardian invitation is being requested."),
+      invitationId: z.string().min(1).describe("The `id` field of the `GuardianInvitation` being requested."),
+      studentId: z.string().min(1).describe("The ID of the student whose guardian invitation is being requested."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1568,7 +1605,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      studentId: z.string().describe("The ID of the student whose guardian invitations are to be returned. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string lite"),
+      studentId: z.string().min(1).describe("The ID of the student whose guardian invitations are to be returned. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string lite"),
       invitedEmailAddress: z.string().describe("If specified, only results with the specified `invited_email_address` are returned.").optional(),
       pageSize: z.number().describe("Maximum number of items to return. Zero or unspecified indicates that the server may assign a maximum. The server may return fewer than the specified number of results.").optional(),
       pageToken: z.string().describe("nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this").optional(),
@@ -1583,12 +1620,17 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     method: { id: "classroom.userProfiles.guardianInvitations.patch", httpMethod: "PATCH", path: "v1/userProfiles/{studentId}/guardianInvitations/{invitationId}", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["studentId","invitationId"], scopes: S_classroom_v1[21] },
     params: [{"field":"invitationId","api":"invitationId","location":"path"},{"field":"studentId","api":"studentId","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"creationTime","api":"creationTime"},{"field":"invitationId_","api":"invitationId"},{"field":"invitedEmailAddress","api":"invitedEmailAddress"},{"field":"state","api":"state"},{"field":"studentId_","api":"studentId"}],
     shape: {
       account: accountField(),
-      invitationId: z.string().describe("The `id` field of the `GuardianInvitation` to be modified."),
-      studentId: z.string().describe("The ID of the student whose guardian invitation is to be modified."),
+      invitationId: z.string().min(1).describe("The `id` field of the `GuardianInvitation` to be modified."),
+      studentId: z.string().min(1).describe("The ID of the student whose guardian invitation is to be modified."),
       updateMask: z.string().describe("Mask that identifies which fields on the course to update. This field is required to do an update. The update fails if invalid fields are specified. The following fields are valid: * `state` When set ").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("GuardianInvitation JSON request body. Top-level fields: creationTime, invitationId, invitedEmailAddress, state, studentId."),
+      creationTime: z.string().describe("The time that this invitation was created. Read-only.").optional(),
+      invitationId_: z.string().describe("Unique identifier for this invitation. Read-only.").optional(),
+      invitedEmailAddress: z.string().describe("Email address that the invitation was sent to. This field is only visible to domain administrators.").optional(),
+      state: z.enum(["GUARDIAN_INVITATION_STATE_UNSPECIFIED","PENDING","COMPLETE"]).describe("The state that this invitation is in.").optional(),
+      studentId_: z.string().describe("ID of the student (in standard format)").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1601,8 +1643,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      guardianId: z.string().describe("The `id` field from a `Guardian`."),
-      studentId: z.string().describe("The student whose guardian is to be deleted. One of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user"),
+      guardianId: z.string().min(1).describe("The `id` field from a `Guardian`."),
+      studentId: z.string().min(1).describe("The student whose guardian is to be deleted. One of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1615,8 +1657,8 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      guardianId: z.string().describe("The `id` field from a `Guardian`."),
-      studentId: z.string().describe("The student whose guardian is being requested. One of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user"),
+      guardianId: z.string().min(1).describe("The `id` field from a `Guardian`."),
+      studentId: z.string().min(1).describe("The student whose guardian is being requested. One of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me\"`, indicating the requesting user"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -1629,7 +1671,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      studentId: z.string().describe("Filter results by the student who the guardian is linked to. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me"),
+      studentId: z.string().min(1).describe("Filter results by the student who the guardian is linked to. The identifier can be one of the following: * the numeric identifier for the user * the email address of the user * the string literal `\"me"),
       invitedEmailAddress: z.string().describe("Filter results by the email address that the original invitation was sent to, resulting in this guardian link. This filter can only be used by domain administrators.").optional(),
       pageSize: z.number().describe("Maximum number of items to return. Zero or unspecified indicates that the server may assign a maximum. The server may return fewer than the specified number of results.").optional(),
       pageToken: z.string().describe("nextPageToken value returned from a previous list call, indicating that the subsequent page of results should be returned. The list request must be otherwise identical to the one that resulted in this").optional(),

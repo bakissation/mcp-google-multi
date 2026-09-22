@@ -1,6 +1,6 @@
 # Features tour
 
-How the server keeps 874 tools usable, fast, and safe. Back to the [README](../README.md).
+How the server keeps 940 tools usable, fast, and safe. Back to the [README](../README.md).
 
 ## Discover-first tools (tiny idle context)
 
@@ -34,6 +34,10 @@ Two eager tools cover anything outside the snapshot: `google_api_search` finds a
 
 Discovery documents are fetched from Google on first use and cached on disk for 7 days (`DISCOVERY_CACHE_PATH`); a stale cache is used when offline.
 
+## Outbound recipient allowlist (off by default)
+
+For unattended or agent-driven deployments, `GOOGLE_OUTBOUND_ALLOWLIST` (comma-separated addresses and `@domain` suffixes) constrains WHO the server can mail, invite or grant access to: Gmail recipients (reply-derived ones included), Calendar attendees, and Drive grantees, enforced across curated tools, generated tools and the escape hatch. While active, escape-hatch raw-compose methods (whose base64 message cannot be inspected) and `anyone` link shares are refused with a hint pointing at the curated, enforced path. It is a prompt-injection blast-radius control: a hijacked agent cannot exfiltrate to arbitrary targets. Blocked calls fail with a typed `recipient_not_allowed` envelope naming the target and the active list. Unset by default: nothing is gated.
+
 ## Lean responses by default
 
 Tool responses are serialized compactly (no pretty-print token tax; set `GOOGLE_TRIM=off` to restore pretty JSON), and the fat readers ship sensible caps with per-call escape valves. The caps are per-call controls (`full` / `maxChars`) and are NOT affected by `GOOGLE_TRIM`:
@@ -42,6 +46,8 @@ Tool responses are serialized compactly (no pretty-print token tax; set `GOOGLE_
 - `gmail_read` / `gmail_read_thread` cap each message body at 50k chars (`bodyTruncated` + `bodyTotalChars` flags); pass `full: true` for the whole body.
 - `gmail_read_batch` reads up to 100 message ids in one call (collapsing the search→read triage loop): one ordered entry per id (`{ id, ...message }` or `{ id, error }`) plus a trailing `{ counts: { ok, failed }, truncated? }` summary. A single failed id does not fail the batch (auth/scope failures do); per-message bodies are capped at 50k (unless `full: true`) and the aggregate output is bounded so a large batch never blows the context window.
 - `calendar_list_events` / `calendar_list_instances` trim descriptions to ~300 chars and drop empty/audit fields in list view; `calendar_get_event` always returns the full event.
+
+**A capped list says so.** `drive_search`, `drive_list`, `calendar_list_events`, `calendar_list_instances`, `contacts_search` and `contacts_group_members` return `{ "<noun>": [...], returned, truncated }` rather than a bare array, plus `nextPageToken` / `totalItems` / `hint` when the API supplies them. A bare array cannot distinguish "these are all your events" from "these are the first 25 of them", so an agent reports the cap as the answer and has no way to notice. The four tools whose Google endpoints offer a continuation token also accept `pageToken`; `contacts_search` and `contacts_group_members` have none to offer, so they report truncation and point at the page-size control instead.
 
 
 ### Email attachments & safe compose
@@ -87,6 +93,10 @@ Any value you pass explicitly wins over the derived one (`to`, `cc`, `subject` a
 `mcp-google-multi doctor` gives a sectioned, exit-coded health report (models `brew doctor`): **Runtime** (Node ≥ 22), **Config** (config.json + legacy env/`.env` detection with the exact `migrate-config`/`mv` fix), **Keys** (`MASTER_KEY` provenance; a brick — unprovisioned key with encrypted tokens present — is a hard fail pointing at `reset`), **Tokens** (per-account status), **Scopes** (three-state granted-vs-profile), and **API enablement**. Every warn/fail carries a copy-pasteable remediation; it is strictly read-only (no mutation). Exit is non-zero on any FAIL (`--strict` also fails on WARN), so `doctor` can gate CI and migration scripts. Flags: `--json` (machine-readable on stdout), `--strict`, `--report` (a redacted, paste-ready bug report that masks email local-parts and never includes token values or keys).
 
 The same engine is exposed to agents as the read-only **`diagnose`** tool, returning the structured report so an agent can self-diagnose an auth/config failure and surface the fix. (HTTP-transport checks and the live per-service API-enablement probe land with the OAuth authorization server.)
+
+## Local usage metrics (off by default)
+
+Operator-enabled, **local-only** usage aggregates (tool names, error classes, latency buckets; never arguments, payloads, or identities) with **zero network egress ever**: no endpoint, no beacon, no push; data leaves the machine only when the operator copies files. Off until `GOOGLE_USAGE_METRICS=on`, self-announcing when on (boot log, `doctor`, `diagnose` name the state and its source), read locally with `mcp-google-multi metrics report`. The file format, structural guarantees at their true scope, the promotion workflow and the operator responsibility note live in [usage-metrics.md](./usage-metrics.md).
 
 `mcp-google-multi reset` recovers a bricked or stale install: it wipes encrypted token files (all accounts, or `--account <alias>`) — **config.json is always kept** — and with `--regenerate-key` also drops the generated `MASTER_KEY` (refused while any account still holds a token, since a fresh key would brick it). It is confirmation-gated (`--yes` for non-interactive) and, after a wipe, prints the exact re-auth command per account.
 

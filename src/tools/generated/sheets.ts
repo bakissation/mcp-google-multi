@@ -19,7 +19,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     shape: {
       account: accountField(),
       metadataId: z.number().describe("The ID of the developer metadata to retrieve."),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet to retrieve metadata from."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet to retrieve metadata from."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -32,7 +32,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet to retrieve metadata from."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet to retrieve metadata from."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchDeveloperMetadataRequest JSON request body. Top-level fields: dataFilters."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -46,7 +46,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      spreadsheetId: z.string().describe("The spreadsheet to request."),
+      spreadsheetId: z.string().min(1).describe("The spreadsheet to request."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GetSpreadsheetByDataFilterRequest JSON request body. Top-level fields: dataFilters, excludeTablesInBandedRanges, includeGridData."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -58,11 +58,12 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     method: { id: "sheets.spreadsheets.sheets.copyTo", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/sheets/{sheetId}:copyTo", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId","sheetId"], scopes: S_sheets_v4[0] },
     params: [{"field":"sheetId","api":"sheetId","location":"path"},{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"destinationSpreadsheetId","api":"destinationSpreadsheetId"}],
     shape: {
       account: accountField(),
       sheetId: z.number().describe("The ID of the sheet to copy."),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet containing the sheet to copy."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("CopySheetToAnotherSpreadsheetRequest JSON request body. Top-level fields: destinationSpreadsheetId."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet containing the sheet to copy."),
+      destinationSpreadsheetId: z.string().describe("The ID of the spreadsheet to copy the sheet to.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -75,7 +76,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet to update."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet to update."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchClearValuesByDataFilterRequest JSON request body. Top-level fields: dataFilters."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -89,21 +90,21 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet to retrieve data from."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet to retrieve data from."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchGetValuesByDataFilterRequest JSON request body. Top-level fields: dataFilters, dateTimeRenderOption, majorDimension, valueRenderOption."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
   registerGeneratedTool(registry, {
     name: "sheets_spreadsheets_values_batch_update_by_data_filter",
-    cud: "create",
+    cud: "update",
     description: "Sets values in one or more ranges of a spreadsheet. For more information, see [Read, write, and search metadata](https://developers.google.com/workspace/sheets/",
     method: { id: "sheets.spreadsheets.values.batchUpdateByDataFilter", httpMethod: "POST", path: "v4/spreadsheets/{spreadsheetId}/values:batchUpdateByDataFilter", baseUrl: "https://sheets.googleapis.com/", requiredParams: ["spreadsheetId"], scopes: S_sheets_v4[0] },
     params: [{"field":"spreadsheetId","api":"spreadsheetId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
       account: accountField(),
-      spreadsheetId: z.string().describe("The ID of the spreadsheet to update."),
+      spreadsheetId: z.string().min(1).describe("The ID of the spreadsheet to update."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchUpdateValuesByDataFilterRequest JSON request body. Top-level fields: data, includeValuesInResponse, responseDateTimeRenderOption, responseValueRenderOption, valueInputOption."),
       fields: z.string().optional().describe('Response field mask.'),
     },

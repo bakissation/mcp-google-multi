@@ -123,6 +123,22 @@ export const BUNDLE_CATALOG: Record<string, BundleCatalogEntry> = {
     description: 'Read Gmail Postmaster Tools deliverability data.',
     risk: 'low',
   },
+  analytics: {
+    scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
+    description: 'Read Google Analytics (GA4): run reports and inspect accounts, properties and their configuration.',
+    risk: 'low',
+  },
+  // Includes readonly so it is self-sufficient: analytics.edit alone does not
+  // authorize Data API reads. The smaller `analytics` bundle stays the hint
+  // target for read scopes (scope-observability sorts bundles by size).
+  analytics_write: {
+    scopes: [
+      'https://www.googleapis.com/auth/analytics.readonly',
+      'https://www.googleapis.com/auth/analytics.edit',
+    ],
+    description: 'Edit Google Analytics (GA4) configuration: properties, data streams, key events, custom dimensions and metrics. Includes read access.',
+    risk: 'medium',
+  },
   groupssettings: {
     scopes: ['https://www.googleapis.com/auth/apps.groups.settings'],
     description: 'Change Google Groups settings for the domain.',

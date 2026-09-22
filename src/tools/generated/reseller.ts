@@ -19,7 +19,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -46,7 +46,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Customer JSON request body. Top-level fields: alternateEmail, customerDomain, customerDomainVerified, customerId, customerType, kind, phoneNumber, postalAddress, primaryAdmin, resourceUiUrl."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -60,7 +60,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Customer JSON request body. Top-level fields: alternateEmail, customerDomain, customerDomainVerified, customerId, customerType, kind, phoneNumber, postalAddress, primaryAdmin, resourceUiUrl."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -92,7 +92,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "reseller_resellernotify_unregister",
-    cud: "create",
+    cud: "delete",
     description: "Unregisters a Reseller for receiving notifications.",
     method: { id: "reseller.resellernotify.unregister", httpMethod: "POST", path: "apps/reseller/v1/resellernotify/unregister", baseUrl: "https://reseller.googleapis.com/", requiredParams: [], scopes: S_reseller_v1[1] },
     params: [{"field":"serviceAccountEmailAddress","api":"serviceAccountEmailAddress","location":"query"},{"field":"fields","api":"fields","location":"query"}],
@@ -105,60 +105,66 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "reseller_subscriptions_activate",
-    cud: "create",
+    cud: "update",
     description: "Activates a subscription previously suspended by the reseller. If you did not suspend the customer subscription and it is suspended for any other reason, such a",
     method: { id: "reseller.subscriptions.activate", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/activate", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
-      subscriptionId: z.string().describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      subscriptionId: z.string().min(1).describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
   registerGeneratedTool(registry, {
     name: "reseller_subscriptions_change_plan",
-    cud: "create",
+    cud: "update",
     description: "Updates a subscription plan. Use this method to update a plan for a 30-day trial or a flexible plan subscription to an annual commitment plan with monthly or ye",
     method: { id: "reseller.subscriptions.changePlan", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/changePlan", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
-      subscriptionId: z.string().describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      subscriptionId: z.string().min(1).describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ChangePlanRequest JSON request body. Top-level fields: dealCode, kind, planName, purchaseOrderId, seats."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
   registerGeneratedTool(registry, {
     name: "reseller_subscriptions_change_renewal_settings",
-    cud: "create",
+    cud: "update",
     description: "Updates a user license's renewal settings. This is applicable for accounts with annual commitment plans only. For more information, see the description in [mana",
     method: { id: "reseller.subscriptions.changeRenewalSettings", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/changeRenewalSettings", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"kind","api":"kind"},{"field":"renewalType","api":"renewalType"}],
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
-      subscriptionId: z.string().describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("RenewalSettings JSON request body. Top-level fields: kind, renewalType."),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      subscriptionId: z.string().min(1).describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
+      kind: z.string().describe("Identifies the resource as a subscription renewal setting. Value: `subscriptions#renewalSettings`").optional(),
+      renewalType: z.string().describe("Renewal settings for the annual commitment plan. For more detailed information, see renewal options in the administrator help center. When renewing a subscription, the `renewalType` is a required prop").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
   registerGeneratedTool(registry, {
     name: "reseller_subscriptions_change_seats",
-    cud: "create",
+    cud: "update",
     description: "Updates a subscription's user license settings. For more information about updating an annual commitment plan or a flexible plan subscription’s licenses, see [M",
     method: { id: "reseller.subscriptions.changeSeats", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/changeSeats", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"kind","api":"kind"},{"field":"licensedNumberOfSeats","api":"licensedNumberOfSeats"},{"field":"maximumNumberOfSeats","api":"maximumNumberOfSeats"},{"field":"numberOfSeats","api":"numberOfSeats"}],
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
-      subscriptionId: z.string().describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Seats JSON request body. Top-level fields: kind, licensedNumberOfSeats, maximumNumberOfSeats, numberOfSeats."),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      subscriptionId: z.string().min(1).describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
+      kind: z.string().describe("Identifies the resource as a subscription seat setting. Value: `subscriptions#seats`").optional(),
+      licensedNumberOfSeats: z.number().describe("Read-only field containing the current number of users that are assigned a license for the product defined in `skuId`. This field's value is equivalent to the numerical count of users returned by the ").optional(),
+      maximumNumberOfSeats: z.number().describe("This is a required property and is exclusive to subscriptions with `FLEXIBLE` or `TRIAL` plans. This property sets the maximum number of licensed users allowed on a subscription. This quantity can be ").optional(),
+      numberOfSeats: z.number().describe("This is a required property and is exclusive to subscriptions with `ANNUAL_MONTHLY_PAY` and `ANNUAL_YEARLY_PAY` plans. This property sets the maximum number of licenses assignable to users on a subscr").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -171,8 +177,8 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
-      subscriptionId: z.string().describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      subscriptionId: z.string().min(1).describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
       deletionType: z.enum(["deletion_type_undefined","cancel","transfer_to_direct"]).describe("The `deletionType` query string enables the cancellation, downgrade, or suspension of a subscription."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -186,8 +192,8 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
-      subscriptionId: z.string().describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      subscriptionId: z.string().min(1).describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -200,7 +206,7 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
       action: z.enum(["actionUnspecified","buy","switch"]).describe("The intented insert action. Advised to set this when the customer already has a subscription for a different SKU in the same product.").optional(),
       customerAuthToken: z.string().describe("The `customerAuthToken` query string is required when creating a resold account that transfers a direct customer's subscription or transfers another reseller customer's subscription to your reseller m").optional(),
       sourceSkuId: z.string().describe("The sku_id of the existing subscription to be upgraded or downgraded. This is required when action is SWITCH.").optional(),
@@ -234,22 +240,22 @@ export function registerResellerGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
-      subscriptionId: z.string().describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      subscriptionId: z.string().min(1).describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
   registerGeneratedTool(registry, {
     name: "reseller_subscriptions_suspend",
-    cud: "create",
+    cud: "update",
     description: "Suspends an active subscription. You can use this method to suspend a paid subscription that is currently in the `ACTIVE` state. * For `FLEXIBLE` subscriptions,",
     method: { id: "reseller.subscriptions.suspend", httpMethod: "POST", path: "apps/reseller/v1/customers/{customerId}/subscriptions/{subscriptionId}/suspend", baseUrl: "https://reseller.googleapis.com/", requiredParams: ["customerId","subscriptionId"], scopes: S_reseller_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"subscriptionId","api":"subscriptionId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
       account: accountField(),
-      customerId: z.string().describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
-      subscriptionId: z.string().describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
+      customerId: z.string().min(1).describe("This can be either the customer's primary domain name or the customer's unique identifier. If the domain name for a customer changes, the old domain name cannot be used to access the customer, but the"),
+      subscriptionId: z.string().min(1).describe("This is a required property. The `subscriptionId` is the subscription identifier and is unique for each customer. Since a `subscriptionId` changes when a subscription is updated, we recommend to not u"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

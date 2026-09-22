@@ -29,8 +29,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("The ID of the draft to delete."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The ID of the draft to delete."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -43,8 +43,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      id: z.string().describe("The ID of the draft to update."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The ID of the draft to update."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Draft JSON request body. Top-level fields: id, message."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -58,8 +58,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("The ID of the label to retrieve."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The ID of the label to retrieve."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -72,8 +72,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      id: z.string().describe("The ID of the label to update."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The ID of the label to update."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Label JSON request body. Top-level fields: color, id, labelListVisibility, messageListVisibility, messagesTotal, messagesUnread, name, threadsTotal, threadsUnread, type."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -87,8 +87,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      id: z.string().describe("The ID of the label to update."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The ID of the label to update."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Label JSON request body. Top-level fields: color, id, labelListVisibility, messageListVisibility, messagesTotal, messagesUnread, name, threadsTotal, threadsUnread, type."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -102,7 +102,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       deleted: coerceBoolean.describe("Mark the email as permanently deleted (not TRASH) and only visible in Google Vault to a Vault administrator. Only used for Google Workspace accounts.").optional(),
       internalDateSource: z.enum(["receivedTime","dateHeader"]).describe("Source for Gmail's internal date of the message.").optional(),
       neverMarkSpam: coerceBoolean.describe("Ignore the Gmail spam classifier decision and never mark this email as SPAM in the mailbox.").optional(),
@@ -120,7 +120,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       deleted: coerceBoolean.describe("Mark the email as permanently deleted (not TRASH) and only visible in Google Vault to a Vault administrator. Only used for Google Workspace accounts.").optional(),
       internalDateSource: z.enum(["receivedTime","dateHeader"]).describe("Source for Gmail's internal date of the message.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Message JSON request body. Top-level fields: classificationLabelValues, historyId, id, internalDate, labelIds, payload, raw, sizeEstimate, snippet, threadId."),
@@ -136,8 +136,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("The ID of the message to remove from Trash."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The ID of the message to remove from Trash."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -150,7 +150,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
+      userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CseIdentity JSON request body. Top-level fields: emailAddress, primaryKeyPairId, signAndEncryptKeyPairs."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -164,8 +164,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      cseEmailAddress: z.string().describe("The primary email address associated with the client-side encryption identity configuration that's removed."),
-      userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
+      cseEmailAddress: z.string().min(1).describe("The primary email address associated with the client-side encryption identity configuration that's removed."),
+      userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -178,8 +178,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      cseEmailAddress: z.string().describe("The primary email address associated with the client-side encryption identity configuration that's retrieved."),
-      userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
+      cseEmailAddress: z.string().min(1).describe("The primary email address associated with the client-side encryption identity configuration that's retrieved."),
+      userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -192,7 +192,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
+      userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       pageSize: z.number().describe("The number of identities to return. If not provided, the page size will default to 20 entries.").optional(),
       pageToken: z.string().describe("Pagination token indicating which page of identities to return. If the token is not supplied, then the API will return the first page of results.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -207,8 +207,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      emailAddress: z.string().describe("The email address of the client-side encryption identity to update."),
-      userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
+      emailAddress: z.string().min(1).describe("The email address of the client-side encryption identity to update."),
+      userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CseIdentity JSON request body. Top-level fields: emailAddress, primaryKeyPairId, signAndEncryptKeyPairs."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -222,7 +222,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
+      userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       chainValidation: z.enum(["all","none"]).describe("The type of certificate chain validation to perform at creation. The request will be rejected if the uploaded chain fails to satisfy the requested validation checks. When unspecified, this parameter d").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CseKeyPair JSON request body. Top-level fields: disableTime, enablementState, keyPairId, pem, pkcs7, privateKeyMetadata, subjectEmailAddresses."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -230,31 +230,31 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "gmail_users_settings_cse_keypairs_disable",
-    cud: "create",
+    cud: "update",
     description: "Turns off a client-side encryption key pair. The authenticated user can no longer use the key pair to decrypt incoming CSE message texts or sign outgoing CSE ma",
     method: { id: "gmail.users.settings.cse.keypairs.disable", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:disable", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"], scopes: S_gmail_v1[5] },
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
-      keyPairId: z.string().describe("The identifier of the key pair to turn off."),
-      userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("DisableCseKeyPairRequest JSON request body."),
+      keyPairId: z.string().min(1).describe("The identifier of the key pair to turn off."),
+      userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
   registerGeneratedTool(registry, {
     name: "gmail_users_settings_cse_keypairs_enable",
-    cud: "create",
+    cud: "update",
     description: "Turns on a client-side encryption key pair that was turned off. The key pair becomes active again for any associated client-side encryption identities. For admi",
     method: { id: "gmail.users.settings.cse.keypairs.enable", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:enable", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"], scopes: S_gmail_v1[5] },
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
-      keyPairId: z.string().describe("The identifier of the key pair to turn on."),
-      userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("EnableCseKeyPairRequest JSON request body."),
+      keyPairId: z.string().min(1).describe("The identifier of the key pair to turn on."),
+      userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -267,8 +267,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      keyPairId: z.string().describe("The identifier of the key pair to retrieve."),
-      userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
+      keyPairId: z.string().min(1).describe("The identifier of the key pair to retrieve."),
+      userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -281,7 +281,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
+      userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       pageSize: z.number().describe("The number of key pairs to return. If not provided, the page size will default to 20 entries.").optional(),
       pageToken: z.string().describe("Pagination token indicating which page of key pairs to return. If the token is not supplied, then the API will return the first page of results.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -294,11 +294,11 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     method: { id: "gmail.users.settings.cse.keypairs.obliterate", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/cse/keypairs/{keyPairId}:obliterate", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","keyPairId"], scopes: S_gmail_v1[5] },
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [],
     shape: {
       account: accountField(),
-      keyPairId: z.string().describe("The identifier of the key pair to obliterate."),
-      userId: z.string().describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("ObliterateCseKeyPairRequest JSON request body."),
+      keyPairId: z.string().min(1).describe("The identifier of the key pair to obliterate."),
+      userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -309,10 +309,12 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     method: { id: "gmail.users.settings.delegates.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/delegates", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[7] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"delegateEmail","api":"delegateEmail"},{"field":"verificationStatus","api":"verificationStatus"}],
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Delegate JSON request body. Top-level fields: delegateEmail, verificationStatus."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      delegateEmail: z.string().describe("The email address of the delegate.").optional(),
+      verificationStatus: z.enum(["verificationStatusUnspecified","accepted","pending","rejected","expired"]).describe("Indicates whether this address has been verified and can act as a delegate for the account. Read-only.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -325,8 +327,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      delegateEmail: z.string().describe("The email address of the user to be removed as a delegate."),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      delegateEmail: z.string().min(1).describe("The email address of the user to be removed as a delegate."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -339,8 +341,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      delegateEmail: z.string().describe("The email address of the user whose delegate relationship is to be retrieved."),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      delegateEmail: z.string().min(1).describe("The email address of the user whose delegate relationship is to be retrieved."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -353,7 +355,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -366,7 +368,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Filter JSON request body. Top-level fields: action, criteria, id."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -380,8 +382,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("The ID of the filter to be deleted."),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The ID of the filter to be deleted."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -394,8 +396,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("The ID of the filter to be fetched."),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The ID of the filter to be fetched."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -408,7 +410,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -419,10 +421,12 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     method: { id: "gmail.users.settings.forwardingAddresses.create", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/forwardingAddresses", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[7] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"forwardingEmail","api":"forwardingEmail"},{"field":"verificationStatus","api":"verificationStatus"}],
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("ForwardingAddress JSON request body. Top-level fields: forwardingEmail, verificationStatus."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      forwardingEmail: z.string().describe("An email address to which messages can be forwarded.").optional(),
+      verificationStatus: z.enum(["verificationStatusUnspecified","accepted","pending"]).describe("Indicates whether this address has been verified and is usable for forwarding. Read-only.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -435,8 +439,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      forwardingEmail: z.string().describe("The forwarding address to be deleted."),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      forwardingEmail: z.string().min(1).describe("The forwarding address to be deleted."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -449,8 +453,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      forwardingEmail: z.string().describe("The forwarding address to be retrieved."),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      forwardingEmail: z.string().min(1).describe("The forwarding address to be retrieved."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -463,7 +467,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -476,7 +480,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -489,7 +493,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -502,7 +506,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -515,7 +519,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -528,7 +532,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SendAs JSON request body. Top-level fields: displayName, isDefault, isPrimary, replyToAddress, sendAsEmail, signature, smtpMsa, treatAsAlias, verificationStatus."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -542,8 +546,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      sendAsEmail: z.string().describe("The send-as alias to be deleted."),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      sendAsEmail: z.string().min(1).describe("The send-as alias to be deleted."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -556,8 +560,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      sendAsEmail: z.string().describe("The send-as alias to be retrieved."),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      sendAsEmail: z.string().min(1).describe("The send-as alias to be retrieved."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -570,7 +574,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -583,8 +587,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      sendAsEmail: z.string().describe("The send-as alias to be updated."),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      sendAsEmail: z.string().min(1).describe("The send-as alias to be updated."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SendAs JSON request body. Top-level fields: displayName, isDefault, isPrimary, replyToAddress, sendAsEmail, signature, smtpMsa, treatAsAlias, verificationStatus."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -598,9 +602,9 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("The immutable ID for the SmimeInfo."),
-      sendAsEmail: z.string().describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The immutable ID for the SmimeInfo."),
+      sendAsEmail: z.string().min(1).describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -613,9 +617,9 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("The immutable ID for the SmimeInfo."),
-      sendAsEmail: z.string().describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The immutable ID for the SmimeInfo."),
+      sendAsEmail: z.string().min(1).describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -626,11 +630,18 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     method: { id: "gmail.users.settings.sendAs.smimeInfo.insert", httpMethod: "POST", path: "gmail/v1/users/{userId}/settings/sendAs/{sendAsEmail}/smimeInfo", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","sendAsEmail"], scopes: S_gmail_v1[5] },
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"encryptedKeyPassword","api":"encryptedKeyPassword"},{"field":"expiration","api":"expiration"},{"field":"id","api":"id"},{"field":"isDefault","api":"isDefault"},{"field":"issuerCn","api":"issuerCn"},{"field":"pem","api":"pem"},{"field":"pkcs12","api":"pkcs12"}],
     shape: {
       account: accountField(),
-      sendAsEmail: z.string().describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("SmimeInfo JSON request body. Top-level fields: encryptedKeyPassword, expiration, id, isDefault, issuerCn, pem, pkcs12."),
+      sendAsEmail: z.string().min(1).describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      encryptedKeyPassword: z.string().describe("Encrypted key password, when key is encrypted.").optional(),
+      expiration: z.string().describe("When the certificate expires (in milliseconds since epoch).").optional(),
+      id: z.string().describe("The immutable ID for the SmimeInfo.").optional(),
+      isDefault: coerceBoolean.describe("Whether this SmimeInfo is the default one for this user's send-as address.").optional(),
+      issuerCn: z.string().describe("The S/MIME certificate issuer's common name.").optional(),
+      pem: z.string().describe("PEM formatted X509 concatenated certificate string (standard base64 encoding). Format used for returning key, which includes public key as well as certificate chain (not private key).").optional(),
+      pkcs12: z.string().describe("PKCS#12 format containing a single private/public key pair and certificate chain. This format is only accepted from client for creating a new SmimeInfo and is never returned, because the private key i").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -643,8 +654,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      sendAsEmail: z.string().describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      sendAsEmail: z.string().min(1).describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -657,9 +668,9 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("The immutable ID for the SmimeInfo."),
-      sendAsEmail: z.string().describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The immutable ID for the SmimeInfo."),
+      sendAsEmail: z.string().min(1).describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -672,8 +683,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      sendAsEmail: z.string().describe("The send-as alias to be updated."),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      sendAsEmail: z.string().min(1).describe("The send-as alias to be updated."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SendAs JSON request body. Top-level fields: displayName, isDefault, isPrimary, replyToAddress, sendAsEmail, signature, smtpMsa, treatAsAlias, verificationStatus."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -687,8 +698,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      sendAsEmail: z.string().describe("The send-as alias to be verified."),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      sendAsEmail: z.string().min(1).describe("The send-as alias to be verified."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -699,10 +710,13 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     method: { id: "gmail.users.settings.updateAutoForwarding", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/autoForwarding", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[7] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"disposition","api":"disposition"},{"field":"emailAddress","api":"emailAddress"},{"field":"enabled","api":"enabled"}],
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("AutoForwarding JSON request body. Top-level fields: disposition, emailAddress, enabled."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      disposition: z.enum(["dispositionUnspecified","leaveInInbox","archive","trash","markRead"]).describe("The state that a message should be left in after it has been forwarded.").optional(),
+      emailAddress: z.string().describe("Email address to which all incoming messages are forwarded. This email address must be a verified member of the forwarding addresses.").optional(),
+      enabled: coerceBoolean.describe("Whether all incoming mail is automatically forwarded to another address.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -713,10 +727,14 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     method: { id: "gmail.users.settings.updateImap", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/imap", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[9] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"autoExpunge","api":"autoExpunge"},{"field":"enabled","api":"enabled"},{"field":"expungeBehavior","api":"expungeBehavior"},{"field":"maxFolderSize","api":"maxFolderSize"}],
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("ImapSettings JSON request body. Top-level fields: autoExpunge, enabled, expungeBehavior, maxFolderSize."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      autoExpunge: coerceBoolean.describe("If this value is true, Gmail will immediately expunge a message when it is marked as deleted in IMAP. Otherwise, Gmail will wait for an update from the client before expunging messages marked as delet").optional(),
+      enabled: coerceBoolean.describe("Whether IMAP is enabled for the account.").optional(),
+      expungeBehavior: z.enum(["expungeBehaviorUnspecified","archive","trash","deleteForever"]).describe("The action that will be executed on a message when it is marked as deleted and expunged from the last visible IMAP folder.").optional(),
+      maxFolderSize: z.number().describe("An optional limit on the number of messages that an IMAP folder may contain. Legal values are 0, 1000, 2000, 5000 or 10000. A value of zero is interpreted to mean that there is no limit.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -727,10 +745,11 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     method: { id: "gmail.users.settings.updateLanguage", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/language", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[9] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"displayLanguage","api":"displayLanguage"}],
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("LanguageSettings JSON request body. Top-level fields: displayLanguage."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      displayLanguage: z.string().describe("The language to display Gmail in, formatted as an RFC 3066 Language Tag (for example `en-GB`, `fr` or `ja` for British English, French, or Japanese respectively). The set of languages supported by Gma").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -741,23 +760,25 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     method: { id: "gmail.users.settings.updatePop", httpMethod: "PUT", path: "gmail/v1/users/{userId}/settings/pop", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[9] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"accessWindow","api":"accessWindow"},{"field":"disposition","api":"disposition"}],
     shape: {
       account: accountField(),
-      userId: z.string().describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("PopSettings JSON request body. Top-level fields: accessWindow, disposition."),
+      userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
+      accessWindow: z.enum(["accessWindowUnspecified","disabled","fromNowOn","allMail"]).describe("The range of messages which are accessible via POP.").optional(),
+      disposition: z.enum(["dispositionUnspecified","leaveInInbox","archive","trash","markRead"]).describe("The action that will be executed on a message after it has been fetched via POP.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
   registerGeneratedTool(registry, {
     name: "gmail_users_stop",
-    cud: "create",
+    cud: "delete",
     description: "Turn off push notification delivery for the given user mailbox. For more information, see [Configure push notifications in Gmail API](https://developers.google.",
     method: { id: "gmail.users.stop", httpMethod: "POST", path: "gmail/v1/users/{userId}/stop", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[10] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -770,8 +791,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("ID of the Thread to delete."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("ID of the Thread to delete."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -784,7 +805,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       includeSpamTrash: coerceBoolean.describe("Include threads from `SPAM` and `TRASH` in the results.").optional(),
       labelIds: coerceArray(z.string()).describe("Only return threads with labels that match all of the specified label IDs.").optional(),
       maxResults: z.number().describe("Maximum number of threads to return. This field defaults to 100. The maximum allowed value for this field is 500.").optional(),
@@ -800,11 +821,13 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     method: { id: "gmail.users.threads.modify", httpMethod: "POST", path: "gmail/v1/users/{userId}/threads/{id}/modify", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId","id"], scopes: S_gmail_v1[4] },
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"addLabelIds","api":"addLabelIds"},{"field":"removeLabelIds","api":"removeLabelIds"}],
     shape: {
       account: accountField(),
-      id: z.string().describe("The ID of the thread to modify."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("ModifyThreadRequest JSON request body. Top-level fields: addLabelIds, removeLabelIds."),
+      id: z.string().min(1).describe("The ID of the thread to modify."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      addLabelIds: coerceArray(z.string()).describe("A list of IDs of labels to add to this thread. You can add up to 100 labels with each update.").optional(),
+      removeLabelIds: coerceArray(z.string()).describe("A list of IDs of labels to remove from this thread. You can remove up to 100 labels with each update.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -817,8 +840,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("The ID of the thread to Trash."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The ID of the thread to Trash."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -831,8 +854,8 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      id: z.string().describe("The ID of the thread to remove from Trash."),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      id: z.string().min(1).describe("The ID of the thread to remove from Trash."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -843,10 +866,14 @@ export function registerGmailGeneratedTools(registry: ToolRegistry): void {
     method: { id: "gmail.users.watch", httpMethod: "POST", path: "gmail/v1/users/{userId}/watch", baseUrl: "https://gmail.googleapis.com/", requiredParams: ["userId"], scopes: S_gmail_v1[10] },
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"labelFilterAction","api":"labelFilterAction"},{"field":"labelFilterBehavior","api":"labelFilterBehavior"},{"field":"labelIds","api":"labelIds"},{"field":"topicName","api":"topicName"}],
     shape: {
       account: accountField(),
-      userId: z.string().describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("WatchRequest JSON request body. Top-level fields: labelFilterAction, labelFilterBehavior, labelIds, topicName."),
+      userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
+      labelFilterAction: z.enum(["include","exclude"]).describe("Filtering behavior of `labelIds list` specified. This field is deprecated because it caused incorrect behavior in some cases; use `label_filter_behavior` instead.").optional(),
+      labelFilterBehavior: z.enum(["include","exclude"]).describe("Filtering behavior of `labelIds list` specified. This field replaces `label_filter_action`; if set, `label_filter_action` is ignored.").optional(),
+      labelIds: coerceArray(z.string()).describe("List of label_ids to restrict notifications about. By default, if unspecified, all changes are pushed out. If specified then dictates which labels are required for a push notification to be generated.").optional(),
+      topicName: z.string().describe("A fully qualified Google Cloud Pub/Sub API topic name to publish the events to. This topic name **must** already exist in Cloud Pub/Sub and you **must** have already granted gmail \"publish\" permission").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

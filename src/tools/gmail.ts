@@ -1,13 +1,14 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
-import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
+import { coerceArray, coerceBoolean, coerceJson, coerceNumber } from './_coerce.js';
 import { gmail as gmailClient } from '@googleapis/gmail';
 import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import { handleGoogleApiError, mapGoogleError } from './_errors.js';
+import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
 import { prepareLocalDest } from './_local-files.js';
+import { checkOutbound } from '../outbound-allowlist.js';
 import addressparser from 'nodemailer/lib/addressparser/index.js';
 import { lookup as lookupMime } from 'mime-types';
 import { configDir } from '../config-file.js';
@@ -473,20 +474,45 @@ export async function readBatch(
   return [...entries, summary];
 }
 
+/** Compact gmail_search row: just the pick-one-message selection signal, with
+ * the snippet flattened to one bounded line. Pure. */
+export function compactMessageRow(m: GmailMessageHeader): { id: string; from: string; subject: string; date: string; snippet: string } {
+  const snippet = m.snippet.replace(/\s+/g, ' ').trim();
+  return {
+    id: m.id,
+    from: m.from,
+    subject: m.subject,
+    date: m.date,
+    snippet: snippet.length > 120 ? `${snippet.slice(0, 119)}…` : snippet,
+  };
+}
+
 export function registerGmailTools(server: ToolRegistry): void {
   server.registerTool(
     'gmail_search',
     {
-      description: 'Search messages in a Gmail account',
+      description:
+        'Search messages in a Gmail account. Returns compact rows (id, from, subject, date, snippet); ' +
+        'pass full=true for threadId, to, labelIds and the untruncated snippet.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         query: z.string().describe('Gmail search syntax, e.g. "from:monaam is:unread"'),
-        maxResults: z.number().min(1).max(100).default(20).optional()
+        maxResults: coerceNumber(z.number().min(1).max(100)).optional()
           .describe('Max results to return (default: 20, max: 100)'),
+        full: coerceBoolean.optional().describe('Return the full row shape instead of the compact default'),
       },
     },
-    async ({ account, query, maxResults }) => {
+    async ({ account, query, maxResults, full }) => {
       try {
+        // Gmail treats a blank `q` as no filter, so a caller passing an unset
+        // variable got the whole mailbox back as if it had matched.
+        if (query.trim() === '') {
+          return invalidParams(
+            account as Account,
+            '`query` is empty, and Gmail reads an empty query as "match everything".',
+            'Pass a real Gmail search term such as "is:unread" or "from:someone@example.com". Returning the whole mailbox for a blank query would look like a successful search.',
+          );
+        }
         const auth = await getClient(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
 
@@ -525,8 +551,12 @@ export function registerGmailTools(server: ToolRegistry): void {
           }
         }
 
+        // Search is a pick-one-message step ~always followed by gmail_read;
+        // the compact row is the selection signal, the rest was measured burn
+        // (p90 14.4k chars per call). full=true restores the pre-6.0 shape.
+        const rows = full === true ? results : results.map(compactMessageRow);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(rows, null, 2) }],
         };
       } catch (error: any) {
         const mapped = composeErrorResult(error, account as Account);
@@ -541,7 +571,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Read a full Gmail message by ID (body capped at 50k chars unless full=true)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageId: z.string().describe('Gmail message ID'),
+        messageId: z.string().min(1).describe('Gmail message ID'),
         full: coerceBoolean.optional().describe('Return the entire body without the character cap'),
         rawHtml: coerceBoolean.optional()
           .describe('Return the HTML body unconverted instead of the plain-text rendering (HTML-only messages)'),
@@ -575,7 +605,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Read all messages in a Gmail thread (bodies capped at 50k chars each unless full=true). mode=summary returns headers + snippets only.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        threadId: z.string().describe('Gmail thread ID'),
+        threadId: z.string().min(1).describe('Gmail thread ID'),
         full: coerceBoolean.optional().describe('Return entire bodies without the character cap'),
         rawHtml: coerceBoolean.optional()
           .describe('Return HTML bodies unconverted instead of the plain-text rendering (HTML-only messages)'),
@@ -702,6 +732,13 @@ export function registerGmailTools(server: ToolRegistry): void {
         if (finalSubject === undefined) {
           throw new GmailComposeError('E_MISSING_SUBJECT', '`subject` is required (or set replyToMessageId to derive it from the source).');
         }
+        // After derivation so reply-autofilled recipients are gated too.
+        const outbound = checkOutbound(
+          'gmail recipient',
+          [...parseAddresses(finalTo), ...parseAddresses(finalCc ?? '')].map((a) => a.address),
+          account as Account,
+        );
+        if (outbound) return outbound;
         const html = renderMarkdown(body, allowRawHtml === true);
         const files = await readAttachments(
           attachments as Array<{ path: string; filename?: string; contentType?: string }> | undefined,
@@ -748,10 +785,10 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Download an email attachment to local disk. Use gmail_read first to get the attachmentId.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageId: z.string().describe('The Gmail message ID'),
-        attachmentId: z.string().describe('The attachment ID from gmail_read response'),
+        messageId: z.string().min(1).describe('The Gmail message ID'),
+        attachmentId: z.string().min(1).describe('The attachment ID from gmail_read response'),
         filename: z.string().describe('Filename to save as (e.g. report.xlsx)'),
-        savePath: z.string().describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server), e.g. /home/user/Downloads; the file name comes from `filename`'),
+        savePath: z.string().min(1).describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server), e.g. /home/user/Downloads; the file name comes from `filename`'),
       },
     },
     async ({ account, messageId, attachmentId, filename, savePath }) => {
@@ -828,6 +865,13 @@ export function registerGmailTools(server: ToolRegistry): void {
         if (finalSubject === undefined) {
           throw new GmailComposeError('E_MISSING_SUBJECT', '`subject` is required (or set replyToMessageId to derive it from the source).');
         }
+        // After derivation so reply-autofilled recipients are gated too.
+        const outbound = checkOutbound(
+          'gmail recipient',
+          [...parseAddresses(finalTo), ...parseAddresses(finalCc ?? '')].map((a) => a.address),
+          account as Account,
+        );
+        if (outbound) return outbound;
         const html = renderMarkdown(body, allowRawHtml === true);
         const files = await readAttachments(
           attachments as Array<{ path: string; filename?: string; contentType?: string }> | undefined,
@@ -881,7 +925,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Add or remove labels on a Gmail message. Use system label IDs like STARRED, UNREAD, INBOX, TRASH, or custom label IDs from gmail_list_labels.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageId: z.string().describe('Gmail message ID'),
+        messageId: z.string().min(1).describe('Gmail message ID'),
         addLabelIds: coerceArray(z.string()).optional().describe('Label IDs to add'),
         removeLabelIds: coerceArray(z.string()).optional().describe('Label IDs to remove'),
       },
@@ -914,7 +958,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Move a Gmail message to Trash (recoverable)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageId: z.string().describe('Gmail message ID'),
+        messageId: z.string().min(1).describe('Gmail message ID'),
       },
     },
     async ({ account, messageId }) => {
@@ -938,7 +982,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Permanently and irreversibly delete a Gmail message. No recovery possible.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        messageId: z.string().describe('Gmail message ID'),
+        messageId: z.string().min(1).describe('Gmail message ID'),
       },
     },
     async ({ account, messageId }) => {
@@ -1052,7 +1096,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Read the full content of a specific Gmail draft',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        draftId: z.string().describe('Draft ID'),
+        draftId: z.string().min(1).describe('Draft ID'),
       },
     },
     async ({ account, draftId }) => {
@@ -1080,7 +1124,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Send an existing Gmail draft by its draft ID',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        draftId: z.string().describe('Draft ID to send'),
+        draftId: z.string().min(1).describe('Draft ID to send'),
       },
     },
     async ({ account, draftId }) => {
@@ -1165,7 +1209,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Permanently delete a Gmail label and remove it from all messages',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        labelId: z.string().describe('Label ID to delete'),
+        labelId: z.string().min(1).describe('Label ID to delete'),
       },
     },
     async ({ account, labelId }) => {
@@ -1212,7 +1256,7 @@ export function registerGmailTools(server: ToolRegistry): void {
       description: 'Get all mailbox changes since a given historyId. Useful for detecting new emails since last check.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        startHistoryId: z.string().describe('History ID from a previous gmail_get_profile or gmail_read response'),
+        startHistoryId: z.string().min(1).describe('History ID from a previous gmail_get_profile or gmail_read response'),
         maxResults: z.number().min(1).max(500).default(100).optional()
           .describe('Max results to return (default: 100)'),
         historyTypes: coerceArray(z.enum(['messageAdded', 'messageDeleted', 'labelAdded', 'labelRemoved'])).optional()

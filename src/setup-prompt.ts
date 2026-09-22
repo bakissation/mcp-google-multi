@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from "@modelcontextprotocol/server";
 
 // B8: the `setup` MCP prompt — the honest ceiling for the un-automatable Google
 // Cloud Console prelude (D4). It renders as a native slash command and returns
@@ -65,7 +65,7 @@ export function registerSetupPrompt(server: McpServer): void {
     {
       title: 'Set up mcp-google-multi',
       description: 'Guided Google Cloud Console prelude: project, APIs, consent screen, OAuth client, and credentials. The one-time browser setup that has no API.',
-      argsSchema: { publicUrl: z.string().optional().describe('Public base URL when serving over HTTP (for the Web OAuth client redirect). Omit for stdio.') },
+      argsSchema: z.object({ publicUrl: z.string().optional().describe('Public base URL when serving over HTTP (for the Web OAuth client redirect). Omit for stdio.') }),
     },
     (args: { publicUrl?: string }) => ({
       messages: [
