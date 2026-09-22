@@ -1,14 +1,19 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { people as peopleClient } from '@googleapis/people';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import { handleGoogleApiError } from './_errors.js';
+import { coerceBoolean } from './_coerce.js';
+import { handleGoogleApiError, invalidParams } from './_errors.js';
+import { listResult } from '../trim.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = accountAliasSchema.optional();
 
 const PERSON_FIELDS = 'names,emailAddresses,phoneNumbers,organizations,addresses,photos,memberships';
+
+// people.getBatchGet rejects more than 200 resource names per call.
+const BATCH_GET_LIMIT = 200;
 
 function formatContact(person: any) {
   return {
@@ -35,6 +40,111 @@ function formatContact(person: any) {
     })),
     photo: person.photos?.[0]?.url ?? '',
   };
+}
+
+// --- A10 contacts_resolve: name -> one canonical email ---------------------
+
+export interface ResolveCandidate {
+  resourceName: string;
+  displayName: string;
+  source: 'contacts' | 'otherContacts';
+  emails: { value: string; type?: string; primary?: boolean }[];
+  hasOrg: boolean;
+}
+
+/** Accent-fold + lowercase for name comparison ("Rym" == "Rÿm"). */
+const foldName = (s: string): string =>
+  s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+
+/** Canonical-address preference within one contact: explicit primary, then
+ * People type order work > home > other. */
+function emailRank(e: { type?: string; primary?: boolean }): number {
+  if (e.primary) return 3;
+  const t = (e.type ?? '').toLowerCase();
+  if (t === 'work') return 2;
+  if (t === 'home') return 1;
+  return 0;
+}
+
+function pickEmail(c: ResolveCandidate): { value: string; type?: string; primary?: boolean } {
+  return [...c.emails].sort((a, b) => emailRank(b) - emailRank(a))[0];
+}
+
+/** Deterministic rank tuple; higher wins, compared lexicographically so the
+ * first discriminating rule decides (A10 tie-break table). */
+function scoreTuple(c: ResolveCandidate, foldedQuery: string): number[] {
+  const exact = foldName(c.displayName) === foldedQuery ? 1 : 0;   // 1. exact over prefix
+  const saved = c.source === 'contacts' ? 1 : 0;                    // 2. saved over other-contact
+  const bestEmail = c.emails.length ? Math.max(...c.emails.map(emailRank)) : 0; // 3. canonical address
+  const complete = c.hasOrg ? 1 : 0;                               // 4. fuller record
+  return [exact, saved, bestEmail, complete];
+}
+
+function cmpTuple(a: number[], b: number[]): number {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return b[i] - a[i];
+  }
+  return 0;
+}
+
+const projectCandidate = (c: ResolveCandidate) => ({
+  name: c.displayName,
+  email: pickEmail(c).value,
+  resourceName: c.resourceName,
+  source: c.source,
+});
+
+/** Rank candidates and return one confident match, an explicit ambiguous list,
+ * or null. Candidates without any email are dropped first. Pure (no I/O) so the
+ * tie-break is unit-testable. */
+export function resolveContacts(candidates: ResolveCandidate[], name: string, maxCandidates: number) {
+  const withEmail = candidates.filter((c) => c.emails.some((e) => e.value));
+  if (withEmail.length === 0) return { query: name, resolved: null };
+
+  const folded = foldName(name);
+  const ranked = withEmail
+    .map((c) => ({ c, t: scoreTuple(c, folded) }))
+    .sort((a, b) => cmpTuple(a.t, b.t));
+
+  const top = ranked[0];
+  const tiedTop = ranked.filter((r) => cmpTuple(r.t, top.t) === 0);
+  if (tiedTop.length === 1) {
+    return { query: name, resolved: projectCandidate(top.c) };
+  }
+  return {
+    query: name,
+    ambiguous: true as const,
+    candidates: tiedTop.slice(0, maxCandidates).map((r) => projectCandidate(r.c)),
+  };
+}
+
+/** People person -> ResolveCandidate projection. */
+function toCandidate(person: any, source: 'contacts' | 'otherContacts'): ResolveCandidate {
+  return {
+    resourceName: person?.resourceName ?? '',
+    displayName: person?.names?.[0]?.displayName ?? '',
+    source,
+    emails: (person?.emailAddresses ?? []).map((e: any) => ({
+      value: e.value ?? '',
+      type: e.type ?? '',
+      primary: e.metadata?.primary === true,
+    })),
+    hasOrg: (person?.organizations?.length ?? 0) > 0,
+  };
+}
+
+/** Merge saved + other contacts, deduped by resourceName (a saved match wins
+ * over the same person surfaced as an other-contact). */
+function dedupeCandidates(list: ResolveCandidate[]): ResolveCandidate[] {
+  const byResource = new Map<string, ResolveCandidate>();
+  for (const c of list) {
+    const key = c.resourceName || `${c.source}:${c.displayName}:${c.emails[0]?.value ?? ''}`;
+    const existing = byResource.get(key);
+    if (!existing || (existing.source === 'otherContacts' && c.source === 'contacts')) {
+      byResource.set(key, c);
+    }
+  }
+  return [...byResource.values()];
 }
 
 export function registerContactsTools(server: ToolRegistry): void {
@@ -66,9 +176,66 @@ export function registerContactsTools(server: ToolRegistry): void {
           pageSize: pageSize ?? 10,
         });
 
+        const limit = pageSize ?? 10;
         const contacts = (res.data.results ?? []).map((r: any) => formatContact(r.person));
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(contacts, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(listResult('contacts', contacts, {
+            // searchContacts returns no token and no total, so a full page is
+            // the only evidence that the cap, not the address book, ended it.
+            capped: contacts.length >= limit,
+            hint: `The page is full at ${limit} of a possible 30, so more contacts may match. Raise pageSize or narrow the query. This search endpoint has no pageToken, so there is no next page to fetch.`,
+          }), null, 2) }],
+        };
+      } catch (error: any) {
+        return handleContactsError(error, account as Account);
+      }
+    },
+  );
+
+  server.registerTool(
+    'contacts_resolve',
+    {
+      annotations: { openWorldHint: true },
+      description: 'Resolve a free-text name/alias to ONE canonical email address (ranked + tie-broken), so you need not hand-expand transliteration OR-queries. Returns a single confident match, an explicit ambiguous candidate list, or null when nothing matches. For picking a recipient before gmail_send.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        name: z.string().min(1).describe('Free-text name or alias to resolve (e.g. "Rym")'),
+        maxCandidates: z.number().min(1).max(10).default(5).optional()
+          .describe('Max candidates to return when ambiguous (1-10, default: 5)'),
+        includeOtherContacts: coerceBoolean.optional()
+          .describe('Also search auto-saved "other contacts" (people you have emailed but not saved). Default true.'),
+      },
+    },
+    async ({ account, name, maxCandidates, includeOtherContacts }) => {
+      try {
+        const auth = await getClient(account as Account);
+        const people = peopleClient({ version: 'v1', auth });
+
+        // Warmup request required by the People API before searchContacts returns hits.
+        await people.people.searchContacts({ query: '', readMask: 'names' });
+
+        const saved = await people.people.searchContacts({
+          query: name,
+          readMask: 'names,emailAddresses,organizations',
+        });
+        const candidates: ResolveCandidate[] = (saved.data.results ?? [])
+          .map((r: any) => toCandidate(r.person, 'contacts'));
+
+        if (includeOtherContacts !== false) {
+          try {
+            const other = await people.otherContacts.search({
+              query: name,
+              readMask: 'names,emailAddresses',
+            });
+            candidates.push(...(other.data.results ?? []).map((r: any) => toCandidate(r.person, 'otherContacts')));
+          } catch {
+            // otherContacts unavailable (scope/5xx): degrade to saved-contacts only.
+          }
+        }
+
+        const result = resolveContacts(dedupeCandidates(candidates), name, maxCandidates ?? 5);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
         };
       } catch (error: any) {
         return handleContactsError(error, account as Account);
@@ -82,7 +249,7 @@ export function registerContactsTools(server: ToolRegistry): void {
       description: 'Get a single contact by resource name',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        resourceName: z.string().describe('Contact resource name (e.g. "people/c1234567890")'),
+        resourceName: z.string().min(1).describe('Contact resource name (e.g. "people/c1234567890")'),
       },
     },
     async ({ account, resourceName }) => {
@@ -203,7 +370,7 @@ export function registerContactsTools(server: ToolRegistry): void {
       description: 'Update an existing contact (reads current etag automatically)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        resourceName: z.string().describe('Contact resource name (e.g. "people/c1234567890")'),
+        resourceName: z.string().min(1).describe('Contact resource name (e.g. "people/c1234567890")'),
         givenName: z.string().optional().describe('Updated first name'),
         familyName: z.string().optional().describe('Updated last name'),
         email: z.string().optional().describe('Updated email address'),
@@ -255,12 +422,11 @@ export function registerContactsTools(server: ToolRegistry): void {
         }
 
         if (updateFields.length === 0) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({
-              error: 'No fields to update. Provide at least one of: givenName, familyName, email, phone, organization, jobTitle',
-            }, null, 2) }],
-            isError: true,
-          };
+          return invalidParams(
+            account as Account,
+            'No fields to update: every optional field was omitted, so the request would have been a no-op.',
+            'Pass at least one of: givenName, familyName, email, phone, organization, jobTitle.',
+          );
         }
 
         const res = await people.people.updateContact({
@@ -284,7 +450,7 @@ export function registerContactsTools(server: ToolRegistry): void {
       description: 'Delete a contact (permanent, cannot be undone)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        resourceName: z.string().describe('Contact resource name (e.g. "people/c1234567890")'),
+        resourceName: z.string().min(1).describe('Contact resource name (e.g. "people/c1234567890")'),
       },
     },
     async ({ account, resourceName }) => {
@@ -342,7 +508,7 @@ export function registerContactsTools(server: ToolRegistry): void {
       description: 'List members of a contact group',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        groupResourceName: z.string().describe('Contact group resource name (e.g. "contactGroups/abc123")'),
+        groupResourceName: z.string().min(1).describe('Contact group resource name (e.g. "contactGroups/abc123")'),
         maxMembers: z.number().min(1).max(1000).default(100).optional()
           .describe('Max member resource names to return (default: 100)'),
       },
@@ -357,28 +523,46 @@ export function registerContactsTools(server: ToolRegistry): void {
         });
 
         const memberResourceNames = groupRes.data.memberResourceNames ?? [];
-        if (memberResourceNames.length === 0) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({
-              group: groupRes.data.name,
-              members: [],
-            }, null, 2) }],
-          };
+        const members: unknown[] = [];
+        let fetchFailures = 0;
+        let firstError: unknown;
+        // getBatchGet caps at 200 names while maxMembers goes to 1000, so a
+        // large group used to fail outright rather than come back in pages.
+        for (let i = 0; i < memberResourceNames.length; i += BATCH_GET_LIMIT) {
+          const chunk = memberResourceNames.slice(i, i + BATCH_GET_LIMIT);
+          try {
+            const membersRes = await people.people.getBatchGet({
+              resourceNames: chunk,
+              personFields: PERSON_FIELDS,
+            });
+            const got = (membersRes.data.responses ?? []).filter((r: any) => r.person);
+            fetchFailures += chunk.length - got.length;
+            for (const r of got) members.push(formatContact(r.person));
+          } catch (chunkError) {
+            firstError ??= chunkError;
+            fetchFailures += chunk.length;
+          }
         }
-        const membersRes = await people.people.getBatchGet({
-          resourceNames: memberResourceNames,
-          personFields: PERSON_FIELDS,
-        });
+        // Every chunk failed, so there is no partial answer to report honestly.
+        if (firstError && members.length === 0 && memberResourceNames.length > 0) throw firstError;
 
-        const members = (membersRes.data.responses ?? [])
-          .filter((r: any) => r.person)
-          .map((r: any) => formatContact(r.person));
+        const total = groupRes.data.memberCount ?? memberResourceNames.length;
+        const namesTruncated = total > memberResourceNames.length;
+        const causes: string[] = [];
+        if (namesTruncated) causes.push(`the maxMembers cap returned ${memberResourceNames.length} of ${total} member names`);
+        if (fetchFailures > 0) causes.push(`${fetchFailures} member record(s) could not be fetched`);
 
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({
-            group: groupRes.data.name,
-            members,
-          }, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(listResult('members', members, {
+            totalItems: total,
+            extra: {
+              group: groupRes.data.name,
+              ...(fetchFailures > 0 ? { fetchFailures } : {}),
+            },
+            hint: causes.length > 0
+              ? `Incomplete because ${causes.join(' and ')}.${namesTruncated ? ' Raise maxMembers to see the rest.' : ''}`
+              : undefined,
+          }), null, 2) }],
         };
       } catch (error: any) {
         return handleContactsError(error, account as Account);

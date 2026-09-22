@@ -12,7 +12,17 @@
       "@semantic-release/github",
       {
         "successCommentCondition": "<% return nextRelease.channel == null; %>",
-        "failCommentCondition": false
+        "failCommentCondition": false,
+        "assets": [
+          { "path": "mcp-google-multi.mcpb", "label": "MCPB bundle for Claude Desktop (drag-and-drop install)" }
+        ]
+      }
+    ],
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "bash scripts/build-mcpb.sh ${nextRelease.version}",
+        "publishCmd": "echo \"version=${nextRelease.version}\" >> \"$GITHUB_OUTPUT\"; echo \"channel=${nextRelease.channel || 'latest'}\" >> \"$GITHUB_OUTPUT\""
       }
     ]
   ]

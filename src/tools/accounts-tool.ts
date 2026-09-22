@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import type { ToolRegistry } from '../registry.js';
-import { ACCOUNTS, ACCOUNT_CONFIG } from '../accounts.js';
+import { getAccountSet, refreshAccountSetIfStale } from '../accounts.js';
+import { buildScopesReport, type ScopesReport } from '../scope-observability.js';
 import { getAdminAccounts, resolveScopesForAccount } from '../auth.js';
 import { hasToken, readToken } from '../token-store.js';
 
@@ -9,6 +10,10 @@ export interface AccountHealthDeps {
   readToken: (alias: string) => { expiry_date?: number; refresh_token?: string; scope?: string } | null;
   fileExists: (p: string) => boolean;
   now: () => number;
+  /** Scopes required by registered tools — feeds doctor's tool-grained
+   * "registered but not requestable" view (B9). account_list stays compact:
+   * its report universe is profile ∪ granted only. */
+  registeredScopes?: () => string[];
 }
 
 const DEFAULT_DEPS: AccountHealthDeps = {
@@ -24,16 +29,30 @@ export interface AccountHealth {
   alias: string;
   email: string;
   admin: boolean;
+  source: 'config' | 'env';
+  sourceNote?: string;
   token: { status: TokenStatus; expiryDate?: string; hint?: string };
-  scopes: { configured: number; granted: number; missing: string[] };
+  scopes: ScopesReport;
 }
 
 export function deriveAccountHealth(alias: string, deps: AccountHealthDeps = DEFAULT_DEPS): AccountHealth {
-  const config = ACCOUNT_CONFIG[alias];
+  const config = getAccountSet().configs[alias];
   const admin = getAdminAccounts().includes(alias);
   const configured = resolveScopesForAccount(alias);
-  const base = { alias, email: config.email, admin };
-  const noScopes = { configured: configured.length, granted: 0, missing: configured };
+  // BR-10: env-sourced accounts are not persisted in config.json, so the
+  // account wizard cannot edit them — the deployer edits env instead.
+  const base = {
+    alias,
+    email: config.email,
+    admin,
+    source: config.source,
+    ...(config.source === 'env'
+      ? { sourceNote: 'Defined by GOOGLE_ACCOUNTS env (not editable via config.json)' }
+      : {}),
+  };
+  const profileSet = new Set(configured);
+  const registered = deps.registeredScopes?.() ?? [];
+  const noScopes = buildScopesReport(new Set<string>(), profileSet, registered);
 
   if (!deps.hasToken(alias)) {
     const legacy = deps.fileExists(config.tokenPath);
@@ -61,7 +80,8 @@ export function deriveAccountHealth(alias: string, deps: AccountHealthDeps = DEF
   }
 
   const granted = typeof token?.scope === 'string' ? token.scope.split(' ').filter(Boolean) : [];
-  const missing = configured.filter((s) => !granted.includes(s));
+  const report = buildScopesReport(new Set(granted), profileSet, registered);
+  const missing = report.requestable;
   const expiry = typeof token?.expiry_date === 'number' ? token.expiry_date : undefined;
   const refreshable = typeof token?.refresh_token === 'string' && token.refresh_token.length > 0;
 
@@ -82,12 +102,17 @@ export function deriveAccountHealth(alias: string, deps: AccountHealthDeps = DEF
             ? 'Re-auth to grant the missing scopes'
             : undefined,
     },
-    scopes: { configured: configured.length, granted: granted.length, missing },
+    scopes: report,
   };
 }
 
 export function registerAccountTools(registry: ToolRegistry, deps: AccountHealthDeps = DEFAULT_DEPS): void {
-  registry.registerMeta(
+  const registerMeta = registry.registerMeta as unknown as (
+    name: string,
+    config: { description: string; inputSchema: Record<string, unknown>; _meta?: Record<string, unknown> },
+    handler: () => unknown,
+  ) => void;
+  registerMeta(
     'account_list',
     {
       description:
@@ -95,14 +120,22 @@ export function registerAccountTools(registry: ToolRegistry, deps: AccountHealth
         '(ok / expired_refreshable / needs_reauth / missing / decrypt_error), and granted vs configured scopes. ' +
         'Use this to see which account aliases are available and healthy.',
       inputSchema: {},
+      _meta: { 'anthropic/alwaysLoad': true },
     },
-    async () => ({
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify({ accounts: ACCOUNTS.map((alias) => deriveAccountHealth(alias, deps)) }),
-        },
-      ],
-    }),
+    async () => {
+      refreshAccountSetIfStale();
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({
+              defaultAccount: getAccountSet().defaultAccount ?? null,
+              defaultAccountSource: getAccountSet().defaultAccountSource ?? null,
+              accounts: getAccountSet().aliases.map((alias) => deriveAccountHealth(alias, deps)),
+            }),
+          },
+        ],
+      };
+    },
   );
 }

@@ -1,0 +1,37 @@
+# Files excluded from the .mcpb bundle. The bundle ships dist/ + runtime
+# node_modules + manifest.json + package.json; everything below is build/dev/
+# secret cruft. (The release build runs `npm ci --omit=dev` first so no
+# devDependencies land in the bundle.)
+src
+tests
+scripts
+docs
+.github
+discovery
+coverage
+node_modules/.cache
+
+# Secrets / local state — must never enter a distributed bundle.
+.env
+.env.*
+*.enc
+master.key
+mcp-tokens.enc
+config.json
+
+# Build config not needed at runtime.
+tsconfig.json
+tsconfig.scripts.json
+eslint.config.js
+vitest.config.ts
+package-lock.json
+Dockerfile
+.dockerignore
+COVERAGE.md
+*.mcpb
+*.log
+.git
+.gitignore
+.gitattributes
+.claude
+.vscode

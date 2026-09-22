@@ -1,0 +1,10 @@
+# Automatic HTTPS for mcp-google-multi. MCP_DOMAIN comes from .env (compose
+# passes it into this container); the domain alone triggers Let's Encrypt.
+{$MCP_DOMAIN} {
+	reverse_proxy mcp:4243 {
+		# MCP Streamable HTTP uses SSE-style responses; Caddy auto-flushes on
+		# text/event-stream, these just make it explicit and reload-safe.
+		flush_interval -1
+		stream_close_delay 5m
+	}
+}

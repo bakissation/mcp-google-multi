@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { ToolRegistry } from '../src/registry.js';
 import { executeApiMethod, buildQueryString } from '../src/executor.js';
 import { registerGeneratedTool, type GeneratedToolDef } from '../src/tools/generated/_shared.js';
-import { emitService, buildServiceFile, emitBarrel, planTools, toolNameFromId, snakeCase } from '../scripts/gen-tools.js';
+import { emitService, buildServiceFile, emitBarrel, flatBodyProp, planTools, toolNameFromId, snakeCase } from '../scripts/gen-tools.js';
 import type { Policy } from '../src/write-control.js';
 
 const FULL: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: [] };
@@ -198,7 +198,10 @@ describe('gen-tools generator', () => {
     expect(first).toBe(committed);
   });
 
-  it('matches the committed barrel', async () => {
+  // First importer of the full 752-tool barrel: cold vitest transform of ~30
+  // generated modules blew the 5s default on a slow Windows runner (flake,
+  // 2026-09-20); the work is real, so the budget must be too.
+  it('matches the committed barrel', { timeout: 30_000 }, async () => {
     const { GENERATED_SERVICES } = await import('../src/tools/generated/index.js');
     const committed = fs.readFileSync(path.join(__dirname, '..', 'src', 'tools', 'generated', 'index.ts'), 'utf-8');
     expect(emitBarrel(GENERATED_SERVICES.map((s) => s.name))).toBe(committed);
@@ -228,7 +231,7 @@ describe('gen-tools generator', () => {
 
   it('exposes every new optional bundle used by generated gates', async () => {
     const { OPTIONAL_SCOPE_BUNDLES } = await import('../src/auth.js');
-    for (const bundle of ['classroom', 'cloudidentity', 'cloudsearch', 'vault', 'keep', 'driveactivity', 'drivelabels', 'script', 'postmaster', 'groupssettings', 'groupsmigration', 'licensing', 'reseller', 'appsmarket']) {
+    for (const bundle of ['classroom', 'cloudidentity', 'cloudsearch', 'vault', 'keep', 'driveactivity', 'drivelabels', 'script', 'postmaster', 'groupssettings', 'groupsmigration', 'licensing', 'reseller', 'appsmarket', 'analytics']) {
       expect(OPTIONAL_SCOPE_BUNDLES[bundle]?.length, bundle).toBeGreaterThan(0);
       for (const scope of OPTIONAL_SCOPE_BUNDLES[bundle]) {
         expect(scope, bundle).toMatch(/^https:\/\/www\.googleapis\.com\/auth\//);
@@ -243,5 +246,135 @@ describe('gen-tools generator', () => {
       id: 'tasks.tasklists.UPDATE',
     };
     expect(() => planTools(twisted, api)).toThrow(/collision/);
+  });
+});
+
+describe('typed request bodies', () => {
+  const doc = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'tasks.v1.json'), 'utf-8'));
+  const api = { file: 'tasks.v1.json', service: 'tasks' };
+
+  it('classifies flat vs nested body properties', () => {
+    expect(flatBodyProp({ type: 'string' })).toBe(true);
+    expect(flatBodyProp({ type: 'string', enum: ['a', 'b'] })).toBe(true);
+    expect(flatBodyProp({ type: 'integer' })).toBe(true);
+    expect(flatBodyProp({ type: 'boolean' })).toBe(true);
+    expect(flatBodyProp({ type: 'array', items: { type: 'string' } })).toBe(true);
+    expect(flatBodyProp({ $ref: 'Nested' })).toBe(false);
+    expect(flatBodyProp({ type: 'object' })).toBe(false);
+    expect(flatBodyProp({ type: 'array', items: { $ref: 'Nested' } })).toBe(false);
+    expect(flatBodyProp({ type: 'array' })).toBe(false);
+    expect(flatBodyProp({ type: 'string', additionalProperties: { type: 'string' } })).toBe(false);
+    expect(flatBodyProp({})).toBe(false);
+  });
+
+  it('types the flat TaskList body and keeps the nested Task body opaque', () => {
+    const { plans, report } = planTools(doc, api);
+    const tasklists = plans.find((p) => p.name === 'tasks_tasklists_update')!;
+    expect(tasklists.typedBody?.map((b) => b.api)).toEqual(['etag', 'id', 'kind', 'selfLink', 'title', 'updated']);
+    const tasks = plans.find((p) => p.name === 'tasks_tasks_update')!;
+    expect(tasks.typedBody).toBeUndefined();
+    expect(report.typedBodies).toBe(1);
+  });
+
+  it('honors BODY_OVERRIDES: opaque forces the JSON arg, typed rejects nested schemas', () => {
+    const opaque = planTools(doc, api, new Set(), { 'tasks.tasklists.update': 'opaque' });
+    expect(opaque.plans.find((p) => p.name === 'tasks_tasklists_update')!.typedBody).toBeUndefined();
+    expect(() => planTools(doc, api, new Set(), { 'tasks.tasks.update': 'typed' })).toThrow(/non-flat/);
+  });
+
+  const WIDGET_DOC = {
+    rootUrl: 'https://x.googleapis.com/',
+    servicePath: '',
+    schemas: {
+      Widget: {
+        properties: {
+          zeta: { type: 'string', description: 'Z field.' },
+          alpha: { type: 'string', annotations: { required: ['x.widgets.create'] } },
+          account: { type: 'string' },
+          fields: { type: 'string' },
+          maxResults: { type: 'integer' },
+          flag: { type: 'boolean' },
+          tags: { type: 'array', items: { type: 'string' } },
+        },
+      },
+    },
+    resources: {
+      widgets: {
+        methods: {
+          create: {
+            id: 'x.widgets.create',
+            httpMethod: 'POST',
+            path: 'v1/widgets',
+            parameters: { maxResults: { location: 'query', type: 'integer' } },
+            request: { $ref: 'Widget' },
+            scopes: ['s'],
+          },
+        },
+      },
+    },
+  };
+  const widgetApi = { file: 'x.v1.json', service: 'x' };
+
+  it('sorts required-first then alphabetical and renames collisions with reserved and param fields', () => {
+    const { plans } = planTools(WIDGET_DOC as never, widgetApi);
+    expect(plans[0].typedBody!.map((b) => ({ field: b.field, api: b.api }))).toEqual([
+      { field: 'alpha', api: 'alpha' },
+      { field: 'account_', api: 'account' },
+      { field: 'fields_', api: 'fields' },
+      { field: 'flag', api: 'flag' },
+      { field: 'maxResults_', api: 'maxResults' },
+      { field: 'tags', api: 'tags' },
+      { field: 'zeta', api: 'zeta' },
+    ]);
+  });
+
+  it('emits typed zod fields (required without .optional()) and the bodyParams def, no opaque body', () => {
+    const { fileText } = emitService(WIDGET_DOC as never, widgetApi);
+    // required string -> .min(1): an empty required id is never meaningful
+    expect(fileText).toContain('alpha: z.string().min(1),');
+    expect(fileText).toContain('account_: z.string().optional(),');
+    expect(fileText).toContain('flag: coerceBoolean.optional(),');
+    expect(fileText).toContain('tags: coerceArray(z.string()).optional(),');
+    expect(fileText).toContain('zeta: z.string().describe("Z field.").optional(),');
+    expect(fileText).toContain('bodyParams: [{"field":"alpha","api":"alpha"}');
+    expect(fileText).not.toContain('body: coerceJson');
+    expect(fileText).toContain('hasBody: true,');
+  });
+
+  it('assembles the request body from typed args at dispatch, restoring renamed API names', async () => {
+    const { registry, registered } = harness(FULL);
+    const request = vi.fn(async () => ({ data: { ok: true } }));
+    registerGeneratedTool(
+      registry,
+      {
+        name: 'x_widgets_create',
+        cud: 'create',
+        description: 'Create a widget.',
+        method: { id: 'x.widgets.create', httpMethod: 'POST', path: 'v1/widgets', baseUrl: 'https://x.googleapis.com/', requiredParams: [] },
+        params: [{ field: 'maxResults_', api: 'maxResults', location: 'query' }],
+        hasBody: true,
+        bodyParams: [
+          { field: 'alpha', api: 'alpha' },
+          { field: 'account_', api: 'account' },
+          { field: 'flag', api: 'flag' },
+        ],
+        shape: {
+          account: z.enum(['test']).describe('Google account alias'),
+          alpha: z.string(),
+          account_: z.string().optional(),
+          flag: z.boolean().optional(),
+        },
+      },
+      { getClientFn: (async () => ({ request })) as never },
+    );
+    const res = await registered[0].handler({ account: 'test', alpha: 'A', account_: 'body-account', maxResults_: 5 });
+    expect(res.isError).toBeUndefined();
+    const arg = request.mock.calls[0][0] as unknown as { url: string; data: unknown };
+    expect(arg.data).toEqual({ alpha: 'A', account: 'body-account' });
+    expect(arg.url).toContain('maxResults=5');
+
+    const empty = await registered[0].handler({ account: 'test', alpha: undefined });
+    expect(empty.isError).toBeUndefined();
+    expect((request.mock.calls[1][0] as unknown as { data: unknown }).data).toEqual({});
   });
 });

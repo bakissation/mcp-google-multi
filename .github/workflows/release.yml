@@ -3,6 +3,15 @@ name: release
 on:
   push:
     branches: [main, staging, dev]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Existing release version to (re)publish as a Docker image, e.g. 6.0.0-alpha.11"
+        required: true
+      channel:
+        description: "Channel alias tag (dev | staging | latest); empty = derived from the version"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -16,7 +25,11 @@ concurrency:
 
 jobs:
   release:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.semrel.outputs.version }}
+      channel: ${{ steps.semrel.outputs.channel }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -35,6 +48,150 @@ jobs:
         run: npm run build
 
       - name: Release
+        id: semrel
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx semantic-release
+
+  # The MCPB bundle is packed by scripts/build-mcpb.sh from semantic-release's
+  # prepareCmd and attached at release creation via the github plugin's assets
+  # option: releases are immutable, so assets cannot be uploaded after publish
+  # (a chained job 422s), and there is no backfill for already-published tags.
+
+  # Publishes STABLE releases to the official MCP Registry via GitHub OIDC
+  # (metadata only; npm hosts the package, and the npm tarball's mcpName field
+  # is the ownership proof). Prereleases are skipped on purpose: a prerelease
+  # published after its stable is never marked latest, so there is no listing
+  # benefit. The registry is in preview and may reset; this job makes a reset
+  # a non-event. A failure here never un-publishes npm/GHCR; re-run the job.
+  registry:
+    needs: release
+    if: >-
+      !cancelled() && needs.release.result == 'success' &&
+      needs.release.outputs.version != '' &&
+      needs.release.outputs.channel == 'latest'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: v${{ needs.release.outputs.version }}
+
+      - name: Install mcp-publisher
+        run: curl -fsSL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz mcp-publisher
+
+      - name: Stamp server.json with the released version and bundle digest
+        run: |
+          curl -fsSL -o mcp-google-multi.mcpb "https://github.com/${{ github.repository }}/releases/download/v${VERSION}/mcp-google-multi.mcpb"
+          SHA256=$(sha256sum mcp-google-multi.mcpb | cut -d' ' -f1)
+          VERSION="$VERSION" SHA256="$SHA256" node -e '
+            const fs = require("node:fs");
+            const v = process.env.VERSION;
+            const s = JSON.parse(fs.readFileSync("server.json", "utf8"));
+            s.version = v;
+            for (const p of s.packages) {
+              if ("version" in p) p.version = v;
+              p.identifier = p.identifier.replaceAll("0.0.0", v);
+              if (p.registryType === "mcpb") p.fileSha256 = process.env.SHA256;
+            }
+            fs.writeFileSync("server.json", JSON.stringify(s, null, 2) + "\n");
+          '
+
+      - name: Publish to the MCP Registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
+
+  # Publishes the released version as a multi-arch image on GHCR. Chained here
+  # (not `on: push: tags`) because tags pushed with GITHUB_TOKEN never trigger
+  # other workflows. workflow_dispatch backfills an image for an existing tag.
+  docker:
+    needs: release
+    if: >-
+      !cancelled() &&
+      (github.event_name == 'workflow_dispatch' ||
+       (needs.release.result == 'success' && needs.release.outputs.version != ''))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - name: Resolve version + channel
+        id: rel
+        env:
+          EVT: ${{ github.event_name }}
+          IN_VERSION: ${{ inputs.version }}
+          IN_CHANNEL: ${{ inputs.channel }}
+          REL_VERSION: ${{ needs.release.outputs.version }}
+          REL_CHANNEL: ${{ needs.release.outputs.channel }}
+        run: |
+          if [ "$EVT" = "workflow_dispatch" ]; then
+            version="$IN_VERSION"; channel="$IN_CHANNEL"
+            if [ -z "$channel" ]; then
+              case "$version" in
+                *-alpha.*) channel=dev ;;
+                *-beta.*)  channel=staging ;;
+                *)         channel=latest ;;
+              esac
+            fi
+          else
+            version="$REL_VERSION"; channel="$REL_CHANNEL"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: v${{ steps.rel.outputs.version }}
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=${{ steps.rel.outputs.version }}
+            type=raw,value=dev,enable=${{ steps.rel.outputs.channel == 'dev' }}
+            type=raw,value=beta,enable=${{ steps.rel.outputs.channel == 'staging' }}
+            type=raw,value=staging,enable=${{ steps.rel.outputs.channel == 'staging' }}
+            type=raw,value=latest,enable=${{ steps.rel.outputs.channel == 'latest' && !contains(steps.rel.outputs.version, '-') }}
+            type=semver,pattern={{major}},value=${{ steps.rel.outputs.version }},enable=${{ steps.rel.outputs.channel == 'latest' && !contains(steps.rel.outputs.version, '-') }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.rel.outputs.version }},enable=${{ steps.rel.outputs.channel == 'latest' && !contains(steps.rel.outputs.version, '-') }}
+          labels: |
+            io.modelcontextprotocol.server.name=io.github.bakissation/mcp-google-multi
+
+      - uses: docker/build-push-action@v6
+        id: push
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

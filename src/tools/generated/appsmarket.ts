@@ -4,17 +4,21 @@ import type { ToolRegistry } from '../../registry.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerAppsmarketGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_appsmarket_v2: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/appsmarketplace.license"],
+  ];
   registerGeneratedTool(registry, {
     name: "appsmarket_customer_license_get",
     cud: "read",
     description: "Gets the customer's licensing status to determine if they have access to a given app. For more information, see [Getting app installation and licensing details]",
-    method: { id: "appsmarket.customerLicense.get", httpMethod: "GET", path: "appsmarket/v2/customerLicense/{applicationId}/{customerId}", baseUrl: "https://appsmarket.googleapis.com/", requiredParams: ["customerId","applicationId"] },
+    method: { id: "appsmarket.customerLicense.get", httpMethod: "GET", path: "appsmarket/v2/customerLicense/{applicationId}/{customerId}", baseUrl: "https://appsmarket.googleapis.com/", requiredParams: ["applicationId","customerId"], scopes: S_appsmarket_v2[0] },
     params: [{"field":"applicationId","api":"applicationId","location":"path"},{"field":"customerId","api":"customerId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
       account: accountField(),
-      applicationId: z.string().describe("The ID of the application."),
-      customerId: z.string().describe("The ID of the customer."),
+      applicationId: z.string().min(1).describe("The ID of the application."),
+      customerId: z.string().min(1).describe("The ID of the customer."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -22,13 +26,13 @@ export function registerAppsmarketGeneratedTools(registry: ToolRegistry): void {
     name: "appsmarket_user_license_get",
     cud: "read",
     description: "Gets the user's licensing status to determine if they have permission to use a given app. For more information, see [Getting app installation and licensing deta",
-    method: { id: "appsmarket.userLicense.get", httpMethod: "GET", path: "appsmarket/v2/userLicense/{applicationId}/{userId}", baseUrl: "https://appsmarket.googleapis.com/", requiredParams: ["userId","applicationId"] },
+    method: { id: "appsmarket.userLicense.get", httpMethod: "GET", path: "appsmarket/v2/userLicense/{applicationId}/{userId}", baseUrl: "https://appsmarket.googleapis.com/", requiredParams: ["applicationId","userId"], scopes: S_appsmarket_v2[0] },
     params: [{"field":"applicationId","api":"applicationId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
       account: accountField(),
-      applicationId: z.string().describe("The ID of the application."),
-      userId: z.string().describe("The ID of the user."),
+      applicationId: z.string().min(1).describe("The ID of the application."),
+      userId: z.string().min(1).describe("The ID of the user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

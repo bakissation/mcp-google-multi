@@ -1,0 +1,61 @@
+# Pull-and-up deployment for mcp-google-multi (Streamable HTTP).
+#
+# Quick start (see docs/http-setup.md "Option 0"):
+#   1. cp .env.example .env   # then fill it in
+#   2. docker compose up -d                          # local / behind your own proxy or tunnel
+#      COMPOSE_PROFILES=caddy docker compose up -d   # VPS + domain: automatic HTTPS via Caddy
+# Upgrade:
+#   docker compose pull && docker compose up -d
+name: mcp-google-multi
+
+services:
+  mcp:
+    # Tracks the stable major by default. During the 6.0.0 prerelease window,
+    # set MCP_IMAGE_TAG=beta (or dev) in .env.
+    image: ghcr.io/bakissation/mcp-google-multi:${MCP_IMAGE_TAG:-6}
+    env_file: .env
+    init: true # distroless has no init; SIGTERM must reach node for a clean shutdown
+    restart: unless-stopped
+    ports:
+      # Loopback-only on the host: reachable by a local client, a tunnel, or
+      # your own reverse proxy. The caddy profile talks to the container over
+      # the compose network instead (set MCP_HTTP_HOST=0.0.0.0 in .env for it).
+      - "127.0.0.1:4243:4243"
+    volumes:
+      # Tokens + the auto-provisioned MASTER_KEY file live here. Losing this
+      # volume (or recreating it) invalidates every stored Google token.
+      - mcp-config:/home/nonroot/.config/mcp-google-multi
+    healthcheck:
+      # Exec-form node probe: the distroless image has no shell or curl. The
+      # PRM well-known route answers unauthenticated; any HTTP response = alive.
+      test:
+        - CMD
+        - /nodejs/bin/node
+        - -e
+        - "const h=process.env.MCP_HTTP_HOST||'127.0.0.1';fetch('http://'+h+':4243/.well-known/oauth-protected-resource').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  caddy:
+    profiles: [caddy]
+    image: caddy:2
+    env_file: .env # provides MCP_DOMAIN to the Caddyfile placeholder
+    restart: unless-stopped
+    ports:
+      - "80:80" # ACME HTTP-01 + redirect to HTTPS
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data # certificates; losing it risks Let's Encrypt rate limits
+      - caddy-config:/config
+    depends_on:
+      mcp:
+        condition: service_healthy
+
+volumes:
+  mcp-config:
+  caddy-data:
+  caddy-config:

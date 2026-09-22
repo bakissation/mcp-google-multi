@@ -8,12 +8,14 @@ export interface GenApi {
   service: string;
 }
 
-// alertcenter (service-account-only auth) and drive v2 (superseded by v3)
-// are deliberately not generated.
+// drive v2 is deliberately not generated (superseded by v3). alertcenter is
+// not even fetched: it needs service-account DWD, which this server declines.
 export const GEN_APIS: GenApi[] = [
   { file: 'admin.datatransfer_v1.json', service: 'admin' },
   { file: 'admin.directory_v1.json', service: 'admin' },
   { file: 'admin.reports_v1.json', service: 'admin' },
+  { file: 'analyticsadmin.v1beta.json', service: 'analytics' },
+  { file: 'analyticsdata.v1beta.json', service: 'analytics' },
   { file: 'appsmarket.v2.json', service: 'appsmarket' },
   { file: 'calendar.v3.json', service: 'calendar' },
   { file: 'chat.v1.json', service: 'chat' },
@@ -46,6 +48,10 @@ export const GEN_APIS: GenApi[] = [
 // Methods already implemented by curated tools — curated quality wins, the
 // generator skips them. Sorted; keep it that way.
 export const CURATED_METHOD_IDS: string[] = [
+  'analyticsadmin.accountSummaries.list',
+  'analyticsdata.properties.getMetadata',
+  'analyticsdata.properties.runRealtimeReport',
+  'analyticsdata.properties.runReport',
   'calendar.calendarList.list',
   'calendar.calendars.insert',
   'calendar.events.delete',
@@ -181,8 +187,34 @@ export const CURATED_METHOD_IDS: string[] = [
   'webmasters.sites.list',
 ];
 
+// Per-method escape valves for the typed-body heuristic (gen-tools): 'opaque'
+// keeps the single coerceJson body arg even when the schema is flat; 'typed'
+// lifts the property-count cap (flatness stays mandatory — the generator
+// throws if a forced method has nested/$ref props).
+export const BODY_OVERRIDES: Record<string, 'typed' | 'opaque'> = {
+  // 63 flat props each: typed params would cost more context than they save,
+  // so the cap already routes both to opaque. Recorded here so the choice is
+  // explicit intent, not an emergent property of MAX_TYPED_BODY_PROPS.
+  'groupsSettings.groups.patch': 'opaque',
+  'groupsSettings.groups.update': 'opaque',
+};
+
 // Corrections where HTTP-verb inference misreads a method's effect.
-export const CUD_OVERRIDES: Record<string, Cud> = {};
+export const CUD_OVERRIDES: Record<string, Cud> = {
+  // One-time consent flag on the property: a state write, not a creation.
+  'analyticsadmin.properties.acknowledgeUserDataCollection': 'update',
+  // The effect is an ARGUMENT, not the method name, so no verb rule can reach
+  // these. All three can deprovision or remotely wipe a device, which is the
+  // most destructive thing in the admin surface.
+  'directory.chromeosdevices.action': 'delete',
+  'directory.mobiledevices.action': 'delete',
+  'admin.directory.v1.customer.devices.chromeos.issueCommand': 'delete',
+  'admin.directory.v1.customer.devices.chromeos.batchChangeStatus': 'delete',
+  // A POST purely because the request carries a body; it runs a test and
+  // returns a report, changing nothing. `run` cannot go in the read verb list
+  // because `script.scripts.run` executes arbitrary Apps Script.
+  'searchconsole.urlTestingTools.mobileFriendlyTest.run': 'read',
+};
 
 // Replacement tool names for methodIds whose derived name exceeds the 64-char
 // MCP limit or collides with another generated name.
@@ -190,6 +222,11 @@ export const NAME_OVERRIDES: Record<string, string> = {
   // curated admin_users_update wraps directory.users.patch; the full-PUT
   // variant needs its own name
   'directory.users.update': 'admin_users_replace',
+  'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.create': 'analytics_data_streams_measurement_protocol_secrets_create',
+  'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.delete': 'analytics_data_streams_measurement_protocol_secrets_delete',
+  'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.get': 'analytics_data_streams_measurement_protocol_secrets_get',
+  'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.list': 'analytics_data_streams_measurement_protocol_secrets_list',
+  'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.patch': 'analytics_data_streams_measurement_protocol_secrets_patch',
   'classroom.courses.courseWork.addOnAttachments.studentSubmissions.get': 'classroom_coursework_addon_submissions_get',
   'classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch': 'classroom_coursework_addon_submissions_patch',
   'classroom.courses.courseWork.studentSubmissions.modifyAttachments': 'classroom_coursework_submissions_modify_attachments',

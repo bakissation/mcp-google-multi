@@ -1,5 +1,8 @@
 node_modules/
 dist/
+bundle/
 tokens/
 .env
 discovery/
+*.mcpb
+eval/tier2/out/

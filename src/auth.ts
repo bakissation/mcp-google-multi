@@ -1,10 +1,11 @@
-import { OAuth2Client } from 'googleapis-common';
-import http from 'node:http';
-import { URL } from 'node:url';
 import { randomBytes } from 'node:crypto';
-import open from 'open';
-import { ACCOUNTS, ACCOUNT_CONFIG } from './accounts.js';
+import { openUrl } from './open-url.js';
+import { ACCOUNTS, getAccountSet } from './accounts.js';
+import { ADMIN_SCOPES, BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from './scope-catalog.js';
+import { resolveMasterKey } from './master-key.js';
+import type { ScopeProfile } from './scope-catalog.js';
 import { writeToken } from './token-store.js';
+import { buildConsentClient, openLoopbackConsent, TESTING_MODE_WARNING } from './oauth-consent.js';
 
 // Personal (non-Workspace) accounts 403 on admin scopes; ADMIN_SCOPES stays per-account opt-in, never granted by default.
 
@@ -21,68 +22,15 @@ export const BASE_SCOPES = [
   'https://www.googleapis.com/auth/meetings.space.readonly',
 ];
 
-export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = {
-  slides: [
-    'https://www.googleapis.com/auth/presentations',
-  ],
-  forms: [
-    'https://www.googleapis.com/auth/forms.body',
-    'https://www.googleapis.com/auth/forms.responses.readonly',
-  ],
-  chat: [
-    'https://www.googleapis.com/auth/chat.spaces',
-    'https://www.googleapis.com/auth/chat.messages',
-    'https://www.googleapis.com/auth/chat.messages.create',
-  ],
-  // These extend the always-on gmail service: users.settings.* writes require these
-  // scopes (reads already work via gmail.modify); sharing is split out as riskier.
-  gmail_settings: [
-    'https://www.googleapis.com/auth/gmail.settings.basic',
-  ],
-  gmail_settings_sharing: [
-    'https://www.googleapis.com/auth/gmail.settings.sharing',
-  ],
-  classroom: [
-    'https://www.googleapis.com/auth/classroom.courses',
-    'https://www.googleapis.com/auth/classroom.coursework.me',
-    'https://www.googleapis.com/auth/classroom.coursework.students',
-    'https://www.googleapis.com/auth/classroom.courseworkmaterials',
-    'https://www.googleapis.com/auth/classroom.rosters',
-    'https://www.googleapis.com/auth/classroom.announcements',
-    'https://www.googleapis.com/auth/classroom.topics',
-  ],
-  cloudidentity: [
-    'https://www.googleapis.com/auth/cloud-identity.groups',
-    'https://www.googleapis.com/auth/cloud-identity.devices',
-  ],
-  cloudsearch: ['https://www.googleapis.com/auth/cloud_search'],
-  vault: ['https://www.googleapis.com/auth/ediscovery'],
-  keep: ['https://www.googleapis.com/auth/keep'],
-  driveactivity: ['https://www.googleapis.com/auth/drive.activity.readonly'],
-  drivelabels: [
-    'https://www.googleapis.com/auth/drive.labels',
-    'https://www.googleapis.com/auth/drive.admin.labels',
-  ],
-  script: [
-    'https://www.googleapis.com/auth/script.projects',
-    'https://www.googleapis.com/auth/script.deployments',
-    'https://www.googleapis.com/auth/script.processes',
-    'https://www.googleapis.com/auth/script.metrics',
-  ],
-  postmaster: ['https://www.googleapis.com/auth/postmaster.readonly'],
-  groupssettings: ['https://www.googleapis.com/auth/apps.groups.settings'],
-  groupsmigration: ['https://www.googleapis.com/auth/apps.groups.migration'],
-  licensing: ['https://www.googleapis.com/auth/apps.licensing'],
-  reseller: ['https://www.googleapis.com/auth/apps.order'],
-  appsmarket: ['https://www.googleapis.com/auth/appsmarketplace.license'],
-};
+// Kept as a derived view for compat (docs generator, tests); the catalog in
+// scope-catalog.ts is the source of truth. "admin" is not an optional bundle.
+export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = Object.fromEntries(
+  Object.entries(BUNDLE_CATALOG)
+    .filter(([name]) => name !== 'admin')
+    .map(([name, entry]) => [name, entry.scopes]),
+);
 
-export const ADMIN_SCOPES = [
-  'https://www.googleapis.com/auth/admin.reports.audit.readonly',
-  'https://www.googleapis.com/auth/admin.directory.user',
-  'https://www.googleapis.com/auth/admin.directory.group.readonly',
-  'https://www.googleapis.com/auth/admin.directory.group.member.readonly',
-];
+export { ADMIN_SCOPES };
 
 /** Parse comma-separated env value into a deduplicated string array. */
 function parseCsvEnv(name: string): string[] {
@@ -92,22 +40,82 @@ function parseCsvEnv(name: string): string[] {
     .filter(Boolean);
 }
 
-/** Bundle keys enabled via GOOGLE_OPTIONAL_SCOPES (e.g. ["forms","chat"]). */
+/**
+ * Legacy global override (BC7): a set GOOGLE_OPTIONAL_SCOPES acts as an
+ * implicit "legacy-global" profile applied to every account (env wins over
+ * file profiles, cc-config R2). Unknown names now fail loudly (BR3) where v5
+ * silently dropped them — the intended migration signal.
+ */
+function legacyGlobalProfile(): ScopeProfile | null {
+  const names = parseCsvEnv('GOOGLE_OPTIONAL_SCOPES');
+  if (names.length === 0) return null;
+  const bundles = resolveBundleAliases(names);
+  // Boot-time validation lives in resolveAccounts (runs whatever
+  // GOOGLE_TOOLSETS selects); this is defense-in-depth for direct callers.
+  for (const bundle of bundles) {
+    if (bundle === 'admin') {
+      throw new Error(
+        'E_UNKNOWN_BUNDLE: "admin" is not a global bundle: grant it per account via GOOGLE_ADMIN_ACCOUNTS or an "admin: true" scope profile.',
+      );
+    }
+    if (!(bundle in BUNDLE_CATALOG)) {
+      const hint = closestBundle(bundle);
+      throw new Error(
+        `E_UNKNOWN_BUNDLE: unknown bundle "${bundle}" in GOOGLE_OPTIONAL_SCOPES${hint ? ` — did you mean "${hint}"?` : ''}`,
+      );
+    }
+  }
+  return { bundles };
+}
+
+function profileForAccount(alias: string): ScopeProfile {
+  const legacy = legacyGlobalProfile();
+  if (legacy) return legacy;
+  const set = getAccountSet();
+  const name = set.configs[alias]?.scopeProfile ?? 'base';
+  // hasOwn: a profile named like an Object.prototype member must never
+  // resolve to the inherited function.
+  return Object.hasOwn(set.scopeProfiles, name) ? set.scopeProfiles[name] : { bundles: [] };
+}
+
+/** Union of every account's resolved bundles: a service registers if ANY
+ * account can authorize it; per-account authz happens at call time (BR2). */
 export function getOptionalBundles(): string[] {
-  return parseCsvEnv('GOOGLE_OPTIONAL_SCOPES').filter(b => b in OPTIONAL_SCOPE_BUNDLES);
+  const legacy = legacyGlobalProfile();
+  if (legacy) return legacy.bundles.filter(b => b !== 'admin');
+  const union = new Set<string>();
+  const set = getAccountSet();
+  for (const alias of set.aliases) {
+    for (const b of profileForAccount(alias).bundles) {
+      if (b !== 'admin') union.add(b);
+    }
+  }
+  return [...union];
 }
 
-/** Account aliases granted ADMIN_SCOPES via GOOGLE_ADMIN_ACCOUNTS. */
+/** Aliases granted ADMIN_SCOPES: per-account admin flag (env
+ * GOOGLE_ADMIN_ACCOUNTS overrides config.json at resolve) OR the account's
+ * scope profile carrying admin (boolean or "admin" bundle) — equivalent forms. */
 export function getAdminAccounts(): string[] {
-  return parseCsvEnv('GOOGLE_ADMIN_ACCOUNTS');
+  const { aliases, configs } = getAccountSet();
+  return aliases.filter((a) => {
+    if (configs[a].admin === true) return true;
+    const p = profileForAccount(a);
+    return p.admin === true || p.bundles.includes('admin');
+  });
 }
 
-/** Scopes are fixed at consent time: changing GOOGLE_OPTIONAL_SCOPES or GOOGLE_ADMIN_ACCOUNTS requires re-running auth. */
+/** Scopes are fixed at consent time: changing an account's profile (or the
+ * legacy env) changes its consent set and requires re-running auth. Evaluated
+ * per account: `work` can carry admin + gmail_settings while `personal` is
+ * never asked for them. */
 export function resolveScopesForAccount(alias: string): string[] {
-  const scopes = [...BASE_SCOPES];
+  const profile = profileForAccount(alias);
+  const scopes = profile.includesBase === false ? [] : [...BASE_SCOPES];
 
-  for (const bundle of getOptionalBundles()) {
-    scopes.push(...OPTIONAL_SCOPE_BUNDLES[bundle]);
+  for (const bundle of profile.bundles) {
+    if (bundle === 'admin') continue;
+    scopes.push(...BUNDLE_CATALOG[bundle].scopes);
   }
 
   if (getAdminAccounts().includes(alias)) {
@@ -140,21 +148,18 @@ export async function runAuthFlow(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const config = ACCOUNT_CONFIG[alias];
+  const config = getAccountSet().configs[alias];
   const scopes = resolveScopesForAccount(alias);
 
-  if (!process.env.MASTER_KEY) {
-    console.error(
-      'MASTER_KEY is not set. Generate one (openssl rand -base64 32) and add it to .env before authenticating.',
-    );
-    process.exit(1);
-  }
+  // Auto-provisions on a fresh install (env > keychain > file > generate);
+  // resolves eagerly so a provisioning failure surfaces before the browser opens.
+  resolveMasterKey();
 
-  const oauth2Client = new OAuth2Client(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    'http://localhost:4242/oauth2callback',
-  );
+  // Shared ephemeral-port loopback flow (oauth-consent.ts): listen first, then
+  // build the auth URL from the assigned redirect. CLI gets a patient timeout;
+  // errors propagate to main()'s fatal handler like every other CLI failure.
+  const loop = await openLoopbackConsent({ timeoutMs: 10 * 60_000 });
+  const oauth2Client = buildConsentClient(loop.redirect);
 
   // CSRF protection for the OAuth callback (RFC 6749 §10.12).
   const expectedState = randomBytes(32).toString('hex');
@@ -172,82 +177,15 @@ export async function runAuthFlow(args: string[]): Promise<void> {
   if (getAdminAccounts().includes(alias)) {
     console.log('  ⚠ Admin scopes included — this account will be granted Workspace admin access.');
   }
-  console.log(`Opening browser for authorization...`);
+  // Always print the URL first: the browser launch is best-effort and
+  // silently does nothing on headless/SSH sessions.
+  console.log(`Opening your browser to authorize "${alias}". If nothing opens, visit:\n${authorizeUrl}`);
+  openUrl(authorizeUrl);
 
-  return new Promise((resolve, reject) => {
-    const server = http
-      .createServer(async (req, res) => {
-        try {
-          if (req.url && req.url.startsWith('/oauth2callback')) {
-            const qs = new URL(req.url, 'http://localhost:4242').searchParams;
+  const tokens = await loop.finish(oauth2Client, expectedState);
+  writeToken(alias, tokens);
 
-            const error = qs.get('error');
-            if (error) {
-              res.writeHead(400, { 'Content-Type': 'text/plain' });
-              res.end(`Authorization denied: ${error}`);
-              server.close();
-              server.closeAllConnections();
-              reject(new Error(`Authorization denied: ${error}`));
-              return;
-            }
-
-            const code = qs.get('code');
-            if (!code) {
-              res.writeHead(400, { 'Content-Type': 'text/plain' });
-              res.end('No authorization code received.');
-              server.close();
-              server.closeAllConnections();
-              reject(new Error('No authorization code received'));
-              return;
-            }
-
-            const returnedState = qs.get('state');
-            if (returnedState !== expectedState) {
-              res.writeHead(400, { 'Content-Type': 'text/plain' });
-              res.end('State mismatch — possible CSRF attempt. Aborting.');
-              server.close();
-              server.closeAllConnections();
-              reject(new Error('OAuth state token mismatch'));
-              return;
-            }
-
-            const { tokens } = await oauth2Client.getToken(code);
-
-            writeToken(alias, tokens);
-
-            res.writeHead(200, { 'Content-Type': 'text/html' });
-            res.end(
-              '<h2>Authentication successful!</h2><p>You can close this tab.</p>',
-            );
-            server.close();
-            server.closeAllConnections();
-
-            console.log(`Token saved (encrypted) for ${alias}.`);
-            console.log('Next: authenticate your other aliases, then verify with: mcp-google-multi config check');
-            resolve();
-          }
-        } catch (e) {
-          res.writeHead(500, { 'Content-Type': 'text/plain' });
-          res.end('Internal error during authentication.');
-          server.close();
-          server.closeAllConnections();
-          reject(e);
-        }
-      })
-      // Bind to loopback only — never expose the OAuth callback to the local network.
-      .listen(4242, '127.0.0.1', () => {
-        // Always print the URL: `open` silently no-ops on headless/SSH sessions.
-        console.log(`Opening your browser to authorize "${alias}". If nothing opens, visit:\n${authorizeUrl}`);
-        open(authorizeUrl, { wait: false }).then((cp) => cp.unref());
-      });
-
-
-    server.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error('Port 4242 is already in use. Close the process using it and retry.');
-        process.exit(1);
-      }
-      reject(err);
-    });
-  });
+  console.log(`Token saved (encrypted) for ${alias}.`);
+  console.log(TESTING_MODE_WARNING);
+  console.log('Next: authenticate your other aliases, then verify with: mcp-google-multi config check');
 }

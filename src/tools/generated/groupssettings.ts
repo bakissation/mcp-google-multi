@@ -5,16 +5,20 @@ import { coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_groupssettings_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/apps.groups.settings"],
+  ];
   registerGeneratedTool(registry, {
     name: "groupssettings_groups_get",
     cud: "read",
     description: "Gets one resource by id.",
-    method: { id: "groupsSettings.groups.get", httpMethod: "GET", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"] },
+    method: { id: "groupsSettings.groups.get", httpMethod: "GET", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"], scopes: S_groupssettings_v1[0] },
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
       account: accountField(),
-      groupUniqueId: z.string().describe("The group's email address."),
+      groupUniqueId: z.string().min(1).describe("The group's email address."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -22,12 +26,12 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): vo
     name: "groupssettings_groups_patch",
     cud: "update",
     description: "Updates an existing resource. This method supports patch semantics.",
-    method: { id: "groupsSettings.groups.patch", httpMethod: "PATCH", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"] },
+    method: { id: "groupsSettings.groups.patch", httpMethod: "PATCH", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"], scopes: S_groupssettings_v1[0] },
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
       account: accountField(),
-      groupUniqueId: z.string().describe("The group's email address."),
+      groupUniqueId: z.string().min(1).describe("The group's email address."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Groups JSON request body. Top-level fields: allowExternalMembers, allowGoogleCommunication, allowWebPosting, archiveOnly, customFooterText, customReplyTo, customRolesEnabledForSettingsToBeMerged, defaultMessageDenyNotificationText, default_sender, description, email, enableCollaborativeInbox, +51 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -36,12 +40,12 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): vo
     name: "groupssettings_groups_update",
     cud: "update",
     description: "Updates an existing resource.",
-    method: { id: "groupsSettings.groups.update", httpMethod: "PUT", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"] },
+    method: { id: "groupsSettings.groups.update", httpMethod: "PUT", path: "{groupUniqueId}", baseUrl: "https://www.googleapis.com/groups/v1/groups/", requiredParams: ["groupUniqueId"], scopes: S_groupssettings_v1[0] },
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
       account: accountField(),
-      groupUniqueId: z.string().describe("The group's email address."),
+      groupUniqueId: z.string().min(1).describe("The group's email address."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Groups JSON request body. Top-level fields: allowExternalMembers, allowGoogleCommunication, allowWebPosting, archiveOnly, customFooterText, customReplyTo, customRolesEnabledForSettingsToBeMerged, defaultMessageDenyNotificationText, default_sender, description, email, enableCollaborativeInbox, +51 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },

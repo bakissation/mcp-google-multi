@@ -14,11 +14,16 @@ updates:
     allow:
       - dependency-name: "@googleapis/*"
       - dependency-name: "googleapis-common"
-    # The @googleapis/* packages pin googleapis-common@^N; a direct major bump
-    # ahead of the graph resolves two copies (cross-major auth mismatch). The
-    # direct pin follows the graph, never leads it.
+    # The @googleapis/* packages pin googleapis-common@^N. Any MAJOR move of
+    # this graph must be one manual, coordinated PR that bumps googleapis-common
+    # together with the 14 API packages: Dependabot cannot express that (a
+    # grouped majors PR strands the common pin -> two copies -> cross-major auth
+    # type mismatch, every tools file fails typecheck), so majors are ignored on
+    # BOTH sides here and minors/patches keep flowing grouped.
     ignore:
       - dependency-name: "googleapis-common"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@googleapis/*"
         update-types: ["version-update:semver-major"]
     groups:
       googleapis:

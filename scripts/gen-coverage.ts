@@ -39,10 +39,23 @@ function gatingFor(service: string): string {
   if (service === 'admin') return '`GOOGLE_ADMIN_ACCOUNTS`';
   const curated = SERVICES.find((s) => s.name === service);
   if (curated?.enabled || GENERATED_GATES[service]) {
-    return `\`GOOGLE_OPTIONAL_SCOPES=${service}\``;
+    return `scope profile bundle \`${service}\``;
   }
   return 'default';
 }
+
+// What a DEFAULT install actually registers: no optional bundles, no admin
+// account, so only the ungated services. `full` above is the ceiling, reached
+// only with every bundle plus an admin account.
+const defaultInstall = makeRegistry();
+for (const svc of SERVICES) if (!svc.enabled) svc.register(defaultInstall);
+for (const gen of GENERATED_SERVICES) {
+  const curated = SERVICES.find((s) => s.name === gen.name);
+  if (!curated?.enabled && !GENERATED_GATES[gen.name]) gen.register(defaultInstall);
+}
+const defaultTools = defaultInstall.tools.filter((t) => !t.meta);
+const defaultServices = [...new Set(defaultTools.map((t) => t.service))];
+const unreachable = full.tools.filter((t) => !t.meta && full.isUngrantable(t));
 
 const services = [...new Set(full.tools.filter((t) => !t.meta).map((t) => t.service))].sort();
 const rows = services.map((service) => {
@@ -64,7 +77,13 @@ const lines: string[] = [
   '',
   'All operational tools are hidden until their `{service}_discover` tool reveals them, so the idle context cost stays at the eager meta-tools only. Writes are deny-by-default via write-control regardless of tier. Generated tools whose scope is not granted return a typed `insufficient_scope` hint at call time; add the relevant bundle and re-auth to use them.',
   '',
-  'Not covered: Alert Center (service-account auth; planned for v6), Drive v2 (superseded by v3), and non-REST surfaces (Marketplace SDK, CalDAV).',
+  '## What a default install gives you',
+  '',
+  `That total is the **ceiling**, reached with every optional scope bundle granted plus an admin account. A default install (client id and secret, one account, no optional bundles) registers **${defaultTools.length} tools across ${defaultServices.length} services**: ${defaultServices.slice().sort().join(', ')}. Everything else in the table is one scope bundle away, and the \`Enabled by\` column says which.`,
+  '',
+  `**${unreachable.length} generated tools cannot succeed on any account under any configuration**, because no bundle in the catalog grants a scope they accept. They are not advertised in \`tools/list\` for that reason, though \`{service}_discover\` still lists them marked \`unreachable\` and they stay callable by name so the failure names the missing scope. Subtracting them, the reachable ceiling is **${totals.curated + totals.generated - unreachable.length} tools**.`,
+  '',
+  'Not covered: Alert Center (requires service-account domain-wide delegation; this server is per-user OAuth consent by design), Drive v2 (superseded by v3), Google Ads (no Discovery document; outside the generator by construction), and non-REST surfaces (Marketplace SDK, CalDAV).',
   '',
   '| Service | Curated | Generated | Total | Enabled by |',
   '|---|---:|---:|---:|---|',

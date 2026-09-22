@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { prepareLocalDest, resolveShareNotification } from '../src/tools/drive.js';
+import { resolveConvertTarget, resolveShareNotification } from '../src/tools/drive.js';
+import { prepareLocalDest } from '../src/tools/_local-files.js';
 import { executeApiMethod, type ApiMethodRef } from '../src/executor.js';
 
 describe('prepareLocalDest', () => {
@@ -21,6 +22,19 @@ describe('prepareLocalDest', () => {
 
     expect(fs.existsSync(savePath)).toBe(true);
     expect(dest).toBe(path.join(savePath, 'report.pdf'));
+  });
+
+  it('tolerates a savePath that already ends with the filename (no double join)', () => {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-dx-'));
+    created.push(parent);
+    const intended = path.join(parent, 'out', 'report.pdf');
+
+    const dest = prepareLocalDest(intended, 'report.pdf');
+
+    expect(dest).toBe(intended);
+    // and no directory named like the file was created
+    expect(fs.existsSync(intended)).toBe(false);
+    expect(fs.statSync(path.join(parent, 'out')).isDirectory()).toBe(true);
   });
 
   it('basename-sanitizes the filename so it never escapes savePath', () => {
@@ -85,5 +99,19 @@ describe('executeApiMethod binary/export steering', () => {
     const p = await payload(getMethod, { account: 'test', queryParams: { alt: 'media' } });
     expect(p.error).toBe('binary_unsupported');
     expect(p.hint).toContain('drive_download');
+  });
+});
+
+describe('resolveConvertTarget', () => {
+  it('maps the shorthands to the full google-apps ids', () => {
+    expect(resolveConvertTarget('document')).toBe('application/vnd.google-apps.document');
+    expect(resolveConvertTarget('spreadsheet')).toBe('application/vnd.google-apps.spreadsheet');
+    expect(resolveConvertTarget('presentation')).toBe('application/vnd.google-apps.presentation');
+    expect(resolveConvertTarget('drawing')).toBe('application/vnd.google-apps.drawing');
+  });
+
+  it('passes full ids through and keeps undefined undefined', () => {
+    expect(resolveConvertTarget('application/vnd.google-apps.document')).toBe('application/vnd.google-apps.document');
+    expect(resolveConvertTarget(undefined)).toBeUndefined();
   });
 });

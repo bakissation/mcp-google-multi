@@ -3,12 +3,12 @@ import { z } from 'zod';
 import { coerceArray, coerceJson } from './_coerce.js';
 import { searchconsole as searchconsoleClient } from '@googleapis/searchconsole';
 import { webmasters as webmastersClient } from '@googleapis/webmasters';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = accountAliasSchema.optional();
 
 export function registerSearchConsoleTools(server: ToolRegistry): void {
   // ─── Sites ───────────────────────────────────────────────
@@ -41,7 +41,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
       description: 'Get details for a specific site (property) in Google Search Console',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        siteUrl: z.string().describe('Site URL exactly as it appears in Search Console (e.g. "https://example.com/" or "sc-domain:example.com")'),
+        siteUrl: z.string().min(1).describe('Site URL exactly as it appears in Search Console (e.g. "https://example.com/" or "sc-domain:example.com")'),
       },
     },
     async ({ account, siteUrl }) => {
@@ -64,7 +64,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
       description: 'Add a site (property) to Google Search Console. You still need to verify ownership separately.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        siteUrl: z.string().describe('Site URL to add (e.g. "https://example.com/" or "sc-domain:example.com")'),
+        siteUrl: z.string().min(1).describe('Site URL to add (e.g. "https://example.com/" or "sc-domain:example.com")'),
       },
     },
     async ({ account, siteUrl }) => {
@@ -87,7 +87,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
       description: 'Remove a site (property) from Google Search Console',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        siteUrl: z.string().describe('Site URL to remove'),
+        siteUrl: z.string().min(1).describe('Site URL to remove'),
       },
     },
     async ({ account, siteUrl }) => {
@@ -112,7 +112,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
       description: 'List all sitemaps submitted for a site in Google Search Console',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        siteUrl: z.string().describe('Site URL (e.g. "https://example.com/" or "sc-domain:example.com")'),
+        siteUrl: z.string().min(1).describe('Site URL (e.g. "https://example.com/" or "sc-domain:example.com")'),
       },
     },
     async ({ account, siteUrl }) => {
@@ -135,7 +135,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
       description: 'Get details for a specific sitemap submitted to Google Search Console',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        siteUrl: z.string().describe('Site URL'),
+        siteUrl: z.string().min(1).describe('Site URL'),
         feedpath: z.string().describe('Full URL of the sitemap (e.g. "https://example.com/sitemap.xml")'),
       },
     },
@@ -159,7 +159,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
       description: 'Submit a sitemap to Google Search Console for a site',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        siteUrl: z.string().describe('Site URL'),
+        siteUrl: z.string().min(1).describe('Site URL'),
         feedpath: z.string().describe('Full URL of the sitemap to submit (e.g. "https://example.com/sitemap.xml")'),
       },
     },
@@ -183,7 +183,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
       description: 'Delete a sitemap from Google Search Console',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        siteUrl: z.string().describe('Site URL'),
+        siteUrl: z.string().min(1).describe('Site URL'),
         feedpath: z.string().describe('Full URL of the sitemap to delete'),
       },
     },
@@ -209,7 +209,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
       description: 'Query Google Search Console search analytics data. Returns clicks, impressions, CTR, and position for your site. Supports filtering by query, page, country, device, search type, and date range.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        siteUrl: z.string().describe('Site URL (e.g. "https://example.com/" or "sc-domain:example.com")'),
+        siteUrl: z.string().min(1).describe('Site URL (e.g. "https://example.com/" or "sc-domain:example.com")'),
         startDate: z.string().describe('Start date (YYYY-MM-DD). Data is available starting ~3 days ago.'),
         endDate: z.string().describe('End date (YYYY-MM-DD)'),
         dimensions: coerceArray(z.enum(['query', 'page', 'country', 'device', 'searchAppearance', 'date'])).optional()
@@ -274,8 +274,8 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
       description: 'Inspect a URL using the Google Search Console URL Inspection API. Returns indexing status, crawl info, rich results, AMP status, and mobile usability for a specific URL.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        siteUrl: z.string().describe('Site URL as registered in Search Console (e.g. "https://example.com/" or "sc-domain:example.com")'),
-        inspectionUrl: z.string().describe('The fully-qualified URL to inspect (must be under the siteUrl property)'),
+        siteUrl: z.string().min(1).describe('Site URL as registered in Search Console (e.g. "https://example.com/" or "sc-domain:example.com")'),
+        inspectionUrl: z.string().min(1).describe('The fully-qualified URL to inspect (must be under the siteUrl property)'),
         languageCode: z.string().optional().describe('BCP-47 language code for localized results (e.g. "en-US", "fr")'),
       },
     },

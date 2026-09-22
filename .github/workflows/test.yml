@@ -1,12 +1,10 @@
 name: ci
 
-# v6 + v6/** are the long-lived integration branch and its stacked slices:
-# they get ci but stay OUT of release.yml, so pushes there publish nothing.
 on:
   push:
-    branches: [main, staging, dev, v6, 'v6/**']
+    branches: [main, staging, dev]
   pull_request:
-    branches: [main, staging, dev, v6, 'v6/**']
+    branches: [main, staging, dev]
 
 # Least privilege: CI only checks out code + runs npm. (CodeQL: actions/missing-workflow-permissions)
 permissions:
@@ -32,6 +30,40 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      # Lazy mode's promise is a small context footprint; growth past the
+      # budget is a regression. Baseline: tests/fixtures/lazy-bytes-baseline.json.
+      - name: Lazy tools/list byte budget
+        run: node scripts/measure-tools.mjs --check
+
+      # Deterministic, network-free tool-surface contract (see eval/README.md).
+      - name: Contract suite (promptfoo)
+        env:
+          PROMPTFOO_DISABLE_UPDATE: '1'
+        run: npm run eval:contract
+
+  # Separate job on purpose: branch protection requires the check literally named
+  # "ci" — a version matrix would rename it to "ci (...)". This is the only leg
+  # exercising the declared engines floor (BV-7); the main job stays on 24.
+  ci-node22:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Build
         run: npm run build

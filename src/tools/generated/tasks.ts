@@ -5,17 +5,27 @@ import { coerceJson } from '../_coerce.js';
 import { accountField, registerGeneratedTool } from './_shared.js';
 
 export function registerTasksGeneratedTools(registry: ToolRegistry): void {
+  // Interned method scope sets (shared across tools; see scope-observability).
+  const S_tasks_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/tasks"],
+  ];
   registerGeneratedTool(registry, {
     name: "tasks_tasklists_update",
     cud: "update",
     description: "Updates the authenticated user's specified task list.",
-    method: { id: "tasks.tasklists.update", httpMethod: "PUT", path: "tasks/v1/users/@me/lists/{tasklist}", baseUrl: "https://tasks.googleapis.com/", requiredParams: ["tasklist"] },
+    method: { id: "tasks.tasklists.update", httpMethod: "PUT", path: "tasks/v1/users/@me/lists/{tasklist}", baseUrl: "https://tasks.googleapis.com/", requiredParams: ["tasklist"], scopes: S_tasks_v1[0] },
     params: [{"field":"tasklist","api":"tasklist","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
+    bodyParams: [{"field":"etag","api":"etag"},{"field":"id","api":"id"},{"field":"kind","api":"kind"},{"field":"selfLink","api":"selfLink"},{"field":"title","api":"title"},{"field":"updated","api":"updated"}],
     shape: {
       account: accountField(),
-      tasklist: z.string().describe("Task list identifier."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("TaskList JSON request body. Top-level fields: etag, id, kind, selfLink, title, updated."),
+      tasklist: z.string().min(1).describe("Task list identifier."),
+      etag: z.string().describe("ETag of the resource.").optional(),
+      id: z.string().describe("Task list identifier.").optional(),
+      kind: z.string().describe("Output only. Type of the resource. This is always \"tasks#taskList\".").optional(),
+      selfLink: z.string().describe("Output only. URL pointing to this task list. Used to retrieve, update, or delete this task list.").optional(),
+      title: z.string().describe("Title of the task list. Maximum length allowed: 1024 characters.").optional(),
+      updated: z.string().describe("Output only. Last modification time of the task list (as a RFC 3339 timestamp).").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -23,13 +33,13 @@ export function registerTasksGeneratedTools(registry: ToolRegistry): void {
     name: "tasks_tasks_update",
     cud: "update",
     description: "Updates the specified task.",
-    method: { id: "tasks.tasks.update", httpMethod: "PUT", path: "tasks/v1/lists/{tasklist}/tasks/{task}", baseUrl: "https://tasks.googleapis.com/", requiredParams: ["tasklist","task"] },
+    method: { id: "tasks.tasks.update", httpMethod: "PUT", path: "tasks/v1/lists/{tasklist}/tasks/{task}", baseUrl: "https://tasks.googleapis.com/", requiredParams: ["tasklist","task"], scopes: S_tasks_v1[0] },
     params: [{"field":"task","api":"task","location":"path"},{"field":"tasklist","api":"tasklist","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
       account: accountField(),
-      task: z.string().describe("Task identifier."),
-      tasklist: z.string().describe("Task list identifier."),
+      task: z.string().min(1).describe("Task identifier."),
+      tasklist: z.string().min(1).describe("Task list identifier."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Task JSON request body. Top-level fields: assignmentInfo, completed, deleted, due, etag, hidden, id, kind, links, notes, parent, position, +5 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },

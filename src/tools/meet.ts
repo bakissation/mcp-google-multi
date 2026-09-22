@@ -1,12 +1,12 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { meet as meetClient } from '@googleapis/meet';
-import { ACCOUNTS } from '../accounts.js';
+import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 
-const accountEnum = z.enum(ACCOUNTS);
+const accountEnum = accountAliasSchema.optional();
 
 export function registerMeetTools(server: ToolRegistry): void {
   // ─── Conference records (past meetings) ────────────────────────────────
@@ -46,7 +46,7 @@ export function registerMeetTools(server: ToolRegistry): void {
       description: 'Get a single conference record by resource name (e.g. conferenceRecords/abc123)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        name: z.string().describe('Resource name, format: conferenceRecords/{conference_record}'),
+        name: z.string().min(1).describe('Resource name, format: conferenceRecords/{conference_record}'),
       },
     },
     async ({ account, name }) => {
@@ -156,5 +156,8 @@ export function registerMeetTools(server: ToolRegistry): void {
 }
 
 function handleMeetError(error: any, account: Account) {
-  return handleGoogleApiError(error, account, "Meet API requires the meetings.space.readonly scope and the Google Meet API enabled in Cloud Console. Confirm both for this account.");
+  return handleGoogleApiError(error, account, {
+    scope: 'Meet needs the meetings.space.readonly scope and the Google Meet API enabled in Cloud Console. Confirm both for this account.',
+    resource: `Meet denied this conference record to "${account}". Meet exposes records only to the organizer or a participant, so check which account hosted the meeting.`,
+  });
 }

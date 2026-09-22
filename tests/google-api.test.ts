@@ -79,6 +79,25 @@ const PEOPLE_FIXTURE = {
   },
 };
 
+// The searchconsole discovery doc keeps its legacy webmasters.* method ids —
+// the fixture mirrors that alias/doc-prefix mismatch.
+const SEARCHCONSOLE_FIXTURE = {
+  baseUrl: 'https://www.googleapis.com/',
+  resources: {
+    sites: {
+      methods: {
+        list: {
+          id: 'webmasters.sites.list',
+          httpMethod: 'GET',
+          path: 'webmasters/v3/sites',
+          description: 'Lists sites.',
+          parameters: {},
+        },
+      },
+    },
+  },
+};
+
 function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string> } = {}) {
   const registered: { name: string; handler: (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }> }[] = [];
   const server = {
@@ -97,7 +116,11 @@ function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string> } = {}) {
     fetchFn: async (url: string) => ({
       ok: true,
       status: 200,
-      json: async () => (url.includes('/people/') ? PEOPLE_FIXTURE : url.includes('/slides/') ? POISONED_FIXTURE : FIXTURE),
+      json: async () =>
+        url.includes('/people/') ? PEOPLE_FIXTURE
+        : url.includes('/slides/') ? POISONED_FIXTURE
+        : url.includes('/searchconsole/') ? SEARCHCONSOLE_FIXTURE
+        : FIXTURE,
     }),
     getClientFn: (async () => ({ request })) as never,
     toolsets: opts.toolsets ?? 'all',
@@ -135,6 +158,14 @@ describe('google_api_search', () => {
     const res = await search({ query: 'x', api: 'nope' });
     expect(res.isError).toBe(true);
     expect(JSON.parse(res.content[0].text).error).toBe('unknown_api');
+  });
+
+  it('fans "analytics" out to both GA4 APIs and reports the resolution', async () => {
+    const { search, dir } = setup(FULL);
+    cleanupDirs.push(dir);
+    const res = await search({ query: 'x', api: 'analytics' });
+    expect(res.isError).toBeUndefined();
+    expect(JSON.parse(res.content[0].text).resolvedApi).toEqual(['analyticsadmin', 'analyticsdata']);
   });
 });
 
@@ -304,6 +335,25 @@ describe('google_api_call', () => {
     const payload = JSON.parse(res.content[0].text);
     expect(payload.error).toBe('unknown_method');
     expect(payload.hint).toContain('google_api_search');
+  });
+
+  it('retries an alias-prefixed methodId under the discovery doc prefix (searchconsole -> webmasters)', async () => {
+    const { call, request, dir } = setup(FULL);
+    cleanupDirs.push(dir);
+    const res = await call({ account: 'test', api: 'searchconsole', methodId: 'searchconsole.sites.list' });
+    expect(res.isError).toBeUndefined();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('suggests the closest method ids for an unknown methodId typo', async () => {
+    const { call, dir } = setup(FULL);
+    cleanupDirs.push(dir);
+    const res = await call({ account: 'test', api: 'gmail', methodId: 'gmail.users.messages.lst' });
+    expect(res.isError).toBe(true);
+    const payload = JSON.parse(res.content[0].text);
+    expect(payload.error).toBe('unknown_method');
+    expect(payload.hint).toContain('Did you mean');
+    expect(payload.hint).toContain('gmail.users.messages.list');
   });
 
   it('reports missing path params with the required list', async () => {

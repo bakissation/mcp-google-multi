@@ -2,12 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { buildMethodIndex, cudFromMethod, type DiscoveryMethod, type DiscoveryParam } from '../src/discovery-client.js';
 import type { Cud } from '../src/registry.js';
-import { CURATED_METHOD_IDS, CUD_OVERRIDES, DESCRIPTION_OVERRIDES, GEN_APIS, NAME_OVERRIDES, type GenApi } from './gen-config.js';
+import { BODY_OVERRIDES, CURATED_METHOD_IDS, CUD_OVERRIDES, DESCRIPTION_OVERRIDES, GEN_APIS, NAME_OVERRIDES, type GenApi } from './gen-config.js';
 
 // npm run gen:tools [service ...] — emits deterministic src/tools/generated/<service>.ts from the discovery/ snapshot; never hand-edit output.
 
 const MAX_TOOL_NAME = 64;
 const RESERVED_FIELDS = new Set(['account', 'body']);
+// Above this, a flat request schema still registers as one opaque body arg:
+// a 40-field inputSchema costs more context than it saves (BODY_OVERRIDES
+// 'typed' lifts the cap per method).
+const MAX_TYPED_BODY_PROPS = 24;
 
 interface DiscoveryDocJson {
   baseUrl?: string;
@@ -22,6 +26,18 @@ interface RawMethod {
   request?: { $ref?: string };
 }
 
+export interface RawBodyProp {
+  type?: string;
+  format?: string;
+  description?: string;
+  enum?: string[];
+  items?: { type?: string; $ref?: string; enum?: string[] };
+  $ref?: string;
+  additionalProperties?: unknown;
+  annotations?: { required?: string[] };
+  required?: boolean;
+}
+
 export interface ToolPlan {
   name: string;
   cud: Cud;
@@ -30,6 +46,9 @@ export interface ToolPlan {
   params: Array<{ field: string; api: string; location: 'path' | 'query' }>;
   bodyRef?: string;
   bodyProperties: string[];
+  /** Present = the request schema is flat, so the tool takes these as typed
+   * top-level args instead of one opaque coerceJson body. */
+  typedBody?: Array<{ field: string; api: string; prop: RawBodyProp }>;
 }
 
 export interface ServiceReport {
@@ -37,6 +56,7 @@ export interface ServiceReport {
   emitted: number;
   skippedCurated: number;
   overrideHits: number;
+  typedBodies: number;
   looseParams: string[];
 }
 
@@ -62,12 +82,69 @@ function describeText(text: string | undefined, fallback: string): string {
   return (first || fallback).slice(0, 200);
 }
 
+const FLAT_BODY_TYPES = new Set(['string', 'integer', 'number', 'boolean']);
+
+/** A body property the typed tier can express as one flat zod field:
+ * primitive, or array of primitives. $ref, nested object, and map-like
+ * (additionalProperties) schemas disqualify — those stay opaque JSON. */
+export function flatBodyProp(prop: RawBodyProp): boolean {
+  if (prop.$ref || prop.additionalProperties !== undefined) return false;
+  if (prop.type !== undefined && FLAT_BODY_TYPES.has(prop.type)) return true;
+  if (prop.type === 'array') {
+    const items = prop.items ?? {};
+    return items.$ref === undefined && FLAT_BODY_TYPES.has(items.type ?? '');
+  }
+  return false;
+}
+
+function bodyPropZod(api: string, prop: RawBodyProp, required: boolean): string {
+  const enumZod = (values: string[] | undefined, fallback: string): string =>
+    Array.isArray(values) && values.length > 0 ? `z.enum(${JSON.stringify(values)})` : fallback;
+  let inner: string;
+  switch (prop.type) {
+    case 'string':
+      // Same rule as a required param: a required body string is an id or a
+      // resource reference, and an empty one is never a meaningful value.
+      inner = enumZod(prop.enum, required ? 'z.string().min(1)' : 'z.string()');
+      break;
+    case 'integer':
+    case 'number':
+      inner = 'z.number()';
+      break;
+    case 'boolean':
+      inner = 'coerceBoolean';
+      break;
+    case 'array': {
+      const items = prop.items ?? {};
+      const itemInner = items.type === 'integer' || items.type === 'number' ? 'z.number()' : items.type === 'boolean' ? 'coerceBoolean' : enumZod(items.enum, 'z.string()');
+      inner = `coerceArray(${itemInner})`;
+      break;
+    }
+    default:
+      throw new Error(`bodyPropZod: non-flat property "${api}" (type ${prop.type ?? 'unknown'}) reached the typed emitter`);
+  }
+  let out = inner;
+  const desc = describeText(prop.description, '');
+  if (desc) out += `.describe(${stringLiteral(desc)})`;
+  if (!required) out += '.optional()';
+  return out;
+}
+
 function paramZod(name: string, param: DiscoveryParam, looseParams: string[], context: string): string {
   const p = param as DiscoveryParam & { enum?: string[]; repeated?: boolean };
   let inner: string;
   switch (p.type) {
     case 'string':
-      inner = Array.isArray(p.enum) && p.enum.length > 0 ? `z.enum(${JSON.stringify(p.enum)})` : 'z.string()';
+      // A path param is a path SEGMENT: an empty value collapses it and the
+      // request addresses the collection instead of the resource. Required
+      // query params are the same story one level down (mimeType, requestId,
+      // orgUnitPath): empty is never a meaningful value. Declare the
+      // constraint so the client sees it; expandPath still enforces the path.
+      inner = Array.isArray(p.enum) && p.enum.length > 0
+        ? `z.enum(${JSON.stringify(p.enum)})`
+        : p.location === 'path' || p.required
+          ? 'z.string().min(1)'
+          : 'z.string()';
       break;
     case 'integer':
     case 'number':
@@ -88,9 +165,14 @@ function paramZod(name: string, param: DiscoveryParam, looseParams: string[], co
   return out;
 }
 
-export function planTools(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: Set<string> = new Set()): { plans: ToolPlan[]; report: ServiceReport } {
+export function planTools(
+  doc: DiscoveryDocJson,
+  api: GenApi,
+  alreadyEmitted: Set<string> = new Set(),
+  bodyOverrides: Record<string, 'typed' | 'opaque'> = BODY_OVERRIDES,
+): { plans: ToolPlan[]; report: ServiceReport } {
   const index = buildMethodIndex(doc, api.service).sort((a, b) => a.id.localeCompare(b.id));
-  const report: ServiceReport = { service: api.service, emitted: 0, skippedCurated: 0, overrideHits: 0, looseParams: [] };
+  const report: ServiceReport = { service: api.service, emitted: 0, skippedCurated: 0, overrideHits: 0, typedBodies: 0, looseParams: [] };
   const rawById = new Map<string, RawMethod>();
   const walkRaw = (node: { resources?: Record<string, unknown>; methods?: Record<string, unknown> }) => {
     for (const m of Object.values(node.methods ?? {})) {
@@ -134,7 +216,39 @@ export function planTools(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: Se
       });
 
     const bodyRef = rawById.get(method.id)?.request?.$ref;
-    const bodyProperties = bodyRef ? Object.keys(doc.schemas?.[bodyRef]?.properties ?? {}).sort() : [];
+    const bodySchema = bodyRef ? doc.schemas?.[bodyRef] : undefined;
+    const bodyProperties = bodyRef ? Object.keys(bodySchema?.properties ?? {}).sort() : [];
+
+    // Typed-body tier: a fully flat request schema becomes typed top-level
+    // args; anything nested/$ref/map-like (or capped, or forced opaque) keeps
+    // the single coerceJson body. A schema without `properties` cannot be
+    // verified flat, so it stays opaque too.
+    const bodyOverride = bodyOverrides[method.id];
+    let typedBody: ToolPlan['typedBody'];
+    if (bodyRef && bodySchema?.properties !== undefined && bodyOverride !== 'opaque') {
+      const entries = Object.entries(bodySchema.properties) as Array<[string, RawBodyProp]>;
+      const allFlat = entries.every(([, p]) => flatBodyProp(p));
+      if (bodyOverride === 'typed' && !allFlat) {
+        throw new Error(`BODY_OVERRIDES["${method.id}"] = 'typed' but ${bodyRef} has non-flat properties`);
+      }
+      if (allFlat && (entries.length <= MAX_TYPED_BODY_PROPS || bodyOverride === 'typed')) {
+        const taken = new Set<string>(['account', 'body', 'fields', ...params.map((p) => p.field)]);
+        const isRequired = (p: RawBodyProp) => p.required === true || (p.annotations?.required ?? []).includes(method.id);
+        typedBody = entries
+          .sort(([a, pa], [b, pb]) => {
+            const req = Number(isRequired(pb)) - Number(isRequired(pa));
+            if (req !== 0) return req;
+            return a.localeCompare(b);
+          })
+          .map(([apiName, prop]) => {
+            let field = apiName;
+            while (taken.has(field)) field += '_';
+            taken.add(field);
+            return { field, api: apiName, prop };
+          });
+        report.typedBodies += 1;
+      }
+    }
 
     plans.push({
       name,
@@ -144,6 +258,7 @@ export function planTools(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: Se
       params: params.map((p) => ({ field: p.field, api: p.apiName, location: p.param.location })),
       bodyRef,
       bodyProperties,
+      typedBody,
     });
     report.emitted += 1;
   }
@@ -163,11 +278,44 @@ function emitShapeField(field: string, zod: string): string {
   return `      ${/^[a-zA-Z_$][\w$]*$/.test(field) ? field : stringLiteral(field)}: ${zod},`;
 }
 
-export function emitService(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: Set<string> = new Set()): { fileText: string; report: ServiceReport; names: string[] } {
+export function emitService(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: Set<string> = new Set()): { fileText: string; report: ServiceReport; names: string[]; pairs: [string, string][] } {
   const { plans, report } = planTools(doc, api, alreadyEmitted);
+
+  // Baked + INTERNED scope sets (#114): tools sharing a scope set share one
+  // frozen array. Keys sorted for deterministic regen diffs.
+  const scopeSetIndex = new Map<string, number>();
+  const scopeSets: string[][] = [];
+  for (const plan of plans) {
+    const sorted = [...new Set(plan.method.scopes ?? [])].sort();
+    if (sorted.length === 0) continue;
+    const key = sorted.join(' ');
+    if (!scopeSetIndex.has(key)) {
+      scopeSetIndex.set(key, scopeSets.length);
+      scopeSets.push(sorted);
+    }
+  }
+
+  // Bodies from multiple Discovery docs merge into one service file
+  // (buildServiceFile slices between the outer braces), so the interned table
+  // lives INSIDE the body under a per-doc unique name.
+  const tableName = `S_${api.file.replace(/\.json$/, '')}`.replace(/[^a-zA-Z0-9_]/g, '_');
   const lines: string[] = [
     `export function register${api.service[0].toUpperCase()}${api.service.slice(1)}GeneratedTools(registry: ToolRegistry): void {`,
+    ...(scopeSets.length > 0
+      ? [
+          '  // Interned method scope sets (shared across tools; see scope-observability).',
+          `  const ${tableName}: readonly (readonly string[])[] = [`,
+          ...scopeSets.map((set) => `    ${JSON.stringify(set)},`),
+          '  ];',
+        ]
+      : []),
   ];
+
+  const scopeRef = (m: DiscoveryMethod): string => {
+    const sorted = [...new Set(m.scopes ?? [])].sort();
+    if (sorted.length === 0) return '';
+    return `, scopes: ${tableName}[${scopeSetIndex.get(sorted.join(' '))}]`;
+  };
 
   for (const plan of plans) {
     const m = plan.method;
@@ -176,7 +324,12 @@ export function emitService(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: 
       const raw = m.params[p.api];
       shape.push(emitShapeField(p.field, paramZod(p.api, raw, report.looseParams, m.id)));
     }
-    if (plan.bodyRef) {
+    if (plan.typedBody) {
+      const isRequired = (p: RawBodyProp) => p.required === true || (p.annotations?.required ?? []).includes(m.id);
+      for (const bp of plan.typedBody) {
+        shape.push(emitShapeField(bp.field, bodyPropZod(bp.api, bp.prop, isRequired(bp.prop))));
+      }
+    } else if (plan.bodyRef) {
       const propsNote = plan.bodyProperties.length > 0
         ? ` Top-level fields: ${plan.bodyProperties.slice(0, 12).join(', ')}${plan.bodyProperties.length > 12 ? `, +${plan.bodyProperties.length - 12} more` : ''}.`
         : '';
@@ -194,9 +347,10 @@ export function emitService(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: 
       `    name: ${stringLiteral(plan.name)},`,
       `    cud: ${stringLiteral(plan.cud)},`,
       `    description: ${stringLiteral(plan.description)},`,
-      `    method: { id: ${stringLiteral(m.id)}, httpMethod: ${stringLiteral(m.httpMethod)}, path: ${stringLiteral(m.path)}, baseUrl: ${stringLiteral(m.baseUrl)}, requiredParams: ${JSON.stringify(m.requiredParams)} },`,
+      `    method: { id: ${stringLiteral(m.id)}, httpMethod: ${stringLiteral(m.httpMethod)}, path: ${stringLiteral(m.path)}, baseUrl: ${stringLiteral(m.baseUrl)}, requiredParams: ${JSON.stringify(m.requiredParams)}${scopeRef(m)} },`,
       `    params: ${JSON.stringify(paramEntries)},`,
       `    hasBody: ${plan.bodyRef ? 'true' : 'false'},`,
+      ...(plan.typedBody ? [`    bodyParams: ${JSON.stringify(plan.typedBody.map(({ field, api }) => ({ field, api })))},`] : []),
       '    shape: {',
       ...shape,
       '    },',
@@ -204,7 +358,7 @@ export function emitService(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: 
     );
   }
   lines.push('}');
-  return { fileText: lines.join('\n'), report, names: plans.map((p) => p.name) };
+  return { fileText: lines.join('\n'), report, names: plans.map((p) => p.name), pairs: plans.map((p) => [p.method.id, p.name] as [string, string]) };
 }
 
 // Registration bodies from every doc of a service merge into one file; the
@@ -226,6 +380,24 @@ export function buildServiceFile(service: string, registrationBodies: string[]):
     '',
   ];
   return `${header.join('\n')}\n${body}`;
+}
+
+/** Runtime join data for `metrics report --promotion`: methodId -> generated
+ * tool name, plus a snapshot of the curated skip-list, emitted so dist code
+ * never has to import build scripts. */
+export function emitMethodMap(pairs: [string, string][]): string {
+  const sorted = [...pairs].sort((a, b) => a[0].localeCompare(b[0]));
+  return [
+    '// GENERATED by scripts/gen-tools.ts — do not edit. Regenerate: npm run gen:tools',
+    'export const GENERATED_METHOD_TOOLS: Record<string, string> = {',
+    ...sorted.map(([id, name]) => `  ${JSON.stringify(id)}: ${JSON.stringify(name)},`),
+    '};',
+    '',
+    'export const CURATED_METHOD_IDS: readonly string[] = [',
+    ...CURATED_METHOD_IDS.map((id) => `  ${JSON.stringify(id)},`),
+    '];',
+    '',
+  ].join('\n');
 }
 
 export function emitBarrel(services: string[]): string {
@@ -273,13 +445,15 @@ async function main(): Promise<void> {
 
   const reports: ServiceReport[] = [];
   const emittedServices: string[] = [];
+  const allPairs: [string, string][] = [];
   for (const [service, entry] of [...byService.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     const bodies: string[] = [];
-    const serviceReport: ServiceReport = { service, emitted: 0, skippedCurated: 0, overrideHits: 0, looseParams: [] };
+    const serviceReport: ServiceReport = { service, emitted: 0, skippedCurated: 0, overrideHits: 0, typedBodies: 0, looseParams: [] };
     const serviceNames = new Set<string>();
     const serviceMethodIds = new Set<string>();
     for (const { doc, api } of entry.docs) {
-      const { fileText, report, names } = emitService(doc, api, serviceMethodIds);
+      const { fileText, report, names, pairs } = emitService(doc, api, serviceMethodIds);
+      allPairs.push(...pairs);
       for (const n of names) {
         if (serviceNames.has(n)) throw new Error(`Cross-document name collision "${n}" in service "${service}"; add NAME_OVERRIDES`);
         if (curatedNames.has(n)) throw new Error(`Generated name "${n}" collides with a curated tool; add NAME_OVERRIDES`);
@@ -288,6 +462,7 @@ async function main(): Promise<void> {
       serviceReport.emitted += report.emitted;
       serviceReport.skippedCurated += report.skippedCurated;
       serviceReport.overrideHits += report.overrideHits;
+      serviceReport.typedBodies += report.typedBodies;
       serviceReport.looseParams.push(...report.looseParams);
       bodies.push(fileText);
     }
@@ -298,11 +473,12 @@ async function main(): Promise<void> {
     fs.writeFileSync(path.join(outDir, `${service}.ts`), buildServiceFile(service, bodies));
     emittedServices.push(service);
     reports.push(serviceReport);
-    console.log(`emitted  ${service}: ${serviceReport.emitted} tools (${serviceReport.skippedCurated} curated skips, ${serviceReport.overrideHits} overrides)`);
+    console.log(`emitted  ${service}: ${serviceReport.emitted} tools (${serviceReport.skippedCurated} curated skips, ${serviceReport.overrideHits} overrides, ${serviceReport.typedBodies} typed bodies)`);
   }
 
   if (filter.size === 0) {
     fs.writeFileSync(path.join(outDir, 'index.ts'), emitBarrel(emittedServices));
+    fs.writeFileSync(path.join(outDir, 'method-map.ts'), emitMethodMap(allPairs));
   }
 
   const loose = reports.flatMap((r) => r.looseParams);
@@ -311,7 +487,8 @@ async function main(): Promise<void> {
     for (const l of loose) console.log(`  - ${l}`);
   }
   const total = reports.reduce((sum, r) => sum + r.emitted, 0);
-  console.log(`\n${total} generated tools across ${emittedServices.length} services.`);
+  const typedTotal = reports.reduce((sum, r) => sum + r.typedBodies, 0);
+  console.log(`\n${total} generated tools across ${emittedServices.length} services (${typedTotal} with typed request bodies).`);
 }
 
 const isDirectRun = process.argv[1] !== undefined && path.resolve(process.argv[1]).includes('gen-tools');

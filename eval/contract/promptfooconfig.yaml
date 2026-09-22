@@ -1,0 +1,151 @@
+# Contract suite v0 (eval harness check 2 of 3): deterministic, network-free
+# assertions on the tool surface's CONTRACT — the error-envelope shape, the
+# hint floor, argument coercion, graceful dispatch, discovery behavior, and
+# write-control — against a fixture registry with no Google tokens, so every
+# Google-bound call exercises exactly the failure contract users hit.
+# Run: npm run eval:contract (Node >= 22.22; PROMPTFOO_DISABLE_UPDATE=1 is set
+# by CI). Curated mode is REQUIRED: promptfoo only calls tools present in
+# tools/list, and lazy mode hides the operational surface. Assertion logic
+# lives in asserts.mjs (promptfoo hands output as content-block JSON).
+description: mcp-google-multi contract suite (curated mode, fixture registry)
+
+prompts:
+  - '{{prompt}}'
+
+providers:
+  - id: mcp
+    config:
+      enabled: true
+      timeout: 30000
+      server:
+        command: node
+        args: ['dist/index.js']
+        name: gmulti-contract
+        env:
+          GOOGLE_ACCOUNTS: 'example:user@example.com'
+          GOOGLE_CLIENT_ID: 'contract'
+          GOOGLE_CLIENT_SECRET: 'contract'
+          MASTER_KEY: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+          TOKEN_STORE_PATH: '/tmp/gmulti-contract-tokens'
+          # Legacy env is the one-line all-bundles grant for a throwaway
+          # fixture process; the E_LEGACY stderr warning is expected and inert.
+          GOOGLE_OPTIONAL_SCOPES: 'slides,forms,chat,gmail_settings,gmail_settings_sharing,classroom,cloudidentity,cloudsearch,vault,keep,driveactivity,drivelabels,script,postmaster,analytics,analytics_write,groupssettings,groupsmigration,licensing,reseller,appsmarket'
+          GOOGLE_TOOLSETS: 'all'
+          GOOGLE_DISCOVERY: 'curated'
+          GOOGLE_PROFILE: 'read-only'
+
+tests:
+  # ── registry + meta surface ──────────────────────────────────────────────
+  - description: account_list reports the fixture account
+    vars: { prompt: '{"tool": "account_list", "args": {}}' }
+    assert:
+      - type: contains
+        value: user@example.com
+
+  - description: gmail_discover returns the catalog with operations, writeControl and a next step
+    vars: { prompt: '{"tool": "gmail_discover", "args": {}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:gmailDiscoverCatalog' }
+
+  - description: gmail_discover query filters the catalog
+    vars: { prompt: '{"tool": "gmail_discover", "args": {"query": "send"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:gmailDiscoverFilter' }
+
+  - description: gmail_discover no-match query hints at retrying without it
+    vars: { prompt: '{"tool": "gmail_discover", "args": {"query": "zzzznothing"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:gmailDiscoverNoMatch' }
+
+  - description: discover_all expands the surface and reports visible tool count
+    vars: { prompt: '{"tool": "discover_all", "args": {}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:discoverAllExpands' }
+
+  - description: discover_reset collapses and promises graceful dispatch
+    vars: { prompt: '{"tool": "discover_reset", "args": {}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:discoverResetCollapses' }
+
+  # ── graceful dispatch + validation ───────────────────────────────────────
+  - description: a curated tool resolves in curated mode (never tool-not-found)
+    vars: { prompt: '{"tool": "tasks_update", "args": {"account": "example", "tasklist": "x", "task": "y"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:curatedToolResolves' }
+
+  - description: missing required arguments surface as a visible validation error
+    vars: { prompt: '{"tool": "tasks_update", "args": {"account": "example"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:validationVisible' }
+
+  - description: an unknown account alias fails validation visibly
+    vars: { prompt: '{"tool": "gmail_search", "args": {"account": "nope", "query": "x"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:unknownAccountFailsValidation' }
+
+  # Same mistake on a NON-fanout tool, which keeps the bare enum: one user
+  # error used to have four different presentations depending on the tool.
+  - description: an unknown alias on a non-fanout tool gives the same envelope
+    vars: { prompt: '{"tool": "tasks_update", "args": {"account": "nope", "tasklistId": "x", "taskId": "y"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:unknownAccountFailsValidation' }
+
+  # ── coercion (clients send string-encoded scalars) ───────────────────────
+  - description: string maxResults coerces instead of failing validation
+    vars: { prompt: '{"tool": "gmail_search", "args": {"account": "example", "query": "x", "maxResults": "5"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:coercesNotValidationError' }
+
+  - description: string boolean full coerces instead of failing validation
+    vars: { prompt: '{"tool": "gmail_search", "args": {"account": "example", "query": "x", "full": "true"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:coercesNotValidationError' }
+
+  # ── the error-envelope contract (no token stored → the failure users hit) ─
+  - description: gmail_search failure is a parseable envelope with the hint floor
+    vars: { prompt: '{"tool": "gmail_search", "args": {"account": "example", "query": "is:unread"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:gmailEnvelopeFloor' }
+
+  - description: drive_search failure carries the same envelope contract
+    vars: { prompt: '{"tool": "drive_search", "args": {"account": "example", "query": "report"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:driveEnvelopeFloor' }
+
+  - description: calendar_list_events failure carries the same envelope contract
+    vars: { prompt: '{"tool": "calendar_list_events", "args": {"account": "example"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:calendarEnvelopeFloor' }
+
+  # ── escape hatch (pre-network paths only; discovery fetches stay out of CI) ─
+  - description: google_api_search unknown api returns unknown_api with the known list
+    vars: { prompt: '{"tool": "google_api_search", "args": {"query": "x", "api": "nope"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:searchUnknownApi' }
+
+  - description: google_api_call unknown api returns unknown_api
+    vars: { prompt: '{"tool": "google_api_call", "args": {"account": "example", "api": "nope", "methodId": "x.y.z"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:callUnknownApi' }
+
+  - description: an ambiguous umbrella alias on google_api_call names the candidates
+    vars: { prompt: '{"tool": "google_api_call", "args": {"account": "example", "api": "analytics", "methodId": "x.y.z"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:callAmbiguousAlias' }
+
+  # ── write-control ────────────────────────────────────────────────────────
+  - description: a write tool under read-only returns write_disabled with the enable hint
+    vars: { prompt: '{"tool": "gmail_send", "args": {"account": "example", "to": "a@b.c", "subject": "s", "body": "b"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:writeDisabled' }
+
+  # ── account wizard contract ──────────────────────────────────────────────
+  - description: account_add refuses in env-registry mode and names the migration path
+    vars: { prompt: '{"tool": "account_add", "args": {}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:accountAddEnvMode' }
+
+  - description: account_reauth with an unknown alias lists the known ones
+    vars: { prompt: '{"tool": "account_reauth", "args": {"alias": "nope"}}' }
+    assert:
+      - { type: javascript, value: 'file://asserts.mjs:accountReauthUnknown' }
