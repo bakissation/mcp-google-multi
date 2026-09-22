@@ -82,18 +82,25 @@ function globToRegExp(glob: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
-function candidates(tool: ToolRef): string[] {
-  const op = tool.name.includes('_') ? tool.name.slice(tool.name.indexOf('_') + 1) : tool.name;
-  return [`${tool.service}:${tool.cud}`, `${tool.service}:${op}`];
+function opOf(tool: ToolRef): string {
+  return tool.name.includes('_') ? tool.name.slice(tool.name.indexOf('_') + 1) : tool.name;
 }
 
-function matchesAny(tool: ToolRef, globs: string[]): boolean {
-  if (globs.length === 0) return false;
+function candidates(tool: ToolRef): string[] {
+  return [`${tool.service}:${tool.cud}`, `${tool.service}:${opOf(tool)}`];
+}
+
+function firstMatch(tool: ToolRef, globs: string[]): string | undefined {
+  if (globs.length === 0) return undefined;
   const cands = candidates(tool);
-  return globs.some((g) => {
+  return globs.find((g) => {
     const re = globToRegExp(g);
     return cands.some((c) => re.test(c));
   });
+}
+
+function matchesAny(tool: ToolRef, globs: string[]): boolean {
+  return firstMatch(tool, globs) !== undefined;
 }
 
 function profileAllows(profile: Profile, cud: Cud): boolean {
@@ -110,11 +117,53 @@ export function isAllowed(tool: ToolRef, policy: Policy): boolean {
   return profileAllows(policy.profile, tool.cud);
 }
 
+/** Which profiles would permit this cud at all. */
+function profilesAllowing(cud: Cud): Profile[] {
+  return PROFILES.filter((p) => profileAllows(p, cud));
+}
+
+export type DenyReason =
+  | { rule: 'read_only' }
+  | { rule: 'deny_glob'; pattern: string }
+  | { rule: 'profile'; profile: Profile };
+
+/** WHICH rule refused the call. `isAllowed` has a precedence order, so exactly
+ * one rule decides; naming the others sends the caller to a setting that
+ * cannot change the outcome. */
+export function denyReason(tool: ToolRef, policy: Policy): DenyReason | undefined {
+  if (tool.cud === 'read') return undefined;
+  if (policy.readOnly) return { rule: 'read_only' };
+  const pattern = firstMatch(tool, policy.deny);
+  if (pattern !== undefined) return { rule: 'deny_glob', pattern };
+  if (matchesAny(tool, policy.allow)) return undefined;
+  if (profileAllows(policy.profile, tool.cud)) return undefined;
+  return { rule: 'profile', profile: policy.profile };
+}
+
+function denyHint(tool: ToolRef, reason: DenyReason): string {
+  if (reason.rule === 'read_only') {
+    return 'GOOGLE_READ_ONLY=true refuses every write, ahead of the profile and the allow-list, so neither of those can enable this. Unset GOOGLE_READ_ONLY to allow writes.';
+  }
+  if (reason.rule === 'deny_glob') {
+    return `GOOGLE_WRITE_DENY pattern "${reason.pattern}" matches this tool, and deny is checked before the allow-list and the profile, so neither can override it. Remove or narrow that pattern.`;
+  }
+  const usable = profilesAllowing(tool.cud).filter((p) => p !== reason.profile);
+  const profiles = usable.length > 0
+    ? `Use GOOGLE_PROFILE=${usable.join(' or ')}`
+    : 'No profile permits this operation';
+  // The allow-list vocabulary is service:cud or service:op, never the tool
+  // name, so suggesting the name would hand back a pattern that never matches.
+  return `Profile "${reason.profile}" does not permit ${tool.cud}. ${profiles}, or allow just this one with GOOGLE_WRITE_ALLOW="${tool.service}:${opOf(tool)}".`;
+}
+
 export function writeDisabledResult(tool: ToolRef, policy: Policy, account?: string) {
+  // Recomputed rather than passed in: every call site has already run
+  // isAllowed, and a hint that disagrees with the verdict is worse than none.
+  const reason = denyReason(tool, policy) ?? { rule: 'profile' as const, profile: policy.profile };
   const envelope = {
     error: 'write_disabled',
     message: `"${tool.name}" (${tool.cud}) is disabled by the current write-control policy (profile: ${policy.profile}${policy.readOnly ? ', GOOGLE_READ_ONLY=true' : ''}).`,
-    hint: `Enable via GOOGLE_PROFILE=safe-writes|full-writes, or GOOGLE_WRITE_ALLOW="${tool.service}:*".`,
+    hint: denyHint(tool, reason),
     retriable: false,
     ...(account ? { account } : {}),
   };
