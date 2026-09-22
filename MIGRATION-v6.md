@@ -40,8 +40,9 @@ Existing encrypted tokens keep decrypting — upgrading alone never forces a re-
 | 14 | Security | CRLF header-injection closed in email compose | none (input hardening) | — |
 | 15 | Behavior | an undeclared tool argument is now refused, not dropped | none for a correct caller; see [§4.3](#43-undeclared-arguments-are-refused-not-dropped) | `unknown_argument` |
 | 16 | Errors | caller-side 4xx split out of `upstream_error` | rebranch if you keyed on the slug; see [§4.4](#44-error-slugs-are-narrower) | `bad_request`, `internal` |
+| 17 | Read tools | five list tools return an object, not a bare array | index `.files` / `.events` / `.instances` / `.contacts`; see [§4.5](#45-list-results-say-whether-they-are-complete) | — |
 
-Rows 1, 3–6, 10–11 need action; rows 7–9, 12–15 are safe defaults, opt-in, or transparent fixes.
+Rows 1, 3–6, 10–11, 17 need action; rows 7–9, 12–16 are safe defaults, opt-in, or transparent fixes.
 
 ---
 
@@ -219,6 +220,45 @@ Two related narrowings, same release:
 - A 403 that is really the wrong tool for the file type (`fileNotDownloadable` on `drive_download`, `fileNotExportable` on `drive_export`) is now `binary_unsupported` and names the sibling tool, instead of `forbidden` with a permissions hint.
 
 **Error messages are now capped** at 1000 characters, and the serialized envelope at 4000. A non-JSON response body (Google serves an HTML page whenever a request fails to route, most often because a path parameter was empty) is replaced by a one-line summary saying what was suppressed, rather than being embedded whole. Up to 8.5 KB of markup used to travel inside the `message` field.
+
+### 4.5 List results say whether they are complete
+
+Six read tools capped their output and returned the survivors as a bare JSON array. Nothing in the response said a cap had been applied, so 25 events and "all your events" were the same value. Callers reported the truncated list as the complete answer, which is the failure mode an agent cannot detect and cannot recover from.
+
+These five now return an object:
+
+| Tool | Array was | Key is now |
+|---|---|---|
+| `drive_search` | `[ {file}, ... ]` | `files` |
+| `drive_list` | `[ {file}, ... ]` | `files` |
+| `calendar_list_events` | `[ {event}, ... ]` | `events` |
+| `calendar_list_instances` | `[ {event}, ... ]` | `instances` |
+| `contacts_search` | `[ {contact}, ... ]` | `contacts` |
+
+```jsonc
+// before
+[ { "id": "1", "name": "Q3 plan" }, { "id": "2", "name": "Q4 plan" } ]
+
+// after
+{
+  "files": [ { "id": "1", "name": "Q3 plan" }, { "id": "2", "name": "Q4 plan" } ],
+  "returned": 2,
+  "truncated": true,
+  "nextPageToken": "CAIQAA",
+  "hint": "More files exist. Pass pageToken to continue from the end of this page."
+}
+```
+
+`returned` and `truncated` are always present. `totalItems`, `nextPageToken` and `hint` appear only when the API supplies them: `hint` is present exactly when `truncated` is true.
+
+`contacts_group_members` already returned an object and keeps its `group` and `members` keys; it gains `returned`, `truncated`, `totalItems` (the group's real `memberCount`) and, when some member records could not be fetched, `fetchFailures`.
+
+**`pageToken` is new on** `drive_search`, `drive_list`, `calendar_list_events` and `calendar_list_instances`: pass back the `nextPageToken` you were given to fetch the next page. `contacts_search` and `contacts_group_members` do **not** get one: the underlying Google endpoints offer no continuation token, so those two report truncation and tell you to raise the page size instead.
+
+Two related fixes ship with this:
+
+- `drive_search` now reports Drive's `incompleteSearch` flag, which is set when Drive could not search every corpus. It was being discarded, so a partial search read as a complete one.
+- `contacts_group_members` now fetches member records in batches of 200. `maxMembers` accepts up to 1000 but the underlying `people.getBatchGet` rejects more than 200 names, so a group larger than that used to fail outright.
 
 ---
 

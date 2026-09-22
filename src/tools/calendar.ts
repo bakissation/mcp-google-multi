@@ -7,7 +7,7 @@ import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { checkOutbound } from '../outbound-allowlist.js';
 import { handleGoogleApiError, invalidParams } from './_errors.js';
-import { sliceClean } from '../trim.js';
+import { listResult, sliceClean } from '../trim.js';
 
 const accountEnum = accountAliasSchema.optional();
 
@@ -59,9 +59,11 @@ export function registerCalendarTools(server: ToolRegistry): void {
           .describe('End of time range (ISO 8601)'),
         maxResults: z.number().min(1).max(250).default(25).optional()
           .describe('Max events to return (default: 25)'),
+        pageToken: z.string().min(1).optional()
+          .describe('Continuation token from a previous call\'s nextPageToken'),
       },
     },
-    async ({ account, calendarId, query, timeMin, timeMax, maxResults }) => {
+    async ({ account, calendarId, query, timeMin, timeMax, maxResults, pageToken }) => {
       const rangeError = timeRangeError(timeMin, timeMax);
       if (rangeError) return invalidParams(account as Account, rangeError, TIME_RANGE_HINT);
       try {
@@ -78,7 +80,10 @@ export function registerCalendarTools(server: ToolRegistry): void {
         if (query) params.q = query;
         if (timeMin) params.timeMin = timeMin;
         if (timeMax) params.timeMax = timeMax;
-        if (!timeMin && !timeMax) {
+        if (pageToken) params.pageToken = pageToken;
+        // A page token is only valid for the window that produced it, so
+        // re-evaluating the "now" default would fetch page 2 of a different query.
+        if (!timeMin && !timeMax && !pageToken) {
           params.timeMin = new Date().toISOString();
         }
 
@@ -86,7 +91,9 @@ export function registerCalendarTools(server: ToolRegistry): void {
         const events = (res.data.items ?? []).map((e) => formatEvent(e, { full: false }));
 
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(events, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(listResult('events', events, {
+            nextPageToken: res.data.nextPageToken,
+          }), null, 2) }],
         };
       } catch (error: any) {
         return handleCalendarError(error, account as Account);
@@ -358,9 +365,11 @@ export function registerCalendarTools(server: ToolRegistry): void {
         timeMax: z.string().optional().describe('ISO 8601 — filter instances before this time'),
         maxResults: z.number().min(1).max(250).default(25).optional()
           .describe('Max instances to return (default: 25)'),
+        pageToken: z.string().min(1).optional()
+          .describe('Continuation token from a previous call\'s nextPageToken'),
       },
     },
-    async ({ account, calendarId, eventId, timeMin, timeMax, maxResults }) => {
+    async ({ account, calendarId, eventId, timeMin, timeMax, maxResults, pageToken }) => {
       const rangeError = timeRangeError(timeMin, timeMax);
       if (rangeError) return invalidParams(account as Account, rangeError, TIME_RANGE_HINT);
       try {
@@ -372,10 +381,13 @@ export function registerCalendarTools(server: ToolRegistry): void {
           timeMin,
           timeMax,
           maxResults: maxResults ?? 25,
+          ...(pageToken ? { pageToken } : {}),
         });
         const events = (res.data.items ?? []).map((e) => formatEvent(e, { full: false }));
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(events, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(listResult('instances', events, {
+            nextPageToken: res.data.nextPageToken,
+          }), null, 2) }],
         };
       } catch (error: any) {
         return handleCalendarError(error, account as Account);

@@ -9,7 +9,7 @@ import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } f
 import { openLocalReadStream, prepareLocalDest } from './_local-files.js';
 import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
-import { capText } from '../trim.js';
+import { capText, listResult } from '../trim.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -150,9 +150,11 @@ export function registerDriveTools(server: ToolRegistry): void {
         maxResults: coerceNumber(z.number().min(1).max(100)).optional()
           .describe('Max results to return (default: 10, max: 100)'),
         driveId: z.string().optional().describe('Optional shared drive ID'),
+        pageToken: z.string().min(1).optional()
+          .describe('Continuation token from a previous call\'s nextPageToken'),
       },
     },
-    async ({ account, query, maxResults, driveId }) => {
+    async ({ account, query, maxResults, driveId, pageToken }) => {
       try {
         // normalizeDriveQuery trims to '' and Drive reads that as "everything",
         // so a blank query returned a raw directory listing as a search result.
@@ -169,7 +171,10 @@ export function registerDriveTools(server: ToolRegistry): void {
         const params: any = {
           q: normalizeDriveQuery(query),
           pageSize: maxResults ?? 10,
-          fields: 'files(id,name,mimeType,modifiedTime,webViewLink,size,parents,driveId)',
+          // nextPageToken and incompleteSearch live OUTSIDE files(...): omit
+          // them from the mask and Drive drops them, so a partial result was
+          // indistinguishable from a complete one.
+          fields: 'nextPageToken,incompleteSearch,files(id,name,mimeType,modifiedTime,webViewLink,size,parents,driveId)',
           supportsAllDrives: true,
           includeItemsFromAllDrives: true,
         };
@@ -178,10 +183,19 @@ export function registerDriveTools(server: ToolRegistry): void {
           params.driveId = driveId;
           params.corpora = 'drive';
         }
+        if (pageToken) params.pageToken = pageToken;
 
         const res = await drive.files.list(params);
+        const incomplete = res.data.incompleteSearch === true;
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(res.data.files ?? [], null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(listResult('files', res.data.files ?? [], {
+            nextPageToken: res.data.nextPageToken,
+            capped: incomplete,
+            extra: incomplete ? { incompleteSearch: true } : undefined,
+            hint: incomplete
+              ? 'Drive could not search every corpus, so results are partial. Pass driveId to search one shared drive, or narrow the query.'
+              : undefined,
+          }), null, 2) }],
         };
       } catch (error: any) {
         if (isDriveInvalidQuery(error)) {
@@ -326,9 +340,11 @@ export function registerDriveTools(server: ToolRegistry): void {
         folderId: z.string().optional().describe('Folder ID to list, omit for root. Named folderId here, not parentFolderId'),
         maxResults: z.number().min(1).max(100).default(50).optional()
           .describe('Max results to return (default: 50)'),
+        pageToken: z.string().min(1).optional()
+          .describe('Continuation token from a previous call\'s nextPageToken'),
       },
     },
-    async ({ account, folderId, maxResults }) => {
+    async ({ account, folderId, maxResults, pageToken }) => {
       try {
         const auth = await getClient(account as Account);
         const drive = driveClient({ version: 'v3', auth });
@@ -338,13 +354,16 @@ export function registerDriveTools(server: ToolRegistry): void {
         const res = await drive.files.list({
           q: `'${parent}' in parents and trashed = false`,
           pageSize: maxResults ?? 50,
-          fields: 'files(id,name,mimeType,modifiedTime,webViewLink,size,parents)',
+          fields: 'nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,size,parents)',
           supportsAllDrives: true,
           includeItemsFromAllDrives: true,
+          ...(pageToken ? { pageToken } : {}),
         });
 
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(res.data.files ?? [], null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(listResult('files', res.data.files ?? [], {
+            nextPageToken: res.data.nextPageToken,
+          }), null, 2) }],
         };
       } catch (error: any) {
         return handleDriveError(error, account as Account);

@@ -6,10 +6,14 @@ import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { coerceBoolean } from './_coerce.js';
 import { handleGoogleApiError } from './_errors.js';
+import { listResult } from '../trim.js';
 
 const accountEnum = accountAliasSchema.optional();
 
 const PERSON_FIELDS = 'names,emailAddresses,phoneNumbers,organizations,addresses,photos,memberships';
+
+// people.getBatchGet rejects more than 200 resource names per call.
+const BATCH_GET_LIMIT = 200;
 
 function formatContact(person: any) {
   return {
@@ -172,9 +176,15 @@ export function registerContactsTools(server: ToolRegistry): void {
           pageSize: pageSize ?? 10,
         });
 
+        const limit = pageSize ?? 10;
         const contacts = (res.data.results ?? []).map((r: any) => formatContact(r.person));
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(contacts, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(listResult('contacts', contacts, {
+            // searchContacts returns no token and no total, so a full page is
+            // the only evidence that the cap, not the address book, ended it.
+            capped: contacts.length >= limit,
+            hint: `The page is full at ${limit} of a possible 30, so more contacts may match. Raise pageSize or narrow the query. This search endpoint has no pageToken, so there is no next page to fetch.`,
+          }), null, 2) }],
         };
       } catch (error: any) {
         return handleContactsError(error, account as Account);
@@ -514,28 +524,46 @@ export function registerContactsTools(server: ToolRegistry): void {
         });
 
         const memberResourceNames = groupRes.data.memberResourceNames ?? [];
-        if (memberResourceNames.length === 0) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({
-              group: groupRes.data.name,
-              members: [],
-            }, null, 2) }],
-          };
+        const members: unknown[] = [];
+        let fetchFailures = 0;
+        let firstError: unknown;
+        // getBatchGet caps at 200 names while maxMembers goes to 1000, so a
+        // large group used to fail outright rather than come back in pages.
+        for (let i = 0; i < memberResourceNames.length; i += BATCH_GET_LIMIT) {
+          const chunk = memberResourceNames.slice(i, i + BATCH_GET_LIMIT);
+          try {
+            const membersRes = await people.people.getBatchGet({
+              resourceNames: chunk,
+              personFields: PERSON_FIELDS,
+            });
+            const got = (membersRes.data.responses ?? []).filter((r: any) => r.person);
+            fetchFailures += chunk.length - got.length;
+            for (const r of got) members.push(formatContact(r.person));
+          } catch (chunkError) {
+            firstError ??= chunkError;
+            fetchFailures += chunk.length;
+          }
         }
-        const membersRes = await people.people.getBatchGet({
-          resourceNames: memberResourceNames,
-          personFields: PERSON_FIELDS,
-        });
+        // Every chunk failed, so there is no partial answer to report honestly.
+        if (firstError && members.length === 0 && memberResourceNames.length > 0) throw firstError;
 
-        const members = (membersRes.data.responses ?? [])
-          .filter((r: any) => r.person)
-          .map((r: any) => formatContact(r.person));
+        const total = groupRes.data.memberCount ?? memberResourceNames.length;
+        const namesTruncated = total > memberResourceNames.length;
+        const causes: string[] = [];
+        if (namesTruncated) causes.push(`the maxMembers cap returned ${memberResourceNames.length} of ${total} member names`);
+        if (fetchFailures > 0) causes.push(`${fetchFailures} member record(s) could not be fetched`);
 
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({
-            group: groupRes.data.name,
-            members,
-          }, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(listResult('members', members, {
+            totalItems: total,
+            extra: {
+              group: groupRes.data.name,
+              ...(fetchFailures > 0 ? { fetchFailures } : {}),
+            },
+            hint: causes.length > 0
+              ? `Incomplete because ${causes.join(' and ')}.${namesTruncated ? ' Raise maxMembers to see the rest.' : ''}`
+              : undefined,
+          }), null, 2) }],
         };
       } catch (error: any) {
         return handleContactsError(error, account as Account);

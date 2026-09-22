@@ -57,3 +57,42 @@ export function compactResult<T extends ToolResult>(result: T): T {
   }
   return result;
 }
+
+export interface ListPage {
+  /** Continuation token from the API, when it offers one. */
+  nextPageToken?: string | null;
+  /** Server-side total, when the API reports one. */
+  totalItems?: number;
+  /** The page came back exactly full and the API offers neither a token nor a
+   * total, so "more exist" can only be inferred from the cap. */
+  capped?: boolean;
+  hint?: string;
+  /** Fields that belong beside the list, e.g. the group a member list is of. */
+  extra?: Record<string, unknown>;
+}
+
+function truncationHint(noun: string, returned: number, page: ListPage): string {
+  if (page.nextPageToken) return `More ${noun} exist. Pass pageToken to continue from the end of this page.`;
+  if (typeof page.totalItems === 'number') {
+    return `${returned} of ${page.totalItems} ${noun} returned. Raise the page size to see the rest.`;
+  }
+  return `The page came back full, so more ${noun} may exist. Narrow the query or raise the page size.`;
+}
+
+/** A list payload that states whether it is the whole answer. A bare JSON array
+ * cannot, so a caller sees 25 events and reports "you have 25 meetings this
+ * week" when the cap, not the calendar, ended the list. */
+export function listResult(noun: string, items: unknown[], page: ListPage = {}): Record<string, unknown> {
+  const { nextPageToken, totalItems, capped, hint, extra } = page;
+  const truncated =
+    Boolean(nextPageToken) || capped === true || (typeof totalItems === 'number' && totalItems > items.length);
+  return {
+    [noun]: items,
+    returned: items.length,
+    truncated,
+    ...(typeof totalItems === 'number' ? { totalItems } : {}),
+    ...(nextPageToken ? { nextPageToken } : {}),
+    ...extra,
+    ...(truncated ? { hint: hint ?? truncationHint(noun, items.length, page) } : {}),
+  };
+}

@@ -9,7 +9,7 @@ import {
 
 // Declared key lists copied from the real tool schemas (src/tools/drive.ts).
 const DRIVE_CREATE_FOLDER = ['account', 'name', 'parentFolderId'];
-const DRIVE_LIST = ['account', 'folderId', 'maxResults'];
+const DRIVE_LIST = ['account', 'folderId', 'maxResults', 'pageToken'];
 const DRIVE_MOVE = ['account', 'fileId', 'newParentFolderId'];
 const DRIVE_UPLOAD = ['account', 'localPath', 'filename', 'mimeType', 'convertTo', 'parentFolderId'];
 
@@ -142,7 +142,7 @@ describe('unknownArgEnvelope', () => {
       'work',
       [{ key: 'parentFolderId', tools: ['drive_upload', 'drive_create_folder', 'drive_copy'] }],
     );
-    expect(e.hint).toContain('This tool accepts: account, folderId, maxResults.');
+    expect(e.hint).toContain('This tool accepts: account, folderId, maxResults, pageToken.');
     expect(e.hint).toContain('"parentFolderId" (drive_upload, drive_create_folder, drive_copy)');
   });
 
