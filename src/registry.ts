@@ -231,10 +231,10 @@ export class ToolRegistry {
         cud === 'read'
           ? baseHandler
           : (...args: unknown[]) =>
-              isAllowed({ name, service, cud }, policy)
+              isAllowed({ name, service, cud, scopes: config.requiredScopes }, policy)
                 ? baseHandler(...args)
                 : writeDisabledResult(
-                    { name, service, cud },
+                    { name, service, cud, scopes: config.requiredScopes },
                     policy,
                     // Concrete by here: default-account injection wraps this.
                     (args[0] as { account?: unknown } | undefined)?.account as string | undefined,

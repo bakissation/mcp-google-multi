@@ -139,10 +139,23 @@ Reads are never gated. **Every create/update/delete is off until you opt in** â€
 | `GOOGLE_PROFILE` | Allows |
 |---|---|
 | `read-only` (default) | reads only |
-| `safe-writes` | create + update (deletes still blocked) |
+| `safe-writes` | create + update on your own data (deletes and privileged writes blocked) |
 | `full-writes` | everything |
 
 `GOOGLE_READ_ONLY=true` overrides all. For fine control: `GOOGLE_WRITE_ALLOW="calendar:*, sheets:update*"` and `GOOGLE_WRITE_DENY="*:delete*"` (deny wins). The policy applies identically to curated tools, generated tools, and the escape hatch.
+
+### What `safe-writes` refuses beyond deletes
+
+"Not a delete" is a statement about an HTTP verb, not about consequences. `safe-writes` also refuses two classes of write that are shaped like an ordinary create or update:
+
+- **Privileged scope.** The method can be authorized by a scope that acts on the whole organization, on legal holds, on billing, or on deployed code: `admin.directory.*`, `admin.datatransfer`, `cloud-identity*`, `apps.licensing`, `apps.order`, `apps.groups.settings`, `apps.groups.migration`, `ediscovery*` (Vault), `script.projects`, `script.deployments`. This is what stops `admin_users_make_admin` and `admin_two_step_verification_turn_off`, both of which are plain `update`s.
+- **Push-channel registration.** Any `*_watch` method, plus `workspaceevents` subscription create and reactivate. These register a webhook that delivers your activity to an external URL, so they are exports wearing the shape of a create.
+
+The rule is derived from each method's declared scopes and name, not from a hand-kept list, so it keeps working as the generated surface is regenerated. A method whose scopes are unknown is treated as **not** privileged: absent information is not evidence, and failing the other way would break ordinary writes.
+
+`GOOGLE_WRITE_ALLOW` still wins over this, because naming a tool explicitly is a deliberate opt-in. `GOOGLE_WRITE_DENY` still wins over that.
+
+In numbers, `safe-writes` permits 271 of 545 write tools instead of 385. Everything it newly refuses is Workspace administration, Vault, reseller billing, script deployment, or push registration. No `gmail`, `drive`, `calendar`, `docs`, `sheets`, `tasks` or `contacts` write is affected except the seven `*_watch` registrations.
 
 ## Services
 

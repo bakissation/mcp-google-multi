@@ -42,8 +42,9 @@ Existing encrypted tokens keep decrypting — upgrading alone never forces a re-
 | 16 | Errors | caller-side 4xx split out of `upstream_error` | rebranch if you keyed on the slug; see [§4.4](#44-error-slugs-are-narrower) | `bad_request`, `internal` |
 | 17 | Read tools | five list tools return an object, not a bare array | index `.files` / `.events` / `.instances` / `.contacts`; see [§4.5](#45-list-results-say-whether-they-are-complete) | — |
 | 18 | Errors | wizard failures return a JSON envelope, not a prose line | parse `error` instead of reading the text; see [§4.6](#46-every-failure-is-an-envelope) | `E_ENV_ACCOUNTS_MODE`, `elicitation_unsupported` |
+| 19 | Write-control | `safe-writes` also refuses privileged writes and push registration | on `safe-writes`, allow-list what you need or move to `full-writes`; see [§4.7](#47-safe-writes-is-no-longer-just-not-a-delete) | `write_disabled` |
 
-Rows 1, 3–6, 10–11, 17 need action; rows 7–9, 12–16 and 18 are safe defaults, opt-in, or transparent fixes.
+Rows 1, 3–6, 10–11, 17, 19 need action; rows 7–9, 12–16 and 18 are safe defaults, opt-in, or transparent fixes.
 
 ---
 
@@ -280,6 +281,39 @@ All three are now the first shape. Concretely:
 - Wizard and `diagnose` catch-alls no longer interpolate a raw thrown message. They go through the same capping and body-suppression path as every other error, which is what keeps a token or an HTML error page out of the response.
 
 If you branch on `error`, the values are now drawn from one closed vocabulary; a test asserts that the set emitted anywhere in the source equals the set the metrics collector knows, so an unregistered slug cannot reach you as an unclassified `other`.
+
+### 4.7 `safe-writes` is no longer just "not a delete"
+
+**Only affects you if you run `GOOGLE_PROFILE=safe-writes`.** `read-only` and `full-writes` are unchanged.
+
+`safe-writes` was implemented as `cud === 'create' || cud === 'update'`. That measures the shape of an operation, not what happens if it is wrong, and the two diverge badly:
+
+- It permitted `admin_users_make_admin`, which grants super-admin, because promoting a user is an `update`.
+- It permitted `admin_two_step_verification_turn_off`, `reseller_subscriptions_suspend` and `vault_matters_close` for the same reason.
+- It permitted `script_scripts_run`, whose blast radius is whatever the script does, because running a script `create`s an execution.
+- It permitted all ten `*_watch` methods, which register a webhook delivering your activity to an external URL.
+- Meanwhile it refused `gmail_trash`, whose own description says "(recoverable)".
+
+`safe-writes` now also refuses a write when either holds:
+
+| Class | Test | Examples |
+|---|---|---|
+| Privileged scope | the method can be authorized by a scope acting on the whole org, legal holds, billing, or deployed code | `admin.directory.*`, `cloud-identity*`, `ediscovery*`, `apps.licensing`, `apps.order`, `apps.groups.settings`, `script.projects` |
+| Push registration | the method registers a push channel | every `*_watch`, `workspaceevents` subscription create and reactivate |
+
+Both are derived from the method's declared scopes and name rather than a hand-kept list of tool names, because the generated surface is regenerated from Discovery and a name list would drift silently. A method whose scopes are unknown is treated as **not** privileged: absent information is not evidence of privilege, and failing the other way would break ordinary writes.
+
+`safe-writes` now permits 271 of 545 write tools instead of 385. Everything newly refused is Workspace administration, Vault, reseller billing, script deployment, or push registration. **No `gmail`, `drive`, `calendar`, `docs`, `sheets`, `tasks` or `contacts` write changed**, with the single exception of the seven `*_watch` registrations in those services.
+
+**If something you rely on is now refused**, the refusal names the tool and suggests a pattern that works:
+
+```
+GOOGLE_WRITE_ALLOW="admin:users_make_admin"
+```
+
+An explicit allow still wins over the profile, because naming a tool is a deliberate opt-in; `GOOGLE_WRITE_DENY` still wins over that. Or move to `GOOGLE_PROFILE=full-writes`, which is unchanged.
+
+This does not close the remaining gap: irreversibility is still not part of the verdict, and `IRREVERSIBLE_TOOLS` continues to drive only the client-side confirmation prompt.
 
 ---
 

@@ -25,6 +25,10 @@ interface ToolRef {
   name: string;
   service: string;
   cud: Cud;
+  /** The method's required OAuth scopes, when the caller knows them. Absent
+   * means "unknown", which is treated as not privileged: a missing scope list
+   * must not silently widen the gate OR silently break an ordinary write. */
+  scopes?: readonly string[];
 }
 
 const PROFILES: Profile[] = ['read-only', 'safe-writes', 'full-writes'];
@@ -103,9 +107,35 @@ function matchesAny(tool: ToolRef, globs: string[]): boolean {
   return firstMatch(tool, globs) !== undefined;
 }
 
-function profileAllows(profile: Profile, cud: Cud): boolean {
+/** Scopes that authorize acting on the whole organization, on legal holds, on
+ * billing, or on deployed code. A write behind one of these is not a "safe"
+ * write in any useful sense of the word, whatever its HTTP verb. */
+const PRIVILEGED_SCOPE_RE =
+  /\/auth\/(admin\.directory|admin\.datatransfer|cloud-identity|apps\.licensing|apps\.order|apps\.groups\.settings|apps\.groups\.migration|ediscovery|script\.projects|script\.deployments)/;
+
+/** Registering a push channel hands this account's activity to an external URL.
+ * It is shaped like a create and behaves like an export, so the verb hides it. */
+const PUSH_REGISTRATION_RE = /(_watch|_subscriptions_create|_subscriptions_reactivate)$/;
+
+export type PrivilegeKind = 'push_registration' | 'privileged_scope';
+
+/** Why this write counts as privileged, or undefined if it does not.
+ * Derived, not a hand-kept name list: the tool surface is regenerated from
+ * Discovery, and a list of names would drift out of date silently. */
+export function privilegeOf(tool: ToolRef): PrivilegeKind | undefined {
+  if (PUSH_REGISTRATION_RE.test(tool.name)) return 'push_registration';
+  // `some`, not `every`: the scope list is an any-of, so a tool that CAN be
+  // authorized by a privileged scope is treated as privileged.
+  if (tool.scopes?.some((sc) => PRIVILEGED_SCOPE_RE.test(sc))) return 'privileged_scope';
+  return undefined;
+}
+
+function profileAllows(profile: Profile, tool: ToolRef): boolean {
   if (profile === 'full-writes') return true;
-  if (profile === 'safe-writes') return cud === 'create' || cud === 'update';
+  if (profile === 'safe-writes') {
+    if (privilegeOf(tool) !== undefined) return false;
+    return tool.cud === 'create' || tool.cud === 'update';
+  }
   return false;
 }
 
@@ -114,17 +144,18 @@ export function isAllowed(tool: ToolRef, policy: Policy): boolean {
   if (policy.readOnly) return false;
   if (matchesAny(tool, policy.deny)) return false;
   if (matchesAny(tool, policy.allow)) return true;
-  return profileAllows(policy.profile, tool.cud);
+  return profileAllows(policy.profile, tool);
 }
 
-/** Which profiles would permit this cud at all. */
-function profilesAllowing(cud: Cud): Profile[] {
-  return PROFILES.filter((p) => profileAllows(p, cud));
+/** Which profiles would permit this tool at all. */
+function profilesAllowing(tool: ToolRef): Profile[] {
+  return PROFILES.filter((p) => profileAllows(p, tool));
 }
 
 export type DenyReason =
   | { rule: 'read_only' }
   | { rule: 'deny_glob'; pattern: string }
+  | { rule: 'privileged'; profile: Profile; kind: PrivilegeKind }
   | { rule: 'profile'; profile: Profile };
 
 /** WHICH rule refused the call. `isAllowed` has a precedence order, so exactly
@@ -136,7 +167,13 @@ export function denyReason(tool: ToolRef, policy: Policy): DenyReason | undefine
   const pattern = firstMatch(tool, policy.deny);
   if (pattern !== undefined) return { rule: 'deny_glob', pattern };
   if (matchesAny(tool, policy.allow)) return undefined;
-  if (profileAllows(policy.profile, tool.cud)) return undefined;
+  if (profileAllows(policy.profile, tool)) return undefined;
+  const kind = privilegeOf(tool);
+  // Distinguished from a plain profile refusal: "delete is not a safe write"
+  // and "this is an org-wide operation" need different answers.
+  if (kind !== undefined && policy.profile === 'safe-writes') {
+    return { rule: 'privileged', profile: policy.profile, kind };
+  }
   return { rule: 'profile', profile: policy.profile };
 }
 
@@ -147,7 +184,13 @@ function denyHint(tool: ToolRef, reason: DenyReason): string {
   if (reason.rule === 'deny_glob') {
     return `GOOGLE_WRITE_DENY pattern "${reason.pattern}" matches this tool, and deny is checked before the allow-list and the profile, so neither can override it. Remove or narrow that pattern.`;
   }
-  const usable = profilesAllowing(tool.cud).filter((p) => p !== reason.profile);
+  if (reason.rule === 'privileged') {
+    const what = reason.kind === 'push_registration'
+      ? 'registers a push channel, which sends this account\'s activity to an external URL'
+      : 'needs a scope that acts on the whole organization, on legal holds, on billing, or on deployed code';
+    return `"${tool.name}" ${what}, so "${reason.profile}" refuses it whatever its verb. Use GOOGLE_PROFILE=full-writes, or allow just this one with GOOGLE_WRITE_ALLOW="${tool.service}:${opOf(tool)}".`;
+  }
+  const usable = profilesAllowing(tool).filter((p) => p !== reason.profile);
   const profiles = usable.length > 0
     ? `Use GOOGLE_PROFILE=${usable.join(' or ')}`
     : 'No profile permits this operation';
