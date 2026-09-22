@@ -159,7 +159,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       inputSchema: {
         account: accountEnum.describe('Google account alias (omit for the default account)'),
         api: z.string().describe(`API alias: ${apiList}`),
-        methodId: z.string().describe('Discovery method id, e.g. "drive.revisions.list"'),
+        methodId: z.string().min(1).describe('Discovery method id, e.g. "drive.revisions.list"'),
         pathParams: coerceJson(z.record(z.string(), z.union([z.string(), z.number()])).optional())
           .describe('Values for {placeholders} in the method path'),
         queryParams: coerceJson(
@@ -235,7 +235,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       const lastSegment = method.id.split('.').pop() ?? method.id;
       const toolRef = { name: `${policyService}_${lastSegment}`, service: policyService, cud };
       if (cud !== 'read' && !isAllowed(toolRef, policy)) {
-        return writeDisabledResult(toolRef, policy);
+        return writeDisabledResult(toolRef, policy, account as string);
       }
 
       return executeApiMethod(

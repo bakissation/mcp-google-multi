@@ -203,6 +203,17 @@ export const BODY_OVERRIDES: Record<string, 'typed' | 'opaque'> = {
 export const CUD_OVERRIDES: Record<string, Cud> = {
   // One-time consent flag on the property: a state write, not a creation.
   'analyticsadmin.properties.acknowledgeUserDataCollection': 'update',
+  // The effect is an ARGUMENT, not the method name, so no verb rule can reach
+  // these. All three can deprovision or remotely wipe a device, which is the
+  // most destructive thing in the admin surface.
+  'directory.chromeosdevices.action': 'delete',
+  'directory.mobiledevices.action': 'delete',
+  'admin.directory.v1.customer.devices.chromeos.issueCommand': 'delete',
+  'admin.directory.v1.customer.devices.chromeos.batchChangeStatus': 'delete',
+  // A POST purely because the request carries a body; it runs a test and
+  // returns a report, changing nothing. `run` cannot go in the read verb list
+  // because `script.scripts.run` executes arbitrary Apps Script.
+  'searchconsole.urlTestingTools.mobileFriendlyTest.run': 'read',
 };
 
 // Replacement tool names for methodIds whose derived name exceeds the 64-char

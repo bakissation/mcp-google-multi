@@ -15,31 +15,51 @@ import { editDistance } from './scope-catalog.js';
 export type UnknownArgMode = 'reject' | 'warn' | 'off';
 
 /**
- * `GOOGLE_ARG_UNKNOWN`: reject | warn | off. Fail-open to `warn` on a bad
- * value, because the safe state here is the one that changes no behavior.
+ * `GOOGLE_ARG_UNKNOWN`: reject | warn | off. A typo in the VALUE still falls
+ * back to `warn`, not to the default: an operator who misspells the setting
+ * has said nothing about which behavior they want, and guessing the strict
+ * one would turn a config typo into failing tool calls.
  */
 export function unknownArgMode(env: NodeJS.ProcessEnv = process.env): UnknownArgMode {
   const raw = (env.GOOGLE_ARG_UNKNOWN ?? '').trim().toLowerCase();
   if (raw === '') return DEFAULT_MODE;
   if (raw === 'reject' || raw === 'warn' || raw === 'off') return raw;
-  process.stderr.write(`GOOGLE_ARG_UNKNOWN="${raw}" is not valid (reject | warn | off); using ${DEFAULT_MODE}\n`);
-  return DEFAULT_MODE;
+  process.stderr.write(`GOOGLE_ARG_UNKNOWN="${raw}" is not valid (reject | warn | off); using warn\n`);
+  return 'warn';
 }
 
-// Staged rollout: `warn` ships first so the change is pure observability, and
-// the flip to `reject` is its own reviewable change.
-const DEFAULT_MODE: UnknownArgMode = 'warn';
+// The staged rollout is over: `warn` shipped first as pure observability, and
+// this is the flip it was staging for. An undeclared argument is dropped by
+// zod before the handler runs, so `warn` means the CLIENT sees a confident
+// success for a call the server did not perform: drive_list with a misspelled
+// folder key returned the My Drive root, byte-identical to no argument at all.
+// A wrong answer that reads as right is the failure mode agents recover from
+// worst, so the default refuses the call and says what it probably meant.
+const DEFAULT_MODE: UnknownArgMode = 'reject';
 
 /** Tools that legitimately accept open-ended top-level keys. Empty at 6.0.0:
  * the escape hatch is NOT one, because its open-endedness lives in the VALUES
  * of queryParams/body, never in its six fixed top-level keys. */
 export const STRICT_EXEMPT_TOOLS: ReadonlySet<string> = new Set<string>();
 
+/** Keys a CLIENT adds on its own, not keys the model chose. `random_string`
+ * is the long-standing probe some clients send to a tool they read as taking
+ * no arguments; the others are call-plumbing that bridges and proxies have
+ * been observed to fold into `arguments` instead of `params._meta`, where the
+ * spec puts them. Rejecting these would fail a call the model got right.
+ * Measured against the full 978-tool surface: none is a declared key. */
+const CLIENT_ARTIFACT_KEYS: ReadonlySet<string> = new Set([
+  'random_string',
+  'toolCallId',
+  'tool_call_id',
+  'tool_call_description',
+]);
+
 /** Metadata a client may legitimately attach. Measured against all registered
  * tools: no declared key starts with `_` or contains `/`, so neither rule can
  * shadow a real parameter. */
 export function isExemptKey(key: string): boolean {
-  return key.startsWith('_') || key.includes('/');
+  return key.startsWith('_') || key.includes('/') || CLIENT_ARTIFACT_KEYS.has(key);
 }
 
 /** Generic words that must never be offered as a suggestion on containment

@@ -7,7 +7,7 @@ import { accountField, registerGeneratedTool } from './_shared.js';
 export function registerSearchconsoleGeneratedTools(registry: ToolRegistry): void {
   registerGeneratedTool(registry, {
     name: "searchconsole_url_testing_tools_mobile_friendly_test_run",
-    cud: "create",
+    cud: "read",
     description: "Runs Mobile-Friendly Test for a given URL.",
     method: { id: "searchconsole.urlTestingTools.mobileFriendlyTest.run", httpMethod: "POST", path: "v1/urlTestingTools/mobileFriendlyTest:run", baseUrl: "https://searchconsole.googleapis.com/", requiredParams: [] },
     params: [{"field":"fields","api":"fields","location":"query"}],

@@ -8,6 +8,11 @@ import { MAX_RESPONSE_CHARS } from './executor.js';
 import type { ArgKind, ArgShape } from './arg-normalize.js';
 import type { Metrics } from './usage-metrics.js';
 import { suggestKeys } from './arg-strict.js';
+import { classifyScope } from './scope-observability.js';
+
+/** Nothing granted, no profile: asks the BUNDLE CATALOG whether a scope is
+ * reachable at all, independently of any account. */
+const EMPTY_SCOPES: ReadonlySet<string> = new Set<string>();
 
 // Client-side result budget advertised for tools that do not declare their own
 // (fat readers do; see trim.ts). ~50k chars stays well inside a default client
@@ -56,6 +61,11 @@ export interface CatalogOperation {
   summary: string;
   args: string[];
   cud: Cud;
+  /** Present only when no scope bundle in the catalog can authorize this
+   * method, so the call cannot succeed on any account however it is
+   * configured. The tool stays callable: graceful dispatch then returns the
+   * real scope error rather than a bare "not found". */
+  unreachable?: true;
 }
 
 interface ToolConfig {
@@ -90,6 +100,12 @@ const SERVICE_OVERRIDES: Record<string, string> = {
 
 // read tools that write local files — same savePath fanned across accounts would clobber
 const FANOUT_EXCLUDE = new Set(['gmail_download_attachment', 'drive_download', 'drive_export']);
+
+/** Account-management tools: the `account` they take is the SUBJECT of the
+ * operation, not the identity it runs as, so injecting the configured default
+ * would silently retarget them. `account_add` would adopt the default as the
+ * new alias, and `account_reauth` would re-authenticate the wrong account. */
+const DEFAULT_ACCOUNT_EXCLUDE = new Set(['account_add', 'account_reauth']);
 
 /** Unwrap optional/default/nullable to the declared scalar kind (zod 4 defs). */
 function scalarKindOf(field: unknown): ArgKind {
@@ -137,6 +153,9 @@ export class ToolRegistry {
   private readonly revealed = new Set<string>();
   private readonly jsonSchemaCache = new Map<string, unknown>();
   private readonly argShapeCache = new Map<string, ArgShape>();
+  /** Memoized isUngrantable verdict per tool: the answer depends on the frozen
+   * bundle catalog only, so it never changes within a process. */
+  private readonly ungrantable = new Map<string, boolean>();
   private readonly compactOutput = trimEnabled();
   private registeringMeta = false;
   /** Configured visibility mode (GOOGLE_DISCOVERY); default lazy = v5 exact. */
@@ -182,7 +201,7 @@ export class ToolRegistry {
       // never fan out meta tools: google_api_call infers cud=read but executes writes
       let inputShape = config.inputSchema ?? {};
       let baseHandler = handler;
-      const hasAccountField = 'account' in inputShape;
+      const hasAccountField = 'account' in inputShape && !DEFAULT_ACCOUNT_EXCLUDE.has(name);
       if (cud === 'read' && !this.registeringMeta && !FANOUT_EXCLUDE.has(name) && isAccountEnum(inputShape.account)) {
         const description = (inputShape.account as z.ZodType).description ?? 'Google account alias';
         inputShape = { ...inputShape, account: fanoutAccountField(description) };
@@ -214,7 +233,12 @@ export class ToolRegistry {
           : (...args: unknown[]) =>
               isAllowed({ name, service, cud }, policy)
                 ? baseHandler(...args)
-                : writeDisabledResult({ name, service, cud }, policy);
+                : writeDisabledResult(
+                    { name, service, cud },
+                    policy,
+                    // Concrete by here: default-account injection wraps this.
+                    (args[0] as { account?: unknown } | undefined)?.account as string | undefined,
+                  );
       // A2: the ONE default-account injection site — outside the CUD gate and
       // the fan-out parse so both observe a concrete alias; NOT meta-skipped
       // (that is what covers google_api_call with zero bespoke code). Explicit
@@ -316,7 +340,11 @@ export class ToolRegistry {
     const declared = new Set(Object.keys(self.inputShape));
     const byKey = new Map<string, { tools: string[]; curated: boolean }>();
     for (const t of this.tools) {
-      if (t.service !== self.service || t.name === tool) continue;
+      // Only tools the agent can actually see in tools/list. A hint naming a
+      // registered-but-unadvertised generated tool turns a recoverable error
+      // into a dead end: in curated mode 353 tools are registered and 181 are
+      // advertised, and the hint used to reach for any of them.
+      if (t.service !== self.service || t.name === tool || !this.isVisible(t)) continue;
       for (const key of Object.keys(t.inputShape)) {
         if (declared.has(key)) continue;
         const e = byKey.get(key) ?? { tools: [], curated: false };
@@ -347,12 +375,19 @@ export class ToolRegistry {
         summary: t.description,
         args: Object.keys(t.inputShape),
         cud: t.cud,
+        ...(this.isUngrantable(t) ? { unreachable: true as const } : {}),
       }));
   }
 
   /** The metrics recorder, for hook sites (escape hatch); null when off. */
   get usageMetrics(): Metrics | null {
     return this.metrics;
+  }
+
+  /** Every registered tool name, hidden ones included: they stay callable, so
+   * a did-you-mean may legitimately point at one. */
+  toolNames(): string[] {
+    return this.tools.map((t) => t.name);
   }
 
   /** Membership test against the REGISTERED tool set (hidden tools included:
@@ -408,8 +443,38 @@ export class ToolRegistry {
     return this.expanded ? 'curated' : 'lazy';
   }
 
+  /**
+   * True when NO bundle in the catalog grants any of the method's alternative
+   * scopes, so the call cannot succeed on any account under any configuration.
+   * Static: it asks the catalog, not an account, so it is safe to cache.
+   * `classifyScope` with nothing granted and no profile reports `add_bundle`
+   * for a scope some bundle could supply and `unknown_scope` only when none
+   * can, which is exactly the distinction wanted here.
+   */
+  isUngrantable(tool: ToolEntry): boolean {
+    if (!tool.requiredScopes || tool.requiredScopes.length === 0) return false;
+    const cached = this.ungrantable.get(tool.name);
+    if (cached !== undefined) return cached;
+    // EVERY alternative must be ungrantable. `classifyMethodScopes` cannot
+    // answer this: `add_bundle` and `unknown_scope` share the
+    // `not_requestable` rank, so its first-best match hides a grantable
+    // alternative that appears later in the list. Discovery scope lists are
+    // ANY-OF, so one grantable alternative makes the method reachable.
+    const verdict = tool.requiredScopes.every((scope) => {
+      const c = classifyScope(scope, EMPTY_SCOPES, EMPTY_SCOPES);
+      return c.state === 'not_requestable' && c.reason === 'unknown_scope';
+    });
+    this.ungrantable.set(tool.name, verdict);
+    return verdict;
+  }
+
   isVisible(tool: ToolEntry): boolean {
     const mode = this.effectiveMode();
+    // Advertising a tool that can never succeed spends context budget to hand
+    // the agent a dead end. It stays registered and callable, so calling it by
+    // name still produces the real scope error plus its remediation, and
+    // {service}_discover still lists it, marked.
+    if (!tool.meta && this.isUngrantable(tool)) return false;
     return (
       tool.meta ||
       mode === 'eager' ||

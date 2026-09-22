@@ -330,7 +330,8 @@ describe('typed request bodies', () => {
 
   it('emits typed zod fields (required without .optional()) and the bodyParams def, no opaque body', () => {
     const { fileText } = emitService(WIDGET_DOC as never, widgetApi);
-    expect(fileText).toContain('alpha: z.string(),');
+    // required string -> .min(1): an empty required id is never meaningful
+    expect(fileText).toContain('alpha: z.string().min(1),');
     expect(fileText).toContain('account_: z.string().optional(),');
     expect(fileText).toContain('flag: coerceBoolean.optional(),');
     expect(fileText).toContain('tags: coerceArray(z.string()).optional(),');

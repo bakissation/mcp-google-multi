@@ -47,7 +47,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
       description: 'Get a presentation as a compact summary (title, per-slide objectId + text digest). Pass full:true for the raw Presentation JSON (can be very large).',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        presentationId: z.string().describe('Presentation ID'),
+        presentationId: z.string().min(1).describe('Presentation ID'),
         full: coerceBoolean.optional().describe('Return the untrimmed Presentation resource'),
       },
     },
@@ -72,8 +72,8 @@ export function registerSlidesTools(server: ToolRegistry): void {
       description: 'Get the full JSON of one slide/page (all page elements with geometry and text)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        presentationId: z.string().describe('Presentation ID'),
-        pageObjectId: z.string().describe('Page object ID (from slides_get)'),
+        presentationId: z.string().min(1).describe('Presentation ID'),
+        pageObjectId: z.string().min(1).describe('Page object ID (from slides_get)'),
       },
     },
     async ({ account, presentationId, pageObjectId }) => {
@@ -96,8 +96,8 @@ export function registerSlidesTools(server: ToolRegistry): void {
       description: 'Get a rendered thumbnail image URL for one slide (the contentUrl expires after ~30 minutes)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        presentationId: z.string().describe('Presentation ID'),
-        pageObjectId: z.string().describe('Page object ID (from slides_get)'),
+        presentationId: z.string().min(1).describe('Presentation ID'),
+        pageObjectId: z.string().min(1).describe('Page object ID (from slides_get)'),
         mimeType: z.enum(['PNG']).optional().describe('Thumbnail mime type (default: PNG)'),
         thumbnailSize: z.enum(['LARGE', 'MEDIUM', 'SMALL', 'WIDTH2000_PX']).optional()
           .describe('LARGE=1600px, MEDIUM=800px, SMALL=200px, WIDTH2000_PX=2000px wide (default: server-chosen)'),
@@ -130,7 +130,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
       description: 'Generic presentations.batchUpdate pass-through. Accepts the full Request union (create/move/delete slides, insert text/shapes/images/tables, styling, replaceAllText, …). See https://developers.google.com/workspace/slides/api/reference/rest/v1/presentations/request',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        presentationId: z.string().describe('Presentation ID'),
+        presentationId: z.string().min(1).describe('Presentation ID'),
         requests: coerceArray(coerceJson(z.record(z.string(), z.unknown())))
           .describe('Array of Request objects, each with one request-type key like {createSlide: {...}}'),
         writeControl: coerceJson(z.object({

@@ -17,7 +17,7 @@ export function registerGroupsmigrationGeneratedTools(registry: ToolRegistry): v
     hasBody: false,
     shape: {
       account: accountField(),
-      groupId: z.string().describe("The group ID"),
+      groupId: z.string().min(1).describe("The group ID"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });

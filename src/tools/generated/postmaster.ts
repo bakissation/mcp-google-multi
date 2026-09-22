@@ -17,7 +17,7 @@ export function registerPostmasterGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The resource name of the domain. It should have the form `domains/{domain_name}`, where domain_name is the fully qualified domain name."),
+      name: z.string().min(1).describe("The resource name of the domain. It should have the form `domains/{domain_name}`, where domain_name is the fully qualified domain name."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -44,7 +44,7 @@ export function registerPostmasterGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The resource name of the traffic statistics to get. E.g., domains/mymail.mydomain.com/trafficStats/20160807."),
+      name: z.string().min(1).describe("The resource name of the traffic statistics to get. E.g., domains/mymail.mydomain.com/trafficStats/20160807."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -57,7 +57,7 @@ export function registerPostmasterGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("The resource name of the domain whose traffic statistics we'd like to list. It should have the form `domains/{domain_name}`, where domain_name is the fully qualified domain name."),
+      parent: z.string().min(1).describe("The resource name of the domain whose traffic statistics we'd like to list. It should have the form `domains/{domain_name}`, where domain_name is the fully qualified domain name."),
       "endDate.day": z.number().describe("Day of a month. Must be from 1 to 31 and valid for the year and month, or 0 to specify a year by itself or a year and month where the day isn't significant.").optional(),
       "endDate.month": z.number().describe("Month of a year. Must be from 1 to 12, or 0 to specify a year without a month and day.").optional(),
       "endDate.year": z.number().describe("Year of the date. Must be from 1 to 9999, or 0 to specify a date without a year.").optional(),

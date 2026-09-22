@@ -5,6 +5,28 @@ import {
   type SiblingSpelling,
   type UnknownArgMode,
 } from './arg-strict.js';
+import { sliceClean } from './trim.js';
+
+// The SDK synthesizes input-validation failures as isError RESULTS, skipping
+// the handler entirely: no handler of ours runs, so no envelope exists and the
+// client gets free text. The text is prose in both SDK eras (v1 prefixed it
+// with "MCP error -32602: ", v2 dropped that prefix), while handler envelopes
+// are always JSON starting with "{".
+const SCHEMA_VALIDATION_TEXT = /^(MCP error -32602: )?Input validation error:/;
+
+export function isSchemaValidationText(text: string): boolean {
+  return SCHEMA_VALIDATION_TEXT.test(text);
+}
+
+/** Capture form of the v2 text. The tool-name class excludes ':' and ' ', so
+ * the first ": " after the name is unambiguously the delimiter. */
+const VALIDATION_PROSE =
+  /^(?:MCP error -32602: )?Input validation error: Invalid arguments for tool ([A-Za-z0-9_.-]+): ([\s\S]+)$/;
+
+/** The SDK's OTHER synthesized prose on the same catch. Both prefixes are
+ * SDK-authored; a HANDLER's free text is not, and must survive untouched
+ * (the account wizard answers in prose today). */
+const SDK_OUTPUT_PROSE = /^(?:MCP error -32602: )?Output validation error: /;
 
 // Wire-level tools/call argument normalization. Clients (LLMs) recurringly
 // snake_case a camelCase parameter (thread_id for threadId) and burn a retry
@@ -89,6 +111,10 @@ export interface StrictArgOptions {
   declaredFor: (tool: string) => readonly string[] | undefined;
   /** sibling spellings of a concept elsewhere in the same service */
   siblingsFor?: (tool: string, keys: string[]) => SiblingSpelling[];
+  /** Replacement text for the SDK's bare "Tool X not found". Still answered as
+   * a JSON-RPC error, which is what the spec prescribes for an unknown tool;
+   * only the message improves. */
+  unknownTool?: (tool: string) => string;
   onDrop?: (tool: string, resolvedKeys: string[]) => void;
 }
 
@@ -113,8 +139,22 @@ export function screenMessage(
   if (!args || typeof args !== 'object' || Array.isArray(args)) return { action: 'forward', msg };
   const tool = m.params.name;
   const declared = opts.declaredFor(tool);
-  // Unregistered tool: leave it to the SDK's own "not found".
-  if (!declared) return { action: 'forward', msg };
+  // Unregistered tool. The spec keeps this a PROTOCOL error (unknown tool is
+  // not something the model can fix by adjusting arguments), so the channel
+  // stays a JSON-RPC error; only the message gets the did-you-mean and the
+  // gated-service next step. Without `unknownTool`, or on a notification,
+  // the SDK's own "not found" still answers.
+  if (!declared) {
+    if (!opts.unknownTool || m.id === undefined) return { action: 'forward', msg };
+    return {
+      action: 'reject',
+      response: {
+        jsonrpc: '2.0',
+        id: m.id,
+        error: { code: -32602, message: opts.unknownTool(tool) },
+      } as unknown as JSONRPCMessage,
+    };
+  }
 
   const screened = screenArguments(tool, args as Record<string, unknown>, declared);
   if (screened.unknown.length === 0 && screened.redundant.length === 0) return { action: 'forward', msg };
@@ -182,14 +222,17 @@ export function withArgNormalization(
             if (!strict) return handler(normalized, extra);
             const outcome = screenMessage(normalized, strict, log);
             if (outcome.action === 'forward') return handler(outcome.msg as typeof message, extra);
+            // Last-resort fallback: dispatch as before rather than hang the
+            // caller. The stderr line and the counter already fired above.
+            // `send` is async, so a rejected promise needs catching too: a
+            // bare `void` left the client waiting for a frame that never came.
+            const fallback = () => handler(normalized as typeof message, extra);
             try {
               // Answer on the INNER transport so the metrics tap still sees the
               // frame and clears its pending id.
-              void transport.send(outcome.response);
+              void Promise.resolve(transport.send(outcome.response)).catch(fallback);
             } catch {
-              // Last-resort: dispatch as before rather than hang the caller.
-              // The stderr line and the counter already fired above.
-              handler(normalized as typeof message, extra);
+              fallback();
             }
           }
         : undefined;
@@ -213,6 +256,138 @@ export function withArgNormalization(
   // passes supportedProtocolVersions explicitly.
   if (transport.setSupportedProtocolVersions) {
     wrapper.setSupportedProtocolVersions = (v: string[]) => transport.setSupportedProtocolVersions!(v);
+  }
+  return wrapper;
+}
+
+// ---------------------------------------------------------------------------
+// The same wire seam owns one OUTBOUND job. withValidationEnvelope converts the
+// SDK's bare validation prose back into the 6.0.0 envelope. It must be wrapped
+// INNERMOST, below the metrics tap: outbound runs outermost-first, so this is
+// the LAST thing to touch the frame and the tap above it still classifies the
+// ORIGINAL prose as schema_validation.
+// ---------------------------------------------------------------------------
+
+export interface ValidationEnvelopeOptions {
+  /** Membership against the REGISTERED tool set: the name on the frame is
+   * ultimately client-supplied, and it must never enter an envelope unchecked. */
+  isKnownTool?: (name: string) => boolean;
+  /** The account the call WOULD have run as. The registry injects the default
+   * AFTER validation, so a validation failure never got that far. */
+  defaultAccount?: () => string | undefined;
+}
+
+const MAX_ACCOUNT_CHARS = 64;
+const MAX_ISSUE_CHARS = 800;
+const MAX_PROSE_CHARS = 500;
+const ENVELOPE_PENDING_CAP = 1_000;
+
+interface PendingCall { tool: string; account?: string }
+
+export function validationEnvelope(tool: string, issues: string, account: string | undefined) {
+  return {
+    error: 'validation_error',
+    message: `${tool} arguments failed validation: ${sliceClean(issues, MAX_ISSUE_CHARS)}`,
+    hint: `Fix the argument named in the message and call again. This tool's inputSchema in tools/list lists every accepted argument, its type and its allowed values. Nothing was sent to Google.`,
+    retriable: false,
+    account: account ?? '',
+  };
+}
+
+/** Floor for the OTHER bare prose the same SDK catch produces: an output-schema
+ * failure. Nothing is known about the cause, so it says exactly that. */
+export function outputFailureEnvelope(tool: string, text: string, account: string | undefined) {
+  return {
+    error: 'internal',
+    message: `${tool} returned a result the protocol rejected: ${sliceClean(text, MAX_PROSE_CHARS)}`,
+    hint: 'A server-side failure, not a rejected argument. Retry once; if it repeats, the message above is the signal to report.',
+    retriable: false,
+    account: account ?? '',
+  };
+}
+
+export function rewriteValidationFrame(
+  message: JSONRPCMessage,
+  pending: Map<string | number, PendingCall>,
+  opts: ValidationEnvelopeOptions,
+): JSONRPCMessage {
+  const m = message as {
+    id?: string | number;
+    method?: unknown;
+    result?: { isError?: boolean; content?: { type?: string; text?: string }[] };
+  };
+  // Responses only. A server-initiated REQUEST (elicitation, sampling) also
+  // carries an id, from a different id space, and evicting on it would drop a
+  // real pending call.
+  if (m.id === undefined || m.method !== undefined) return message;
+  const call = pending.get(m.id);
+  pending.delete(m.id);
+  if (m.result?.isError !== true) return message;
+  const content = m.result.content;
+  if (!content || content.length !== 1 || content[0]?.type !== 'text') return message;
+  const text = content[0].text;
+  if (typeof text !== 'string' || text.startsWith('{')) return message;
+  const parsed = isSchemaValidationText(text) ? VALIDATION_PROSE.exec(text) : null;
+  // Anything the SDK did not author is a handler's own answer. Leave it alone.
+  if (!parsed && !SDK_OUTPUT_PROSE.test(text)) return message;
+  const tool = parsed?.[1] ?? call?.tool;
+  if (!tool || (opts.isKnownTool && !opts.isKnownTool(tool))) return message;
+  const account = call?.account ?? opts.defaultAccount?.();
+  const envelope = parsed
+    ? validationEnvelope(tool, parsed[2], account)
+    : outputFailureEnvelope(tool, text, account);
+  return {
+    ...(message as Record<string, unknown>),
+    result: { ...m.result, content: [{ type: 'text', text: JSON.stringify(envelope) }] },
+  } as unknown as JSONRPCMessage;
+}
+
+export function withValidationEnvelope(transport: Transport, opts: ValidationEnvelopeOptions = {}): Transport {
+  const pending = new Map<string | number, PendingCall>();
+  const wrapper = {
+    start: () => transport.start(),
+    send: (message: JSONRPCMessage, options?: Parameters<Transport['send']>[1]) => {
+      let out = message;
+      try {
+        out = rewriteValidationFrame(message, pending, opts);
+      } catch { /* the seam may never break the wire */ }
+      return transport.send(out, options);
+    },
+    close: () => transport.close(),
+  } as Transport;
+  Object.defineProperty(wrapper, 'onmessage', {
+    get: () => transport.onmessage,
+    set: (handler: OnMessage) => {
+      transport.onmessage = handler
+        ? (message, extra) => {
+            try {
+              const m = message as { id?: string | number; method?: unknown; params?: { name?: unknown; arguments?: unknown } };
+              if (m.method === 'tools/call' && m.id !== undefined && typeof m.params?.name === 'string') {
+                if (pending.size >= ENVELOPE_PENDING_CAP) pending.clear();
+                const args = m.params.arguments;
+                const raw = args && typeof args === 'object' ? (args as { account?: unknown }).account : undefined;
+                pending.set(m.id, {
+                  tool: m.params.name,
+                  account: typeof raw === 'string' ? sliceClean(raw, MAX_ACCOUNT_CHARS) : undefined,
+                });
+              }
+            } catch { /* never break dispatch */ }
+            handler(message, extra);
+          }
+        : undefined;
+    },
+  });
+  for (const prop of ['onclose', 'onerror'] as const) {
+    Object.defineProperty(wrapper, prop, {
+      get: () => transport[prop],
+      set: (v) => {
+        transport[prop] = v;
+      },
+    });
+  }
+  Object.defineProperty(wrapper, 'sessionId', { get: () => transport.sessionId });
+  if (transport.setProtocolVersion) {
+    wrapper.setProtocolVersion = (v: string) => transport.setProtocolVersion!(v);
   }
   return wrapper;
 }

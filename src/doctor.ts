@@ -10,6 +10,7 @@ import { configDir, loadConfigFile } from './config-file.js';
 import { envValueSource } from './env-load.js';
 import { describeMetricsDir, resolveUsageMetrics, sourceLabel } from './usage-metrics.js';
 import { probeApiEnablement } from './api-probe.js';
+import { safeMessage, stringifyEnvelope } from './tools/_errors.js';
 import { resolveHttpConfig, HttpConfigError, type HttpConfig } from './http-config.js';
 import { parseOwnerEmails } from './http-transport.js';
 
@@ -435,9 +436,14 @@ export function exitCodeFor(report: DiagnosticsReport, strict: boolean): number 
 }
 
 /** Agent-callable structured health report (read-only). Mirrors `doctor`'s
- * engine; NOT alwaysLoad (the agent asks for it when diagnosing). */
+ * engine. Registered as a META tool, like `account_list`: it introspects this
+ * server rather than Google data, and as a normal tool it became a service of
+ * its own with no `{service}_discover` to reveal it (discover tools are built
+ * from already-registered services, and this runs after that), so it was
+ * advertised only once something else expanded the surface. The README sends
+ * people here when they are stuck, so it has to be findable. */
 export function registerDiagnoseTool(registry: ToolRegistry): void {
-  registry.registerTool(
+  registry.registerMeta(
     'diagnose',
     {
       annotations: { readOnlyHint: true, openWorldHint: true },
@@ -449,7 +455,11 @@ export function registerDiagnoseTool(registry: ToolRegistry): void {
         const result = await runDiagnostics();
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (e: any) {
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'diagnose_failed', message: e?.message ?? String(e) }) }], isError: true };
+        return { content: [{ type: 'text' as const, text: stringifyEnvelope({
+          error: 'diagnose_failed',
+          message: safeMessage(e),
+          retriable: false,
+        }) }], isError: true };
       }
     },
   );

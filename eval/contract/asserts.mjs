@@ -72,17 +72,30 @@ export function curatedToolResolves(output) {
   return s.length > 0 ? ok(s.slice(0, 120)) : fail('empty output');
 }
 
+/** A schema rejection is an ENVELOPE like every other failure. It used to be
+ * bare SDK prose with no slug, hint or retriable, which is the free-text
+ * contract break the hint floor exists to prevent. */
 export function validationVisible(output) {
   const s = text(output);
-  return /invalid|required|-32602|expected/i.test(s) ? ok(s.slice(0, 160)) : fail(s.slice(0, 160));
+  let j;
+  try { j = JSON.parse(s); } catch { return fail('not JSON: ' + s.slice(0, 160)); }
+  if (j.error !== 'validation_error') return fail('slug: ' + String(j.error));
+  if (!j.hint) return fail('no hint: ' + s.slice(0, 160));
+  if (j.retriable !== false) return fail('retriable: ' + String(j.retriable));
+  return ok(s.slice(0, 160));
 }
 
-/** A single unknown alias fails at the SDK schema (the alias union), so the
- * contract is a VISIBLE validation error naming the account field; the
- * friendly alias list belongs to the CSV/fan-out path (invalidAccountsResult). */
+/** A single unknown alias must name the VALID aliases. It used to leak the
+ * CSV regex, implying a comma was required, and never named one. */
 export function unknownAccountFailsValidation(output) {
   const s = text(output);
-  return /-32602|invalid/i.test(s) && /account/i.test(s) ? ok(s.slice(0, 160)) : fail(s.slice(0, 160));
+  let j;
+  try { j = JSON.parse(s); } catch { return fail('not JSON: ' + s.slice(0, 160)); }
+  if (j.error !== 'validation_error') return fail('slug: ' + String(j.error));
+  if (!/account/i.test(s)) return fail('does not name the field: ' + s.slice(0, 160));
+  if (!/Valid: /.test(s)) return fail('does not name the valid aliases: ' + s.slice(0, 160));
+  if (/must match pattern|\^\[a-zA-Z0-9_-\]/.test(s)) return fail('leaks the CSV regex: ' + s.slice(0, 160));
+  return ok(s.slice(0, 160));
 }
 
 export function coercesNotValidationError(output) {
@@ -119,12 +132,24 @@ export function writeDisabled(output) {
   return ok_ ? ok(j.message.slice(0, 160)) : fail(text(output).slice(0, 160));
 }
 
+// Wizard failures used to be bare prose, so these asserted on substrings.
+// They are envelopes now: assert the slug and the recovery, not the wording.
 export function accountAddEnvMode(output) {
-  const s = text(output);
-  return /E_ENV_ACCOUNTS_MODE/.test(s) && /migrate-config/.test(s) ? ok(s.slice(0, 160)) : fail(s.slice(0, 160));
+  const j = envelope(output);
+  if (!j) return fail('not a parseable envelope: ' + text(output).slice(0, 160));
+  if (j.error !== 'E_ENV_ACCOUNTS_MODE') return fail('wrong slug: ' + j.error);
+  if (j.retriable !== false) return fail('env mode is not retriable');
+  if (!/migrate-config/.test(j.hint ?? '')) return fail('hint does not name the way out');
+  return ok(j.error);
 }
 
 export function accountReauthUnknown(output) {
-  const s = text(output);
-  return /E_VALIDATION/.test(s) && s.includes('example') ? ok(s.slice(0, 160)) : fail(s.slice(0, 160));
+  const j = envelope(output);
+  if (!j) return fail('not a parseable envelope: ' + text(output).slice(0, 160));
+  // Same slug as an unknown alias passed to any other tool: one condition,
+  // one name, wherever it is raised.
+  if (j.error !== 'validation_error') return fail('wrong slug: ' + j.error);
+  if (j.account !== 'nope') return fail('does not echo the rejected alias: ' + j.account);
+  if (!(j.hint ?? '').includes('example')) return fail('hint does not list the known aliases');
+  return ok(j.error);
 }

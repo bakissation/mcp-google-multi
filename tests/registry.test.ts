@@ -278,8 +278,12 @@ describe('ToolRegistry', () => {
     expect(invalidBody.error).toBe('validation_error');
     expect(invalidBody.message).toContain('bogus');
 
+    // The CSV form always fans out now: the answer's shape must not depend on
+    // whether the caller happened to repeat an alias.
     const deduped = await handler({ account: 'test,test', query: 'q' });
-    expect(JSON.parse(deduped.content[0].text)).toEqual({ hit: 'q' });
+    const dedupedBody = JSON.parse(deduped.content[0].text);
+    expect(dedupedBody.results).toEqual([{ account: 'test', ok: true, data: { hit: 'q' } }]);
+    expect(dedupedBody.partial).toBe(false);
   });
 
   it('gates drive_transfer move as a delete while copy stays create-gated', async () => {

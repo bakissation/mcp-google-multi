@@ -32,7 +32,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The name of the operation resource."),
+      name: z.string().min(1).describe("The name of the operation resource."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -59,7 +59,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the subscription to delete. Format: `subscriptions/{subscription}`"),
+      name: z.string().min(1).describe("Required. Resource name of the subscription to delete. Format: `subscriptions/{subscription}`"),
       allowMissing: coerceBoolean.describe("Optional. If set to `true` and the subscription isn't found, the request succeeds but doesn't delete the subscription.").optional(),
       etag: z.string().describe("Optional. Etag of the subscription. If present, it must match with the server's etag. Otherwise, request fails with the status `ABORTED`.").optional(),
       validateOnly: coerceBoolean.describe("Optional. If set to `true`, validates and previews the request, but doesn't delete the subscription.").optional(),
@@ -75,7 +75,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the subscription. Format: `subscriptions/{subscription}`"),
+      name: z.string().min(1).describe("Required. Resource name of the subscription. Format: `subscriptions/{subscription}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -103,7 +103,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: true,
     shape: {
       account: accountField(),
-      name: z.string().describe("Identifier. Resource name of the subscription. Format: `subscriptions/{subscription}`"),
+      name: z.string().min(1).describe("Identifier. Resource name of the subscription. Format: `subscriptions/{subscription}`"),
       updateMask: z.string().describe("Optional. The field to update. If omitted, updates any fields included in the request. You can update one of the following fields in a subscription: * `expire_time`: The timestamp when the subscriptio").optional(),
       validateOnly: coerceBoolean.describe("Optional. If set to `true`, validates and previews the request, but doesn't update the subscription.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Subscription JSON request body. Top-level fields: authority, createTime, driveOptions, etag, eventTypes, expireTime, name, notificationEndpoint, payloadOptions, reconciling, serviceAccountAuthority, state, +6 more."),
@@ -112,7 +112,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
   });
   registerGeneratedTool(registry, {
     name: "workspaceevents_subscriptions_reactivate",
-    cud: "create",
+    cud: "update",
     description: "Reactivates a suspended Google Workspace subscription. This method resets your subscription's `State` field to `ACTIVE`. Before you use this method, you must fi",
     method: { id: "workspaceevents.subscriptions.reactivate", httpMethod: "POST", path: "v1/{+name}:reactivate", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"], scopes: S_workspaceevents_v1[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -120,13 +120,13 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     bodyParams: [],
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Resource name of the subscription. Format: `subscriptions/{subscription}`"),
+      name: z.string().min(1).describe("Required. Resource name of the subscription. Format: `subscriptions/{subscription}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
   registerGeneratedTool(registry, {
     name: "workspaceevents_tasks_cancel",
-    cud: "create",
+    cud: "delete",
     description: "Cancel a task from the agent. If supported one should expect no more task updates for the task.",
     method: { id: "workspaceevents.tasks.cancel", httpMethod: "POST", path: "v1/{+name}:cancel", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -134,7 +134,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     bodyParams: [{"field":"tenant","api":"tenant"}],
     shape: {
       account: accountField(),
-      name: z.string().describe("The resource name of the task to cancel. Format: tasks/{task_id}"),
+      name: z.string().min(1).describe("The resource name of the task to cancel. Format: tasks/{task_id}"),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -148,7 +148,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The resource name of the task. Format: tasks/{task_id}"),
+      name: z.string().min(1).describe("Required. The resource name of the task. Format: tasks/{task_id}"),
       historyLength: z.number().describe("The number of most recent messages from the task's history to retrieve.").optional(),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -163,7 +163,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: true,
     shape: {
       account: accountField(),
-      parent: z.string().describe("Required. The parent task resource for this config. Format: tasks/{task_id}"),
+      parent: z.string().min(1).describe("Required. The parent task resource for this config. Format: tasks/{task_id}"),
       configId: z.string().describe("Required. The ID for the new config.").optional(),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("TaskPushNotificationConfig JSON request body. Top-level fields: name, pushNotificationConfig."),
@@ -179,7 +179,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The resource name of the config to delete. Format: tasks/{task_id}/pushNotificationConfigs/{config_id}"),
+      name: z.string().min(1).describe("The resource name of the config to delete. Format: tasks/{task_id}/pushNotificationConfigs/{config_id}"),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -193,7 +193,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The resource name of the config to retrieve. Format: tasks/{task_id}/pushNotificationConfigs/{config_id}"),
+      name: z.string().min(1).describe("The resource name of the config to retrieve. Format: tasks/{task_id}/pushNotificationConfigs/{config_id}"),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -207,7 +207,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: false,
     shape: {
       account: accountField(),
-      parent: z.string().describe("The parent task resource. Format: tasks/{task_id}"),
+      parent: z.string().min(1).describe("The parent task resource. Format: tasks/{task_id}"),
       pageSize: z.number().describe("For AIP-158 these fields are present. Usually not used/needed. The maximum number of configurations to return. If unspecified, all configs will be returned.").optional(),
       pageToken: z.string().describe("A page token received from a previous ListTaskPushNotificationConfigRequest call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListTaskPushNotificat").optional(),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
@@ -223,7 +223,7 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("The resource name of the task to subscribe to. Format: tasks/{task_id}"),
+      name: z.string().min(1).describe("The resource name of the task to subscribe to. Format: tasks/{task_id}"),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },

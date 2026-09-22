@@ -19,7 +19,7 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. The name of the attachment."),
+      name: z.string().min(1).describe("Required. The name of the attachment."),
       mimeType: z.string().describe("The IANA MIME type format requested. The requested MIME type must be one specified in the attachment.mime_type. Required when downloading attachment media and ignored otherwise.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -46,7 +46,7 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Name of the note to delete."),
+      name: z.string().min(1).describe("Required. Name of the note to delete."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -59,7 +59,7 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      name: z.string().describe("Required. Name of the resource."),
+      name: z.string().min(1).describe("Required. Name of the resource."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   });
@@ -87,7 +87,7 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      parent: z.string().describe("The parent resource shared by all Permissions being created. Format: `notes/{note}` If this is set, the parent field in the CreatePermission messages must either be empty or match this field."),
+      parent: z.string().min(1).describe("The parent resource shared by all Permissions being created. Format: `notes/{note}` If this is set, the parent field in the CreatePermission messages must either be empty or match this field."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchCreatePermissionsRequest JSON request body. Top-level fields: requests."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -102,7 +102,7 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"names","api":"names"}],
     shape: {
       account: accountField(),
-      parent: z.string().describe("The parent resource shared by all permissions being deleted. Format: `notes/{note}` If this is set, the parent of all of the permissions specified in the DeletePermissionRequest messages must match th"),
+      parent: z.string().min(1).describe("The parent resource shared by all permissions being deleted. Format: `notes/{note}` If this is set, the parent of all of the permissions specified in the DeletePermissionRequest messages must match th"),
       names: coerceArray(z.string()).describe("Required. The names of the permissions to delete. Format: `notes/{note}/permissions/{permission}`").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },

@@ -37,7 +37,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      resourceName: z.string().describe("Required. The resource name of the contact group to delete."),
+      resourceName: z.string().min(1).describe("Required. The resource name of the contact group to delete."),
       deleteContacts: coerceBoolean.describe("Optional. Set to true to also delete the contacts in the specified group.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -52,7 +52,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"resourceNamesToAdd","api":"resourceNamesToAdd"},{"field":"resourceNamesToRemove","api":"resourceNamesToRemove"}],
     shape: {
       account: accountField(),
-      resourceName: z.string().describe("Required. The resource name of the contact group to modify."),
+      resourceName: z.string().min(1).describe("Required. The resource name of the contact group to modify."),
       resourceNamesToAdd: coerceArray(z.string()).describe("Optional. The resource names of the contact people to add in the form of `people/{person_id}`. The total number of resource names in `resource_names_to_add` and `resource_names_to_remove` must be less").optional(),
       resourceNamesToRemove: coerceArray(z.string()).describe("Optional. The resource names of the contact people to remove in the form of `people/{person_id}`. The total number of resource names in `resource_names_to_add` and `resource_names_to_remove` must be l").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -67,7 +67,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     shape: {
       account: accountField(),
-      resourceName: z.string().describe("The resource name for the contact group, assigned by the server. An ASCII string, in the form of `contactGroups/{contact_group_id}`."),
+      resourceName: z.string().min(1).describe("The resource name for the contact group, assigned by the server. An ASCII string, in the form of `contactGroups/{contact_group_id}`."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("UpdateContactGroupRequest JSON request body. Top-level fields: contactGroup, readGroupFields, updateGroupFields."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -82,7 +82,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"copyMask","api":"copyMask"},{"field":"readMask","api":"readMask"},{"field":"sources","api":"sources"}],
     shape: {
       account: accountField(),
-      resourceName: z.string().describe("Required. The resource name of the \"Other contact\" to copy."),
+      resourceName: z.string().min(1).describe("Required. The resource name of the \"Other contact\" to copy."),
       copyMask: z.string().describe("Required. A field mask to restrict which fields are copied into the new contact. Valid values are: * emailAddresses * names * phoneNumbers").optional(),
       readMask: z.string().describe("Optional. A field mask to restrict which fields on the person are returned. Multiple fields can be specified by separating them with commas. Defaults to the copy mask with metadata and membership fiel").optional(),
       sources: coerceArray(z.enum(["READ_SOURCE_TYPE_UNSPECIFIED","READ_SOURCE_TYPE_PROFILE","READ_SOURCE_TYPE_CONTACT","READ_SOURCE_TYPE_DOMAIN_CONTACT","READ_SOURCE_TYPE_OTHER_CONTACT"])).describe("Optional. A mask of what source types to return. Defaults to READ_SOURCE_TYPE_CONTACT and READ_SOURCE_TYPE_PROFILE if not set.").optional(),
@@ -151,7 +151,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
   });
   registerGeneratedTool(registry, {
     name: "contacts_people_batch_update_contacts",
-    cud: "create",
+    cud: "update",
     description: "Update a batch of contacts and return a map of resource names to PersonResponses for the updated contacts. Mutate requests for the same user should be sent sequ",
     method: { id: "people.people.batchUpdateContacts", httpMethod: "POST", path: "v1/people:batchUpdateContacts", baseUrl: "https://people.googleapis.com/", requiredParams: [], scopes: S_people_v1[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
@@ -171,7 +171,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     hasBody: false,
     shape: {
       account: accountField(),
-      resourceName: z.string().describe("Required. The resource name of the contact whose photo will be deleted."),
+      resourceName: z.string().min(1).describe("Required. The resource name of the contact whose photo will be deleted."),
       personFields: z.string().describe("Optional. A field mask to restrict which fields on the person are returned. Multiple fields can be specified by separating them with commas. Defaults to empty if not set, which will skip the post muta").optional(),
       sources: coerceArray(z.enum(["READ_SOURCE_TYPE_UNSPECIFIED","READ_SOURCE_TYPE_PROFILE","READ_SOURCE_TYPE_CONTACT","READ_SOURCE_TYPE_DOMAIN_CONTACT","READ_SOURCE_TYPE_OTHER_CONTACT"])).describe("Optional. A mask of what source types to return. Defaults to READ_SOURCE_TYPE_CONTACT and READ_SOURCE_TYPE_PROFILE if not set.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -224,7 +224,7 @@ export function registerContactsGeneratedTools(registry: ToolRegistry): void {
     bodyParams: [{"field":"personFields","api":"personFields"},{"field":"photoBytes","api":"photoBytes"},{"field":"sources","api":"sources"}],
     shape: {
       account: accountField(),
-      resourceName: z.string().describe("Required. Person resource name"),
+      resourceName: z.string().min(1).describe("Required. Person resource name"),
       personFields: z.string().describe("Optional. A field mask to restrict which fields on the person are returned. Multiple fields can be specified by separating them with commas. Defaults to empty if not set, which will skip the post muta").optional(),
       photoBytes: z.string().describe("Required. Raw photo bytes").optional(),
       sources: coerceArray(z.enum(["READ_SOURCE_TYPE_UNSPECIFIED","READ_SOURCE_TYPE_PROFILE","READ_SOURCE_TYPE_CONTACT","READ_SOURCE_TYPE_DOMAIN_CONTACT","READ_SOURCE_TYPE_OTHER_CONTACT"])).describe("Optional. A mask of what source types to return. Defaults to READ_SOURCE_TYPE_CONTACT and READ_SOURCE_TYPE_PROFILE if not set.").optional(),

@@ -249,11 +249,22 @@ export function clearDiscoveryMemoryCache(): void {
 
 // GA4-style report execution (runReport, batchRunPivotReports, runAccessReport)
 // and check* predicates are POSTs purely for the request-body size — reads.
-const POST_READ_VERB = /^(get|list|search|query|lookup|count|batchGet|generateIds|export|download|inspect|check|(batch)?run\w*report)/i;
-const POST_UPDATE_VERB = /^(untrash|undelete|restore|modify|move|set|sort|merge|unmerge|replace|resize|publish|resolve|update|patch|write|format)/i;
+const POST_READ_VERB = /^(get|list|search|query|lookup|count|batchGet|generateIds|export|download|inspect|check|suggest|(batch)?run\w*report)/i;
+// `cancelWipe` must be matched here, BEFORE `cancel` reaches the delete list:
+// it calls off a pending wipe, which is the opposite of one. Update is tested
+// before delete for exactly that reason.
+// State transitions on something that already exists: reversible, and none of
+// them creates anything, so `create` was both wrong and the most permissive
+// class available. `(batch)?` mirrors the delete list, without which every
+// `batchUpdate*` POST fell through to `create`.
+const POST_UPDATE_VERB = /^(cancelWipe|(batch)?(untrash|undelete|restore|modify|move|set|sort|merge|unmerge|replace|resize|publish|resolve|update|patch|write|format|change|close|reopen|enable|disable|hide|unhide|accept|approve|decline|reassign|reactivate|renew|mark|turn|suspend|activate|make|return|reclaim|complete))/i;
 // archive sits with the deletes: in GA4 archiving a custom dimension/metric is
 // permanent, so the most restrictive write class is the safe classification.
-const POST_DELETE_VERB = /^(batch)?(delete|remove|trash|clear|empty|obliterate|purge|revoke|wipeout|archive)/i;
+// So do the teardown verbs: `stop` and `cancel` tear down a push channel or a
+// long-running operation, `wipe`/`invalidate`/`signOut` destroy device data,
+// codes and sessions, `reset` discards a configuration, and `end` terminates a
+// live conference. Each removes something that existed.
+const POST_DELETE_VERB = /^(batch)?(delete|remove|trash|clear|empty|obliterate|purge|revoke|wipeout|archive|wipe|invalidate|signOut|stop|cancel|unregister|unreserve|reset|end)/i;
 
 export function cudFromMethod(method: Pick<DiscoveryMethod, 'httpMethod' | 'id'>): 'read' | 'create' | 'update' | 'delete' {
   switch (method.httpMethod) {
@@ -283,7 +294,27 @@ export function expandPath(template: string, pathParams: Record<string, string>)
     if (value === undefined) {
       throw new Error(`Missing required path parameter "${name}"`);
     }
-    return plus ? String(value).split('/').map(encodeURIComponent).join('/') : encodeURIComponent(String(value));
+    // A blank segment collapses the path and Google routes the resulting
+    // trailing-slash URL to the COLLECTION: `sites.get` with siteUrl:"" came
+    // back as the whole site LIST, reported as success. Dot segments resolve
+    // at URL-parse time, so `../v1/contactGroups` retargets the call at a
+    // different endpoint and returns ITS response as success. Both are
+    // silent-wrong, so refuse locally rather than send a different request.
+    // `{+param}` keeps its slashes, so every segment has to be checked.
+    const segments = plus ? String(value).split('/') : [String(value)];
+    for (const segment of segments) {
+      if (segment.trim() === '') {
+        throw new Error(
+          `Path parameter "${name}" is empty. An empty value addresses the collection, not one resource, so nothing was sent to Google.`,
+        );
+      }
+      if (segment === '.' || segment === '..') {
+        throw new Error(
+          `Path parameter "${name}" contains a "${segment}" path segment, which would retarget the request at a different endpoint. Nothing was sent to Google.`,
+        );
+      }
+    }
+    return segments.map(encodeURIComponent).join('/');
   });
 }
 

@@ -9,7 +9,7 @@ import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import type { HttpConfig } from './http-config.js';
-import { withArgNormalization, type ArgShape, type StrictArgOptions } from './arg-normalize.js';
+import { withArgNormalization, type ArgShape, type StrictArgOptions, withValidationEnvelope, type ValidationEnvelopeOptions } from './arg-normalize.js';
 export type AuthOutcome =
   | { ok: true }
   | { ok: false; status: number; body: string; headers?: Record<string, string> };
@@ -39,6 +39,9 @@ export interface HttpHostOptions {
   argShapeFor?: (tool: string) => ArgShape | undefined;
   /** Usage-metrics transport tap (metrics-tap.ts); absent = off. */
   metricsTap?: (t: Transport) => Transport;
+  /** Wired identically on both transports so a schema rejection reads the same
+   * over stdio and over HTTP. */
+  validationEnvelope?: ValidationEnvelopeOptions;
   /** Usage-metrics argfix observer, forwarded into arg normalization. */
   onArgRename?: (tool: string, renames: number) => void;
   /** Unknown-argument screening (arg-strict.ts); absent = off. */
@@ -234,7 +237,10 @@ export class HttpTransportHost {
         timer = setTimeout(() => resolve('timeout'), deadlineMs);
         timer.unref?.();
       });
-      const tapped = this.opts.metricsTap ? this.opts.metricsTap(transport) : transport;
+      // Same composition as the stdio leg: the envelope rewrite is innermost,
+      // so the tap above it still classifies the original validation prose.
+      const enveloped = withValidationEnvelope(transport, this.opts.validationEnvelope ?? {});
+      const tapped = this.opts.metricsTap ? this.opts.metricsTap(enveloped) : enveloped;
       await this.opts.server.connect(
         this.opts.argShapeFor || this.opts.strictArgs
           ? withArgNormalization(tapped, this.opts.argShapeFor ?? (() => undefined), this.opts.log, this.opts.onArgRename, this.opts.strictArgs)

@@ -76,7 +76,8 @@ describe('validateAddForm', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.slug).toBe('E_UNKNOWN_BUNDLE');
-      expect(r.message).toContain('forms');
+      expect(r.message).toContain('"form"');
+      expect(r.hint).toContain('Did you mean "forms"?');
     }
   });
 
@@ -102,6 +103,12 @@ describe('argsToAddForm (argument-mode fallback)', () => {
     const v = validateAddForm(argsToAddForm({ alias: 'work' }), []);
     expect(v.ok).toBe(false);
     if (!v.ok) expect(v.slug).toBe('E_VALIDATION');
+  });
+
+  // Every other tool in the server spells this `account`, so both are accepted.
+  it('accepts `account` as a synonym for `alias`, and `alias` wins when both are sent', () => {
+    expect(argsToAddForm({ account: 'work', email: 'a@b.c' }).alias).toBe('work');
+    expect(argsToAddForm({ alias: 'real', account: 'other', email: 'a@b.c' }).alias).toBe('real');
   });
 
   it('an unknown bundle still gets the did-you-mean', () => {

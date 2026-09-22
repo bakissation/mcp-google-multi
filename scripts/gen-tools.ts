@@ -103,7 +103,9 @@ function bodyPropZod(api: string, prop: RawBodyProp, required: boolean): string 
   let inner: string;
   switch (prop.type) {
     case 'string':
-      inner = enumZod(prop.enum, 'z.string()');
+      // Same rule as a required param: a required body string is an id or a
+      // resource reference, and an empty one is never a meaningful value.
+      inner = enumZod(prop.enum, required ? 'z.string().min(1)' : 'z.string()');
       break;
     case 'integer':
     case 'number':
@@ -133,7 +135,16 @@ function paramZod(name: string, param: DiscoveryParam, looseParams: string[], co
   let inner: string;
   switch (p.type) {
     case 'string':
-      inner = Array.isArray(p.enum) && p.enum.length > 0 ? `z.enum(${JSON.stringify(p.enum)})` : 'z.string()';
+      // A path param is a path SEGMENT: an empty value collapses it and the
+      // request addresses the collection instead of the resource. Required
+      // query params are the same story one level down (mimeType, requestId,
+      // orgUnitPath): empty is never a meaningful value. Declare the
+      // constraint so the client sees it; expandPath still enforces the path.
+      inner = Array.isArray(p.enum) && p.enum.length > 0
+        ? `z.enum(${JSON.stringify(p.enum)})`
+        : p.location === 'path' || p.required
+          ? 'z.string().min(1)'
+          : 'z.string()';
       break;
     case 'integer':
     case 'number':

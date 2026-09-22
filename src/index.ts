@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // First import: triggers accounts.js module load (env files + registry) before
 // anything else. Named to also pull the server-only empty-registry guard (BR-4).
-import { assertServerAccountsConfigured } from './accounts.js';
+import { assertServerAccountsConfigured, getAccountSet } from './accounts.js';
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +10,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { McpServer } from "@modelcontextprotocol/server";
 import type { Transport } from "@modelcontextprotocol/server";
 import { GENERATED_SERVICES } from './tools/generated/index.js';
-import { GENERATED_GATES, SERVICES } from './services.js';
+import { GENERATED_GATES, SERVICES, unknownToolMessage } from './services.js';
 import { ToolRegistry, resolveDiscoveryMode, type DiscoveryMode } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
@@ -22,7 +22,7 @@ import { isAllowed, describePolicy } from './write-control.js';
 import { buildIdentityContext, type IdentityContext } from './identity.js';
 import { registerSetupPrompt } from './setup-prompt.js';
 import { applyNetTuning } from './net-tuning.js';
-import { argNormalizationEnabled, withArgNormalization, type StrictArgOptions } from './arg-normalize.js';
+import { argNormalizationEnabled, withArgNormalization, withValidationEnvelope, type StrictArgOptions } from './arg-normalize.js';
 import { unknownArgMode } from './arg-strict.js';
 import { envValueSource } from './env-load.js';
 import { loadConfigFile } from './config-file.js';
@@ -42,6 +42,7 @@ function strictArgOptions(registry: ToolRegistry, metrics: Metrics | null): Stri
     mode,
     declaredFor: (tool) => registry.declaredKeys(tool),
     siblingsFor: (tool, keys) => registry.siblingSpellings(tool, keys),
+    unknownTool: (name) => unknownToolMessage(registry, name),
     onDrop: metrics ? (tool, keys) => metrics.recordArgDrop(tool, keys) : undefined,
   };
 }
@@ -275,9 +276,15 @@ async function main() {
     const registry = buildRegistry(server, buildIdentityContext(process.env, { transport: 'stdio' }), undefined, stdioMetrics);
     registry.installListHandler();
     registerSetupPrompt(server);
-    // Tap sits under arg normalization at the same wrap site; it only counts
-    // outbound JSON-RPC error frames (no handler ran) plus id->tool names.
-    let transport: Transport = new StdioServerTransport();
+    // Outbound runs outermost-first, so the composition is deliberate: the
+    // envelope rewrite is INNERMOST (last to touch the frame), the tap sits
+    // above it (classifying the ORIGINAL validation prose), arg normalization
+    // outermost. The tap only counts outbound JSON-RPC error frames (no
+    // handler ran) plus id->tool names.
+    let transport: Transport = withValidationEnvelope(new StdioServerTransport(), {
+      isKnownTool: (n) => registry.hasTool(n),
+      defaultAccount: () => getAccountSet().defaultAccount,
+    });
     if (stdioMetrics) {
       const { tapUsageMetrics } = await import('./metrics-tap.js');
       transport = tapUsageMetrics(transport, stdioMetrics, (n) => registry.hasTool(n));
@@ -287,7 +294,11 @@ async function main() {
       argNormalizationEnabled() || strictStdio
         ? withArgNormalization(
             transport,
-            (n) => registry.argShape(n),
+            // Gated exactly as the HTTP leg gates `argShapeFor`. Passing the
+            // shape unconditionally made stdio rename keys while
+            // GOOGLE_ARG_NORMALIZE=off, so the same call succeeded on stdio
+            // and failed on HTTP once screening rejects.
+            argNormalizationEnabled() ? (n) => registry.argShape(n) : () => undefined,
             undefined,
             stdioMetrics ? (tool, n) => stdioMetrics.recordArgFix(tool, n) : undefined,
             strictStdio,
@@ -399,6 +410,10 @@ async function main() {
       log: (l) => process.stderr.write(`[http] ${l}\n`),
       argShapeFor: argNormalizationEnabled() ? (n) => registry.argShape(n) : undefined,
       metricsTap: httpTap,
+      validationEnvelope: {
+        isKnownTool: (n: string) => registry.hasTool(n),
+        defaultAccount: () => getAccountSet().defaultAccount,
+      },
       onArgRename: httpMetrics ? (tool: string, n: number) => httpMetrics.recordArgFix(tool, n) : undefined,
       strictArgs: strictArgOptions(registry, httpMetrics),
     });
