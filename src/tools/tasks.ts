@@ -5,7 +5,7 @@ import { tasks as tasksClient } from '@googleapis/tasks';
 import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import { handleGoogleApiError } from './_errors.js';
+import { handleGoogleApiError, invalidParams } from './_errors.js';
 
 const accountEnum = accountAliasSchema.optional();
 
@@ -264,7 +264,11 @@ export function registerTasksTools(server: ToolRegistry): void {
         if (status !== undefined) requestBody.status = status;
 
         if (Object.keys(requestBody).length === 0) {
-          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'No fields to update' }) }], isError: true };
+          return invalidParams(
+            account as Account,
+            'No fields to update: every optional field was omitted, so the request would have been a no-op.',
+            'Pass at least one of: title, notes, due, status.',
+          );
         }
 
         const res = await tasks.tasks.patch({

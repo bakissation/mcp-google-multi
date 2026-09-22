@@ -41,8 +41,9 @@ Existing encrypted tokens keep decrypting — upgrading alone never forces a re-
 | 15 | Behavior | an undeclared tool argument is now refused, not dropped | none for a correct caller; see [§4.3](#43-undeclared-arguments-are-refused-not-dropped) | `unknown_argument` |
 | 16 | Errors | caller-side 4xx split out of `upstream_error` | rebranch if you keyed on the slug; see [§4.4](#44-error-slugs-are-narrower) | `bad_request`, `internal` |
 | 17 | Read tools | five list tools return an object, not a bare array | index `.files` / `.events` / `.instances` / `.contacts`; see [§4.5](#45-list-results-say-whether-they-are-complete) | — |
+| 18 | Errors | wizard failures return a JSON envelope, not a prose line | parse `error` instead of reading the text; see [§4.6](#46-every-failure-is-an-envelope) | `E_ENV_ACCOUNTS_MODE`, `elicitation_unsupported` |
 
-Rows 1, 3–6, 10–11, 17 need action; rows 7–9, 12–16 are safe defaults, opt-in, or transparent fixes.
+Rows 1, 3–6, 10–11, 17 need action; rows 7–9, 12–16 and 18 are safe defaults, opt-in, or transparent fixes.
 
 ---
 
@@ -259,6 +260,26 @@ Two related fixes ship with this:
 
 - `drive_search` now reports Drive's `incompleteSearch` flag, which is set when Drive could not search every corpus. It was being discarded, so a partial search read as a complete one.
 - `contacts_group_members` now fetches member records in batches of 200. `maxMembers` accepts up to 1000 but the underlying `people.getBatchGet` rejects more than 200 names, so a group larger than that used to fail outright.
+
+### 4.6 Every failure is an envelope
+
+A failure used to be reported in whichever shape its handler happened to use. Three were in circulation:
+
+- the documented envelope, `{ error, message, hint?, retriable, account }`;
+- an object whose `error` field held a whole English sentence, for example `{"error": "No fields to update"}`;
+- a bare line of prose from the account wizard, for example `E_VALIDATION: Invalid alias "has space". Use letters, digits, "_" or "-".`
+
+Only the first can be branched on. The second gives a different `error` value for every wording, so a client matching on it matches nothing and usage metrics count each phrasing separately. The third is not JSON at all.
+
+All three are now the first shape. Concretely:
+
+- **16 argument guards** across `admin`, `chat`, `contacts`, `docs`, `sheets` and `tasks` (the "no fields to update" and "supply one of X" checks) now return `invalid_params` with the fault in `message` and the list of accepted fields in `hint`.
+- **The account wizard** (`account_add`, `account_reauth`, `account_write_config`) returns envelopes. The slugs are `E_ENV_ACCOUNTS_MODE`, `E_VALIDATION`, `E_ALIAS_EXISTS`, `E_UNKNOWN_BUNDLE`, `elicitation_unsupported`, `confirmation_declined`, `invalid_client`, `auth_required` and `internal`. Wizard **success** output stays prose: it is an onboarding report meant to be read, not parsed.
+- **`account` is now carried** by `write_disabled`, by the `drive_transfer` and `drive_read` outcomes, and by the `docs_read` tab and heading errors, so a fan-out result can be attributed to the account that produced it. It is formally optional, because a few failures genuinely happen before any account is resolved.
+- **`ambiguous_heading` is gone**; `docs_read` reports an ambiguous heading as `ambiguous`, the slug already used elsewhere for the same condition.
+- Wizard and `diagnose` catch-alls no longer interpolate a raw thrown message. They go through the same capping and body-suppression path as every other error, which is what keeps a token or an HTML error page out of the response.
+
+If you branch on `error`, the values are now drawn from one closed vocabulary; a test asserts that the set emitted anywhere in the source equals the set the metrics collector knows, so an unregistered slug cannot reach you as an unclassified `other`.
 
 ---
 

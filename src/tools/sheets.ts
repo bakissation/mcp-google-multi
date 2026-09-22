@@ -5,7 +5,7 @@ import { sheets as sheetsClient } from '@googleapis/sheets';
 import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import { handleGoogleApiError } from './_errors.js';
+import { handleGoogleApiError, invalidParams } from './_errors.js';
 
 const accountEnum = accountAliasSchema.optional();
 
@@ -460,10 +460,11 @@ export function registerSheetsTools(server: ToolRegistry): void {
           for (const f of gridFields) fields.push(`gridProperties.${f}`);
         }
         if (fields.length === 0) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: 'No properties supplied' }, null, 2) }],
-            isError: true,
-          };
+          return invalidParams(
+            account as Account,
+            'No properties to update: every optional property was omitted, so the request would have been a no-op.',
+            'Pass at least one of: title, index, hidden, tabColor, frozenRowCount, frozenColumnCount, rowCount, columnCount.',
+          );
         }
 
         await sheets.spreadsheets.batchUpdate({
@@ -521,10 +522,11 @@ export function registerSheetsTools(server: ToolRegistry): void {
         const sheets = sheetsClient({ version: 'v4', auth });
         const built = buildCellFormat(format);
         if (built.fields.length === 0) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: 'No format properties supplied' }, null, 2) }],
-            isError: true,
-          };
+          return invalidParams(
+            account as Account,
+            'No formatting to apply: every optional format property was omitted.',
+            'Pass at least one of: backgroundColor, textFormat, horizontalAlignment, verticalAlignment, wrapStrategy, numberFormat.',
+          );
         }
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -575,10 +577,11 @@ export function registerSheetsTools(server: ToolRegistry): void {
         if (innerHorizontal) borders.innerHorizontal = toBorder(innerHorizontal);
         if (innerVertical) borders.innerVertical = toBorder(innerVertical);
         if (Object.keys(borders).length === 1) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: 'At least one border edge must be supplied' }, null, 2) }],
-            isError: true,
-          };
+          return invalidParams(
+            account as Account,
+            'No border edge was supplied, so there is nothing to draw.',
+            'Pass at least one of: top, bottom, left, right, innerHorizontal, innerVertical.',
+          );
         }
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -685,10 +688,11 @@ export function registerSheetsTools(server: ToolRegistry): void {
     async ({ account, spreadsheetId, ranges, index, booleanRule, gradientRule }) => {
       try {
         if (!booleanRule && !gradientRule) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either booleanRule or gradientRule must be supplied' }, null, 2) }],
-            isError: true,
-          };
+          return invalidParams(
+            account as Account,
+            'A conditional format rule needs a rule body: neither booleanRule nor gradientRule was supplied.',
+            'Pass booleanRule for a condition-based rule, or gradientRule for a color scale.',
+          );
         }
         const auth = await getClient(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
@@ -885,12 +889,20 @@ export function registerSheetsTools(server: ToolRegistry): void {
         if (scope === 'allSheets') findReplace.allSheets = true;
         else if (scope === 'sheet') {
           if (sheetId === undefined) {
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'sheetId required when scope=sheet' }) }], isError: true };
+            return invalidParams(
+              account as Account,
+              'scope is "sheet" but sheetId was not supplied, so no tab is addressed.',
+              'Pass sheetId, or use scope="allSheets" to search the whole spreadsheet.',
+            );
           }
           findReplace.sheetId = sheetId;
         } else {
           if (!range) {
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'range required when scope=range' }) }], isError: true };
+            return invalidParams(
+              account as Account,
+              'scope is "range" but range was not supplied, so no range is addressed.',
+              'Pass range as a GridRange, or use scope="allSheets" to search the whole spreadsheet.',
+            );
           }
           findReplace.range = range;
         }

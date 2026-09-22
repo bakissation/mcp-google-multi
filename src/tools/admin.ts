@@ -5,7 +5,7 @@ import { admin as adminClient } from '@googleapis/admin';
 import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import { handleGoogleApiError } from './_errors.js';
+import { handleGoogleApiError, invalidParams } from './_errors.js';
 
 const accountEnum = accountAliasSchema.optional();
 
@@ -166,7 +166,11 @@ export function registerAdminTools(server: ToolRegistry): void {
         if (orgUnitPath !== undefined) requestBody.orgUnitPath = orgUnitPath;
 
         if (Object.keys(requestBody).length === 0) {
-          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'No fields to update' }) }], isError: true };
+          return invalidParams(
+            account as Account,
+            'No fields to update: every optional field was omitted, so the request would have been a no-op.',
+            'Pass at least one of: givenName, familyName, suspended, password, changePasswordAtNextLogin, orgUnitPath.',
+          );
         }
 
         const res = await directory.users.patch({ userKey, requestBody });

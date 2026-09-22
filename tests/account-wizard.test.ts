@@ -76,7 +76,8 @@ describe('validateAddForm', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.slug).toBe('E_UNKNOWN_BUNDLE');
-      expect(r.message).toContain('forms');
+      expect(r.message).toContain('"form"');
+      expect(r.hint).toContain('Did you mean "forms"?');
     }
   });
 

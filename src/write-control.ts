@@ -110,12 +110,13 @@ export function isAllowed(tool: ToolRef, policy: Policy): boolean {
   return profileAllows(policy.profile, tool.cud);
 }
 
-export function writeDisabledResult(tool: ToolRef, policy: Policy) {
+export function writeDisabledResult(tool: ToolRef, policy: Policy, account?: string) {
   const envelope = {
     error: 'write_disabled',
     message: `"${tool.name}" (${tool.cud}) is disabled by the current write-control policy (profile: ${policy.profile}${policy.readOnly ? ', GOOGLE_READ_ONLY=true' : ''}).`,
     hint: `Enable via GOOGLE_PROFILE=safe-writes|full-writes, or GOOGLE_WRITE_ALLOW="${tool.service}:*".`,
     retriable: false,
+    ...(account ? { account } : {}),
   };
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(envelope) }],

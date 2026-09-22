@@ -5,7 +5,7 @@ import { docs as docsClient } from '@googleapis/docs';
 import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import { handleGoogleApiError } from './_errors.js';
+import { handleGoogleApiError, invalidParams } from './_errors.js';
 import { capText } from '../trim.js';
 
 const accountEnum = accountAliasSchema.optional();
@@ -270,13 +270,11 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, heading, headingIndex, tabId, maxChars, offset }) => {
       try {
         if (heading !== undefined && headingIndex !== undefined) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({
-              error: 'invalid_params',
-              message: 'Provide either heading or headingIndex, not both',
-            }, null, 2) }],
-            isError: true,
-          };
+          return invalidParams(
+            account as Account,
+            'Both heading and headingIndex were supplied, and they address different sections.',
+            'Pass heading to look a section up by its text, or headingIndex to address one by position. Not both.',
+          );
         }
         const auth = await getClient(account as Account);
         const docs = docsClient({ version: 'v1', auth });
@@ -292,7 +290,10 @@ export function registerDocsTools(server: ToolRegistry): void {
             return {
               content: [{ type: 'text' as const, text: JSON.stringify({
                 error: 'not_found',
-                message: `Tab "${tabId}" not found in document ${documentId}`,
+                message: `Tab "${tabId}" was not found in document ${documentId}.`,
+                hint: 'Pick a tabId from availableTabs below, or omit tabId to read the first tab.',
+                retriable: false,
+                account: account as string,
                 availableTabs: listTabs(res.data.tabs as any[]),
               }, null, 2) }],
               isError: true,
@@ -310,7 +311,10 @@ export function registerDocsTools(server: ToolRegistry): void {
             return {
               content: [{ type: 'text' as const, text: JSON.stringify({
                 error: 'invalid_params',
-                message: `headingIndex ${headingIndex} is out of range (document has ${headings.length} headings)`,
+                message: `headingIndex ${headingIndex} is out of range: the document has ${headings.length} heading(s).`,
+                hint: 'Indexes are zero-based. Pick one from the headings list below, or omit headingIndex to read the whole document.',
+                retriable: false,
+                account: account as string,
                 headings: headings.map(({ i, level, text }) => ({ i, level, text })),
               }, null, 2) }],
               isError: true,
@@ -321,10 +325,17 @@ export function registerDocsTools(server: ToolRegistry): void {
           if ('error' in resolved) {
             return {
               content: [{ type: 'text' as const, text: JSON.stringify({
-                error: resolved.error === 'ambiguous' ? 'ambiguous_heading' : 'not_found',
+                // 'ambiguous', not 'ambiguous_heading': the slug vocabulary is
+                // shared, and a one-off name buckets as `other` in metrics.
+                error: resolved.error === 'ambiguous' ? 'ambiguous' : 'not_found',
                 message: resolved.error === 'ambiguous'
-                  ? `Heading "${heading}" matches multiple headings; use headingIndex to disambiguate`
-                  : `Heading "${heading}" not found in document ${documentId}`,
+                  ? `Heading "${heading}" matches ${resolved.candidates.length} headings in document ${documentId}.`
+                  : `Heading "${heading}" was not found in document ${documentId}.`,
+                hint: resolved.error === 'ambiguous'
+                  ? 'Pass headingIndex with the i value of the one you want, from candidates below.'
+                  : 'Pick a heading from candidates below (it lists every heading in the document), or pass headingIndex.',
+                retriable: false,
+                account: account as string,
                 candidates: resolved.candidates.map(({ i, level, text }) => ({ i, level, text })),
               }, null, 2) }],
               isError: true,
@@ -518,12 +529,11 @@ export function registerDocsTools(server: ToolRegistry): void {
         }
 
         if (fields.length === 0) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({
-              error: 'No style properties provided. Set at least one of: bold, italic, underline, fontSize, fontFamily',
-            }, null, 2) }],
-            isError: true,
-          };
+          return invalidParams(
+            account as Account,
+            'No style properties to apply: every optional property was omitted.',
+            'Pass at least one of: bold, italic, underline, fontSize, fontFamily.',
+          );
         }
 
         const res = await docs.documents.batchUpdate({
@@ -645,7 +655,11 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, namedRangeId, name }) => {
       try {
         if (!namedRangeId && !name) {
-          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either namedRangeId or name must be supplied' }) }], isError: true };
+          return invalidParams(
+            account as Account,
+            'Neither namedRangeId nor name was supplied, so no named range is addressed.',
+            'Pass namedRangeId to delete one specific range, or name to delete every range carrying that name.',
+          );
         }
         const auth = await getClient(account as Account);
         const docs = docsClient({ version: 'v1', auth });
@@ -681,7 +695,11 @@ export function registerDocsTools(server: ToolRegistry): void {
     async ({ account, documentId, namedRangeId, namedRangeName, text }) => {
       try {
         if (!namedRangeId && !namedRangeName) {
-          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either namedRangeId or namedRangeName must be supplied' }) }], isError: true };
+          return invalidParams(
+            account as Account,
+            'Neither namedRangeId nor namedRangeName was supplied, so no named range is addressed.',
+            'Pass namedRangeId to replace one specific range, or namedRangeName to replace every range carrying that name.',
+          );
         }
         const auth = await getClient(account as Account);
         const docs = docsClient({ version: 'v1', auth });
@@ -736,7 +754,11 @@ export function registerDocsTools(server: ToolRegistry): void {
         const docs = docsClient({ version: 'v1', auth });
         const built = buildParagraphStyle(style);
         if (built.fields.length === 0) {
-          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'No paragraph style properties supplied' }) }], isError: true };
+          return invalidParams(
+            account as Account,
+            'No paragraph style properties to apply: every optional property was omitted.',
+            'Pass at least one of: namedStyleType, alignment, lineSpacing, spaceAbove, spaceBelow, indentStart, indentEnd, indentFirstLine, direction, keepLinesTogether, keepWithNext, avoidWidowAndOrphan.',
+          );
         }
         await docs.documents.batchUpdate({
           documentId,
@@ -786,7 +808,11 @@ export function registerDocsTools(server: ToolRegistry): void {
         const docs = docsClient({ version: 'v1', auth });
         const built = buildDocumentStyle(style);
         if (built.fields.length === 0) {
-          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'No document style properties supplied' }) }], isError: true };
+          return invalidParams(
+            account as Account,
+            'No document style properties to apply: every optional property was omitted.',
+            'Pass at least one of: pageWidth, pageHeight, marginTop, marginBottom, marginLeft, marginRight, marginHeader, marginFooter, pageNumberStart, useFirstPageHeaderFooter, useEvenPageHeaderFooter, useCustomHeaderFooterMargins.',
+          );
         }
         await docs.documents.batchUpdate({
           documentId,
@@ -1280,7 +1306,11 @@ export function registerDocsTools(server: ToolRegistry): void {
         if (index !== undefined) { tabProperties.index = index; fields.push('index'); }
         if (parentTabId !== undefined) { tabProperties.parentTabId = parentTabId; fields.push('parentTabId'); }
         if (fields.length === 0) {
-          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'No tab property supplied' }) }], isError: true };
+          return invalidParams(
+            account as Account,
+            'No tab property to update: title, index and parentTabId were all omitted.',
+            'Pass at least one of: title, index, parentTabId.',
+          );
         }
         await docs.documents.batchUpdate({
           documentId,

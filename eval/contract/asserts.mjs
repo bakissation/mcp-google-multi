@@ -132,12 +132,24 @@ export function writeDisabled(output) {
   return ok_ ? ok(j.message.slice(0, 160)) : fail(text(output).slice(0, 160));
 }
 
+// Wizard failures used to be bare prose, so these asserted on substrings.
+// They are envelopes now: assert the slug and the recovery, not the wording.
 export function accountAddEnvMode(output) {
-  const s = text(output);
-  return /E_ENV_ACCOUNTS_MODE/.test(s) && /migrate-config/.test(s) ? ok(s.slice(0, 160)) : fail(s.slice(0, 160));
+  const j = envelope(output);
+  if (!j) return fail('not a parseable envelope: ' + text(output).slice(0, 160));
+  if (j.error !== 'E_ENV_ACCOUNTS_MODE') return fail('wrong slug: ' + j.error);
+  if (j.retriable !== false) return fail('env mode is not retriable');
+  if (!/migrate-config/.test(j.hint ?? '')) return fail('hint does not name the way out');
+  return ok(j.error);
 }
 
 export function accountReauthUnknown(output) {
-  const s = text(output);
-  return /E_VALIDATION/.test(s) && s.includes('example') ? ok(s.slice(0, 160)) : fail(s.slice(0, 160));
+  const j = envelope(output);
+  if (!j) return fail('not a parseable envelope: ' + text(output).slice(0, 160));
+  // Same slug as an unknown alias passed to any other tool: one condition,
+  // one name, wherever it is raised.
+  if (j.error !== 'validation_error') return fail('wrong slug: ' + j.error);
+  if (j.account !== 'nope') return fail('does not echo the rejected alias: ' + j.account);
+  if (!(j.hint ?? '').includes('example')) return fail('hint does not list the known aliases');
+  return ok(j.error);
 }

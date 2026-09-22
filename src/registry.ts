@@ -233,7 +233,12 @@ export class ToolRegistry {
           : (...args: unknown[]) =>
               isAllowed({ name, service, cud }, policy)
                 ? baseHandler(...args)
-                : writeDisabledResult({ name, service, cud }, policy);
+                : writeDisabledResult(
+                    { name, service, cud },
+                    policy,
+                    // Concrete by here: default-account injection wraps this.
+                    (args[0] as { account?: unknown } | undefined)?.account as string | undefined,
+                  );
       // A2: the ONE default-account injection site — outside the CUD gate and
       // the fan-out parse so both observe a concrete alias; NOT meta-skipped
       // (that is what covers google_api_call with zero bespoke code). Explicit

@@ -24,7 +24,10 @@ export interface ErrorEnvelope {
   message: string;
   hint?: string;
   retriable: boolean;
-  account: string;
+  /** Optional because some failures genuinely precede account resolution (an
+   * undeclared argument, a wizard step before the alias is known). Every
+   * producer that HAS an account must still pass it. */
+  account?: string;
 }
 
 function statusOf(error: any): number | undefined {
@@ -491,7 +494,7 @@ export function handleGoogleApiError(
 /** Local argument rejection, before any Google call. Same envelope as
  * mapGoogleError so a caller parses one shape. The slug literal stays inline
  * because the KNOWN_ERROR_SLUGS honesty test greps for `error: '<slug>'`. */
-export function invalidParams(account: Account, message: string, hint: string) {
+export function invalidParams(account: Account | undefined, message: string, hint: string) {
   return {
     content: [{
       type: 'text' as const,

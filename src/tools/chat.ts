@@ -5,7 +5,7 @@ import { chat as chatClient } from '@googleapis/chat';
 import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
-import { handleGoogleApiError } from './_errors.js';
+import { handleGoogleApiError, invalidParams } from './_errors.js';
 
 const accountEnum = accountAliasSchema.optional();
 
@@ -78,7 +78,11 @@ export function registerChatTools(server: ToolRegistry): void {
     async ({ account, parent, text, cardsV2, threadKey, messageReplyOption }) => {
       try {
         if (!text && (!cardsV2 || cardsV2.length === 0)) {
-          return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Either text or cardsV2 must be provided' }) }], isError: true };
+          return invalidParams(
+            account as Account,
+            'A message needs content: neither text nor cardsV2 was supplied.',
+            'Pass text for a plain message, or cardsV2 for a Card v2 payload. Both may be sent together.',
+          );
         }
         const auth = await getClient(account as Account);
         const chat = chatClient({ version: 'v1', auth });

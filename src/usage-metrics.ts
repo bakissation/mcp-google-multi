@@ -41,9 +41,11 @@ const ARG_KEY_RE = /^[A-Za-z][A-Za-z0-9_.]{0,63}$/;
 /** Union of every `error:` slug literal emitted anywhere in src/ (kept honest
  * by a set-equality grep test). Anything outside buckets to `other`. */
 export const KNOWN_ERROR_SLUGS: ReadonlySet<string> = new Set([
-  'E_CIMD_INVALID', 'E_MCP_TOKEN_INVALID', 'E_NO_DEFAULT_ACCOUNT', 'ambiguous',
+  'E_ALIAS_EXISTS', 'E_CIMD_INVALID', 'E_ENV_ACCOUNTS_MODE', 'E_MCP_TOKEN_INVALID',
+  'E_NO_DEFAULT_ACCOUNT', 'E_UNKNOWN_BUNDLE', 'E_VALIDATION', 'ambiguous',
   'api_not_enabled', 'auth_required', 'bad_request', 'binary', 'binary_unsupported',
-  'diagnose_failed', 'discovery_unavailable', 'dispatch_timeout', 'fanout_failed', 'forbidden',
+  'confirmation_declined', 'diagnose_failed', 'discovery_unavailable', 'dispatch_timeout',
+  'elicitation_unsupported', 'fanout_failed', 'forbidden',
   'insufficient_scope', 'internal', 'invalid_client', 'invalid_client_metadata',
   'invalid_grant', 'invalid_params', 'invalid_query', 'invalid_request',
   'invalid_scope', 'network_error', 'not_found', 'rate_limited',

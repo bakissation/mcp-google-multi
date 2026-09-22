@@ -281,7 +281,10 @@ export function registerDriveTools(server: ToolRegistry): void {
                 name,
                 mimeType,
                 error: 'binary',
+                message: `"${name}" is ${mimeType}, which has no text to inline.`,
                 hint: BINARY_READ_HINT,
+                retriable: false,
+                account: account as string,
                 webViewLink,
               }, null, 2),
             }],
@@ -298,6 +301,10 @@ export function registerDriveTools(server: ToolRegistry): void {
                 name,
                 mimeType,
                 error: 'too_large',
+                message: `"${name}" is ${fileSize} bytes, over the ${MAX_FILE_SIZE}-byte inline limit for non-Google files.`,
+                hint: 'Use drive_download to save it to disk, or open webViewLink.',
+                retriable: false,
+                account: account as string,
                 webViewLink,
               }, null, 2),
             }],
@@ -320,7 +327,10 @@ export function registerDriveTools(server: ToolRegistry): void {
               name,
               mimeType,
               error: 'binary',
+              message: `"${name}" is ${mimeType}, which has no text to inline.`,
               hint: BINARY_READ_HINT,
+              retriable: false,
+              account: account as string,
               webViewLink,
             }, null, 2),
           }],
@@ -1438,7 +1448,7 @@ export function registerDriveTools(server: ToolRegistry): void {
       // op candidate is transfer_move, not transfer: allowing "drive:transfer" must not grant the delete
       const moveRef = { name: 'drive_transfer_move', service: 'drive', cud: 'delete' as const };
       if (move && !isAllowed(moveRef, server.policy)) {
-        return writeDisabledResult(moveRef, server.policy);
+        return writeDisabledResult(moveRef, server.policy, fromAccount as string);
       }
       if (fromAccount === toAccount) {
         return {
@@ -1477,6 +1487,7 @@ export function registerDriveTools(server: ToolRegistry): void {
                 message: 'Folders cannot be transferred.',
                 hint: 'Transfer files individually, or create the folder on the target with drive_create_folder.',
                 retriable: false,
+                account: fromAccount as string,
               }),
             }],
             isError: true as const,
@@ -1528,6 +1539,7 @@ export function registerDriveTools(server: ToolRegistry): void {
                 error: 'unsupported_type',
                 message: `Cannot transfer "${meta.data.mimeType}": share+copy was blocked and this native type has no export fallback.`,
                 retriable: false,
+                account: fromAccount as string,
               }),
             }],
             isError: true as const,

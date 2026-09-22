@@ -5,7 +5,7 @@ import { accountAliasSchema } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient } from '../client.js';
 import { coerceBoolean } from './_coerce.js';
-import { handleGoogleApiError } from './_errors.js';
+import { handleGoogleApiError, invalidParams } from './_errors.js';
 import { listResult } from '../trim.js';
 
 const accountEnum = accountAliasSchema.optional();
@@ -422,12 +422,11 @@ export function registerContactsTools(server: ToolRegistry): void {
         }
 
         if (updateFields.length === 0) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({
-              error: 'No fields to update. Provide at least one of: givenName, familyName, email, phone, organization, jobTitle',
-            }, null, 2) }],
-            isError: true,
-          };
+          return invalidParams(
+            account as Account,
+            'No fields to update: every optional field was omitted, so the request would have been a no-op.',
+            'Pass at least one of: givenName, familyName, email, phone, organization, jobTitle.',
+          );
         }
 
         const res = await people.people.updateContact({

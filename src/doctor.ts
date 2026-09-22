@@ -10,6 +10,7 @@ import { configDir, loadConfigFile } from './config-file.js';
 import { envValueSource } from './env-load.js';
 import { describeMetricsDir, resolveUsageMetrics, sourceLabel } from './usage-metrics.js';
 import { probeApiEnablement } from './api-probe.js';
+import { safeMessage, stringifyEnvelope } from './tools/_errors.js';
 import { resolveHttpConfig, HttpConfigError, type HttpConfig } from './http-config.js';
 import { parseOwnerEmails } from './http-transport.js';
 
@@ -454,7 +455,11 @@ export function registerDiagnoseTool(registry: ToolRegistry): void {
         const result = await runDiagnostics();
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (e: any) {
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'diagnose_failed', message: e?.message ?? String(e) }) }], isError: true };
+        return { content: [{ type: 'text' as const, text: stringifyEnvelope({
+          error: 'diagnose_failed',
+          message: safeMessage(e),
+          retriable: false,
+        }) }], isError: true };
       }
     },
   );

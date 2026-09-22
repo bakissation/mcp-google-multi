@@ -235,7 +235,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       const lastSegment = method.id.split('.').pop() ?? method.id;
       const toolRef = { name: `${policyService}_${lastSegment}`, service: policyService, cud };
       if (cud !== 'read' && !isAllowed(toolRef, policy)) {
-        return writeDisabledResult(toolRef, policy);
+        return writeDisabledResult(toolRef, policy, account as string);
       }
 
       return executeApiMethod(

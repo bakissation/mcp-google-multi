@@ -408,6 +408,14 @@ describe('KNOWN_ERROR_SLUGS honesty', () => {
           const src = fs.readFileSync(p, 'utf-8');
           for (const m of src.matchAll(/error: '([A-Za-z0-9_]+)'/g)) found.add(m[1]);
           for (const m of src.matchAll(/error: "([A-Za-z0-9_]+)"/g)) found.add(m[1]);
+          // Envelopes built through a helper carry the slug as an argument, so
+          // an `error:` scan alone misses every wizard failure.
+          for (const m of src.matchAll(/errorResult\(\s*'([A-Za-z0-9_]+)'/g)) found.add(m[1]);
+          // `slug:` is the same namespace everywhere EXCEPT doctor.ts, where it
+          // identifies a report LINE and never reaches an error envelope.
+          if (f.name !== 'doctor.ts') {
+            for (const m of src.matchAll(/slug: '([A-Za-z0-9_]+)'/g)) found.add(m[1]);
+          }
         }
       }
     };
