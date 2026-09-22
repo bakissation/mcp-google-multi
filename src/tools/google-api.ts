@@ -233,7 +233,10 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       const cud = cudFromMethod(method);
       const policyService = serviceForAlias(apiKey);
       const lastSegment = method.id.split('.').pop() ?? method.id;
-      const toolRef = { name: `${policyService}_${lastSegment}`, service: policyService, cud };
+      // The escape hatch self-gates, so it needs the same scope signal the
+      // registry wrapper gets; without it a privileged method would slip past
+      // safe-writes here while its generated twin is refused.
+      const toolRef = { name: `${policyService}_${lastSegment}`, service: policyService, cud, scopes: method.scopes };
       if (cud !== 'read' && !isAllowed(toolRef, policy)) {
         return writeDisabledResult(toolRef, policy, account as string);
       }

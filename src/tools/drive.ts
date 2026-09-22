@@ -288,6 +288,7 @@ export function registerDriveTools(server: ToolRegistry): void {
                 webViewLink,
               }, null, 2),
             }],
+            isError: true as const,
           };
         }
 
@@ -308,6 +309,7 @@ export function registerDriveTools(server: ToolRegistry): void {
                 webViewLink,
               }, null, 2),
             }],
+            isError: true as const,
           };
         }
 
@@ -334,6 +336,7 @@ export function registerDriveTools(server: ToolRegistry): void {
               webViewLink,
             }, null, 2),
           }],
+          isError: true as const,
         };
       } catch (error: any) {
         return handleDriveError(error, account as Account);

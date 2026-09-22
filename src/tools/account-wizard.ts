@@ -22,7 +22,7 @@ import {
 // running server can add an account without the deployer editing env + running
 // a CLI. Google consent reuses the loopback flow (leg C); the HTTP-transport
 // consent path (${BASE}/authorize) is owned by the OAuth AS and lands with that
-// cluster — account_add over http is gated behind it.
+// cluster. account_add over http is gated behind it.
 
 const ALIAS_RE = /^[a-zA-Z0-9_-]+$/;
 
@@ -254,7 +254,7 @@ async function runConsent(server: McpServer, alias: string): Promise<{ ok: true;
 function s4Text(alias: string, missing: string[]): string {
   const outcome = missing.length === 0
     ? `✔ "${alias}" authenticated; all requested scopes granted. It is now usable without a restart.`
-    : `⚠ "${alias}" authenticated, but ${missing.length} requested scope(s) were NOT granted (E_SCOPE_NOT_GRANTED) — you may have unchecked some on the consent screen. Re-run account_reauth to grant them. The account is usable for the granted scopes.`;
+    : `⚠ "${alias}" authenticated, but ${missing.length} requested scope(s) were NOT granted (E_SCOPE_NOT_GRANTED). You may have unchecked some on the consent screen. Re-run account_reauth to grant them. The account is usable for the granted scopes.`;
   return `${outcome}\n${TESTING_MODE_WARNING}`;
 }
 
@@ -275,7 +275,7 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
     {
       _meta: REQUIRES_INTERACTION,
       annotations: { openWorldHint: true },
-      description: 'Add a new Google account: pass alias + email directly (plus optional bundles/allBundles/admin), or pass nothing for an interactive form where the client supports elicitation. Writes the registry and runs Google consent in the browser — no file editing or restart needed. Requires GOOGLE_CLIENT_ID/SECRET (run the `setup` prompt first if missing).',
+      description: 'Add a new Google account: pass alias + email directly (plus optional bundles/allBundles/admin), or pass nothing for an interactive form where the client supports elicitation. Writes the registry and runs Google consent in the browser. No file editing or restart needed. Requires GOOGLE_CLIENT_ID/SECRET (run the `setup` prompt first if missing).',
       inputSchema: {
         alias: z.string().optional().describe('Account alias (letters, digits, _ or -). Pass with email to add directly, skipping the form.'),
         account: z.string().optional().describe('Alias for the new account (same as `alias`; every other tool spells it `account`)'),
@@ -436,16 +436,16 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
         for (const client of targets) {
           const instr = renderInstruction(client, name, entry);
           if (client.managed === 'cli') {
-            blocks.push(`${client.label} — run:\n  ${instr.text}`);
+            blocks.push(`${client.label}: run\n  ${instr.text}`);
           } else if (a.write) {
             const res = applyFileEntry(client, name, entry);
             blocks.push(
               res.ok
-                ? `${client.label} — ${res.action} "${name}" in ${res.path}${res.backup ? ` (backup ${res.backup})` : ''}`
-                : `${client.label} — ${res.message}\n${res.snippet ?? ''}`,
+                ? `${client.label}: ${res.action} "${name}" in ${res.path}${res.backup ? ` (backup ${res.backup})` : ''}`
+                : `${client.label}: ${res.message}\n${res.snippet ?? ''}`,
             );
           } else {
-            blocks.push(`${client.label} — add to ${instr.path}:\n${instr.text}`);
+            blocks.push(`${client.label}: add to ${instr.path}\n${instr.text}`);
           }
         }
         if (targets.length === 0) {

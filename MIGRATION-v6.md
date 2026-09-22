@@ -10,13 +10,13 @@ If you keep secrets and accounts in env vars for a server deployment, the short 
 
 - **Node ≥ 22** is required (Node 20 is EOL 2026-04-30). [Details](#1-install-and-engines-node--22).
 - Your account registry (`GOOGLE_ACCOUNTS` / `GOOGLE_OPTIONAL_SCOPES` / `GOOGLE_ADMIN_ACCOUNTS`) moves into a mutable **`config.json`**. Run **`migrate-config`** and it writes the file for you. **Env still overrides**, so 12-factor deployments change nothing.
-- Your `.env` **can** move to `~/.config/mcp-google-multi/.env`, but you don't have to — the working-directory and package-root `.env` still load (additive; nothing is taken away).
+- Your `.env` **can** move to `~/.config/mcp-google-multi/.env`, but you don't have to: the working-directory and package-root `.env` still load (additive; nothing is taken away).
 - Run **`migrate-config`**, then **`doctor`**, and fix anything red.
 - **Re-auth only** the accounts `doctor` names (changing a scope profile re-runs Google consent).
 - **Email format changed** (both directions): reads return **Markdown** for HTML-only mail; `body` on send is **Markdown**; `htmlBody` is **removed**. [Details](#3-email-format-breaking-both-directions).
 - Optional: turn on the **HTTP transport** for the native Claude Code `/mcp` Authenticate button and the claude.ai connector.
 
-Existing encrypted tokens keep decrypting — upgrading alone never forces a re-auth.
+Existing encrypted tokens keep decrypting: upgrading alone never forces a re-auth.
 
 ---
 
@@ -25,25 +25,27 @@ Existing encrypted tokens keep decrypting — upgrading alone never forces a re-
 | # | Area | What changed | Your action | Slug if skipped |
 |---|------|--------------|-------------|-----------------|
 | 1 | Install | `engines.node` `>=20` → `>=22` | upgrade Node | `E_NODE_TOO_OLD` |
-| 2 | Deps | `googleapis` monolith → `@googleapis/*` | none (automatic, `dist`-only) | — |
+| 2 | Deps | `googleapis` monolith → `@googleapis/*` | none (automatic, `dist`-only) | n/a |
 | 3 | Env loader | `dotenv` dropped for native `process.loadEnvFile` | none if env is set; else place a `.env` | `E_ENV_NOT_FOUND` |
 | 4 | Config | account registry env → `config.json` | run `migrate-config` | `E_NO_ACCOUNTS_CONFIGURED` |
 | 5 | Env | `GOOGLE_OPTIONAL_SCOPES` → per-account scope profiles | run `migrate-config` | `E_LEGACY_GLOBAL_SCOPES` (warn) |
 | 6 | Env | `GOOGLE_ADMIN_ACCOUNTS` → per-account `admin` flag | run `migrate-config` | `E_LEGACY_ENV` (warn) |
-| 7 | Behavior | tool-visibility modes added | none — default `lazy` = v5 | — |
-| 8 | Behavior | default account (optional `account` param) | none, or set `GOOGLE_DEFAULT_ACCOUNT` | — |
-| 9 | Email read | HTML-only body now Markdown | branch on `bodyFormat`; pass `rawHtml:true` for source | — |
+| 7 | Behavior | tool-visibility modes added | none: default `lazy` = v5 | n/a |
+| 8 | Behavior | default account (optional `account` param) | none, or set `GOOGLE_DEFAULT_ACCOUNT` | n/a |
+| 9 | Email read | HTML-only body now Markdown | branch on `bodyFormat`; pass `rawHtml:true` for source | n/a |
 | 10 | Email send | `body` is Markdown; `htmlBody` removed | rewrite callers ([§3](#3-email-format-breaking-both-directions)) | `E_HTMLBODY_REMOVED` |
 | 11 | Removed | `alertcenter` bundle removed | drop it from any scope config | `E_UNKNOWN_BUNDLE` |
-| 12 | Auth (opt-in) | HTTP `/mcp` + OAuth authorization server | opt-in only | — |
-| 13 | Auth | OAuth redirect URI now configurable | none (default preserved) | — |
-| 14 | Security | CRLF header-injection closed in email compose | none (input hardening) | — |
+| 12 | Auth (opt-in) | HTTP `/mcp` + OAuth authorization server | opt-in only | n/a |
+| 13 | Auth | OAuth redirect URI now configurable | none (default preserved) | n/a |
+| 14 | Security | CRLF header-injection closed in email compose | none (input hardening) | n/a |
 | 15 | Behavior | an undeclared tool argument is now refused, not dropped | none for a correct caller; see [§4.3](#43-undeclared-arguments-are-refused-not-dropped) | `unknown_argument` |
 | 16 | Errors | caller-side 4xx split out of `upstream_error` | rebranch if you keyed on the slug; see [§4.4](#44-error-slugs-are-narrower) | `bad_request`, `internal` |
-| 17 | Read tools | five list tools return an object, not a bare array | index `.files` / `.events` / `.instances` / `.contacts`; see [§4.5](#45-list-results-say-whether-they-are-complete) | — |
+| 17 | Read tools | five list tools return an object, not a bare array | index `.files` / `.events` / `.instances` / `.contacts`; see [§4.5](#45-list-results-say-whether-they-are-complete) | n/a |
 | 18 | Errors | wizard failures return a JSON envelope, not a prose line | parse `error` instead of reading the text; see [§4.6](#46-every-failure-is-an-envelope) | `E_ENV_ACCOUNTS_MODE`, `elicitation_unsupported` |
+| 19 | Write-control | `safe-writes` also refuses privileged writes and push registration | on `safe-writes`, allow-list what you need or move to `full-writes`; see [§4.7](#47-safe-writes-is-no-longer-just-not-a-delete) | `write_disabled` |
+| 20 | Read tools | `drive_read` flags an unreadable file with `isError` | treat `binary` and `too_large` as failures, which they already were | `binary`, `too_large` |
 
-Rows 1, 3–6, 10–11, 17 need action; rows 7–9, 12–16 and 18 are safe defaults, opt-in, or transparent fixes.
+Rows 1, 3-6, 10-11, 17, 19 need action; rows 7-9, 12-16 and 18 are safe defaults, opt-in, or transparent fixes.
 
 ---
 
@@ -64,11 +66,11 @@ nvm install 22 && nvm use 22
 
 ## 2. Config migration (`config.json` + `.env`)
 
-This is one coupled move: **where your config and env live.** v5 read the registry from `GOOGLE_ACCOUNTS` at import, so a running server couldn't edit its own accounts. v6 moves the registry into a mutable `config.json` the setup wizard can write. **Secrets never move** — `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MASTER_KEY` stay env-only, so `config.json` is safe to commit.
+This is one coupled move: **where your config and env live.** v5 read the registry from `GOOGLE_ACCOUNTS` at import, so a running server couldn't edit its own accounts. v6 moves the registry into a mutable `config.json` the setup wizard can write. **Secrets never move**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MASTER_KEY` stay env-only, so `config.json` is safe to commit.
 
 ### 2.1 Run `migrate-config`
 
-It reads your current env, synthesizes `config.json`, prints a before/after diff, and **never deletes env**. It is idempotent — safe to re-run.
+It reads your current env, synthesizes `config.json`, prints a before/after diff, and **never deletes env**. It is idempotent: safe to re-run.
 
 ```sh
 mcp-google-multi migrate-config
@@ -82,7 +84,7 @@ The non-obvious mappings it handles for you:
 
 ### 2.2 What `config.json` looks like
 
-Path: `${XDG_CONFIG_HOME:-~/.config}/mcp-google-multi/config.json`, beside `tokens/` and `discovery/`. It is plaintext by design (no secrets ever) and validated on load. You normally never hand-edit it — this is just so you recognize `migrate-config`'s output:
+Path: `${XDG_CONFIG_HOME:-~/.config}/mcp-google-multi/config.json`, beside `tokens/` and `discovery/`. It is plaintext by design (no secrets ever) and validated on load. You normally never hand-edit it: this is just so you recognize `migrate-config`'s output:
 
 ```jsonc
 {
@@ -102,11 +104,11 @@ Path: `${XDG_CONFIG_HOME:-~/.config}/mcp-google-multi/config.json`, beside `toke
 
 Use whatever alias names you already had in `GOOGLE_ACCOUNTS`. Full field reference: [docs/configuration.md](./docs/configuration.md).
 
-**Env still wins.** While `GOOGLE_ACCOUNTS` is set and non-empty, the whole registry comes from env and the file is ignored — 12-factor deployers keep working unchanged.
+**Env still wins.** While `GOOGLE_ACCOUNTS` is set and non-empty, the whole registry comes from env and the file is ignored: 12-factor deployers keep working unchanged.
 
 ### 2.3 `.env` location (nothing is forced to move)
 
-v5 loaded `.env` from the working directory then the package root. Because `npx` launches from an arbitrary directory, that working-directory `.env` was often silently missed — the classic first-run failure.
+v5 loaded `.env` from the working directory then the package root. Because `npx` launches from an arbitrary directory, that working-directory `.env` was often silently missed: the classic first-run failure.
 
 v6 **adds** `~/.config/mcp-google-multi/.env` as a new lowest-priority tier, plus an `MCP_GOOGLE_MULTI_ENV=/abs/path/.env` override. It does **not** remove the existing tiers. Precedence (highest first):
 
@@ -114,7 +116,7 @@ v6 **adds** `~/.config/mcp-google-multi/.env` as a new lowest-priority tier, plu
 real environment  >  ./.env  >  <package-root>/.env  >  ~/.config/mcp-google-multi/.env
 ```
 
-No move is forced — existing setups keep working. `doctor` detects a legacy-location `.env` and prints the exact `mv` if you want the stable path. A missing default `.env` is a valid state; only a missing **explicitly-requested** `MCP_GOOGLE_MULTI_ENV` path errors, with `E_ENV_NOT_FOUND` naming the path it looked for. The native loader also writes 0 bytes to stdio, structurally killing the old dotenv startup banner that corrupted the JSON-RPC channel.
+No move is forced: existing setups keep working. `doctor` detects a legacy-location `.env` and prints the exact `mv` if you want the stable path. A missing default `.env` is a valid state; only a missing **explicitly-requested** `MCP_GOOGLE_MULTI_ENV` path errors, with `E_ENV_NOT_FOUND` naming the path it looked for. The native loader also writes 0 bytes to stdio, structurally killing the old dotenv startup banner that corrupted the JSON-RPC channel.
 
 ### 2.4 Per-account scope profiles (replaces `GOOGLE_OPTIONAL_SCOPES`)
 
@@ -133,7 +135,7 @@ This is the one behavior change likely to touch your callers.
 | **Read** | HTML-only body flattened to text | HTML-only body → **Markdown** (via turndown); `text/plain` mail is unchanged; a new `bodyFormat` field is `markdown` or `text/plain` | branch on `bodyFormat`; pass `rawHtml:true` when you need the raw HTML source |
 | **Send** | `body` = plain text; `htmlBody` = optional HTML | `body` = **Markdown** (rendered to a `multipart/alternative` with an auto-generated HTML part); **`htmlBody` is removed** | author `body` as Markdown; drop `htmlBody`; use `allowRawHtml:true` for the rare raw-HTML case |
 
-**Silent trap — read this even if you never used `htmlBody`.** A v5 caller that passed only `body` with *plain prose containing Markdown metacharacters* now has it rendered as Markdown. Text like `# 1 priority`, `Cost: $5 * 3`, `> quoted`, or `[x] done` will render as a heading, emphasis, a blockquote, or a task item. If your prose isn't meant to be Markdown, escape the metacharacters or send it with `allowRawHtml:true` wrapping pre-escaped HTML.
+**Silent trap: read this even if you never used `htmlBody`.** A v5 caller that passed only `body` with *plain prose containing Markdown metacharacters* now has it rendered as Markdown. Text like `# 1 priority`, `Cost: $5 * 3`, `> quoted`, or `[x] done` will render as a heading, emphasis, a blockquote, or a task item. If your prose isn't meant to be Markdown, escape the metacharacters or send it with `allowRawHtml:true` wrapping pre-escaped HTML.
 
 Passing `htmlBody` now returns `E_HTMLBODY_REMOVED` with the exact rewrite. Color and other HTML-only styling are intentionally not expressible in Markdown; `allowRawHtml:true` is the documented escape hatch.
 
@@ -147,19 +149,19 @@ Passing `htmlBody` now returns `E_HTMLBODY_REMOVED` with the exact rewrite. Colo
 + gmail_send({ to, subject,
 +   body: "See the [report](...)." })          // Markdown IS the text/plain part; HTML auto-rendered
 
-  // raw-HTML exception (color — the documented escape hatch):
+  // raw-HTML exception, color being the documented escape hatch:
 + gmail_send({ to, subject,
 +   body: 'Status: <span style="color:#c00">overdue</span>',
 +   allowRawHtml: true })
 ```
 
-Additive email conveniences you now also get (nothing to migrate): attachments on both `gmail_send` and `gmail_create_draft`, reply auto-fill of to/cc/subject from `replyToMessageId`, `gmail_read_batch`, and an agent-callable contact/alias resolver. The old hand-rolled header encoders (a CRLF-injection surface) are gone — MailComposer validates and encodes headers and rejects embedded newlines.
+Additive email conveniences you now also get (nothing to migrate): attachments on both `gmail_send` and `gmail_create_draft`, reply auto-fill of to/cc/subject from `replyToMessageId`, `gmail_read_batch`, and an agent-callable contact/alias resolver. The old hand-rolled header encoders (a CRLF-injection surface) are gone: MailComposer validates and encodes headers and rejects embedded newlines.
 
 ---
 
 ## 4. Other behavior changes (safe defaults)
 
-### 4.1 Tool visibility — default `lazy` (exactly v5)
+### 4.1 Tool visibility: default `lazy` (exactly v5)
 
 The default is `lazy`: meta tools plus `{service}_discover` reveal, which is precisely v5's surface. Nothing to do on upgrade.
 
@@ -173,7 +175,7 @@ New over stdio: agent-callable **expand** (reveal all curated at once) and **col
 
 ### 4.2 Default account
 
-`account` used to be required on every call. It becomes **optional** when `GOOGLE_DEFAULT_ACCOUNT` (or `config.defaultAccount`) is set — the default is injected at the single dispatch point when you omit it. `*`, CSV, and explicit aliases behave exactly as before, and a bare default is never treated as `*`. This is a relaxation, so nothing breaks; set it to drop the parameter from most calls.
+`account` used to be required on every call. It becomes **optional** when `GOOGLE_DEFAULT_ACCOUNT` (or `config.defaultAccount`) is set: the default is injected at the single dispatch point when you omit it. `*`, CSV, and explicit aliases behave exactly as before, and a bare default is never treated as `*`. This is a relaxation, so nothing breaks; set it to drop the parameter from most calls.
 
 ### 4.3 Undeclared arguments are refused, not dropped
 
@@ -281,6 +283,47 @@ All three are now the first shape. Concretely:
 
 If you branch on `error`, the values are now drawn from one closed vocabulary; a test asserts that the set emitted anywhere in the source equals the set the metrics collector knows, so an unregistered slug cannot reach you as an unclassified `other`.
 
+### 4.7 `safe-writes` is no longer just "not a delete"
+
+**Only affects you if you run `GOOGLE_PROFILE=safe-writes`.** `read-only` and `full-writes` are unchanged.
+
+`safe-writes` was implemented as `cud === 'create' || cud === 'update'`. That measures the shape of an operation, not what happens if it is wrong, and the two diverge badly:
+
+- It permitted `admin_users_make_admin`, which grants super-admin, because promoting a user is an `update`.
+- It permitted `admin_two_step_verification_turn_off`, `reseller_subscriptions_suspend` and `vault_matters_close` for the same reason.
+- It permitted `script_scripts_run`, whose blast radius is whatever the script does, because running a script `create`s an execution.
+- It permitted all ten `*_watch` methods, which register a webhook delivering your activity to an external URL.
+- Meanwhile it refused `gmail_trash`, whose own description says "(recoverable)".
+
+`safe-writes` now also refuses a write when either holds:
+
+| Class | Test | Examples |
+|---|---|---|
+| Privileged scope | the method can be authorized by a scope acting on the whole org, legal holds, billing, or deployed code | `admin.directory.*`, `cloud-identity*`, `ediscovery*`, `apps.licensing`, `apps.order`, `apps.groups.settings`, `script.projects` |
+| Push registration | the method registers a push channel | every `*_watch`, `workspaceevents` subscription create and reactivate |
+
+Both are derived from the method's declared scopes and name rather than a hand-kept list of tool names, because the generated surface is regenerated from Discovery and a name list would drift silently. A method whose scopes are unknown is treated as **not** privileged: absent information is not evidence of privilege, and failing the other way would break ordinary writes.
+
+`safe-writes` now permits 271 of 545 write tools instead of 385. Everything newly refused is Workspace administration, Vault, reseller billing, script deployment, or push registration. **No `gmail`, `drive`, `calendar`, `docs`, `sheets`, `tasks` or `contacts` write changed**, with the single exception of the seven `*_watch` registrations in those services.
+
+**If something you rely on is now refused**, the refusal names the tool and suggests a pattern that works:
+
+```
+GOOGLE_WRITE_ALLOW="admin:users_make_admin"
+```
+
+An explicit allow still wins over the profile, because naming a tool is a deliberate opt-in; `GOOGLE_WRITE_DENY` still wins over that. Or move to `GOOGLE_PROFILE=full-writes`, which is unchanged.
+
+This does not close the remaining gap: irreversibility is still not part of the verdict, and `IRREVERSIBLE_TOOLS` continues to drive only the client-side confirmation prompt.
+
+### 4.8 `drive_read` marks an unreadable file as an error
+
+Asking `drive_read` for a PNG, or for a non-Google file over the 2 MB inline cap, returned a result carrying `"error": "binary"` or `"error": "too_large"` but **without** `isError`. So the call was a success that contained an error field: metrics counted it in the success bucket, and a client checking `isError` saw nothing wrong while getting no content back.
+
+Both slugs were already in the server's error vocabulary, which is what gives the game away: they were meant to be errors and never arrived as any.
+
+They now set `isError: true`. The payload is otherwise unchanged and still carries `id`, `name`, `mimeType` and `webViewLink` alongside the hint pointing at `drive_download` or `drive_export`.
+
 ---
 
 ## 5. Auth changes
@@ -295,7 +338,7 @@ stdio stays the default. HTTP exists mainly so Claude Code's native `/mcp` Authe
 | Owner gate | `MCP_OWNER_EMAILS` allowlists the Google account(s) allowed to authenticate. It is **required** whenever `MCP_TRANSPORT` includes `http`; empty ⇒ startup fails with `E_OWNER_EMAILS_REQUIRED`. |
 | Client registration | CIMD **plus** a minimal DCR `/register` endpoint, on by default. |
 | Redirect URI | Now configurable (was hardcoded `http://localhost:4242/oauth2callback`); the default is preserved for local use. Remote HTTP uses `${MCP_PUBLIC_URL}/callback`. |
-| Turn it on | `MCP_TRANSPORT=http` + the connector URL in your client. Full walkthrough — including the Cloudflare **named** tunnel path (quick tunnels are demo-only) and one-click Render/Railway deploys — in **[docs/http-setup.md](./docs/http-setup.md)**. |
+| Turn it on | `MCP_TRANSPORT=http` + the connector URL in your client. Full walkthrough in **[docs/http-setup.md](./docs/http-setup.md)**, including the Cloudflare **named** tunnel path (quick tunnels are demo-only) and one-click Render/Railway deploys. |
 | Trust caveat | Behind a tunnel, **Cloudflare terminates TLS and can see the bearer token and all Gmail/Drive bytes in transit.** This is a trust boundary you accept, not a bug. |
 
 ### 5.2 Existing tokens keep working
@@ -307,10 +350,10 @@ The encrypted-store crypto is unchanged (AES-256-GCM). Existing `<alias>.enc` fi
 | Trigger | Re-auth? |
 |---|---|
 | Plain version bump, scopes unchanged | No |
-| You change a scope profile | Yes — that account only |
-| You move an account to `admin` | Yes — that account |
+| You change a scope profile | Yes: that account only |
+| You move an account to `admin` | Yes: that account |
 
-v6 names the exact accounts that need re-auth instead of letting calls 403 later. Where your client supports it, an expired Google refresh token (the 7-day "Testing" mode trap) is surfaced as an MCP auth challenge so the client re-runs the flow and resumes the original call — self-healing that depends on the client honoring the challenge. The durable fix is still setting your Google app's Publishing status to **In production**.
+v6 names the exact accounts that need re-auth instead of letting calls 403 later. Where your client supports it, an expired Google refresh token (the 7-day "Testing" mode trap) is surfaced as an MCP auth challenge so the client re-runs the flow and resumes the original call: self-healing that depends on the client honoring the challenge. The durable fix is still setting your Google app's Publishing status to **In production**.
 
 Re-auth a named account with:
 
@@ -329,14 +372,14 @@ mcp-google-multi auth --account <alias>
 | Hard safety guard | If encrypted tokens already exist and **no** key is recoverable, v6 **refuses** to generate a new one and errors (`E_MASTER_KEY_MISSING_TOKENS_EXIST`), routing you to the reset path rather than silently bricking your tokens. |
 | Server deploys | Keep providing `MASTER_KEY` via env / your secret manager. |
 
-This protects tokens **at rest**, not against same-user malware — exactly like a plaintext `.env` did. See [docs/secrets.md](./docs/secrets.md) for keeping it out of a plaintext file entirely.
+This protects tokens **at rest**, not against same-user malware: exactly like a plaintext `.env` did. See [docs/secrets.md](./docs/secrets.md) for keeping it out of a plaintext file entirely.
 
 ---
 
 ## 7. Removed features
 
-- **Alert Center bundle** — removed. It was declared but never functional (service-account only; never a real tool or grantable scope). Referencing an `alertcenter` bundle in a profile now yields `E_UNKNOWN_BUNDLE`.
-- **Service accounts / Domain-Wide Delegation** — declined on principle. This is a consent-first product; SA + DWD is blanket domain impersonation. Not a supported feature (documentation, not code).
+- **Alert Center bundle**: removed. It was declared but never functional (service-account only; never a real tool or grantable scope). Referencing an `alertcenter` bundle in a profile now yields `E_UNKNOWN_BUNDLE`.
+- **Service accounts / Domain-Wide Delegation**: declined on principle. This is a consent-first product; SA + DWD is blanket domain impersonation. Not a supported feature (documentation, not code).
 
 ---
 
@@ -346,7 +389,7 @@ This protects tokens **at rest**, not against same-user malware — exactly like
 1. Upgrade Node to ≥ 22 (`nvm install 22 && nvm use 22`).
 2. Keep or place your `.env`. It can stay in the working directory / package root (still loaded), or move to `~/.config/mcp-google-multi/.env`, or point `MCP_GOOGLE_MULTI_ENV` at it. Keep `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and (if set) `MASTER_KEY` there.
 3. Install v6: `npx -y mcp-google-multi@6` (or bump the `claude mcp` entry / your MCPB bundle).
-4. Run `mcp-google-multi migrate-config` — writes `config.json` from the old env vars and prints a diff. Nothing is deleted; env still overrides.
+4. Run `mcp-google-multi migrate-config`: writes `config.json` from the old env vars and prints a diff. Nothing is deleted; env still overrides.
 5. Run `mcp-google-multi doctor`. Fix anything red. It exits non-zero on failure; `--json` for scripts; `--report` emits a redacted, paste-ready bug report.
 6. Re-auth only the accounts `doctor` names: `mcp-google-multi auth --account <alias>`.
 7. *(Optional)* Turn on HTTP: set `MCP_TRANSPORT=http` and follow [docs/http-setup.md](./docs/http-setup.md).
@@ -360,7 +403,7 @@ This protects tokens **at rest**, not against same-user malware — exactly like
 v6 does not touch v5 tokens and does not overwrite v5 env, so rollback is clean: reinstall `mcp-google-multi@5`, keep `.env` where v5 expects it (working directory / package root), ignore `config.json`. No data is lost. Two traps to know before you downgrade:
 
 - **`MASTER_KEY` keychain-only.** If v6 auto-provisioned `MASTER_KEY` into the OS keychain with **no** env copy, an env-only v5 cannot find it and token decryption breaks. Before downgrading, export the key from the keychain into `.env` (or, during any period you might roll back, keep `MASTER_KEY` in env rather than keychain-only). v6 also mirrors an env key into the keychain on first successful decrypt to reduce this risk.
-- **`config.json` version.** A future `config.json` written by a newer v6 (`version: 2`) is rejected by an older reader with `E_CONFIG_VERSION_UNSUPPORTED` rather than crashing — but that also means a newer file won't load on an older binary. If you downgrade across a config-version bump, restore the older `config.json` from your backup (step 0).
+- **`config.json` version.** A future `config.json` written by a newer v6 (`version: 2`) is rejected by an older reader with `E_CONFIG_VERSION_UNSUPPORTED` rather than crashing: but that also means a newer file won't load on an older binary. If you downgrade across a config-version bump, restore the older `config.json` from your backup (step 0).
 
 Email and tool-visibility changes are code-level only: downgrading the package restores v5 behavior with no data implication.
 
@@ -368,4 +411,4 @@ Email and tool-visibility changes are code-level only: downgrading the package r
 
 ## 10. Getting help
 
-Every error prints a stable `E_*` slug plus an inline fix hint — search the slug (in these docs or the issue tracker) to find the fix. For a bug report, `mcp-google-multi doctor --report` emits a **redacted, paste-ready** diagnostic so report quality doesn't depend on remembering what to include. Configuration reference: [docs/configuration.md](./docs/configuration.md). Feature rationale: [docs/features.md](./docs/features.md).
+Every error prints a stable `E_*` slug plus an inline fix hint: search the slug (in these docs or the issue tracker) to find the fix. For a bug report, `mcp-google-multi doctor --report` emits a **redacted, paste-ready** diagnostic so report quality doesn't depend on remembering what to include. Configuration reference: [docs/configuration.md](./docs/configuration.md). Feature rationale: [docs/features.md](./docs/features.md).
