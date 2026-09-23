@@ -1,11 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import path from 'node:path';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import {
   buildTransferBundle,
   encryptBundle,
   decryptBundle,
   BundleDecryptError,
   planImport,
+  refuseIfMultiTenant,
+  runExportCli,
   type TransferBundle,
   type TransferDeps,
 } from '../src/registry-transfer.js';
@@ -99,6 +103,48 @@ describe('encrypt/decrypt bundle (passphrase)', () => {
     // encrypt an arbitrary object with the passphrase, then try to import it
     const blob = encryptBundle({ nope: true } as unknown as TransferBundle, 'pw');
     expect(() => decryptBundle(blob, 'pw')).toThrow(BundleDecryptError);
+  });
+});
+
+describe('refuseIfMultiTenant (S1.19, invariant 9)', () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+  const tmp = () => {
+    const d = mkdtempSync(path.join(tmpdir(), 'gm-mt-'));
+    dirs.push(d);
+    return d;
+  };
+
+  it('fires on a tenant-namespaced store and names the dir', () => {
+    const base = tmp();
+    const tenants = path.join(base, 'tenants');
+    mkdirSync(path.join(tenants, 'tenant-a', 'tokens'), { recursive: true });
+    expect(refuseIfMultiTenant(tenants)).toBe(tenants);
+  });
+
+  it('no-ops on a flat store: absent or EMPTY tenants dir', () => {
+    const base = tmp();
+    expect(refuseIfMultiTenant(path.join(base, 'tenants'))).toBeNull();
+    mkdirSync(path.join(base, 'tenants'));
+    expect(refuseIfMultiTenant(path.join(base, 'tenants'))).toBeNull();
+  });
+
+  it('the export CLI refuses with E_MULTI_TENANT_EXPORT_REFUSED before touching anything', async () => {
+    // the sandboxed XDG configDir is where the default predicate looks
+    const tenants = path.join(process.env.XDG_CONFIG_HOME!, 'mcp-google-multi', 'tenants');
+    mkdirSync(path.join(tenants, 'tenant-a'), { recursive: true });
+    const errs: string[] = [];
+    const errSpy = vi.spyOn(console, 'error').mockImplementation((m: string) => void errs.push(String(m)));
+    try {
+      const code = await runExportCli(['account', 'export', '--out', path.join(tmp(), 'b.enc')]);
+      expect(code).toBe(2);
+      expect(errs.join(' ')).toContain('E_MULTI_TENANT_EXPORT_REFUSED');
+    } finally {
+      errSpy.mockRestore();
+      rmSync(tenants, { recursive: true, force: true });
+    }
   });
 });
 
