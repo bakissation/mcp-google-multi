@@ -45,15 +45,15 @@ function parseCsv(value: string | undefined): string[] {
   return (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-function accountPaths(alias: string): { tokenPath: string; encPath: string } {
+function accountPaths(alias: string, dir: string = tokenDir): { tokenPath: string; encPath: string } {
   return {
-    tokenPath: path.join(tokenDir, alias, 'token.json'),
-    encPath: path.join(tokenDir, `${alias}.enc`),
+    tokenPath: path.join(dir, alias, 'token.json'),
+    encPath: path.join(dir, `${alias}.enc`),
   };
 }
 
 /** v5 env parser, guards verbatim. Format: GOOGLE_ACCOUNTS="alias1:email1,alias2:email2". */
-function parseEnvAccounts(raw: string, adminAliases: string[]): { aliases: string[]; configs: Record<string, AccountConfig> } {
+function parseEnvAccounts(raw: string, adminAliases: string[], dir: string = tokenDir): { aliases: string[]; configs: Record<string, AccountConfig> } {
   const configs: Record<string, AccountConfig> = {};
   const aliases: string[] = [];
 
@@ -94,7 +94,7 @@ function parseEnvAccounts(raw: string, adminAliases: string[]): { aliases: strin
     aliases.push(alias);
     configs[alias] = {
       email,
-      ...accountPaths(alias),
+      ...accountPaths(alias, dir),
       admin: adminAliases.includes(alias) || undefined,
       source: 'env',
     };
@@ -131,7 +131,9 @@ export function resolveAccounts(
   env: NodeJS.ProcessEnv = process.env,
   filePath = configFilePath(),
   onInvalid: 'exit' | 'throw' = 'exit',
+  opts: { tokenDir?: string } = {},
 ): AccountSet {
+  const dir = opts.tokenDir ?? tokenDir;
   const adminEnv = parseCsv(env.GOOGLE_ADMIN_ACCOUNTS);
   const rawEnv = env.GOOGLE_ACCOUNTS;
 
@@ -169,7 +171,7 @@ export function resolveAccounts(
   }
 
   if (rawEnv && rawEnv.trim() !== '') {
-    const { aliases, configs } = parseEnvAccounts(rawEnv, adminEnv);
+    const { aliases, configs } = parseEnvAccounts(rawEnv, adminEnv, dir);
     materializeFirstRun(aliases, configs, filePath);
     const def = resolveDefaultAccount(env, null, aliases, fail);
     return {
@@ -246,7 +248,7 @@ export function resolveAccounts(
     aliases.push(alias);
     configs[alias] = {
       email: entry.email,
-      ...accountPaths(alias),
+      ...accountPaths(alias, dir),
       scopeProfile: entry.scopeProfile,
       admin: adminEnv.length > 0 ? adminEnv.includes(alias) : entry.admin,
       source: 'config',
@@ -285,7 +287,7 @@ function resolveDefaultAccount(
   return { defaultAccount: value, defaultAccountSource: fromEnv ? 'env' : 'config' };
 }
 
-function fileStamp(filePath: string, version: number): string {
+export function fileStamp(filePath: string, version: number): string {
   try {
     return `${version}:${fs.statSync(filePath).mtimeMs}`;
   } catch {

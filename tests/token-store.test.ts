@@ -8,7 +8,8 @@ const ACCOUNT_CONFIG = getAccountSet().configs;
 // masterKey() caches process-lifetime; without this, per-test env mutations
 // would be inert and the suite green only by shared-constant luck.
 beforeEach(() => clearKeyCacheForTest());
-import { deriveKey, encryptToken, decryptToken, readToken, writeToken, updateToken } from '../src/token-store.js';
+import { deriveKey, deriveTenantKey, encryptToken, decryptToken, readToken, writeToken, updateToken } from '../src/token-store.js';
+import { ensureTenantDirs, tenantConfigFilePath, tenantTokenDir, tenantsDir } from '../src/config-file.js';
 
 const KEY = 'test-master-key';
 const sample = { refresh_token: 'r', access_token: 'a', scope: 's', expiry_date: 123 };
@@ -51,6 +52,66 @@ describe('token-store crypto', () => {
     buf[0] ^= 0xff;
     o.data = buf.toString('base64');
     expect(() => decryptToken(JSON.stringify(o), KEY)).toThrow();
+  });
+
+  describe('tenant-keyed v2 files (S1.6, HKDF)', () => {
+    it('tenantId omitted writes v1 byte-compatible files (single-owner default unchanged)', () => {
+      const o = JSON.parse(encryptToken(sample, KEY));
+      expect(o.v).toBe(1);
+      expect(decryptToken(encryptToken(sample, KEY), KEY)).toEqual(sample);
+    });
+
+    it('a v2 file round-trips with the SAME tenant id only', () => {
+      const enc = encryptToken(sample, KEY, 'tenant-a');
+      expect(JSON.parse(enc).v).toBe(2);
+      expect(decryptToken(enc, KEY, 'tenant-a')).toEqual(sample);
+      // a different tenant id derives a different subkey: GCM auth failure
+      expect(() => decryptToken(enc, KEY, 'tenant-b')).toThrow();
+    });
+
+    it('a v2 file refuses a tenant-less read; a v1 file refuses a tenant-scoped read', () => {
+      expect(() => decryptToken(encryptToken(sample, KEY, 'tenant-a'), KEY)).toThrow(/version: 2/);
+      expect(() => decryptToken(encryptToken(sample, KEY), KEY, 'tenant-a')).toThrow(/version: 1/);
+    });
+
+    it('two tenants, identical plaintext and alias: distinct subkeys, paths and ciphertexts', () => {
+      const a = deriveTenantKey(KEY, 'tenant-a');
+      const b = deriveTenantKey(KEY, 'tenant-b');
+      expect(a.equals(b)).toBe(false);
+      expect(a.equals(deriveKey(KEY))).toBe(false);
+      // deterministic per (masterKey, tenantId)
+      expect(deriveTenantKey(KEY, 'tenant-a').equals(a)).toBe(true);
+      expect(deriveTenantKey('another-key', 'tenant-a').equals(a)).toBe(false);
+      expect(tenantTokenDir('tenant-a')).not.toBe(tenantTokenDir('tenant-b'));
+      expect(path.join(tenantTokenDir('tenant-a'), 'work.enc')).not.toBe(path.join(tenantTokenDir('tenant-b'), 'work.enc'));
+    });
+  });
+
+  describe('tenant paths (S1.6, OQ-B every-level 0700)', () => {
+    afterEach(() => fs.rmSync(tenantsDir(), { recursive: true, force: true }));
+
+    it('helpers produce configDir()/tenants/<id>/{config.json,tokens}', () => {
+      expect(tenantConfigFilePath('tenant-a')).toBe(path.join(tenantsDir(), 'tenant-a', 'config.json'));
+      expect(tenantTokenDir('tenant-a')).toBe(path.join(tenantsDir(), 'tenant-a', 'tokens'));
+    });
+
+    it('rejects traversal-shaped and reserved tenant ids at the path helper', () => {
+      for (const bad of ['..', 'a/b', 'a\\b', '', '__proto__', 'constructor', '.hidden!']) {
+        expect(() => tenantTokenDir(bad)).toThrow(/E_TENANT_ID_INVALID/);
+        expect(() => tenantConfigFilePath(bad)).toThrow(/E_TENANT_ID_INVALID/);
+      }
+    });
+
+    it.skipIf(process.platform === 'win32')('ensureTenantDirs stamps 0700 on EVERY level, including the shared tenants/ root', () => {
+      const { tokenDir } = ensureTenantDirs('tenant-a');
+      const levels = [tenantsDir(), path.join(tenantsDir(), 'tenant-a'), tokenDir];
+      for (const dir of levels) {
+        expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
+      }
+      // a second tenant provisioning later never widens the shared root
+      ensureTenantDirs('tenant-b');
+      expect(fs.statSync(tenantsDir()).mode & 0o777).toBe(0o700);
+    });
   });
 
   it('rejects an unsupported file version', () => {
