@@ -99,6 +99,19 @@ describe('encrypt/decrypt bundle (passphrase)', () => {
     expect(() => decryptBundle(blob, 'wrong')).toThrow(BundleDecryptError);
   });
 
+  it('envelope is scrypt v2: per-bundle salt, no two exports alike (S-sec)', () => {
+    const a = JSON.parse(encryptBundle(bundle, 'pw')) as { bv: number; salt: string };
+    const b = JSON.parse(encryptBundle(bundle, 'pw')) as { bv: number; salt: string };
+    expect(a.bv).toBe(2);
+    expect(a.salt).toBeTruthy();
+    expect(a.salt).not.toBe(b.salt);
+  });
+
+  it('refuses the retired v1 (prerelease) envelope with a re-export hint', () => {
+    const v1 = JSON.stringify({ v: 1, iv: 'aa', tag: 'bb', data: 'cc' });
+    expect(() => decryptBundle(v1, 'pw')).toThrow(/retired v1 prerelease format/);
+  });
+
   it('rejects a decrypted blob that is not a valid bundle', () => {
     // encrypt an arbitrary object with the passphrase, then try to import it
     const blob = encryptBundle({ nope: true } as unknown as TransferBundle, 'pw');

@@ -8,7 +8,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import * as readline from 'node:readline';
 import path from 'node:path';
-import { encryptToken, decryptToken } from './token-store.js';
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
 import { atomicWriteFileSync, atomicWriteWithLock } from './fs-atomic.js';
 import { ALIAS_RE, configFilePath, CONFIG_VERSION, tenantsDir } from './config-file.js';
 import { getTokenDir } from './accounts.js';
@@ -85,16 +85,64 @@ export function buildTransferBundle(exportedAt: string, deps: TransferDeps = {})
   return { manifest: { v: 1, exportedAt, aliases: [...aliasSet].sort() }, config, tokens };
 }
 
+// Bundle envelope v2: a REAL passphrase KDF. The v1 envelope reused the
+// token store's deriveKey, whose passphrase branch is one unsalted sha256 —
+// an exported bundle could be brute-forced offline (CodeQL
+// js/insufficient-password-hash). scrypt with a per-bundle random salt fixes
+// that; v1 bundles (a prerelease-only format, never produced by any stable
+// release) are refused with a re-export hint rather than kept decryptable.
+const BUNDLE_VERSION = 2;
+const SCRYPT_PARAMS = { N: 1 << 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 } as const;
+
+interface BundleFile {
+  bv: number;
+  salt: string;
+  iv: string;
+  tag: string;
+  data: string;
+}
+
+function bundleKey(passphrase: string, salt: Buffer): Buffer {
+  return scryptSync(passphrase, salt, 32, SCRYPT_PARAMS);
+}
+
 export function encryptBundle(bundle: TransferBundle, passphrase: string): string {
-  return encryptToken(bundle, passphrase);
+  const salt = randomBytes(16);
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', bundleKey(passphrase, salt), iv);
+  const data = Buffer.concat([cipher.update(Buffer.from(JSON.stringify(bundle), 'utf8')), cipher.final()]);
+  const file: BundleFile = {
+    bv: BUNDLE_VERSION,
+    salt: salt.toString('base64'),
+    iv: iv.toString('base64'),
+    tag: cipher.getAuthTag().toString('base64'),
+    data: data.toString('base64'),
+  };
+  return JSON.stringify(file);
 }
 
 export class BundleDecryptError extends Error {}
 
 export function decryptBundle(contents: string, passphrase: string): TransferBundle {
+  let file: Partial<BundleFile> & { v?: number };
+  try {
+    file = JSON.parse(contents) as Partial<BundleFile> & { v?: number };
+  } catch {
+    throw new BundleDecryptError('The file is not a registry export bundle.');
+  }
+  if (file.v !== undefined && file.bv === undefined) {
+    throw new BundleDecryptError(
+      'This bundle uses the retired v1 prerelease format (weak passphrase derivation); re-export it from the source machine with the current version.',
+    );
+  }
+  if (file.bv !== BUNDLE_VERSION || !file.salt || !file.iv || !file.tag || !file.data) {
+    throw new BundleDecryptError('The file is not a valid registry export (bad envelope).');
+  }
   let obj: unknown;
   try {
-    obj = decryptToken(contents, passphrase) as unknown;
+    const decipher = createDecipheriv('aes-256-gcm', bundleKey(passphrase, Buffer.from(file.salt, 'base64')), Buffer.from(file.iv, 'base64'));
+    decipher.setAuthTag(Buffer.from(file.tag, 'base64'));
+    obj = JSON.parse(Buffer.concat([decipher.update(Buffer.from(file.data, 'base64')), decipher.final()]).toString('utf8'));
   } catch {
     throw new BundleDecryptError('Could not decrypt the bundle — wrong passphrase or the file is corrupt.');
   }
