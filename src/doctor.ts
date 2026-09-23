@@ -422,9 +422,34 @@ export function renderDoctorText(report: DiagnosticsReport): string {
   return out.join('\n');
 }
 
-/** Mask the local-part of an email so a report never carries a full address (BR8). */
+const EMAIL_LOCAL_CHAR = /[A-Za-z0-9._%+-]/;
+const EMAIL_DOMAIN_CHAR = /[A-Za-z0-9.-]/;
+
+/** Mask the local-part of an email so a report never carries a full address
+ * (BR8). A linear scan, not a regex: the `local* @domain` pattern backtracks
+ * polynomially on long local-charset runs without an @ (CodeQL
+ * js/polynomial-redos), and report text can embed arbitrary error strings. */
 function maskEmails(text: string): string {
-  return text.replace(/([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*(@[A-Za-z0-9.-]+)/g, '$1***$2');
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === '@') {
+      let j = i + 1;
+      while (j < text.length && EMAIL_DOMAIN_CHAR.test(text[j])) j += 1;
+      let k = out.length;
+      while (k > 0 && EMAIL_LOCAL_CHAR.test(out[k - 1])) k -= 1;
+      if (j > i + 1 && k < out.length) {
+        // keep the first local char, mask the rest ('*' is outside the local
+        // charset, so a masked run can never be re-masked by a later @)
+        out = `${out.slice(0, k + 1)}***${text.slice(i, j)}`;
+        i = j;
+        continue;
+      }
+    }
+    out += text[i];
+    i += 1;
+  }
+  return out;
 }
 
 /** Redacted, paste-ready bug report (BR8): verdicts + provenance labels + token
