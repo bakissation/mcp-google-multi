@@ -27,7 +27,7 @@ function captureHandlers(): { handlers: Record<string, Handler>; registry: ToolR
       handlers[name] = h;
     },
   } as unknown as ToolRegistry;
-  const server = { server: { getClientCapabilities: () => undefined } } as unknown as McpServer;
+  const server = { server: { getClientCapabilities: () => undefined }, sendToolListChanged: vi.fn() } as unknown as McpServer;
   registerAccountWizardTools(registry, server);
   return { handlers, registry, server };
 }
@@ -76,6 +76,16 @@ describe('runConsent over HTTP (S1.20)', () => {
     const res = await handlers.account_reauth({ alias: 'test' });
     expect(res.isError).toBe(true);
     expect(res.content[0].text).toContain('internal');
+  });
+});
+
+describe('account_add refresh nudge (S1.10-A)', () => {
+  it('a successful add fires sendToolListChanged so clients re-fetch the live enums', async () => {
+    const { handlers, server } = captureHandlers();
+    setWizardHttpConsent({ mintConsentUrl: (alias) => `https://mcp.example.com/authorize?flow=alias_reauth&alias=${alias}` });
+    const res = await handlers.account_add({ alias: 'fresh', email: 'fresh@x.example' });
+    expect(res.isError).toBeUndefined();
+    expect((server as unknown as { sendToolListChanged: ReturnType<typeof vi.fn> }).sendToolListChanged).toHaveBeenCalled();
   });
 });
 

@@ -377,6 +377,14 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
         // S2: atomic write + make the alias callable without a restart (BR3).
         writeAccountRow(validated.alias, validated.email, validated.bundles, validated.admin);
         invalidateAccountSet();
+        // Live account args validate against the refreshed registry already;
+        // the list_changed nudge makes clients re-fetch tools/list, where the
+        // advertised account enums are rebuilt from the live set.
+        try {
+          server.sendToolListChanged();
+        } catch {
+          // a client that cannot receive notifications loses nothing but the nudge
+        }
 
         // S3 + S4: consent + validate.
         const consent = await runConsent(server, validated.alias);
