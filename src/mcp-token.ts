@@ -240,4 +240,23 @@ export class RefreshStore {
       return { token: next, sub: rec.sub };
     });
   }
+
+  /** Drop every ACTIVE record minted under `sub` (linear scan under the store
+   * lock). Spent entries carry no sub and stay: with their families gone, a
+   * reuse finds nothing to revoke — inert by construction. Returns the number
+   * of active tokens dropped. */
+  purgeTenant(sub: string): number {
+    return withFileLock(this.path, () => {
+      const data = this.load();
+      let dropped = 0;
+      for (const [t, r] of Object.entries(data.active)) {
+        if (r.sub === sub) {
+          delete data.active[t];
+          dropped += 1;
+        }
+      }
+      if (dropped > 0) this.save(data);
+      return dropped;
+    });
+  }
 }
