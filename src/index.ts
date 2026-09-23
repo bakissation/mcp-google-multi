@@ -62,7 +62,7 @@ function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Discovery
   }
   for (const svc of SERVICES) {
     if (!toolsetEnabled(toolsets, svc.name)) continue;
-    if (svc.enabled && !svc.enabled()) {
+    if (svc.enabled && !svc.enabled(ctx.accounts)) {
       if (toolsets !== 'all') {
         const hint = svc.name === 'admin' ? 'set admin on an account/profile (or GOOGLE_ADMIN_ACCOUNTS)' : `add "${svc.name}" to an account's scope profile (or legacy GOOGLE_OPTIONAL_SCOPES)`;
         process.stderr.write(`GOOGLE_TOOLSETS: "${svc.name}" requested but not enabled — ${hint}\n`);
@@ -75,7 +75,7 @@ function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Discovery
     if (!toolsetEnabled(toolsets, gen.name)) continue;
     const curated = SERVICES.find((s) => s.name === gen.name);
     const gate = curated?.enabled ?? GENERATED_GATES[gen.name]?.enabled;
-    if (gate && !gate()) {
+    if (gate && !gate(ctx.accounts)) {
       if (!curated && toolsets !== 'all') {
         process.stderr.write(`GOOGLE_TOOLSETS: "${gen.name}" requested but not enabled — ${GENERATED_GATES[gen.name].hint}\n`);
       }
