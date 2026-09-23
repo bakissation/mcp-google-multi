@@ -2,14 +2,18 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceJson } from './_coerce.js';
 import { chat as chatClient } from '@googleapis/chat';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams } from './_errors.js';
 
-const accountEnum = accountAliasSchema.optional();
 
-export function registerChatTools(server: ToolRegistry): void {
+export function registerChatTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   server.registerTool(
     'chat_spaces_list',
     {
@@ -23,7 +27,7 @@ export function registerChatTools(server: ToolRegistry): void {
     },
     async ({ account, pageSize, pageToken, filter }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const chat = chatClient({ version: 'v1', auth });
         const res = await chat.spaces.list({
           pageSize: pageSize ?? 100,
@@ -50,7 +54,7 @@ export function registerChatTools(server: ToolRegistry): void {
     },
     async ({ account, name }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const chat = chatClient({ version: 'v1', auth });
         const res = await chat.spaces.get({ name });
         return {
@@ -84,7 +88,7 @@ export function registerChatTools(server: ToolRegistry): void {
             'Pass text for a plain message, or cardsV2 for a Card v2 payload. Both may be sent together.',
           );
         }
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const chat = chatClient({ version: 'v1', auth });
         const requestBody: any = {};
         if (text) requestBody.text = text;
@@ -120,7 +124,7 @@ export function registerChatTools(server: ToolRegistry): void {
     },
     async ({ account, parent, pageSize, pageToken, filter, orderBy }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const chat = chatClient({ version: 'v1', auth });
         const res = await chat.spaces.messages.list({
           parent,

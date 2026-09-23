@@ -1,15 +1,19 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { forms as formsClient } from '@googleapis/forms';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 
-const accountEnum = accountAliasSchema.optional();
 
-export function registerFormsTools(server: ToolRegistry): void {
+export function registerFormsTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   server.registerTool(
     'forms_get',
     {
@@ -21,7 +25,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     },
     async ({ account, formId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.get({ formId });
         return {
@@ -47,7 +51,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     },
     async ({ account, formId, pageSize, pageToken, filter }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.responses.list({
           formId,
@@ -76,7 +80,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     },
     async ({ account, formId, responseId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.responses.get({ formId, responseId });
         return {
@@ -99,7 +103,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     },
     async ({ account, formId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.watches.list({ formId });
         return {
@@ -123,7 +127,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     },
     async ({ account, title, documentTitle }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.create({
           requestBody: { info: { title, documentTitle } },
@@ -162,7 +166,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     },
     async ({ account, formId, requests, includeFormInResponse, writeControl }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const forms = formsClient({ version: 'v1', auth });
         const res = await forms.forms.batchUpdate({
           formId,
@@ -194,7 +198,7 @@ export function registerFormsTools(server: ToolRegistry): void {
     },
     async ({ account, formId, isPublished, isAcceptingResponses }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const forms = formsClient({ version: 'v1', auth });
         const updateMask = ['publishState.isPublished'];
         if (isAcceptingResponses !== undefined) updateMask.push('publishState.isAcceptingResponses');

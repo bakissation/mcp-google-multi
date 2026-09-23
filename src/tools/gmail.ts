@@ -2,9 +2,9 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean, coerceJson, coerceNumber } from './_coerce.js';
 import { gmail as gmailClient } from '@googleapis/gmail';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
 import { prepareLocalDest } from './_local-files.js';
@@ -18,7 +18,6 @@ import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../t
 import * as path from 'path';
 import * as fs from 'fs';
 
-const accountEnum = accountAliasSchema.optional();
 
 function getHeader(
   headers: { name?: string | null; value?: string | null }[] | undefined,
@@ -487,7 +486,12 @@ export function compactMessageRow(m: GmailMessageHeader): { id: string; from: st
   };
 }
 
-export function registerGmailTools(server: ToolRegistry): void {
+export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   server.registerTool(
     'gmail_search',
     {
@@ -513,7 +517,7 @@ export function registerGmailTools(server: ToolRegistry): void {
             'Pass a real Gmail search term such as "is:unread" or "from:someone@example.com". Returning the whole mailbox for a blank query would look like a successful search.',
           );
         }
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
 
         const listRes = await gmail.users.messages.list({
@@ -579,7 +583,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, messageId, full, rawHtml }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
 
         const res = await gmail.users.messages.get({
@@ -615,7 +619,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, threadId, full, rawHtml, mode }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
 
         if (mode === 'summary') {
@@ -671,7 +675,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, ids, full, rawHtml }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const result = await readBatch(gmail, account as Account, (ids as string[]) ?? [], full === true, rawHtml === true);
         return {
@@ -708,7 +712,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, replyToThreadId, attachments }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
 
@@ -793,7 +797,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, messageId, attachmentId, filename, savePath }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
 
         const res = await gmail.users.messages.attachments.get({
@@ -843,7 +847,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, replyToThreadId, attachments }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
 
@@ -932,7 +936,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, messageId, addLabelIds, removeLabelIds }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.messages.modify({
           userId: 'me',
@@ -963,7 +967,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, messageId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.messages.trash({ userId: 'me', id: messageId });
         return {
@@ -987,7 +991,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, messageId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         await gmail.users.messages.delete({ userId: 'me', id: messageId });
         return {
@@ -1013,7 +1017,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, messageIds, addLabelIds, removeLabelIds }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         await gmail.users.messages.batchModify({
           userId: 'me',
@@ -1044,7 +1048,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, messageIds }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         await gmail.users.messages.batchDelete({
           userId: 'me',
@@ -1073,7 +1077,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, maxResults, query }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.drafts.list({
           userId: 'me',
@@ -1101,7 +1105,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, draftId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.drafts.get({
           userId: 'me',
@@ -1129,7 +1133,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, draftId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.drafts.send({
           userId: 'me',
@@ -1155,7 +1159,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.labels.list({ userId: 'me' });
         return {
@@ -1183,7 +1187,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, name, messageListVisibility, labelListVisibility }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.labels.create({
           userId: 'me',
@@ -1214,7 +1218,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, labelId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         await gmail.users.labels.delete({ userId: 'me', id: labelId });
         return {
@@ -1237,7 +1241,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.getProfile({ userId: 'me' });
         return {
@@ -1265,7 +1269,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, startHistoryId, maxResults, historyTypes }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.history.list({
           userId: 'me',
@@ -1293,7 +1297,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.settings.getVacation({ userId: 'me' });
         return {
@@ -1323,7 +1327,7 @@ export function registerGmailTools(server: ToolRegistry): void {
     },
     async ({ account, enableAutoReply, responseSubject, responseBodyPlainText, startTime, endTime, restrictToContacts, restrictToDomain }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
         const res = await gmail.users.settings.updateVacation({
           userId: 'me',

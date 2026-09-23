@@ -2,15 +2,19 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceBoolean } from './_coerce.js';
 import { admin as adminClient } from '@googleapis/admin';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams } from './_errors.js';
 
-const accountEnum = accountAliasSchema.optional();
 
 // Admin SDK requires Workspace super-admin (or delegated admin) on the account — personal @gmail.com accounts 403 on every endpoint.
-export function registerAdminTools(server: ToolRegistry): void {
+export function registerAdminTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   // ─── Reports / audit log ───────────────────────────────────────────────
 
   server.registerTool(
@@ -42,7 +46,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     },
     async ({ account, applicationName, userKey, startTime, endTime, eventName, actorIpAddress, filters, orgUnitID, groupIdFilter, customerId, maxResults, pageToken }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const reports = adminClient({ version: 'reports_v1', auth });
         const res = await reports.activities.list({
           applicationName,
@@ -87,7 +91,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     },
     async ({ account, customer, domain, query, maxResults, pageToken, orderBy, showDeleted, projection }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const directory = adminClient({ version: 'directory_v1', auth });
         const res = await directory.users.list({
           customer: customer ?? 'my_customer',
@@ -120,7 +124,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     },
     async ({ account, userKey, projection }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const directory = adminClient({ version: 'directory_v1', auth });
         const res = await directory.users.get({
           userKey,
@@ -152,7 +156,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     },
     async ({ account, userKey, givenName, familyName, suspended, password, changePasswordAtNextLogin, orgUnitPath }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const directory = adminClient({ version: 'directory_v1', auth });
         const requestBody: any = {};
         if (givenName !== undefined || familyName !== undefined) {
@@ -201,7 +205,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     },
     async ({ account, customer, domain, userKey, query, maxResults, pageToken }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const directory = adminClient({ version: 'directory_v1', auth });
         const res = await directory.groups.list({
           customer: customer ?? 'my_customer',
@@ -235,7 +239,7 @@ export function registerAdminTools(server: ToolRegistry): void {
     },
     async ({ account, groupKey, roles, includeDerivedMembership, maxResults, pageToken }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const directory = adminClient({ version: 'directory_v1', auth });
         const res = await directory.members.list({
           groupKey,

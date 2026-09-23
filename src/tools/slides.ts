@@ -1,18 +1,22 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { slides as slidesClient } from '@googleapis/slides';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 import { sliceClean } from '../trim.js';
 
-const accountEnum = accountAliasSchema.optional();
 
 const SLIDE_TEXT_DIGEST_CHARS = 200;
 
-export function registerSlidesTools(server: ToolRegistry): void {
+export function registerSlidesTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   server.registerTool(
     'slides_create',
     {
@@ -24,7 +28,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
     },
     async ({ account, title }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const slides = slidesClient({ version: 'v1', auth });
         const res = await slides.presentations.create({ requestBody: { title } });
         return {
@@ -53,7 +57,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
     },
     async ({ account, presentationId, full }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const slides = slidesClient({ version: 'v1', auth });
         const res = await slides.presentations.get({ presentationId });
         const payload = full ? res.data : summarizePresentation(res.data as Record<string, any>);
@@ -78,7 +82,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
     },
     async ({ account, presentationId, pageObjectId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const slides = slidesClient({ version: 'v1', auth });
         const res = await slides.presentations.pages.get({ presentationId, pageObjectId });
         return {
@@ -105,7 +109,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
     },
     async ({ account, presentationId, pageObjectId, mimeType, thumbnailSize }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const slides = slidesClient({ version: 'v1', auth });
         const res = await slides.presentations.pages.getThumbnail({
           presentationId,
@@ -140,7 +144,7 @@ export function registerSlidesTools(server: ToolRegistry): void {
     },
     async ({ account, presentationId, requests, writeControl }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const slides = slidesClient({ version: 'v1', auth });
         const res = await slides.presentations.batchUpdate({
           presentationId,

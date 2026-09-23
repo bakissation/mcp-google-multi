@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../registry.js';
 import { isAllowed, writeDisabledResult, type Policy } from '../write-control.js';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import { getClient } from '../client.js';
 import { coerceJson } from './_coerce.js';
 import { getToolsets, toolsetEnabled, type Toolsets } from '../toolsets.js';
@@ -17,7 +17,6 @@ import {
   searchMethods,
 } from '../discovery-client.js';
 
-const accountEnum = accountAliasSchema.optional();
 
 // Policy/toolset namespace for each API alias must match the NAMED tools' service
 // names, or user deny globs and GOOGLE_TOOLSETS silently miss escape-hatch calls.
@@ -74,6 +73,8 @@ function describeMethod(m: DiscoveryMethod) {
 }
 
 export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps: EscapeDeps = {}): void {
+  // Live per-registry account validation (S1.10), same as the curated files.
+  const accountEnum = accountArgLive(() => registry.accountAliases()).optional();
   const getClientFn = deps.getClientFn ?? getClient;
   const toolsets = deps.toolsets ?? getToolsets();
   const serviceForAlias = (alias: string): string => SERVICE_FOR_ALIAS[alias] ?? alias;
