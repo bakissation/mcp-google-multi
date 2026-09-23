@@ -20,6 +20,7 @@ See CONTRIBUTING.md for the full workflow.
 - [ ] Conventional commit messages
 - [ ] README tables + `CHANGELOG.md` updated; version bumped if warranted
 - [ ] No secrets, tokens, or `.env` committed
+- [ ] If this touches a module published via the package `exports` map (see `package.json` — `identity`, `compose`, `registry`, `oauth-as`, `accounts`, `token-store`, `http-transport`, `client`, `config-file`, `mcp-token`, `boot-gates`, `tenant-purge`, `doctor`, `http-config`), the exported signatures are unchanged — or the change is called out in the PR description and `MIGRATION-v6.md`
 - [ ] New pure-logic helpers have unit tests (handlers verified by manual smoke test)
 
 ## How was this tested?
