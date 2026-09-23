@@ -8,9 +8,11 @@ import { resolvePolicy, type Policy, type Transport } from './write-control.js';
  * The one forward-compat seam (frozen public API): the free core builds
  * exactly one context with subject "owner"; EE later instantiates N contexts
  * from N registries. Nothing here may assume a global current-account.
+ * `subject` is a string (not the literal 'owner') so a context can carry a
+ * tenant id; the free core still always builds 'owner'.
  */
 export interface IdentityContext {
-  subject: 'owner';
+  subject: string;
   accounts: AccountSet;
   policy: Policy;
   getClient: typeof getClient;
