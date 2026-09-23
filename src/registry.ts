@@ -523,9 +523,32 @@ export class ToolRegistry {
     return {
       name: tool.name,
       description: tool.description,
-      inputSchema,
+      inputSchema: this.withLiveAccountEnum(tool, inputSchema),
       annotations: tool.annotations,
       ...(tool.clientMeta ? { _meta: tool.clientMeta } : {}),
     };
+  }
+
+  /** Advertise the CURRENT alias enum on every tools/list: account validation
+   * is (or is becoming) live, so a cached boot-time enum would go stale the
+   * moment account_add lands mid-session. The structural schema stays cached;
+   * only the account property's values are refreshed per call. Skipped for
+   * the subject-taking account tools (their `account` is the OPERAND, e.g. a
+   * brand-new alias name, not an identity to enumerate). */
+  private withLiveAccountEnum(tool: ToolEntry, schema: unknown): unknown {
+    if (DEFAULT_ACCOUNT_EXCLUDE.has(tool.name)) return schema;
+    const s = schema as { properties?: Record<string, unknown> };
+    const account = s?.properties?.account as { anyOf?: unknown[]; enum?: unknown[] } | undefined;
+    if (!account) return schema;
+    const aliases = this.accounts().aliases;
+    if (aliases.length === 0) return schema;
+    if (Array.isArray(account.anyOf)) {
+      // fan-out union: refresh the enum branch ('*' + aliases), keep the CSV branch
+      const hasEnumBranch = account.anyOf.some((b) => Array.isArray((b as { enum?: unknown[] }).enum));
+      if (!hasEnumBranch) return schema;
+      const anyOf = account.anyOf.map((b) => (Array.isArray((b as { enum?: unknown[] }).enum) ? { ...(b as object), enum: ['*', ...aliases] } : b));
+      return { ...s, properties: { ...s.properties, account: { ...account, anyOf } } };
+    }
+    return { ...s, properties: { ...s.properties, account: { ...account, enum: [...aliases] } } };
   }
 }

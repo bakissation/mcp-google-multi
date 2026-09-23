@@ -402,6 +402,21 @@ export function accountAliasSchemaFor(aliases: readonly string[]): z.ZodType<str
 /** Shared, load-time snapshot used by every tool's `account` field. */
 export const accountAliasSchema: z.ZodType<string> = accountAliasSchemaFor(ACCOUNTS);
 
+/** Live account argument: validates at PARSE time against the accessor's
+ * CURRENT aliases, so an alias added mid-session (account_add, or a tenant
+ * alias link) is immediately valid on already-registered tools — a baked
+ * z.enum freezes the boot-time set until restart. An empty set stays
+ * permissive (same empty-safe rule as above); dispatch still resolves the
+ * alias against the live registry. */
+export function accountArgLive(aliases: () => readonly string[]): z.ZodType<string> {
+  return z.string().superRefine((value, ctx) => {
+    const current = aliases();
+    if (current.length > 0 && !current.includes(value)) {
+      ctx.addIssue({ code: 'custom', message: unknownAliasMessage(current) });
+    }
+  });
+}
+
 /**
  * BR-4: the stdio/http SERVER never boots with an empty registry — a fresh user
  * bootstraps via env / `migrate-config` / `account import` / `auth` first. The
