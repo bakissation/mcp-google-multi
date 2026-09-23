@@ -32,6 +32,23 @@ function deps(over: Partial<DiagnosticsDeps> = {}): DiagnosticsDeps {
   };
 }
 
+describe('maskEmails via renderReport (BR8, linear scan)', () => {
+  it('masks every address shape the old regex masked', async () => {
+    const r = await runDiagnostics(deps({ accountHealth: (a) => health(a, { email: 'someone.long+tag@sub.example.co' }) }));
+    const out = renderReport(r, '0.0.0');
+    expect(out).toContain('s***@sub.example.co');
+    expect(out).not.toContain('someone.long+tag@');
+  });
+
+  it('leaves @-runs without a local part or domain alone, and survives a long local-charset run instantly', async () => {
+    const r = await runDiagnostics(deps({ accountHealth: (a) => health(a, { email: `${'%'.repeat(20000)}@x.example` }) }));
+    const started = performance.now();
+    const out = renderReport(r, '0.0.0');
+    expect(performance.now() - started).toBeLessThan(1000); // the old regex went polynomial here
+    expect(out).toContain('%***@x.example');
+  });
+});
+
 describe('tenant-scoped diagnose (S1.21)', () => {
   const httpEnv = { MCP_TRANSPORT: 'http', MCP_PUBLIC_URL: 'https://mcp.example.com', MCP_OWNER_EMAILS: 'operator-private@x.example' };
 
