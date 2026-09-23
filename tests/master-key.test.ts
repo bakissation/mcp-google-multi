@@ -208,6 +208,79 @@ describe('dispatch path never exits the process', () => {
   });
 });
 
+describe('hard guard token scan is recursive (S1.2 anti-brick)', () => {
+  // These cases OMIT deps.hasAnyToken on purpose: they exercise the real
+  // scanner against the sandboxed TOKEN_STORE_PATH / XDG_CONFIG_HOME dirs.
+  const realScanDeps = () => ({
+    env: {} as NodeJS.ProcessEnv,
+    dir,
+    keychain: fakeKeychain(new Map(), false),
+  });
+
+  const expectRefusal = (fn: () => unknown) => {
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('exit-called');
+    });
+    expect(fn).toThrow('exit-called');
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(String(stderr.mock.calls[0]?.[0])).toContain('E_MASTER_KEY_MISSING_TOKENS_EXIST');
+  };
+
+  it('a flat .enc directly in the token dir still refuses to mint (superset of the old scan)', async () => {
+    const { mkdirSync } = await import('node:fs');
+    const tokenDir = process.env.TOKEN_STORE_PATH!;
+    mkdirSync(tokenDir, { recursive: true });
+    const enc = path.join(tokenDir, 'flat-guard.enc');
+    writeFileSync(enc, '{}');
+    try {
+      expectRefusal(() => resolveMasterKey(realScanDeps()));
+    } finally {
+      rmSync(enc, { force: true });
+    }
+  });
+
+  it('a NESTED .enc under the token dir refuses to mint (the flat scan missed it = brick)', async () => {
+    const { mkdirSync } = await import('node:fs');
+    const nested = path.join(process.env.TOKEN_STORE_PATH!, 'nested', 'deeper');
+    mkdirSync(nested, { recursive: true });
+    const enc = path.join(nested, 'alias.enc');
+    writeFileSync(enc, '{}');
+    try {
+      expectRefusal(() => resolveMasterKey(realScanDeps()));
+    } finally {
+      rmSync(path.join(process.env.TOKEN_STORE_PATH!, 'nested'), { recursive: true, force: true });
+    }
+  });
+
+  it('a tenant-namespaced .enc under configDir()/tenants refuses to mint (future S1.6 layout)', async () => {
+    const { mkdirSync } = await import('node:fs');
+    const tenantTokens = path.join(process.env.XDG_CONFIG_HOME!, 'mcp-google-multi', 'tenants', 'tenant-a', 'tokens');
+    mkdirSync(tenantTokens, { recursive: true });
+    const enc = path.join(tenantTokens, 'alias.enc');
+    writeFileSync(enc, '{}');
+    try {
+      expectRefusal(() => resolveMasterKey(realScanDeps()));
+    } finally {
+      rmSync(path.join(process.env.XDG_CONFIG_HOME!, 'mcp-google-multi', 'tenants'), { recursive: true, force: true });
+    }
+  });
+
+  it('non-.enc nested files (legacy plaintext token.json layout) do NOT trip the guard', async () => {
+    vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    const { mkdirSync } = await import('node:fs');
+    const legacy = path.join(process.env.TOKEN_STORE_PATH!, 'some-alias');
+    mkdirSync(legacy, { recursive: true });
+    writeFileSync(path.join(legacy, 'token.json'), '{}');
+    try {
+      const r = resolveMasterKey(realScanDeps());
+      expect(r.provenance).toBe('generated');
+    } finally {
+      rmSync(legacy, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('hard guard (BR-3)', () => {
   it('never generates while encrypted tokens exist: E_MASTER_KEY_MISSING_TOKENS_EXIST', () => {
     const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
