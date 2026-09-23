@@ -1,22 +1,25 @@
 import { z } from 'zod';
-import { ACCOUNTS, getAccountSet, unknownAliasMessage } from './accounts.js';
+import { getAccountSet, unknownAliasMessage } from './accounts.js';
 
 export const CSV_RE = /^[a-zA-Z0-9_-]+(\s*,\s*[a-zA-Z0-9_-]+)+$/;
 
 const FANOUT_CONCURRENCY = 5;
 
-export function fanoutAccountField(description: string): z.ZodType {
-  const csvExample = ACCOUNTS.length > 1 ? `; or a CSV subset like "${ACCOUNTS.slice(0, 2).join(',')}"` : '';
+// `aliases` is required (no global default): the field is baked into a
+// registry's inputSchema, so it must be built from THAT registry's account
+// set or a '*' would advertise and accept another registry's aliases.
+export function fanoutAccountField(description: string, aliases: readonly string[]): z.ZodType {
+  const csvExample = aliases.length > 1 ? `; or a CSV subset like "${aliases.slice(0, 2).join(',')}"` : '';
   // The union's OWN error only fires when every branch aborts at the type
   // check (a non-string). For a string, zod surfaces the single non-aborted
   // branch verbatim, which is the CSV regex, so a mistyped alias used to read
   // as "Invalid string: must match pattern /^[a-zA-Z0-9_-]+(,...)/" and never
   // named an alias. Hence the same message on BOTH.
-  const bad = () => unknownAliasMessage(ACCOUNTS, true);
+  const bad = () => unknownAliasMessage(aliases, true);
   return z
-    // '*' first so the tuple is statically non-empty even when ACCOUNTS is empty
+    // '*' first so the tuple is statically non-empty even when aliases is empty
     // (a fresh install): z.enum requires [string, ...string[]].
-    .union([z.enum(['*', ...ACCOUNTS]), z.string().regex(CSV_RE, { error: bad })], { error: bad })
+    .union([z.enum(['*', ...aliases]), z.string().regex(CSV_RE, { error: bad })], { error: bad })
     .optional()
     .describe(`${description}; "*" = all accounts${csvExample}; omit for the default account`);
 }

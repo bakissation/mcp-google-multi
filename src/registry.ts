@@ -1,7 +1,7 @@
 import type { ListToolsResult, McpServer } from "@modelcontextprotocol/server";
 import { z } from 'zod';
 import { type Policy, isAllowed, writeDisabledResult, IRREVERSIBLE_TOOLS } from './write-control.js';
-import { getAccountSet, refreshAccountSetIfStale } from './accounts.js';
+import { getAccountSet, refreshAccountSetIfStale, type AccountSet } from './accounts.js';
 import { compactResult, trimEnabled } from './trim.js';
 import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFanout } from './fanout.js';
 import { MAX_RESPONSE_CHARS } from './executor.js';
@@ -169,6 +169,10 @@ export class ToolRegistry {
     policy: Policy,
     mode: DiscoveryMode = resolveDiscoveryMode(),
     private readonly metrics: Metrics | null = null,
+    // The registry's OWN account view: fan-out expansion, selector validation
+    // and default-account injection all read through it so a registry built
+    // over a subset never observes (or leaks) the global set.
+    private readonly accounts: () => AccountSet = getAccountSet,
   ) {
     this.policy = policy;
     this.mode = mode;
@@ -204,11 +208,11 @@ export class ToolRegistry {
       const hasAccountField = 'account' in inputShape && !DEFAULT_ACCOUNT_EXCLUDE.has(name);
       if (cud === 'read' && !this.registeringMeta && !FANOUT_EXCLUDE.has(name) && isAccountEnum(inputShape.account)) {
         const description = (inputShape.account as z.ZodType).description ?? 'Google account alias';
-        inputShape = { ...inputShape, account: fanoutAccountField(description) };
+        inputShape = { ...inputShape, account: fanoutAccountField(description, this.accounts().aliases) };
         baseHandler = async (...args: unknown[]) => {
           const first = args[0] as { account?: string } | undefined;
-          const parsed = parseAccountSelector(typeof first?.account === 'string' ? first.account : '');
-          if (!parsed.ok) return invalidAccountsResult(parsed.invalid);
+          const parsed = parseAccountSelector(typeof first?.account === 'string' ? first.account : '', this.accounts().aliases);
+          if (!parsed.ok) return invalidAccountsResult(parsed.invalid, this.accounts().aliases);
           if (!parsed.fanout) return handler({ ...first, account: parsed.aliases[0] }, ...args.slice(1));
           return runFanout(handler, args, parsed.aliases);
         };
@@ -253,7 +257,7 @@ export class ToolRegistry {
             // heals for a client that always omits account (this branch never
             // reaches getClient's probe). One stat, only on omission.
             refreshAccountSetIfStale();
-            const def = getAccountSet().defaultAccount;
+            const def = this.accounts().defaultAccount;
             if (!def) {
               return {
                 content: [
@@ -262,7 +266,7 @@ export class ToolRegistry {
                     text: JSON.stringify({
                       error: 'E_NO_DEFAULT_ACCOUNT',
                       message: 'No "account" given and no default account is configured.',
-                      hint: `Pass account explicitly (valid: ${getAccountSet().aliases.join(', ')}), or set GOOGLE_DEFAULT_ACCOUNT / "defaultAccount" in config.json.`,
+                      hint: `Pass account explicitly (valid: ${this.accounts().aliases.join(', ')}), or set GOOGLE_DEFAULT_ACCOUNT / "defaultAccount" in config.json.`,
                       retriable: false,
                     }),
                   },
