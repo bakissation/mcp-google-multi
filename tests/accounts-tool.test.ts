@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { deriveAccountHealth, type AccountHealthDeps } from '../src/tools/accounts-tool.js';
+import { setHttpReauthBase } from '../src/reauth-hint.js';
 import { resolveScopesForAccount } from '../src/auth.js';
 
 const ALIAS = 'test';
@@ -17,6 +18,17 @@ function deps(overrides: Partial<AccountHealthDeps>): AccountHealthDeps {
 }
 
 describe('deriveAccountHealth', () => {
+  it('missing-token hint becomes an AS re-auth link over HTTP (S1.18)', () => {
+    setHttpReauthBase('https://mcp.example.com');
+    try {
+      const h = deriveAccountHealth(ALIAS, deps({ hasToken: () => false }));
+      expect(h.token.hint).toContain('https://mcp.example.com/authorize?flow=alias_reauth&alias=test');
+      expect(h.token.hint).not.toContain('npx mcp-google-multi');
+    } finally {
+      setHttpReauthBase(null);
+    }
+  });
+
   it('reports missing with an auth hint when no token file exists', () => {
     const h = deriveAccountHealth(ALIAS, deps({ hasToken: () => false }));
     expect(h.token.status).toBe('missing');

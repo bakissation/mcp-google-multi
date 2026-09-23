@@ -8,6 +8,7 @@ import { peekMasterKeyProvenance, deleteMasterKeyMaterial } from './master-key.j
 import { hasToken } from './token-store.js';
 import { configDir, loadConfigFile } from './config-file.js';
 import { envValueSource } from './env-load.js';
+import { reauthHint } from './reauth-hint.js';
 import { describeMetricsDir, resolveUsageMetrics, sourceLabel } from './usage-metrics.js';
 import { probeApiEnablement } from './api-probe.js';
 import { safeMessage, stringifyEnvelope } from './tools/_errors.js';
@@ -251,7 +252,7 @@ function sectionsTokensAndScopes(deps: DiagnosticsDeps, aliases: string[]): [Dia
     if (r.requestable.length > 0) {
       if (scopeVerdict === 'ok') scopeVerdict = 'warn';
       scopeLines.push(`${alias}: ${r.callable.length} callable, ${r.requestable.length} requested-not-granted`);
-      scopeHint = `Re-auth to grant missing scopes: \`npx mcp-google-multi auth --account ${alias}\`.`;
+      scopeHint = `Re-auth to grant missing scopes. ${reauthHint(alias)}`;
     } else {
       scopeLines.push(`${alias}: ${r.callable.length} callable, all profile scopes granted`);
     }
