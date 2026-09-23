@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { ToolRegistry } from '../src/registry.js';
+import type { AccountSet } from '../src/accounts.js';
+import { registerTasksGeneratedTools } from '../src/tools/generated/tasks.js';
 import { executeApiMethod, buildQueryString } from '../src/executor.js';
 import { registerGeneratedTool, type GeneratedToolDef } from '../src/tools/generated/_shared.js';
 import { emitService, buildServiceFile, emitBarrel, flatBodyProp, planTools, toolNameFromId, snakeCase } from '../scripts/gen-tools.js';
@@ -31,6 +33,59 @@ function harness(policy: Policy) {
   };
   return { registry: new ToolRegistry(server as never, policy), registered };
 }
+
+function setOf(aliases: string[]): AccountSet {
+  return {
+    aliases,
+    configs: Object.fromEntries(aliases.map((a) => [a, { email: `${a}@x.example`, tokenPath: `/x/${a}/t.json`, encPath: `/x/${a}.enc`, source: 'env' as const }])),
+    scopeProfiles: { base: { bundles: [] } },
+    source: 'env',
+    stamp: 'env:0',
+  } as AccountSet;
+}
+
+function ctxHarness(aliases: string[]) {
+  const captured: { name: string; config: { inputSchema: Record<string, z.ZodType> }; handler: (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }> }[] = [];
+  const server = {
+    registerTool: (name: string, config: never, handler: never) => {
+      captured.push({ name, config, handler });
+      return 'ok';
+    },
+    sendToolListChanged: vi.fn(),
+    server: { setRequestHandler: () => {} },
+  };
+  const registry = new ToolRegistry(server as never, FULL, 'eager', null, () => setOf(aliases));
+  return { registry, captured };
+}
+
+describe('generated registration threads the registry context (S1.9)', () => {
+  it('two registries, disjoint aliases: each generated account enum accepts ONLY its own set', () => {
+    const a = ctxHarness(['a1', 'a2']);
+    const b = ctxHarness(['b1']);
+    registerTasksGeneratedTools(a.registry);
+    registerTasksGeneratedTools(b.registry);
+    // a write tool keeps the plain per-registry enum (no fan-out rewrap)
+    const toolA = a.captured.find((t) => t.name === 'tasks_tasklists_update')!;
+    const toolB = b.captured.find((t) => t.name === 'tasks_tasklists_update')!;
+    expect(toolA.config.inputSchema.account.safeParse('a1').success).toBe(true);
+    expect(toolA.config.inputSchema.account.safeParse('b1').success).toBe(false);
+    expect(toolB.config.inputSchema.account.safeParse('b1').success).toBe(true);
+    expect(toolB.config.inputSchema.account.safeParse('a1').success).toBe(false);
+    // the global test registry alias never leaks into either
+    expect(toolA.config.inputSchema.account.safeParse('test').success).toBe(false);
+  });
+
+  it('register<Api>GeneratedTools(registry, deps) reaches dispatch: injected getClientFn serves the call', async () => {
+    const { registry, captured } = ctxHarness(['a1']);
+    const request = vi.fn(async () => ({ data: { threaded: true } }));
+    registerTasksGeneratedTools(registry, { getClientFn: (async () => ({ request })) as never });
+    const tool = captured.find((t) => t.name === 'tasks_tasklists_update')!;
+    const res = await tool.handler({ account: 'a1', tasklist: 'l1' });
+    expect(res.isError).toBeUndefined();
+    expect(request).toHaveBeenCalledOnce();
+    expect(JSON.parse(res.content[0].text)).toEqual({ threaded: true });
+  });
+});
 
 describe('executeApiMethod', () => {
   it('assembles the URL from baked metadata with repeated query keys', async () => {

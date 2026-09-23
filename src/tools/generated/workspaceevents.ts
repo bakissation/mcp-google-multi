@@ -2,9 +2,9 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../../registry.js';
 import { coerceBoolean, coerceJson } from '../_coerce.js';
-import { accountField, registerGeneratedTool } from './_shared.js';
+import { accountField, registerGeneratedTool, type ExecuteDeps } from './_shared.js';
 
-export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): void {
+export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry, deps: ExecuteDeps = {}): void {
   // Interned method scope sets (shared across tools; see scope-observability).
   const S_workspaceevents_v1: readonly (readonly string[])[] = [
     ["https://www.googleapis.com/auth/chat.bot","https://www.googleapis.com/auth/chat.memberships","https://www.googleapis.com/auth/chat.memberships.readonly","https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.reactions","https://www.googleapis.com/auth/chat.messages.reactions.readonly","https://www.googleapis.com/auth/chat.messages.readonly","https://www.googleapis.com/auth/chat.spaces","https://www.googleapis.com/auth/chat.spaces.readonly","https://www.googleapis.com/auth/chat.users.availability","https://www.googleapis.com/auth/chat.users.availability.readonly","https://www.googleapis.com/auth/chat.users.readstate","https://www.googleapis.com/auth/chat.users.readstate.readonly","https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.metadata","https://www.googleapis.com/auth/drive.metadata.readonly","https://www.googleapis.com/auth/drive.readonly","https://www.googleapis.com/auth/meetings.space.created","https://www.googleapis.com/auth/meetings.space.readonly"],
@@ -18,11 +18,11 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SendMessageRequest JSON request body. Top-level fields: configuration, message, metadata, tenant."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_operations_get",
     cud: "read",
@@ -31,11 +31,11 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the operation resource."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_subscriptions_create",
     cud: "create",
@@ -44,12 +44,12 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"validateOnly","api":"validateOnly","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       validateOnly: coerceBoolean.describe("Optional. If set to `true`, validates and previews the request, but doesn't create the subscription.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Subscription JSON request body. Top-level fields: authority, createTime, driveOptions, etag, eventTypes, expireTime, name, notificationEndpoint, payloadOptions, reconciling, serviceAccountAuthority, state, +6 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_subscriptions_delete",
     cud: "delete",
@@ -58,14 +58,14 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"name","api":"name","location":"path"},{"field":"allowMissing","api":"allowMissing","location":"query"},{"field":"etag","api":"etag","location":"query"},{"field":"validateOnly","api":"validateOnly","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. Resource name of the subscription to delete. Format: `subscriptions/{subscription}`"),
       allowMissing: coerceBoolean.describe("Optional. If set to `true` and the subscription isn't found, the request succeeds but doesn't delete the subscription.").optional(),
       etag: z.string().describe("Optional. Etag of the subscription. If present, it must match with the server's etag. Otherwise, request fails with the status `ABORTED`.").optional(),
       validateOnly: coerceBoolean.describe("Optional. If set to `true`, validates and previews the request, but doesn't delete the subscription.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_subscriptions_get",
     cud: "read",
@@ -74,11 +74,11 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. Resource name of the subscription. Format: `subscriptions/{subscription}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_subscriptions_list",
     cud: "read",
@@ -87,13 +87,13 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       filter: z.string().describe("Required. A query filter. You can filter subscriptions by event type (`event_types`) and target resource (`target_resource`). You must specify at least one event type in your query. To filter for mult").optional(),
       pageSize: z.number().describe("Optional. The maximum number of subscriptions to return. The service might return fewer than this value. If unspecified or set to `0`, up to 50 subscriptions are returned. The maximum value is 100. If").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous list subscriptions call. Provide this parameter to retrieve the subsequent page. When paginating, the filter value should match the call that provided ").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_subscriptions_patch",
     cud: "update",
@@ -102,14 +102,14 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"validateOnly","api":"validateOnly","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Identifier. Resource name of the subscription. Format: `subscriptions/{subscription}`"),
       updateMask: z.string().describe("Optional. The field to update. If omitted, updates any fields included in the request. You can update one of the following fields in a subscription: * `expire_time`: The timestamp when the subscriptio").optional(),
       validateOnly: coerceBoolean.describe("Optional. If set to `true`, validates and previews the request, but doesn't update the subscription.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Subscription JSON request body. Top-level fields: authority, createTime, driveOptions, etag, eventTypes, expireTime, name, notificationEndpoint, payloadOptions, reconciling, serviceAccountAuthority, state, +6 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_subscriptions_reactivate",
     cud: "update",
@@ -119,11 +119,11 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. Resource name of the subscription. Format: `subscriptions/{subscription}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_tasks_cancel",
     cud: "delete",
@@ -133,12 +133,12 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     hasBody: true,
     bodyParams: [{"field":"tenant","api":"tenant"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The resource name of the task to cancel. Format: tasks/{task_id}"),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_tasks_get",
     cud: "read",
@@ -147,13 +147,13 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"name","api":"name","location":"path"},{"field":"historyLength","api":"historyLength","location":"query"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The resource name of the task. Format: tasks/{task_id}"),
       historyLength: z.number().describe("The number of most recent messages from the task's history to retrieve.").optional(),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_tasks_push_notification_configs_create",
     cud: "create",
@@ -162,14 +162,14 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"configId","api":"configId","location":"query"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent task resource for this config. Format: tasks/{task_id}"),
       configId: z.string().describe("Required. The ID for the new config.").optional(),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("TaskPushNotificationConfig JSON request body. Top-level fields: name, pushNotificationConfig."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_tasks_push_notification_configs_delete",
     cud: "delete",
@@ -178,12 +178,12 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"name","api":"name","location":"path"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The resource name of the config to delete. Format: tasks/{task_id}/pushNotificationConfigs/{config_id}"),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_tasks_push_notification_configs_get",
     cud: "read",
@@ -192,12 +192,12 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"name","api":"name","location":"path"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The resource name of the config to retrieve. Format: tasks/{task_id}/pushNotificationConfigs/{config_id}"),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_tasks_push_notification_configs_list",
     cud: "read",
@@ -206,14 +206,14 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("The parent task resource. Format: tasks/{task_id}"),
       pageSize: z.number().describe("For AIP-158 these fields are present. Usually not used/needed. The maximum number of configurations to return. If unspecified, all configs will be returned.").optional(),
       pageToken: z.string().describe("A page token received from a previous ListTaskPushNotificationConfigRequest call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListTaskPushNotificat").optional(),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "workspaceevents_tasks_subscribe",
     cud: "read",
@@ -222,10 +222,10 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry): v
     params: [{"field":"name","api":"name","location":"path"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The resource name of the task to subscribe to. Format: tasks/{task_id}"),
       tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
 }

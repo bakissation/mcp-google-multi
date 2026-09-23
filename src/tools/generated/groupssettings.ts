@@ -2,9 +2,9 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../../registry.js';
 import { coerceJson } from '../_coerce.js';
-import { accountField, registerGeneratedTool } from './_shared.js';
+import { accountField, registerGeneratedTool, type ExecuteDeps } from './_shared.js';
 
-export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): void {
+export function registerGroupssettingsGeneratedTools(registry: ToolRegistry, deps: ExecuteDeps = {}): void {
   // Interned method scope sets (shared across tools; see scope-observability).
   const S_groupssettings_v1: readonly (readonly string[])[] = [
     ["https://www.googleapis.com/auth/apps.groups.settings"],
@@ -17,11 +17,11 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): vo
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       groupUniqueId: z.string().min(1).describe("The group's email address."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "groupssettings_groups_patch",
     cud: "update",
@@ -30,12 +30,12 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): vo
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       groupUniqueId: z.string().min(1).describe("The group's email address."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Groups JSON request body. Top-level fields: allowExternalMembers, allowGoogleCommunication, allowWebPosting, archiveOnly, customFooterText, customReplyTo, customRolesEnabledForSettingsToBeMerged, defaultMessageDenyNotificationText, default_sender, description, email, enableCollaborativeInbox, +51 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "groupssettings_groups_update",
     cud: "update",
@@ -44,10 +44,10 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry): vo
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       groupUniqueId: z.string().min(1).describe("The group's email address."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Groups JSON request body. Top-level fields: allowExternalMembers, allowGoogleCommunication, allowWebPosting, archiveOnly, customFooterText, customReplyTo, customRolesEnabledForSettingsToBeMerged, defaultMessageDenyNotificationText, default_sender, description, email, enableCollaborativeInbox, +51 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
 }

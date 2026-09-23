@@ -2,9 +2,9 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../../registry.js';
 import { coerceArray, coerceJson } from '../_coerce.js';
-import { accountField, registerGeneratedTool } from './_shared.js';
+import { accountField, registerGeneratedTool, type ExecuteDeps } from './_shared.js';
 
-export function registerScriptGeneratedTools(registry: ToolRegistry): void {
+export function registerScriptGeneratedTools(registry: ToolRegistry, deps: ExecuteDeps = {}): void {
   // Interned method scope sets (shared across tools; see scope-observability).
   const S_script_v1: readonly (readonly string[])[] = [
     ["https://www.googleapis.com/auth/script.processes"],
@@ -23,7 +23,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"userProcessFilter.deploymentId","api":"userProcessFilter.deploymentId","location":"query"},{"field":"userProcessFilter.endTime","api":"userProcessFilter.endTime","location":"query"},{"field":"userProcessFilter.functionName","api":"userProcessFilter.functionName","location":"query"},{"field":"userProcessFilter.projectName","api":"userProcessFilter.projectName","location":"query"},{"field":"userProcessFilter.scriptId","api":"userProcessFilter.scriptId","location":"query"},{"field":"userProcessFilter.startTime","api":"userProcessFilter.startTime","location":"query"},{"field":"userProcessFilter.statuses","api":"userProcessFilter.statuses","location":"query"},{"field":"userProcessFilter.types","api":"userProcessFilter.types","location":"query"},{"field":"userProcessFilter.userAccessLevels","api":"userProcessFilter.userAccessLevels","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       pageSize: z.number().describe("The maximum number of returned processes per page of results. Defaults to 50.").optional(),
       pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of `nextPageToken` from a previous response.").optional(),
       "userProcessFilter.deploymentId": z.string().describe("Optional field used to limit returned processes to those originating from projects with a specific deployment ID.").optional(),
@@ -37,7 +37,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
       "userProcessFilter.userAccessLevels": coerceArray(z.enum(["USER_ACCESS_LEVEL_UNSPECIFIED","NONE","READ","WRITE","OWNER"])).describe("Optional field used to limit returned processes to those having one of the specified user access levels.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_processes_list_script_processes",
     cud: "read",
@@ -46,7 +46,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"scriptId","api":"scriptId","location":"query"},{"field":"scriptProcessFilter.deploymentId","api":"scriptProcessFilter.deploymentId","location":"query"},{"field":"scriptProcessFilter.endTime","api":"scriptProcessFilter.endTime","location":"query"},{"field":"scriptProcessFilter.functionName","api":"scriptProcessFilter.functionName","location":"query"},{"field":"scriptProcessFilter.startTime","api":"scriptProcessFilter.startTime","location":"query"},{"field":"scriptProcessFilter.statuses","api":"scriptProcessFilter.statuses","location":"query"},{"field":"scriptProcessFilter.types","api":"scriptProcessFilter.types","location":"query"},{"field":"scriptProcessFilter.userAccessLevels","api":"scriptProcessFilter.userAccessLevels","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       pageSize: z.number().describe("The maximum number of returned processes per page of results. Defaults to 50.").optional(),
       pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of `nextPageToken` from a previous response.").optional(),
       scriptId: z.string().describe("The script ID of the project whose processes are listed.").optional(),
@@ -59,7 +59,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
       "scriptProcessFilter.userAccessLevels": coerceArray(z.enum(["USER_ACCESS_LEVEL_UNSPECIFIED","NONE","READ","WRITE","OWNER"])).describe("Optional field used to limit returned processes to those having one of the specified user access levels.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_create",
     cud: "create",
@@ -69,12 +69,12 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     bodyParams: [{"field":"parentId","api":"parentId"},{"field":"title","api":"title"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parentId: z.string().describe("The Drive ID of a parent file that the created script project is bound to. This is usually the ID of a Google Doc, Google Sheet, Google Form, or Google Slides file. If not set, a standalone script pro").optional(),
       title: z.string().describe("The title for the project.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_deployments_create",
     cud: "create",
@@ -84,7 +84,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     bodyParams: [{"field":"description","api":"description"},{"field":"manifestFileName","api":"manifestFileName"},{"field":"scriptId_","api":"scriptId"},{"field":"versionNumber","api":"versionNumber"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       scriptId: z.string().min(1).describe("The script project's Drive ID."),
       description: z.string().describe("The description for this deployment.").optional(),
       manifestFileName: z.string().describe("The manifest file name for this deployment.").optional(),
@@ -92,7 +92,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
       versionNumber: z.number().describe("The version number on which this deployment is based.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_deployments_delete",
     cud: "delete",
@@ -101,12 +101,12 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"deploymentId","api":"deploymentId","location":"path"},{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       deploymentId: z.string().min(1).describe("The deployment ID to be undeployed."),
       scriptId: z.string().min(1).describe("The script project's Drive ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_deployments_get",
     cud: "read",
@@ -115,12 +115,12 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"deploymentId","api":"deploymentId","location":"path"},{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       deploymentId: z.string().min(1).describe("The deployment ID."),
       scriptId: z.string().min(1).describe("The script project's Drive ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_deployments_list",
     cud: "read",
@@ -129,13 +129,13 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       scriptId: z.string().min(1).describe("The script project's Drive ID."),
       pageSize: z.number().describe("The maximum number of deployments on each returned page. Defaults to 50.").optional(),
       pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of `nextPageToken` from a previous response.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_deployments_update",
     cud: "update",
@@ -144,13 +144,13 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"deploymentId","api":"deploymentId","location":"path"},{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       deploymentId: z.string().min(1).describe("The deployment ID for this deployment."),
       scriptId: z.string().min(1).describe("The script project's Drive ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("UpdateDeploymentRequest JSON request body. Top-level fields: deploymentConfig."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_get",
     cud: "read",
@@ -159,11 +159,11 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       scriptId: z.string().min(1).describe("The script project's Drive ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_get_content",
     cud: "read",
@@ -172,12 +172,12 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"versionNumber","api":"versionNumber","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       scriptId: z.string().min(1).describe("The script project's Drive ID."),
       versionNumber: z.number().describe("The version number of the project to retrieve. If not provided, the project's HEAD version is returned.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_get_metrics",
     cud: "read",
@@ -186,13 +186,13 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"metricsFilter.deploymentId","api":"metricsFilter.deploymentId","location":"query"},{"field":"metricsGranularity","api":"metricsGranularity","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       scriptId: z.string().min(1).describe("Required field indicating the script to get metrics for."),
       "metricsFilter.deploymentId": z.string().describe("Optional field indicating a specific deployment to retrieve metrics from.").optional(),
       metricsGranularity: z.enum(["UNSPECIFIED_GRANULARITY","WEEKLY","DAILY"]).describe("Required field indicating what granularity of metrics are returned.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_update_content",
     cud: "update",
@@ -201,12 +201,12 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       scriptId: z.string().min(1).describe("The script project's Drive ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Content JSON request body. Top-level fields: files, scriptId."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_versions_create",
     cud: "create",
@@ -216,7 +216,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     bodyParams: [{"field":"createTime","api":"createTime"},{"field":"description","api":"description"},{"field":"scriptId_","api":"scriptId"},{"field":"versionNumber","api":"versionNumber"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       scriptId: z.string().min(1).describe("The script project's Drive ID."),
       createTime: z.string().describe("When the version was created.").optional(),
       description: z.string().describe("The description for this version.").optional(),
@@ -224,7 +224,7 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
       versionNumber: z.number().describe("The incremental ID that is created by Apps Script when a version is created. This is system assigned number and is immutable once created.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_versions_get",
     cud: "read",
@@ -233,12 +233,12 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"versionNumber","api":"versionNumber","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       scriptId: z.string().min(1).describe("The script project's Drive ID."),
       versionNumber: z.number().describe("The version number."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_projects_versions_list",
     cud: "read",
@@ -247,13 +247,13 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       scriptId: z.string().min(1).describe("The script project's Drive ID."),
       pageSize: z.number().describe("The maximum number of versions on each returned page. Defaults to 50.").optional(),
       pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of `nextPageToken` from a previous response.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "script_scripts_run",
     cud: "create",
@@ -262,10 +262,10 @@ export function registerScriptGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"scriptId","api":"scriptId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       scriptId: z.string().min(1).describe("The script ID of the script to be executed. Find the script ID on the **Project settings** page under \"IDs.\" As multiple executable APIs can be deployed in new IDE for same script, this field should b"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ExecutionRequest JSON request body. Top-level fields: devMode, function, parameters, sessionState."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
 }

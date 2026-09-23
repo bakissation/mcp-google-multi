@@ -2,9 +2,9 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../../registry.js';
 import { coerceBoolean } from '../_coerce.js';
-import { accountField, registerGeneratedTool } from './_shared.js';
+import { accountField, registerGeneratedTool, type ExecuteDeps } from './_shared.js';
 
-export function registerSearchconsoleGeneratedTools(registry: ToolRegistry): void {
+export function registerSearchconsoleGeneratedTools(registry: ToolRegistry, deps: ExecuteDeps = {}): void {
   registerGeneratedTool(registry, {
     name: "searchconsole_url_testing_tools_mobile_friendly_test_run",
     cud: "read",
@@ -14,10 +14,10 @@ export function registerSearchconsoleGeneratedTools(registry: ToolRegistry): voi
     hasBody: true,
     bodyParams: [{"field":"requestScreenshot","api":"requestScreenshot"},{"field":"url","api":"url"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       requestScreenshot: coerceBoolean.describe("Whether or not screenshot is requested. Default is false.").optional(),
       url: z.string().describe("URL for inspection.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
 }

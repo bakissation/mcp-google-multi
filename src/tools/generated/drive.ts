@@ -2,9 +2,9 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../../registry.js';
 import { coerceArray, coerceBoolean, coerceJson } from '../_coerce.js';
-import { accountField, registerGeneratedTool } from './_shared.js';
+import { accountField, registerGeneratedTool, type ExecuteDeps } from './_shared.js';
 
-export function registerDriveGeneratedTools(registry: ToolRegistry): void {
+export function registerDriveGeneratedTools(registry: ToolRegistry, deps: ExecuteDeps = {}): void {
   // Interned method scope sets (shared across tools; see scope-observability).
   const S_drive_v3: readonly (readonly string[])[] = [
     ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.metadata","https://www.googleapis.com/auth/drive.metadata.readonly","https://www.googleapis.com/auth/drive.readonly"],
@@ -29,12 +29,12 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"proposalId","api":"proposalId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fileId: z.string().min(1).describe("Required. The ID of the item the request is on."),
       proposalId: z.string().min(1).describe("Required. The ID of the access proposal to resolve."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_approvals_approve",
     cud: "update",
@@ -44,13 +44,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     bodyParams: [{"field":"message","api":"message"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       approvalId: z.string().min(1).describe("Required. The ID of the approval to approve."),
       fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       message: z.string().describe("Optional. A message to accompany the reviewer response on the approval. This message is included in notifications for the action and in the approval activity log.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_approvals_cancel",
     cud: "delete",
@@ -60,13 +60,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     bodyParams: [{"field":"message","api":"message"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       approvalId: z.string().min(1).describe("Required. The ID of the approval to cancel."),
       fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       message: z.string().describe("Optional. A message to accompany the cancellation of the approval. This message is included in notifications for the action and in the approval activity log.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_approvals_comment",
     cud: "create",
@@ -76,13 +76,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     bodyParams: [{"field":"message","api":"message"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       approvalId: z.string().min(1).describe("Required. The ID of the approval to comment on."),
       fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       message: z.string().describe("Required. A message to comment on the approval. This message is included in notifications for the action and in the approval activity log.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_approvals_decline",
     cud: "update",
@@ -92,13 +92,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     bodyParams: [{"field":"message","api":"message"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       approvalId: z.string().min(1).describe("Required. The ID of the approval to decline."),
       fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       message: z.string().describe("Optional. A message to accompany the reviewer response on the approval. This message is included in notifications for the action and in the approval activity log.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_approvals_get",
     cud: "read",
@@ -107,12 +107,12 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       approvalId: z.string().min(1).describe("Required. The ID of the approval."),
       fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_approvals_list",
     cud: "read",
@@ -121,13 +121,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       pageSize: z.number().describe("The maximum number of approvals to return. When not set, at most 100 approvals are returned.").optional(),
       pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of `nextPageToken` from a previous response.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_approvals_reassign",
     cud: "update",
@@ -136,13 +136,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"approvalId","api":"approvalId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       approvalId: z.string().min(1).describe("Required. The ID of the approval to reassign."),
       fileId: z.string().min(1).describe("Required. The ID of the file that the approval is on."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ReassignApprovalRequest JSON request body. Top-level fields: addReviewers, message, replaceReviewers."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_approvals_start",
     cud: "create",
@@ -152,7 +152,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     bodyParams: [{"field":"dueTime","api":"dueTime"},{"field":"fileContentChangeBehavior","api":"fileContentChangeBehavior"},{"field":"lockFile","api":"lockFile"},{"field":"message","api":"message"},{"field":"reviewerEmails","api":"reviewerEmails"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fileId: z.string().min(1).describe("Required. The ID of the file that the approval is created on."),
       dueTime: z.string().describe("Optional. The time that the approval is due.").optional(),
       fileContentChangeBehavior: z.enum(["FILE_CONTENT_CHANGE_BEHAVIOR_UNSPECIFIED","RESET_APPROVAL","NO_APPROVAL_ACTION"]).describe("Optional. The behavior of the approval when the file content changes.").optional(),
@@ -161,7 +161,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
       reviewerEmails: coerceArray(z.string()).describe("Required. The emails of the users who are set to review the approval.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_apps_get",
     cud: "read",
@@ -170,11 +170,11 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"appId","api":"appId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       appId: z.string().min(1).describe("The ID of the app."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_apps_list",
     cud: "read",
@@ -183,13 +183,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"appFilterExtensions","api":"appFilterExtensions","location":"query"},{"field":"appFilterMimeTypes","api":"appFilterMimeTypes","location":"query"},{"field":"languageCode","api":"languageCode","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       appFilterExtensions: z.string().describe("A comma-separated list of file extensions to limit returned results. All results within the given app query scope which can open any of the given file extensions are included in the response. If `appF").optional(),
       appFilterMimeTypes: z.string().describe("A comma-separated list of file extensions to limit returned results. All results within the given app query scope which can open any of the given MIME types will be included in the response. If `appFi").optional(),
       languageCode: z.string().describe("A language or locale code, as defined by BCP 47, with some extensions from Unicode's LDML format (http://www.unicode.org/reports/tr35/).").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_changes_get_start_page_token",
     cud: "read",
@@ -198,14 +198,14 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"driveId","api":"driveId","location":"query"},{"field":"supportsAllDrives","api":"supportsAllDrives","location":"query"},{"field":"supportsTeamDrives","api":"supportsTeamDrives","location":"query"},{"field":"teamDriveId","api":"teamDriveId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       driveId: z.string().describe("The ID of the shared drive for which the starting pageToken for listing future changes from that shared drive will be returned.").optional(),
       supportsAllDrives: coerceBoolean.describe("Whether the requesting application supports both My Drives and shared drives.").optional(),
       supportsTeamDrives: coerceBoolean.describe("Deprecated: Use `supportsAllDrives` instead.").optional(),
       teamDriveId: z.string().describe("Deprecated: Use `driveId` instead.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_changes_list",
     cud: "read",
@@ -214,7 +214,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"pageToken","api":"pageToken","location":"query"},{"field":"driveId","api":"driveId","location":"query"},{"field":"includeCorpusRemovals","api":"includeCorpusRemovals","location":"query"},{"field":"includeItemsFromAllDrives","api":"includeItemsFromAllDrives","location":"query"},{"field":"includeLabels","api":"includeLabels","location":"query"},{"field":"includePermissionsForView","api":"includePermissionsForView","location":"query"},{"field":"includeRemoved","api":"includeRemoved","location":"query"},{"field":"includeTeamDriveItems","api":"includeTeamDriveItems","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"restrictToMyDrive","api":"restrictToMyDrive","location":"query"},{"field":"spaces","api":"spaces","location":"query"},{"field":"supportsAllDrives","api":"supportsAllDrives","location":"query"},{"field":"supportsTeamDrives","api":"supportsTeamDrives","location":"query"},{"field":"teamDriveId","api":"teamDriveId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       pageToken: z.string().min(1).describe("The token for continuing a previous list request on the next page. This should be set to the value of 'nextPageToken' from the previous response or to the response from the getStartPageToken method."),
       driveId: z.string().describe("The shared drive from which changes will be returned. If specified the change IDs will be reflective of the shared drive; use the combined drive ID and change ID as an identifier.").optional(),
       includeCorpusRemovals: coerceBoolean.describe("Whether changes should include the file resource if the file is still accessible by the user at the time of the request, even when a file was removed from the list of changes and there will be no furt").optional(),
@@ -231,7 +231,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
       teamDriveId: z.string().describe("Deprecated: Use `driveId` instead.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_changes_watch",
     cud: "create",
@@ -240,7 +240,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"pageToken","api":"pageToken","location":"query"},{"field":"driveId","api":"driveId","location":"query"},{"field":"includeCorpusRemovals","api":"includeCorpusRemovals","location":"query"},{"field":"includeItemsFromAllDrives","api":"includeItemsFromAllDrives","location":"query"},{"field":"includeLabels","api":"includeLabels","location":"query"},{"field":"includePermissionsForView","api":"includePermissionsForView","location":"query"},{"field":"includeRemoved","api":"includeRemoved","location":"query"},{"field":"includeTeamDriveItems","api":"includeTeamDriveItems","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"restrictToMyDrive","api":"restrictToMyDrive","location":"query"},{"field":"spaces","api":"spaces","location":"query"},{"field":"supportsAllDrives","api":"supportsAllDrives","location":"query"},{"field":"supportsTeamDrives","api":"supportsTeamDrives","location":"query"},{"field":"teamDriveId","api":"teamDriveId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       pageToken: z.string().min(1).describe("The token for continuing a previous list request on the next page. This should be set to the value of 'nextPageToken' from the previous response or to the response from the getStartPageToken method."),
       driveId: z.string().describe("The shared drive from which changes will be returned. If specified the change IDs will be reflective of the shared drive; use the combined drive ID and change ID as an identifier.").optional(),
       includeCorpusRemovals: coerceBoolean.describe("Whether changes should include the file resource if the file is still accessible by the user at the time of the request, even when a file was removed from the list of changes and there will be no furt").optional(),
@@ -258,7 +258,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Channel JSON request body. Top-level fields: address, expiration, id, kind, params, payload, resourceId, resourceUri, token, type."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_channels_stop",
     cud: "delete",
@@ -267,11 +267,11 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Channel JSON request body. Top-level fields: address, expiration, id, kind, params, payload, resourceId, resourceUri, token, type."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_drives_create",
     cud: "create",
@@ -280,12 +280,12 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"requestId","api":"requestId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       requestId: z.string().min(1).describe("Required. An ID, such as a random UUID, which uniquely identifies this user's request for idempotent creation of a shared drive. A repeated request by the same user and with the same request ID will a"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Drive JSON request body. Top-level fields: backgroundImageFile, backgroundImageLink, capabilities, colorRgb, createdTime, hidden, id, kind, name, orgUnitId, restrictions, themeId."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_drives_delete",
     cud: "delete",
@@ -294,13 +294,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"driveId","api":"driveId","location":"path"},{"field":"allowItemDeletion","api":"allowItemDeletion","location":"query"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       driveId: z.string().min(1).describe("The ID of the shared drive."),
       allowItemDeletion: coerceBoolean.describe("Whether any items inside the shared drive should also be deleted. This option is only supported when `useDomainAdminAccess` is also set to `true`.").optional(),
       useDomainAdminAccess: coerceBoolean.describe("Issue the request as a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the shared drive belongs.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_drives_hide",
     cud: "update",
@@ -309,11 +309,11 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"driveId","api":"driveId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       driveId: z.string().min(1).describe("The ID of the shared drive."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_drives_unhide",
     cud: "update",
@@ -322,11 +322,11 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"driveId","api":"driveId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       driveId: z.string().min(1).describe("The ID of the shared drive."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_drives_update",
     cud: "update",
@@ -335,13 +335,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"driveId","api":"driveId","location":"path"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       driveId: z.string().min(1).describe("The ID of the shared drive."),
       useDomainAdminAccess: coerceBoolean.describe("Issue the request as a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the shared drive belongs.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Drive JSON request body. Top-level fields: backgroundImageFile, backgroundImageLink, capabilities, colorRgb, createdTime, hidden, id, kind, name, orgUnitId, restrictions, themeId."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_files_download",
     cud: "read",
@@ -350,13 +350,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"mimeType","api":"mimeType","location":"query"},{"field":"revisionId","api":"revisionId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fileId: z.string().min(1).describe("Required. The ID of the file to download."),
       mimeType: z.string().describe("Optional. The MIME type the file should be downloaded as. This field can only be set when downloading Google Workspace documents. For a list of supported MIME types, see [Export MIME types for Google ").optional(),
       revisionId: z.string().describe("Optional. The revision ID of the file to download. This field can only be set when downloading blob files, Google Docs, and Google Sheets. Returns `INVALID_ARGUMENT` if downloading a specific revision").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_files_generate_cse_token",
     cud: "read",
@@ -365,12 +365,12 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"fileId","api":"fileId","location":"query"},{"field":"parent","api":"parent","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fileId: z.string().describe("The ID of the file for which the JWT should be generated. If not provided, an id will be generated.").optional(),
       parent: z.string().describe("The ID of the expected parent of the file. Used when generating a JWT for a new CSE file. If specified, the parent will be fetched, and if the parent is a shared drive item, the shared drive's policy ").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_files_generate_ids",
     cud: "read",
@@ -379,13 +379,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"count","api":"count","location":"query"},{"field":"space","api":"space","location":"query"},{"field":"type","api":"type","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       count: z.number().describe("The number of IDs to return.").optional(),
       space: z.string().describe("The space in which the IDs can be used to create files. Supported values are `drive` and `appDataFolder`. (Default: `drive`.) For more information, see [File organization](https://developers.google.co").optional(),
       type: z.string().describe("The type of items which the IDs can be used for. Supported values are `files` and `shortcuts`. Note that `shortcuts` are only supported in the `drive` `space`. (Default: `files`.) For more information").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_files_list_labels",
     cud: "read",
@@ -394,13 +394,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fileId: z.string().min(1).describe("The ID for the file."),
       maxResults: z.number().describe("The maximum number of labels to return per page. When not set, defaults to 100.").optional(),
       pageToken: z.string().describe("The token for continuing a previous list request on the next page. This should be set to the value of `nextPageToken` from the previous response.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_files_modify_labels",
     cud: "update",
@@ -409,12 +409,12 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fileId: z.string().min(1).describe("The ID of the file to which the labels belong."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ModifyLabelsRequest JSON request body. Top-level fields: kind, labelModifications."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_files_watch",
     cud: "create",
@@ -423,7 +423,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"acknowledgeAbuse","api":"acknowledgeAbuse","location":"query"},{"field":"includeLabels","api":"includeLabels","location":"query"},{"field":"includePermissionsForView","api":"includePermissionsForView","location":"query"},{"field":"supportsAllDrives","api":"supportsAllDrives","location":"query"},{"field":"supportsTeamDrives","api":"supportsTeamDrives","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fileId: z.string().min(1).describe("The ID of the file."),
       acknowledgeAbuse: coerceBoolean.describe("Whether the user is acknowledging the risk of downloading known malware or other abusive files. This is only applicable when the `alt` parameter is set to `media` and the user is the owner of the file").optional(),
       includeLabels: z.string().describe("A comma-separated list of IDs of labels to include in the `labelInfo` part of the response.").optional(),
@@ -433,7 +433,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Channel JSON request body. Top-level fields: address, expiration, id, kind, params, payload, resourceId, resourceUri, token, type."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_operations_get",
     cud: "read",
@@ -442,11 +442,11 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the operation resource."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_permissions_get",
     cud: "read",
@@ -455,7 +455,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"permissionId","api":"permissionId","location":"path"},{"field":"supportsAllDrives","api":"supportsAllDrives","location":"query"},{"field":"supportsTeamDrives","api":"supportsTeamDrives","location":"query"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fileId: z.string().min(1).describe("The ID of the file."),
       permissionId: z.string().min(1).describe("The ID of the permission."),
       supportsAllDrives: coerceBoolean.describe("Whether the requesting application supports both My Drives and shared drives.").optional(),
@@ -463,7 +463,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
       useDomainAdminAccess: coerceBoolean.describe("Issue the request as a domain administrator. If set to `true`, and if the following additional conditions are met, the requester is granted access: 1. The file ID parameter refers to a shared drive. 2").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_replies_get",
     cud: "read",
@@ -472,14 +472,14 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"commentId","api":"commentId","location":"path"},{"field":"fileId","api":"fileId","location":"path"},{"field":"replyId","api":"replyId","location":"path"},{"field":"includeDeleted","api":"includeDeleted","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       commentId: z.string().min(1).describe("The ID of the comment."),
       fileId: z.string().min(1).describe("The ID of the file."),
       replyId: z.string().min(1).describe("The ID of the reply."),
       includeDeleted: coerceBoolean.describe("Whether to return deleted replies. Deleted replies don't include their original content.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_revisions_get",
     cud: "read",
@@ -488,13 +488,13 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"revisionId","api":"revisionId","location":"path"},{"field":"acknowledgeAbuse","api":"acknowledgeAbuse","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fileId: z.string().min(1).describe("The ID of the file."),
       revisionId: z.string().min(1).describe("The ID of the revision."),
       acknowledgeAbuse: coerceBoolean.describe("Whether the user is acknowledging the risk of downloading known malware or other abusive files. This is only applicable when the `alt` parameter is set to `media` and the user is the owner of the file").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_teamdrives_create",
     cud: "create",
@@ -503,12 +503,12 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"requestId","api":"requestId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       requestId: z.string().min(1).describe("Required. An ID, such as a random UUID, which uniquely identifies this user's request for idempotent creation of a Team Drive. A repeated request by the same user and with the same request ID will avo"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("TeamDrive JSON request body. Top-level fields: backgroundImageFile, backgroundImageLink, capabilities, colorRgb, createdTime, id, kind, name, orgUnitId, restrictions, themeId."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_teamdrives_delete",
     cud: "delete",
@@ -517,11 +517,11 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"teamDriveId","api":"teamDriveId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       teamDriveId: z.string().min(1).describe("The ID of the Team Drive"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_teamdrives_get",
     cud: "read",
@@ -530,12 +530,12 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"teamDriveId","api":"teamDriveId","location":"path"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       teamDriveId: z.string().min(1).describe("The ID of the Team Drive"),
       useDomainAdminAccess: coerceBoolean.describe("Issue the request as a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the Team Drive belongs.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_teamdrives_list",
     cud: "read",
@@ -544,14 +544,14 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"q","api":"q","location":"query"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       pageSize: z.number().describe("Maximum number of Team Drives to return.").optional(),
       pageToken: z.string().describe("Page token for Team Drives.").optional(),
       q: z.string().describe("Query string for searching Team Drives.").optional(),
       useDomainAdminAccess: coerceBoolean.describe("Issue the request as a domain administrator; if set to true, then all Team Drives of the domain in which the requester is an administrator are returned.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "drive_teamdrives_update",
     cud: "update",
@@ -560,11 +560,11 @@ export function registerDriveGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"teamDriveId","api":"teamDriveId","location":"path"},{"field":"useDomainAdminAccess","api":"useDomainAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       teamDriveId: z.string().min(1).describe("The ID of the Team Drive"),
       useDomainAdminAccess: coerceBoolean.describe("Issue the request as a domain administrator; if set to true, then the requester will be granted access if they are an administrator of the domain to which the Team Drive belongs.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("TeamDrive JSON request body. Top-level fields: backgroundImageFile, backgroundImageLink, capabilities, colorRgb, createdTime, id, kind, name, orgUnitId, restrictions, themeId."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
 }

@@ -2,9 +2,9 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../../registry.js';
 import { coerceJson } from '../_coerce.js';
-import { accountField, registerGeneratedTool } from './_shared.js';
+import { accountField, registerGeneratedTool, type ExecuteDeps } from './_shared.js';
 
-export function registerFormsGeneratedTools(registry: ToolRegistry): void {
+export function registerFormsGeneratedTools(registry: ToolRegistry, deps: ExecuteDeps = {}): void {
   // Interned method scope sets (shared across tools; see scope-observability).
   const S_forms_v1: readonly (readonly string[])[] = [
     ["https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.readonly","https://www.googleapis.com/auth/forms.body","https://www.googleapis.com/auth/forms.body.readonly","https://www.googleapis.com/auth/forms.responses.readonly"],
@@ -17,12 +17,12 @@ export function registerFormsGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"formId","api":"formId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       formId: z.string().min(1).describe("Required. ID of the Form to watch."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CreateWatchRequest JSON request body. Top-level fields: watch, watchId."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "forms_forms_watches_delete",
     cud: "delete",
@@ -31,12 +31,12 @@ export function registerFormsGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"formId","api":"formId","location":"path"},{"field":"watchId","api":"watchId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       formId: z.string().min(1).describe("Required. The ID of the Form."),
       watchId: z.string().min(1).describe("Required. The ID of the Watch to delete."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "forms_forms_watches_renew",
     cud: "update",
@@ -46,10 +46,10 @@ export function registerFormsGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       formId: z.string().min(1).describe("Required. The ID of the Form."),
       watchId: z.string().min(1).describe("Required. The ID of the Watch to renew."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
 }
