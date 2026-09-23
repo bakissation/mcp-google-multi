@@ -67,15 +67,22 @@ export function __setKeychainFactoryForTest(fn: ((account: string) => KeychainEn
   keychainFactory = fn ?? systemKeychain;
 }
 
-// Glob the token dir instead of iterating registered aliases: an orphan .enc
-// (alias removed from the registry, or a partial GOOGLE_ACCOUNTS override in
-// one client) must still stop a fresh key from being minted.
-function anyTokenFileExists(): boolean {
+function anyEncFileUnder(dir: string): boolean {
   try {
-    return fs.readdirSync(getTokenDir()).some((f) => f.endsWith('.enc'));
+    return fs.readdirSync(dir, { recursive: true }).some((f) => String(f).endsWith('.enc'));
   } catch {
     return false;
   }
+}
+
+// Glob the token dir instead of iterating registered aliases: an orphan .enc
+// (alias removed from the registry, or a partial GOOGLE_ACCOUNTS override in
+// one client) must still stop a fresh key from being minted. The walk is
+// recursive and also covers configDir()/tenants (the tenant-namespaced token
+// root): a flat scan returns false the moment tokens nest, and minting a
+// fresh MASTER_KEY over existing .enc files bricks them irreversibly.
+function anyTokenFileExists(): boolean {
+  return anyEncFileUnder(getTokenDir()) || anyEncFileUnder(path.join(configDir(), 'tenants'));
 }
 
 function readKeyFile(filePath: string): string | null {
