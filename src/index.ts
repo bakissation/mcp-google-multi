@@ -354,6 +354,13 @@ async function main() {
     // re-auth link into the AS's alias_reauth flow instead of a stdio CLI hint.
     const { setHttpReauthBase } = await import('./reauth-hint.js');
     setHttpReauthBase(httpCfg.publicUrl);
+    // Wizard consent over HTTP: hand out the clientless AS link instead of
+    // binding a loopback listener (single-owner flow; a tenancy host installs
+    // its own signed-mint context here).
+    const { setWizardHttpConsent } = await import('./tools/account-wizard.js');
+    setWizardHttpConsent({
+      mintConsentUrl: (alias) => `${httpCfg.publicUrl}/authorize?flow=alias_reauth&alias=${encodeURIComponent(alias)}`,
+    });
 
     let httpTap: ((t: Transport) => Transport) | undefined;
     if (httpMetrics) {
