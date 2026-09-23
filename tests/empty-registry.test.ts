@@ -72,7 +72,7 @@ describe('empty registry, end-to-end via the CLI (gap #23)', () => {
   // Run the built entry through tsx (reflects src, no dist dependency) on a fresh
   // config home, with MCP_GOOGLE_MULTI_ENV pointed at an EMPTY file so a stray
   // repo-root .env can't leak accounts in. stdin is closed so the server can't hang.
-  function runCli(args: string[]): { status: number | null; out: string } {
+  function runCli(args: string[], envOver: Record<string, string> = {}): { status: number | null; out: string } {
     const home = mkdtempSync(path.join(tmpdir(), 'mcp-gm-e2e-'));
     const emptyEnv = path.join(home, 'empty.env');
     writeFileSync(emptyEnv, '');
@@ -81,6 +81,7 @@ describe('empty registry, end-to-end via the CLI (gap #23)', () => {
     env.XDG_CONFIG_HOME = home;
     env.TOKEN_STORE_PATH = path.join(home, 'tokens');
     env.MCP_GOOGLE_MULTI_ENV = emptyEnv;
+    Object.assign(env, envOver);
     // cwd = repoRoot so `--import tsx` resolves from node_modules; MCP_GOOGLE_MULTI_ENV
     // (an empty file) already bypasses all .env search tiers, so no repo .env leaks.
     const r = spawnSync(process.execPath, ['--import', 'tsx', srcIndex, ...args], {
@@ -112,6 +113,24 @@ describe('empty registry, end-to-end via the CLI (gap #23)', () => {
 
   it('the SERVER still REFUSES to boot on an empty registry (BR-4)', () => {
     const { status, out } = runCli([]); // no subcommand => server path
+    expect(status).not.toBe(0);
+    expect(out).toMatch(/E_NO_ACCOUNTS_CONFIGURED/);
+  });
+
+  // S1.16 golden: the boot reorder (transport derivation before the accounts
+  // gate) must keep both free-core refusals byte-recognizable.
+  it('http boot with accounts but no MCP_OWNER_EMAILS still refuses: E_OWNER_EMAILS_REQUIRED', () => {
+    const { status, out } = runCli([], {
+      MCP_TRANSPORT: 'http',
+      GOOGLE_ACCOUNTS: 'work:w@x.example',
+      MCP_OWNER_EMAILS: '',
+    });
+    expect(status).toBe(1);
+    expect(out).toMatch(/E_OWNER_EMAILS_REQUIRED/);
+  });
+
+  it('http boot with an empty registry (single-owner) still refuses on accounts first', () => {
+    const { status, out } = runCli([], { MCP_TRANSPORT: 'http', MCP_OWNER_EMAILS: 'owner@x.example' });
     expect(status).not.toBe(0);
     expect(out).toMatch(/E_NO_ACCOUNTS_CONFIGURED/);
   });

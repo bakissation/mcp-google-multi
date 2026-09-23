@@ -2,6 +2,7 @@
 // First import: triggers accounts.js module load (env files + registry) before
 // anything else. Named to also pull the server-only empty-registry guard (BR-4).
 import { assertServerAccountsConfigured, getAccountSet } from './accounts.js';
+import { accountsAssertRequired, assertNoEnvAccountsMode, assertNoEnvOptionalScopesMode, isMultiTenantBoot, mtBootGates } from './boot-gates.js';
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -213,16 +214,8 @@ async function main() {
     return;
   }
 
-  // BR-4: the SERVER never boots with an empty registry. The bootstrap and
-  // diagnostic CLIs above already returned; a fresh user configures accounts
-  // (env / migrate-config / account import / auth) before the server runs.
-  assertServerAccountsConfigured();
-
-  // Resolve (or provision) the master key BEFORE serving: the hard guard is
-  // specced "fatal at startup", never mid-dispatch.
-  const { resolveMasterKey } = await import('./master-key.js');
-  resolveMasterKey();
-
+  // Transport derivation FIRST: the accounts gate below is transport-aware
+  // (a multi-tenant HTTP deploy legitimately boots with zero accounts).
   const { resolveHttpConfig, transportIncludesHttp } = await import('./http-config.js');
   let httpCfg;
   try {
@@ -233,6 +226,22 @@ async function main() {
   }
   const wantStdio = httpCfg.transport === 'stdio' || httpCfg.transport === 'both';
   const wantHttp = transportIncludesHttp(httpCfg.transport);
+
+  // BR-4: the SERVER never boots with an empty registry — stdio always, HTTP
+  // when single-owner. The bootstrap and diagnostic CLIs above already
+  // returned. A multi-tenant boot instead refuses the two process-wide env
+  // vectors that would leak one operator's accounts/scopes into every tenant.
+  const mt = isMultiTenantBoot();
+  if (accountsAssertRequired(wantStdio, mt)) assertServerAccountsConfigured();
+  if (mt) {
+    assertNoEnvAccountsMode();
+    assertNoEnvOptionalScopesMode();
+  }
+
+  // Resolve (or provision) the master key BEFORE serving: the hard guard is
+  // specced "fatal at startup", never mid-dispatch.
+  const { resolveMasterKey } = await import('./master-key.js');
+  resolveMasterKey();
 
   // Local usage metrics: fail-closed resolve, self-announcing source, null
   // when off (no wrapper, no dir, nothing initializes). One instance per
@@ -309,14 +318,22 @@ async function main() {
 
   if (wantHttp) {
     const { HttpTransportHost, parseOwnerEmails } = await import('./http-transport.js');
-    // BR3 / C13: the owner allowlist is the entire multi-tenant collapse; refuse
-    // to open an ungated HTTP endpoint.
     const owners = parseOwnerEmails(process.env);
-    if (owners.length === 0) {
-      process.stderr.write(
-        'E_OWNER_EMAILS_REQUIRED: MCP_TRANSPORT includes http but MCP_OWNER_EMAILS is empty. Set MCP_OWNER_EMAILS to the Google email(s) allowed to authenticate.\n',
-      );
-      process.exit(1);
+    const gates = mtBootGates();
+    if (gates?.multiTenant) {
+      // Same fail-fast SHAPE, different condition: an ungated HTTP endpoint
+      // must never boot; under tenancy the gate is "a valid provisioning
+      // mechanism exists", not a flat owner allowlist.
+      gates.assertProvisioningGate();
+    } else {
+      // BR3 / C13: the owner allowlist is the entire multi-tenant collapse;
+      // refuse to open an ungated HTTP endpoint.
+      if (owners.length === 0) {
+        process.stderr.write(
+          'E_OWNER_EMAILS_REQUIRED: MCP_TRANSPORT includes http but MCP_OWNER_EMAILS is empty. Set MCP_OWNER_EMAILS to the Google email(s) allowed to authenticate.\n',
+        );
+        process.exit(1);
+      }
     }
     // BR7: stateless HTTP cannot push tools/list_changed, so it forces curated.
     const configuredMode = (process.env.GOOGLE_DISCOVERY ?? '').trim().toLowerCase();
