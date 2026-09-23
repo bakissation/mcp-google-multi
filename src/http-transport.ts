@@ -27,6 +27,11 @@ export interface HttpHostOptions {
   version: string;
   ownerConfigured: boolean;
   authenticate: Authenticator;
+  /** Tenant-resolution seam: map the verified subject to ITS server. Absent
+   * (free core) = every request dispatches to the one boot `server`. Return
+   * null for an unknown subject -> 403 tenant_not_found. Each distinct
+   * resolved server gets its own serialize key. */
+  resolveServer?: (claims: { sub: string }) => Promise<{ server: McpServer } | null> | { server: McpServer } | null;
   /** Extra routes keyed by exact pathname (AS endpoints mount here in B13). */
   routes?: Record<string, RouteHandler>;
   log?: (line: string) => void;
@@ -88,20 +93,25 @@ export function jsonRpcMethod(body: unknown): string {
 
 export class HttpTransportHost {
   private httpServer?: Server;
-  // Serialize the connect→dispatch critical section: the shared McpServer
+  // Serialize the connect→dispatch critical section PER KEY: a McpServer
   // captures its transport per request (protocol.js), but the gap between
   // connect() and the dispatch capturing it would still race under true
-  // concurrency. Single-owner HTTP traffic is effectively serial, so a mutex
-  // keeps correctness at negligible cost (and never rebuilds the registry).
-  private lock: Promise<unknown> = Promise.resolve();
+  // concurrency, so all traffic to ONE server runs under one mutex. The free
+  // core uses a single key (one boot server); with resolveServer each subject
+  // gets its own server and therefore its own independent lock lane.
+  private readonly locks = new Map<string, Promise<unknown>>();
 
   constructor(private readonly opts: HttpHostOptions) {}
 
-  private serialize<T>(fn: () => Promise<T>): Promise<T> {
-    const run = this.lock.then(fn, fn);
-    this.lock = run.then(
-      () => undefined,
-      () => undefined,
+  private serializeFor<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.locks.get(key) ?? Promise.resolve();
+    const run = prev.then(fn, fn);
+    this.locks.set(
+      key,
+      run.then(
+        () => undefined,
+        () => undefined,
+      ),
     );
     return run as Promise<T>;
   }
@@ -204,6 +214,25 @@ export class HttpTransportHost {
       return;
     }
 
+    const sub = auth.sub ?? 'owner';
+
+    // Tenant resolution (the seam EE fills): map the verified subject to ITS
+    // server. Absent resolver = the one boot server for every subject.
+    let target: { server: McpServer } | null = { server: this.opts.server };
+    if (this.opts.resolveServer) {
+      try {
+        target = await this.opts.resolveServer({ sub });
+      } catch {
+        target = null;
+      }
+      if (!target) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'tenant_not_found', message: 'no tenant is provisioned for this subject' }));
+        this.log('403 tenant_not_found path=/mcp');
+        return;
+      }
+    }
+
     // Thread the verified subject to tool handlers: the Node transport forwards
     // req.auth verbatim as ctx.http.authInfo. Token/clientId stay empty — the
     // bearer value must not re-enter the dispatch path via handler context.
@@ -211,7 +240,7 @@ export class HttpTransportHost {
       token: '',
       clientId: '',
       scopes: ['mcp:use'],
-      extra: { sub: auth.sub ?? 'owner' },
+      extra: { sub },
     };
 
     let body: unknown;
@@ -240,7 +269,12 @@ export class HttpTransportHost {
     // releases. (A shared initialized-state persists across stateless requests;
     // benign for the single-owner design.)
     const deadlineMs = this.opts.dispatchTimeoutMs ?? DISPATCH_TIMEOUT_DEFAULT;
-    await this.serialize(async () => {
+    // The lock lane must match the SERVER identity, not the subject: without a
+    // resolver every subject shares the one boot server, so keying on sub
+    // would let two subjects race one server through the connect gap.
+    const serializeKey = this.opts.resolveServer ? sub : '__single__';
+    const mcpServer = target.server;
+    await this.serializeFor(serializeKey, async () => {
       const disconnected = new Promise<'closed'>((resolve) => res.once('close', () => resolve('closed')));
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timedOut = new Promise<'timeout'>((resolve) => {
@@ -251,7 +285,7 @@ export class HttpTransportHost {
       // so the tap above it still classifies the original validation prose.
       const enveloped = withValidationEnvelope(transport, this.opts.validationEnvelope ?? {});
       const tapped = this.opts.metricsTap ? this.opts.metricsTap(enveloped) : enveloped;
-      await this.opts.server.connect(
+      await mcpServer.connect(
         this.opts.argShapeFor || this.opts.strictArgs
           ? withArgNormalization(tapped, this.opts.argShapeFor ?? (() => undefined), this.opts.log, this.opts.onArgRename, this.opts.strictArgs)
           : tapped,

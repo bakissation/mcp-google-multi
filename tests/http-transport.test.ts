@@ -173,6 +173,93 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
     expect(JSON.parse(res.text).result.content[0].text).toBe('owner');
   });
 
+  it('resolveServer routes two subjects to two distinct servers (S1.15)', async () => {
+    const named = (marker: string) => {
+      const s = new McpServer({ name: `srv-${marker}`, version: '0.0.0' });
+      s.registerTool('marker', { description: 'which server am I', inputSchema: z.object({}) }, async () => ({
+        content: [{ type: 'text' as const, text: marker }],
+      }));
+      return s;
+    };
+    const servers: Record<string, McpServer> = { 'tenant-a': named('A'), 'tenant-b': named('B') };
+    const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
+    const host = new HttpTransportHost({
+      server: makeServer(),
+      config,
+      version: '9.9.9',
+      ownerConfigured: true,
+      authenticate: (req) => ({ ok: true, sub: String(req.headers['x-test-sub'] ?? '') }),
+      resolveServer: ({ sub }) => (servers[sub] ? { server: servers[sub] } : null),
+    });
+    await host.start();
+    hosts.push(host);
+    const port = host.address()!.port;
+
+    const call = async (sub: string) => {
+      await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT, 'x-test-sub': sub }, body: initBody });
+      const res = await request(port, 'POST', '/mcp', {
+        headers: { accept: MCP_ACCEPT, 'x-test-sub': sub },
+        body: { jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'marker', arguments: {} } },
+      });
+      return { status: res.status, text: res.text };
+    };
+
+    const a = await call('tenant-a');
+    const b = await call('tenant-b');
+    expect(a.status).toBe(200);
+    expect(JSON.parse(a.text).result.content[0].text).toBe('A');
+    expect(JSON.parse(b.text).result.content[0].text).toBe('B');
+
+    // an unknown subject resolves no server: 403 tenant_not_found, never the boot server
+    const unknown = await request(port, 'POST', '/mcp', {
+      headers: { accept: MCP_ACCEPT, 'x-test-sub': 'tenant-zz' },
+      body: initBody,
+    });
+    expect(unknown.status).toBe(403);
+    expect(JSON.parse(unknown.text).error).toBe('tenant_not_found');
+  });
+
+  it('per-subject lock lanes are independent: one tenant\'s slow call never queues another\'s (S1.15)', async () => {
+    const named = (marker: string, delayMs: number) => {
+      const s = new McpServer({ name: `srv-${marker}`, version: '0.0.0' });
+      s.registerTool('work', { description: 'do work', inputSchema: z.object({}) }, async () => {
+        await new Promise((r) => setTimeout(r, delayMs));
+        return { content: [{ type: 'text' as const, text: marker }] };
+      });
+      return s;
+    };
+    const servers: Record<string, McpServer> = { slow: named('SLOW', 700), fast: named('FAST', 0) };
+    const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
+    const host = new HttpTransportHost({
+      server: makeServer(),
+      config,
+      version: '9.9.9',
+      ownerConfigured: true,
+      authenticate: (req) => ({ ok: true, sub: String(req.headers['x-test-sub'] ?? '') }),
+      resolveServer: ({ sub }) => (servers[sub] ? { server: servers[sub] } : null),
+    });
+    await host.start();
+    hosts.push(host);
+    const port = host.address()!.port;
+
+    for (const sub of ['slow', 'fast']) {
+      await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT, 'x-test-sub': sub }, body: initBody });
+    }
+    const callWork = (sub: string) =>
+      request(port, 'POST', '/mcp', {
+        headers: { accept: MCP_ACCEPT, 'x-test-sub': sub },
+        body: { jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name: 'work', arguments: {} } },
+      }).then((r) => ({ sub, r }));
+
+    const slowP = callWork('slow');
+    const fastP = callWork('fast');
+    const first = await Promise.race([slowP, fastP]);
+    // under the old single global lock, fast would queue behind slow
+    expect(first.sub).toBe('fast');
+    const [slow] = await Promise.all([slowP]);
+    expect(JSON.parse(slow.r.text).result.content[0].text).toBe('SLOW');
+  });
+
   it('GET /mcp is 405 (no SSE in stateless mode)', async () => {
     const port = await startHost();
     const res = await request(port, 'GET', '/mcp');
