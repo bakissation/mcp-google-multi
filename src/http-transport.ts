@@ -1,5 +1,5 @@
 // B12: the Streamable HTTP transport host (cc-transport-hosting T2/T3). Owns the
-import type { McpServer, Transport } from "@modelcontextprotocol/server";
+import type { McpServer, Transport, AuthInfo } from "@modelcontextprotocol/server";
 import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 
 // node:http server, the route table, the front guard (Host / Origin / DNS-rebind),
@@ -11,7 +11,7 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import type { HttpConfig } from './http-config.js';
 import { withArgNormalization, type ArgShape, type StrictArgOptions, withValidationEnvelope, type ValidationEnvelopeOptions } from './arg-normalize.js';
 export type AuthOutcome =
-  | { ok: true }
+  | { ok: true; sub?: string }
   | { ok: false; status: number; body: string; headers?: Record<string, string> };
 
 /** Bearer / owner check for POST /mcp. B12 default = loopback-owner; B13 swaps in JWT verify. */
@@ -203,6 +203,16 @@ export class HttpTransportHost {
       this.log(`${auth.status} auth_failed path=/mcp`);
       return;
     }
+
+    // Thread the verified subject to tool handlers: the Node transport forwards
+    // req.auth verbatim as ctx.http.authInfo. Token/clientId stay empty — the
+    // bearer value must not re-enter the dispatch path via handler context.
+    (req as IncomingMessage & { auth?: AuthInfo }).auth = {
+      token: '',
+      clientId: '',
+      scopes: ['mcp:use'],
+      extra: { sub: auth.sub ?? 'owner' },
+    };
 
     let body: unknown;
     try {

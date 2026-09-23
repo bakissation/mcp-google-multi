@@ -58,6 +58,9 @@ function makeServer(): McpServer {
   s.registerTool('ping', { description: 'ping the server', inputSchema: z.object({}) }, async () => ({
     content: [{ type: 'text' as const, text: 'pong' }],
   }));
+  s.registerTool('whoami', { description: 'echo the authenticated subject', inputSchema: z.object({}) }, async (_args, ctx) => ({
+    content: [{ type: 'text' as const, text: String((ctx.http?.authInfo?.extra as { sub?: string } | undefined)?.sub ?? 'none') }],
+  }));
   s.registerTool('slow', { description: 'slow tool', inputSchema: z.object({}) }, async () => {
     await new Promise((r) => setTimeout(r, 300));
     return { content: [{ type: 'text' as const, text: 'done' }] };
@@ -146,6 +149,28 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
     const json = JSON.parse(res.text);
     const names = (json.result.tools as { name: string }[]).map((t) => t.name);
     expect(names).toContain('ping');
+  });
+
+  it('stamps the authenticated sub into ctx.http.authInfo.extra for tool handlers (S1.4)', async () => {
+    const port = await startHost(() => ({ ok: true, sub: 'tenant-42' }));
+    await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: initBody });
+    const res = await request(port, 'POST', '/mcp', {
+      headers: { accept: MCP_ACCEPT },
+      body: { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'whoami', arguments: {} } },
+    });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.text).result.content[0].text).toBe('tenant-42');
+  });
+
+  it('defaults the stamped sub to owner when the authenticator carries none', async () => {
+    const port = await startHost(); // default authenticator returns a bare {ok: true}
+    await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: initBody });
+    const res = await request(port, 'POST', '/mcp', {
+      headers: { accept: MCP_ACCEPT },
+      body: { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'whoami', arguments: {} } },
+    });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.text).result.content[0].text).toBe('owner');
   });
 
   it('GET /mcp is 405 (no SSE in stateless mode)', async () => {
