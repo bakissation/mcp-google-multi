@@ -1,3 +1,4 @@
+import type { AccountSet } from './accounts.js';
 import { registerGmailTools } from './tools/gmail.js';
 import { registerDriveTools } from './tools/drive.js';
 import { registerCalendarTools } from './tools/calendar.js';
@@ -20,7 +21,10 @@ import { suggestKeys } from './arg-strict.js';
 export interface ServiceEntry {
   name: string;
   register: (registry: ToolRegistry) => void;
-  enabled?: () => boolean;
+  /** Absent = always on. Gates evaluate against the PASSED account set (the
+   * calling tenant's view); omitted set = the global registry, today's
+   * behavior. */
+  enabled?: (set?: AccountSet) => boolean;
 }
 
 export const SERVICES: ServiceEntry[] = [
@@ -33,20 +37,20 @@ export const SERVICES: ServiceEntry[] = [
   { name: 'searchconsole', register: registerSearchConsoleTools },
   { name: 'tasks', register: registerTasksTools },
   { name: 'meet', register: registerMeetTools },
-  { name: 'slides', register: registerSlidesTools, enabled: () => new Set(getOptionalBundles()).has('slides') },
-  { name: 'forms', register: registerFormsTools, enabled: () => new Set(getOptionalBundles()).has('forms') },
-  { name: 'chat', register: registerChatTools, enabled: () => new Set(getOptionalBundles()).has('chat') },
-  { name: 'analytics', register: registerAnalyticsTools, enabled: () => { const b = new Set(getOptionalBundles()); return b.has('analytics') || b.has('analytics_write'); } },
-  { name: 'admin', register: registerAdminTools, enabled: () => getAdminAccounts().length > 0 },
+  { name: 'slides', register: registerSlidesTools, enabled: (set) => new Set(getOptionalBundles(set)).has('slides') },
+  { name: 'forms', register: registerFormsTools, enabled: (set) => new Set(getOptionalBundles(set)).has('forms') },
+  { name: 'chat', register: registerChatTools, enabled: (set) => new Set(getOptionalBundles(set)).has('chat') },
+  { name: 'analytics', register: registerAnalyticsTools, enabled: (set) => { const b = new Set(getOptionalBundles(set)); return b.has('analytics') || b.has('analytics_write'); } },
+  { name: 'admin', register: registerAdminTools, enabled: (set) => getAdminAccounts(set).length > 0 },
 ];
 
 // Generated-only services with opt-in scopes; admin/forms/chat/analytics reuse their curated gate in buildRegistry,
 // and workspaceevents is deliberately absent — no dedicated scope (subscriptions use resource scopes).
 const bundleGate = (name: string) => ({
-  enabled: () => new Set(getOptionalBundles()).has(name),
+  enabled: (set?: AccountSet) => new Set(getOptionalBundles(set)).has(name),
   hint: `add "${name}" to an account's scope profile (or legacy GOOGLE_OPTIONAL_SCOPES)`,
 });
-export const GENERATED_GATES: Record<string, { enabled: () => boolean; hint: string }> = {
+export const GENERATED_GATES: Record<string, { enabled: (set?: AccountSet) => boolean; hint: string }> = {
   appsmarket: bundleGate('appsmarket'),
   classroom: bundleGate('classroom'),
   cloudidentity: bundleGate('cloudidentity'),
