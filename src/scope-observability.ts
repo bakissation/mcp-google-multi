@@ -1,6 +1,7 @@
 import { ADMIN_SCOPES, BUNDLE_CATALOG } from './scope-catalog.js';
 import { BASE_SCOPES, resolveScopesForAccount } from './auth.js';
 import { readToken } from './token-store.js';
+import { reauthHint } from './reauth-hint.js';
 
 // The #114 three-state model: what action, if any, reaches a granted state.
 export type ScopeState = 'callable' | 'requestable_not_granted' | 'not_requestable';
@@ -97,7 +98,7 @@ export function scopeHint(scope: string, c: ScopeClassification, alias: string):
       return {
         hint:
           `Scope ${scope} is in ${alias}'s profile but not granted (you unchecked it at consent). ` +
-          `Re-grant: npx mcp-google-multi auth --account ${alias}`,
+          reauthHint(alias),
         retriable: true,
       };
     case 'not_requestable':

@@ -28,7 +28,11 @@ const accountEntrySchema = z.strictObject({
 // masterKey, jwtKey, clientId) fails validation, structurally enforcing
 // secrets-env-only. scopeProfiles/defaultAccount/discovery/toolsets are part
 // of the frozen envelope; their consumers land in later slices.
-const RESERVED_ALIASES = ['__proto__', 'constructor', 'prototype'];
+export const RESERVED_ALIASES = ['__proto__', 'constructor', 'prototype'];
+
+export function isReservedAlias(name: string): boolean {
+  return RESERVED_ALIASES.includes(name);
+}
 
 const configSchema = z.strictObject({
   version: z.number().int(),
