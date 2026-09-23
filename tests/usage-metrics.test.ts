@@ -27,7 +27,7 @@ afterEach(() => {
   for (const d of dirs.splice(0)) fs.rmSync(d, { recursive: true, force: true });
 });
 
-function make(dir: string, opts: { now?: () => number; mono?: () => number; log?: (l: string) => void } = {}) {
+function make(dir: string, opts: { now?: () => number; mono?: () => number; log?: (l: string) => void; sequencingEnabled?: boolean } = {}) {
   return new Metrics({
     dir,
     version: '6.0.0-test',
@@ -36,6 +36,7 @@ function make(dir: string, opts: { now?: () => number; mono?: () => number; log?
     now: opts.now,
     monotonic: opts.mono,
     log: opts.log ?? (() => {}),
+    sequencingEnabled: opts.sequencingEnabled,
   });
 }
 
@@ -136,7 +137,7 @@ describe('recording and derivations', () => {
   it('an unknown slug buckets to other, and a hostile email-shaped slug never reaches the file', async () => {
     const dir = tmp();
     const m = make(dir);
-    const w = m.wrap(entry('drive_search'), async () => errResult({ error: 'baki@example.com', message: 'x', retriable: false, account: 'a' }));
+    const w = m.wrap(entry('drive_search'), async () => errResult({ error: 'intruder@example.com', message: 'x', retriable: false, account: 'a' }));
     await w({});
     m.flush();
     const raw = fs.readFileSync(path.join(dir, 'agg', fs.readdirSync(path.join(dir, 'agg'))[0]), 'utf-8');
@@ -166,6 +167,36 @@ describe('recording and derivations', () => {
     await m.wrap(entry('tasks_update'), async () => okResult())({});
     m.flush();
     expect(readDay(dir).retries).toEqual({});
+  });
+
+  it('sequencingEnabled=false skips the retry and bigram chains that would link distinct callers (S1.17)', async () => {
+    // Baseline: a shared process links caller A's error to caller B's success.
+    const linked = tmp();
+    let t = 0;
+    const mLinked = make(linked, { mono: () => t });
+    await mLinked.wrap(entry('tasks_update'), async () => errResult({ error: 'validation_error', message: 'x', hint: 'h', retriable: false, account: 'a' }))({});
+    t += 60_000;
+    await mLinked.wrap(entry('tasks_update'), async () => okResult())({});
+    await mLinked.wrap(entry('gmail_read'), async () => okResult())({});
+    mLinked.flush();
+    expect(readDay(linked).retries.validation_error).toEqual({ hintedOk: 1, hintedFail: 0, unhintedOk: 0, unhintedFail: 0 });
+    expect(readDay(linked).bigrams['tasks_update>gmail_read']).toBe(1);
+
+    // Same event sequence with the flag off: no cross-call linkage at all,
+    // per-tool counts unaffected, DayAgg shape unchanged (empty maps).
+    const isolated = tmp();
+    t = 0;
+    const mIsolated = make(isolated, { mono: () => t, sequencingEnabled: false });
+    await mIsolated.wrap(entry('tasks_update'), async () => errResult({ error: 'validation_error', message: 'x', hint: 'h', retriable: false, account: 'a' }))({});
+    t += 60_000;
+    await mIsolated.wrap(entry('tasks_update'), async () => okResult())({});
+    await mIsolated.wrap(entry('gmail_read'), async () => okResult())({});
+    mIsolated.flush();
+    const day = readDay(isolated);
+    expect(day.retries).toEqual({});
+    expect(day.bigrams).toEqual({});
+    expect(day.tools.tasks_update.n).toBe(2);
+    expect(day.tools.gmail_read.n).toBe(1);
   });
 
   it('bigrams chain in order and break on a 5-minute gap', async () => {

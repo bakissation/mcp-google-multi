@@ -175,6 +175,11 @@ export interface InitOptions {
   now?: () => number;
   monotonic?: () => number;
   log?: (line: string) => void;
+  /** Default true. The retry and bigram chains correlate CONSECUTIVE calls,
+   * which is only meaningful when one caller owns the whole process; a host
+   * serving several callers sets false so their sequences never cross-link.
+   * DayAgg shape is unchanged (retries/bigrams stay empty maps). */
+  sequencingEnabled?: boolean;
 }
 
 function emptyDay(day: string): DayAgg {
@@ -284,8 +289,10 @@ export class Metrics {
   private dirty = false;
   private failures = 0;
   private disabled = false;
+  private readonly sequencing: boolean;
 
   constructor(opts: InitOptions) {
+    this.sequencing = opts.sequencingEnabled !== false;
     this.dir = opts.dir ?? path.join(stateDir(opts.env), METRICS_DIR_NAME);
     this.aggDir = path.join(this.dir, 'agg');
     this.eventsFile = path.join(this.dir, 'events.jsonl');
@@ -411,22 +418,26 @@ export class Metrics {
       addInto(f as unknown as Record<string, number>, fan);
     }
 
-    // retry self-correction chain (spec section 1): in-memory only.
+    // retry self-correction chain (spec section 1): in-memory only. Both
+    // chains link consecutive calls, so they only run when one caller owns
+    // the process (sequencingEnabled).
     const nowM = this.mono();
-    const prev = this.lastError.get(entry.name);
-    if (prev && nowM - prev.at <= RETRY_WINDOW_MS) {
-      const rr = (this.deltas.retries[prev.slug] ??= { hintedOk: 0, hintedFail: 0, unhintedOk: 0, unhintedFail: 0 });
-      const key = `${prev.hinted ? 'hinted' : 'unhinted'}${ok ? 'Ok' : 'Fail'}` as keyof typeof rr;
-      rr[key] += 1;
-      this.lastError.delete(entry.name);
-    }
-    if (!ok && slug) this.lastError.set(entry.name, { slug, hinted: hinted === true, at: nowM });
+    if (this.sequencing) {
+      const prev = this.lastError.get(entry.name);
+      if (prev && nowM - prev.at <= RETRY_WINDOW_MS) {
+        const rr = (this.deltas.retries[prev.slug] ??= { hintedOk: 0, hintedFail: 0, unhintedOk: 0, unhintedFail: 0 });
+        const key = `${prev.hinted ? 'hinted' : 'unhinted'}${ok ? 'Ok' : 'Fail'}` as keyof typeof rr;
+        rr[key] += 1;
+        this.lastError.delete(entry.name);
+      }
+      if (!ok && slug) this.lastError.set(entry.name, { slug, hinted: hinted === true, at: nowM });
 
-    // bigrams: ordered pairs within the process, 5-minute gap breaks the chain.
-    if (this.lastTool && nowM - this.lastTool.at <= BIGRAM_GAP_MS) {
-      addInto(this.deltas.bigrams, `${this.lastTool.name}>${entry.name}`);
+      // bigrams: ordered pairs within the process, 5-minute gap breaks the chain.
+      if (this.lastTool && nowM - this.lastTool.at <= BIGRAM_GAP_MS) {
+        addInto(this.deltas.bigrams, `${this.lastTool.name}>${entry.name}`);
+      }
+      this.lastTool = { name: entry.name, at: nowM };
     }
-    this.lastTool = { name: entry.name, at: nowM };
 
     const event: Record<string, unknown> = {
       ts: new Date(this.now()).toISOString().slice(0, 16) + ':00Z',
