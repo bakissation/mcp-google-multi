@@ -438,17 +438,17 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       if (!form.code_verifier || pkceS256(form.code_verifier) !== code.code_challenge) {
         return json(res, 400, { error: 'invalid_grant', message: 'PKCE verification failed' });
       }
-      const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl });
-      const refreshToken = refresh.issue(now());
+      const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl, sub: 'owner' });
+      const refreshToken = refresh.issue(now(), 'owner');
       log('token issued grant=authorization_code');
       return json(res, 200, { access_token: access, token_type: 'Bearer', expires_in: accessTtl, refresh_token: refreshToken, scope: 'mcp:use' });
     }
     if (grant === 'refresh_token') {
       const next = refresh.rotate(form.refresh_token ?? '', now());
       if (!next) return json(res, 400, { error: 'invalid_grant', message: 'unknown or rotated refresh token' });
-      const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl });
+      const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl, sub: 'owner' });
       log('token issued grant=refresh_token');
-      return json(res, 200, { access_token: access, token_type: 'Bearer', expires_in: accessTtl, refresh_token: next, scope: 'mcp:use' });
+      return json(res, 200, { access_token: access, token_type: 'Bearer', expires_in: accessTtl, refresh_token: next.token, scope: 'mcp:use' });
     }
     return json(res, 400, { error: 'unsupported_grant_type', message: 'authorization_code or refresh_token only' });
   };
