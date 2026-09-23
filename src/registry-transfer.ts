@@ -10,8 +10,21 @@ import * as readline from 'node:readline';
 import path from 'node:path';
 import { encryptToken, decryptToken } from './token-store.js';
 import { atomicWriteFileSync, atomicWriteWithLock } from './fs-atomic.js';
-import { ALIAS_RE, configFilePath, CONFIG_VERSION } from './config-file.js';
+import { ALIAS_RE, configFilePath, CONFIG_VERSION, tenantsDir } from './config-file.js';
 import { getTokenDir } from './accounts.js';
+
+/** D11 (refuse-only for v1): export/import operate on the FLAT single-owner
+ * store. A tenant-namespaced layout means the bundle would either miss every
+ * tenant's tokens or exfiltrate all of them in one file — refuse instead.
+ * Returns the offending dir, or null when the store is flat. */
+export function refuseIfMultiTenant(dir: string = tenantsDir()): string | null {
+  try {
+    if (readdirSync(dir).length > 0) return dir;
+  } catch {
+    // absent or unreadable tenants/ = flat store
+  }
+  return null;
+}
 
 
 export interface TransferBundle {
@@ -198,6 +211,11 @@ async function resolvePassphrase(prompt: string): Promise<string | null> {
 }
 
 export async function runExportCli(argv: string[]): Promise<number> {
+  const mtDir = refuseIfMultiTenant();
+  if (mtDir) {
+    console.error(`E_MULTI_TENANT_EXPORT_REFUSED: tenant-namespaced token stores exist under ${mtDir}; account export only operates on a flat single-owner store.`);
+    return 2;
+  }
   const out = argFlag(argv, '--out');
   if (!out) {
     console.error('Usage: mcp-google-multi account export --out <bundle.enc>');
@@ -218,6 +236,11 @@ export async function runExportCli(argv: string[]): Promise<number> {
 }
 
 export async function runImportCli(argv: string[]): Promise<number> {
+  const mtDir = refuseIfMultiTenant();
+  if (mtDir) {
+    console.error(`E_MULTI_TENANT_EXPORT_REFUSED: tenant-namespaced token stores exist under ${mtDir}; account import only operates on a flat single-owner store.`);
+    return 2;
+  }
   const file = argv[argv.indexOf('import') + 1];
   if (!file || file.startsWith('--')) {
     console.error('Usage: mcp-google-multi account import <bundle.enc> [--replace]');
