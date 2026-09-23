@@ -21,6 +21,8 @@
     "./http-config": "./dist/http-config.js",
     "./client": "./dist/client.js",
     "./config-file": "./dist/config-file.js",
+    "./fs-atomic": "./dist/fs-atomic.js",
+    "./master-key": "./dist/master-key.js",
     "./mcp-token": "./dist/mcp-token.js",
     "./boot-gates": "./dist/boot-gates.js",
     "./tenant-purge": "./dist/tenant-purge.js",
