@@ -2,7 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { z } from 'zod';
 import { loadEnvFiles } from './env-load.js';
-import { CONFIG_VERSION, configDir, configFilePath, failStartup, loadConfigFile, mutateConfigFile } from './config-file.js';
+import { ALIAS_RE, CONFIG_VERSION, configDir, configFilePath, failStartup, isReservedAlias, loadConfigFile, mutateConfigFile } from './config-file.js';
 import type { ConfigFile } from './config-file.js';
 import { BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from './scope-catalog.js';
 import type { ScopeProfile } from './scope-catalog.js';
@@ -79,7 +79,7 @@ function parseEnvAccounts(raw: string, adminAliases: string[]): { aliases: strin
 
     // Restrict alias to a safe charset so it can't escape `tokenDir` via path traversal
     // (e.g. "../../etc/passwd:foo@bar.com" in .env).
-    if (!/^[a-zA-Z0-9_-]+$/.test(alias) || ['__proto__', 'constructor', 'prototype'].includes(alias)) {
+    if (!ALIAS_RE.test(alias) || isReservedAlias(alias)) {
       throw new Error(
         `Invalid alias "${alias}". Allowed characters: letters, digits, underscore, hyphen.`,
       );

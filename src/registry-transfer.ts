@@ -10,10 +10,9 @@ import * as readline from 'node:readline';
 import path from 'node:path';
 import { encryptToken, decryptToken } from './token-store.js';
 import { atomicWriteFileSync, atomicWriteWithLock } from './fs-atomic.js';
-import { configFilePath, CONFIG_VERSION } from './config-file.js';
+import { ALIAS_RE, configFilePath, CONFIG_VERSION } from './config-file.js';
 import { getTokenDir } from './accounts.js';
 
-const ALIAS_RE = /^[a-zA-Z0-9_-]+$/;
 
 export interface TransferBundle {
   manifest: { v: 1; exportedAt: string; aliases: string[] };

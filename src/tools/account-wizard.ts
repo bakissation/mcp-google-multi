@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ToolRegistry } from '../registry.js';
 import { getAccountSet, invalidateAccountSet } from '../accounts.js';
-import { mutateConfigFile } from '../config-file.js';
+import { ALIAS_RE, mutateConfigFile } from '../config-file.js';
 import { writeToken } from '../token-store.js';
 import { resolveScopesForAccount } from '../auth.js';
 import { BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from '../scope-catalog.js';
@@ -23,8 +23,6 @@ import {
 // a CLI. Google consent reuses the loopback flow (leg C); the HTTP-transport
 // consent path (${BASE}/authorize) is owned by the OAuth AS and lands with that
 // cluster. account_add over http is gated behind it.
-
-const ALIAS_RE = /^[a-zA-Z0-9_-]+$/;
 
 export interface AddForm {
   alias: string;
