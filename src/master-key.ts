@@ -77,12 +77,14 @@ function anyEncFileUnder(dir: string): boolean {
 
 // Glob the token dir instead of iterating registered aliases: an orphan .enc
 // (alias removed from the registry, or a partial GOOGLE_ACCOUNTS override in
-// one client) must still stop a fresh key from being minted. The walk is
-// recursive and also covers configDir()/tenants (the tenant-namespaced token
-// root): a flat scan returns false the moment tokens nest, and minting a
-// fresh MASTER_KEY over existing .enc files bricks them irreversibly.
+// one client) must still stop a fresh key from being minted. TOKEN_STORE_PATH
+// may relocate the token dir outside configDir(), so scan it directly; the
+// recursive configDir() walk then covers BOTH the tenant-namespaced token root
+// (tenants/<id>) AND any top-level master-key-encrypted registry beside it
+// (e.g. a downstream tenant map / invite store). Minting a fresh MASTER_KEY
+// over any existing .enc bricks it irreversibly, so the scan must see them all.
 function anyTokenFileExists(): boolean {
-  return anyEncFileUnder(getTokenDir()) || anyEncFileUnder(path.join(configDir(), 'tenants'));
+  return anyEncFileUnder(getTokenDir()) || anyEncFileUnder(configDir());
 }
 
 function readKeyFile(filePath: string): string | null {

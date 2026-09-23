@@ -266,6 +266,19 @@ describe('hard guard token scan is recursive (S1.2 anti-brick)', () => {
     }
   });
 
+  it('a top-level .enc directly under configDir() refuses to mint (downstream tenant/invite registry beside tenants/)', async () => {
+    const { mkdirSync } = await import('node:fs');
+    const cfg = path.join(process.env.XDG_CONFIG_HOME!, 'mcp-google-multi');
+    mkdirSync(cfg, { recursive: true });
+    const enc = path.join(cfg, 'tenant-registry.enc');
+    writeFileSync(enc, '{}');
+    try {
+      expectRefusal(() => resolveMasterKey(realScanDeps()));
+    } finally {
+      rmSync(enc, { force: true });
+    }
+  });
+
   it('non-.enc nested files (legacy plaintext token.json layout) do NOT trip the guard', async () => {
     vi.spyOn(process.stderr, 'write').mockReturnValue(true);
     const { mkdirSync } = await import('node:fs');
