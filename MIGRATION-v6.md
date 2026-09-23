@@ -326,6 +326,18 @@ They now set `isError: true`. The payload is otherwise unchanged and still carri
 
 ---
 
+### 4.x Package deep imports are now declared (`exports` map)
+
+v6 adds a package `exports` map. The supported programmatic entry points are
+declared explicitly (`mcp-google-multi/identity`, `/compose`, `/registry`,
+`/oauth-as`, `/accounts`, `/token-store`, `/http-transport`, `/http-config`,
+`/client`, `/config-file`, `/mcp-token`, `/boot-gates`, `/tenant-purge`,
+`/doctor`). Any OTHER deep import into `dist/` (previously unrestricted, e.g.
+`mcp-google-multi/dist/trim.js`) now fails with
+`ERR_PACKAGE_PATH_NOT_EXPORTED`. The CLI (`npx mcp-google-multi ...`) and the
+MCP server entry are unaffected. If you relied on an undeclared deep import,
+open an issue naming the module so it can be promoted to a declared entry.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)

@@ -9,6 +9,24 @@
     "mcp-google-multi": "dist/index.js"
   },
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./identity": "./dist/identity.js",
+    "./compose": "./dist/compose.js",
+    "./registry": "./dist/registry.js",
+    "./oauth-as": "./dist/oauth-as.js",
+    "./accounts": "./dist/accounts.js",
+    "./token-store": "./dist/token-store.js",
+    "./http-transport": "./dist/http-transport.js",
+    "./http-config": "./dist/http-config.js",
+    "./client": "./dist/client.js",
+    "./config-file": "./dist/config-file.js",
+    "./mcp-token": "./dist/mcp-token.js",
+    "./boot-gates": "./dist/boot-gates.js",
+    "./tenant-purge": "./dist/tenant-purge.js",
+    "./doctor": "./dist/doctor.js",
+    "./package.json": "./package.json"
+  },
   "files": [
     "dist"
   ],
