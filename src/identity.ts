@@ -1,7 +1,7 @@
 import type { AccountSet } from './accounts.js';
-import { getAccountSet } from './accounts.js';
-import { getClient } from './client.js';
-import { hasToken, readToken, updateToken, writeToken } from './token-store.js';
+import { getAccountSet, getTokenDir, refreshAccountSetIfStale } from './accounts.js';
+import { getClient, makeGetClient } from './client.js';
+import { createTokenStore, hasToken, readToken, updateToken, writeToken } from './token-store.js';
 import { resolvePolicy, type Policy, type Transport } from './write-control.js';
 
 /**
@@ -28,6 +28,10 @@ export function buildIdentityContext(
   env: NodeJS.ProcessEnv = process.env,
   opts: { transport?: Transport } = {},
 ): IdentityContext {
+  // Real closures over the single-owner state (the SAME factories EE
+  // instantiates per tenant), bound here to the global registry + token dir —
+  // behavior-identical to the module-level functions for the free core.
+  const tokenStore = createTokenStore(getTokenDir());
   return {
     subject: 'owner',
     // Live getter: the seam must always see the current registry, never a
@@ -38,7 +42,12 @@ export function buildIdentityContext(
     // The dispatch transport rides into the resolved policy as a reserved seam
     // (cc-write-control B14); it does not change any write-control verdict.
     policy: resolvePolicy(env, { transport: opts.transport }),
-    getClient,
-    tokenStore: { readToken, writeToken, updateToken, hasToken },
+    getClient: makeGetClient('owner', {
+      accounts: getAccountSet,
+      readToken: tokenStore.readToken,
+      updateToken: tokenStore.updateToken,
+      refreshIfStale: refreshAccountSetIfStale,
+    }),
+    tokenStore,
   };
 }
