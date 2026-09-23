@@ -3,14 +3,18 @@ import { z } from 'zod';
 import { coerceArray, coerceJson } from './_coerce.js';
 import { searchconsole as searchconsoleClient } from '@googleapis/searchconsole';
 import { webmasters as webmastersClient } from '@googleapis/webmasters';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 
-const accountEnum = accountAliasSchema.optional();
 
-export function registerSearchConsoleTools(server: ToolRegistry): void {
+export function registerSearchConsoleTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   // ─── Sites ───────────────────────────────────────────────
 
   server.registerTool(
@@ -23,7 +27,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     },
     async ({ account }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const wm = webmastersClient({ version: 'v3', auth });
         const res = await wm.sites.list();
         return {
@@ -46,7 +50,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     },
     async ({ account, siteUrl }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const wm = webmastersClient({ version: 'v3', auth });
         const res = await wm.sites.get({ siteUrl });
         return {
@@ -69,7 +73,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     },
     async ({ account, siteUrl }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const wm = webmastersClient({ version: 'v3', auth });
         await wm.sites.add({ siteUrl });
         return {
@@ -92,7 +96,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     },
     async ({ account, siteUrl }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const wm = webmastersClient({ version: 'v3', auth });
         await wm.sites.delete({ siteUrl });
         return {
@@ -117,7 +121,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     },
     async ({ account, siteUrl }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const wm = webmastersClient({ version: 'v3', auth });
         const res = await wm.sitemaps.list({ siteUrl });
         return {
@@ -141,7 +145,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     },
     async ({ account, siteUrl, feedpath }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const wm = webmastersClient({ version: 'v3', auth });
         const res = await wm.sitemaps.get({ siteUrl, feedpath });
         return {
@@ -165,7 +169,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     },
     async ({ account, siteUrl, feedpath }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const wm = webmastersClient({ version: 'v3', auth });
         await wm.sitemaps.submit({ siteUrl, feedpath });
         return {
@@ -189,7 +193,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     },
     async ({ account, siteUrl, feedpath }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const wm = webmastersClient({ version: 'v3', auth });
         await wm.sitemaps.delete({ siteUrl, feedpath });
         return {
@@ -237,7 +241,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     },
     async ({ account, siteUrl, startDate, endDate, dimensions, type, dimensionFilterGroups, rowLimit, startRow, aggregationType, dataState }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const wm = webmastersClient({ version: 'v3', auth });
 
         const requestBody: any = { startDate, endDate };
@@ -281,7 +285,7 @@ export function registerSearchConsoleTools(server: ToolRegistry): void {
     },
     async ({ account, siteUrl, inspectionUrl, languageCode }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const searchconsole = searchconsoleClient({ version: 'v1', auth });
 
         const res = await searchconsole.urlInspection.index.inspect({

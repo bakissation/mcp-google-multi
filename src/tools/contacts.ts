@@ -1,14 +1,13 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { people as peopleClient } from '@googleapis/people';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { coerceBoolean } from './_coerce.js';
 import { handleGoogleApiError, invalidParams } from './_errors.js';
 import { listResult } from '../trim.js';
 
-const accountEnum = accountAliasSchema.optional();
 
 const PERSON_FIELDS = 'names,emailAddresses,phoneNumbers,organizations,addresses,photos,memberships';
 
@@ -147,7 +146,12 @@ function dedupeCandidates(list: ResolveCandidate[]): ResolveCandidate[] {
   return [...byResource.values()];
 }
 
-export function registerContactsTools(server: ToolRegistry): void {
+export function registerContactsTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   server.registerTool(
     'contacts_search',
     {
@@ -161,7 +165,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     },
     async ({ account, query, pageSize }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const people = peopleClient({ version: 'v1', auth });
 
         // Warmup request required by the People API
@@ -208,7 +212,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     },
     async ({ account, name, maxCandidates, includeOtherContacts }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const people = peopleClient({ version: 'v1', auth });
 
         // Warmup request required by the People API before searchContacts returns hits.
@@ -254,7 +258,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     },
     async ({ account, resourceName }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const people = peopleClient({ version: 'v1', auth });
         const res = await people.people.get({
           resourceName,
@@ -289,7 +293,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     },
     async ({ account, pageSize, pageToken, sortOrder }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const people = peopleClient({ version: 'v1', auth });
         const res = await people.people.connections.list({
           resourceName: 'people/me',
@@ -332,7 +336,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     },
     async ({ account, givenName, familyName, email, emailType, phone, phoneType, organization, jobTitle }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const people = peopleClient({ version: 'v1', auth });
 
         const requestBody: any = {
@@ -385,7 +389,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     },
     async ({ account, resourceName, givenName, familyName, email, emailType, phone, phoneType, organization, jobTitle }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const people = peopleClient({ version: 'v1', auth });
 
         // Fetch current contact to get etag
@@ -455,7 +459,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     },
     async ({ account, resourceName }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const people = peopleClient({ version: 'v1', auth });
         await people.people.deleteContact({ resourceName });
         return {
@@ -481,7 +485,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     },
     async ({ account, pageSize }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const people = peopleClient({ version: 'v1', auth });
         const res = await people.contactGroups.list({
           pageSize: pageSize ?? 100,
@@ -515,7 +519,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     },
     async ({ account, groupResourceName, maxMembers }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const people = peopleClient({ version: 'v1', auth });
         const groupRes = await people.contactGroups.get({
           resourceName: groupResourceName,
@@ -581,7 +585,7 @@ export function registerContactsTools(server: ToolRegistry): void {
     },
     async ({ account, name }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const people = peopleClient({ version: 'v1', auth });
         const res = await people.contactGroups.create({
           requestBody: {

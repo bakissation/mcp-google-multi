@@ -1,4 +1,5 @@
 import type { AccountSet } from './accounts.js';
+import type { CuratedToolDeps } from './client.js';
 import { registerGmailTools } from './tools/gmail.js';
 import { registerDriveTools } from './tools/drive.js';
 import { registerCalendarTools } from './tools/calendar.js';
@@ -20,7 +21,7 @@ import { suggestKeys } from './arg-strict.js';
 
 export interface ServiceEntry {
   name: string;
-  register: (registry: ToolRegistry) => void;
+  register: (registry: ToolRegistry, deps?: CuratedToolDeps) => void;
   /** Absent = always on. Gates evaluate against the PASSED account set (the
    * calling tenant's view); omitted set = the global registry, today's
    * behavior. */

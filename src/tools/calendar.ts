@@ -2,16 +2,20 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean } from './_coerce.js';
 import { calendar as calendarClient } from '@googleapis/calendar';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { checkOutbound } from '../outbound-allowlist.js';
 import { handleGoogleApiError, invalidParams } from './_errors.js';
 import { listResult, sliceClean } from '../trim.js';
 
-const accountEnum = accountAliasSchema.optional();
 
-export function registerCalendarTools(server: ToolRegistry): void {
+export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   server.registerTool(
     'calendar_list_calendars',
     {
@@ -22,7 +26,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     },
     async ({ account }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 
         const res = await cal.calendarList.list();
@@ -67,7 +71,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
       const rangeError = timeRangeError(timeMin, timeMax);
       if (rangeError) return invalidParams(account as Account, rangeError, TIME_RANGE_HINT);
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 
         const params: any = {
@@ -114,7 +118,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     },
     async ({ account, eventId, calendarId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 
         const res = await cal.events.get({
@@ -156,7 +160,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
           const outbound = checkOutbound('calendar attendee', attendees.split(','), String(account));
           if (outbound) return outbound;
         }
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 
         const event: any = { summary };
@@ -216,7 +220,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
           const outbound = checkOutbound('calendar attendee', attendees.split(','), String(account));
           if (outbound) return outbound;
         }
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 
         // Fetch the event first so a 404 surfaces before we attempt the patch.
@@ -274,7 +278,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     },
     async ({ account, eventId, calendarId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 
         await cal.events.delete({
@@ -305,7 +309,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     },
     async ({ account, calendarId, text, sendNotifications }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
         const res = await cal.events.quickAdd({
           calendarId: calendarId ?? 'primary',
@@ -335,7 +339,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     },
     async ({ account, calendarId, eventId, destinationCalendarId, sendNotifications }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
         const res = await cal.events.move({
           calendarId,
@@ -373,7 +377,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
       const rangeError = timeRangeError(timeMin, timeMax);
       if (rangeError) return invalidParams(account as Account, rangeError, TIME_RANGE_HINT);
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
         const res = await cal.events.instances({
           calendarId: calendarId ?? 'primary',
@@ -418,7 +422,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
         }
         const rangeError = timeRangeError(timeMin, timeMax);
         if (rangeError) return invalidParams(account as Account, rangeError, TIME_RANGE_HINT);
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
         const res = await cal.freebusy.query({
           requestBody: {
@@ -454,7 +458,7 @@ export function registerCalendarTools(server: ToolRegistry): void {
     },
     async ({ account, summary, description, timeZone }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
         const res = await cal.calendars.insert({
           requestBody: {

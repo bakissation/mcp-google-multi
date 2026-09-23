@@ -1,14 +1,18 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { meet as meetClient } from '@googleapis/meet';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 
-const accountEnum = accountAliasSchema.optional();
 
-export function registerMeetTools(server: ToolRegistry): void {
+export function registerMeetTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   // ─── Conference records (past meetings) ────────────────────────────────
 
   server.registerTool(
@@ -24,7 +28,7 @@ export function registerMeetTools(server: ToolRegistry): void {
     },
     async ({ account, pageSize, pageToken, filter }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const meet = meetClient({ version: 'v2', auth });
         const res = await meet.conferenceRecords.list({
           pageSize: pageSize ?? 20,
@@ -51,7 +55,7 @@ export function registerMeetTools(server: ToolRegistry): void {
     },
     async ({ account, name }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const meet = meetClient({ version: 'v2', auth });
         const res = await meet.conferenceRecords.get({ name });
         return {
@@ -78,7 +82,7 @@ export function registerMeetTools(server: ToolRegistry): void {
     },
     async ({ account, parent, pageSize, pageToken }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const meet = meetClient({ version: 'v2', auth });
         const res = await meet.conferenceRecords.recordings.list({
           parent,
@@ -109,7 +113,7 @@ export function registerMeetTools(server: ToolRegistry): void {
     },
     async ({ account, parent, pageSize, pageToken }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const meet = meetClient({ version: 'v2', auth });
         const res = await meet.conferenceRecords.transcripts.list({
           parent,
@@ -138,7 +142,7 @@ export function registerMeetTools(server: ToolRegistry): void {
     },
     async ({ account, parent, pageSize, pageToken }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const meet = meetClient({ version: 'v2', auth });
         const res = await meet.conferenceRecords.transcripts.entries.list({
           parent,
