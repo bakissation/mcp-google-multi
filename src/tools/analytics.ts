@@ -3,12 +3,11 @@ import { z } from 'zod';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 import { analyticsdata as analyticsdataClient } from '@googleapis/analyticsdata';
 import { analyticsadmin as analyticsadminClient } from '@googleapis/analyticsadmin';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError } from './_errors.js';
 
-const accountEnum = accountAliasSchema.optional();
 
 /** Accepts "213025502" or "properties/213025502"; rejects the identifiers
  * people paste by mistake (G-… measurement IDs, UA-… properties) with a
@@ -114,7 +113,12 @@ const propertySchema = z
     'GA4 property: numeric ID like "213025502" or "properties/213025502" — NOT a "G-..." measurement ID and not "UA-...". Find yours with analytics_account_summaries.',
   );
 
-export function registerAnalyticsTools(server: ToolRegistry): void {
+export function registerAnalyticsTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   server.registerTool(
     'analytics_account_summaries',
     {
@@ -128,7 +132,7 @@ export function registerAnalyticsTools(server: ToolRegistry): void {
     },
     async ({ account, pageSize, pageToken }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const admin = analyticsadminClient({ version: 'v1beta', auth });
         const res = await admin.accountSummaries.list({ pageSize, pageToken });
         return {
@@ -182,7 +186,7 @@ export function registerAnalyticsTools(server: ToolRegistry): void {
       const prop = normalizeProperty(property);
       if ('hint' in prop) return invalidProperty(prop.hint, account);
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const dataApi = analyticsdataClient({ version: 'v1beta', auth });
         const requestBody: any = {
           dateRanges: [{ startDate, endDate }],
@@ -234,7 +238,7 @@ export function registerAnalyticsTools(server: ToolRegistry): void {
       const prop = normalizeProperty(property);
       if ('hint' in prop) return invalidProperty(prop.hint, account);
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const dataApi = analyticsdataClient({ version: 'v1beta', auth });
         const requestBody: any = { metrics: metrics.map((name) => ({ name })) };
         if (dimensions?.length) requestBody.dimensions = dimensions.map((name) => ({ name }));
@@ -267,7 +271,7 @@ export function registerAnalyticsTools(server: ToolRegistry): void {
       const prop = normalizeProperty(property);
       if ('hint' in prop) return invalidProperty(prop.hint, account);
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const dataApi = analyticsdataClient({ version: 'v1beta', auth });
         const res = await dataApi.properties.getMetadata({ name: `${prop.name}/metadata` });
         return {

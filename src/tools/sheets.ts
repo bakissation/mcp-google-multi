@@ -2,14 +2,18 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean, coerceJson } from './_coerce.js';
 import { sheets as sheetsClient } from '@googleapis/sheets';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams } from './_errors.js';
 
-const accountEnum = accountAliasSchema.optional();
 
-export function registerSheetsTools(server: ToolRegistry): void {
+export function registerSheetsTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   server.registerTool(
     'sheets_create',
     {
@@ -23,7 +27,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, title, sheetTitles }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
 
         const requestBody: any = {
@@ -62,7 +66,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.get({
           spreadsheetId,
@@ -103,7 +107,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, range, valueRenderOption }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.get({
           spreadsheetId,
@@ -137,7 +141,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, range, values, valueInputOption }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.update({
           spreadsheetId,
@@ -174,7 +178,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, range, values, valueInputOption }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.append({
           spreadsheetId,
@@ -209,7 +213,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, range }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.clear({
           spreadsheetId,
@@ -242,7 +246,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, ranges, valueRenderOption }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.batchGet({
           spreadsheetId,
@@ -279,7 +283,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, data, valueInputOption }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.batchUpdate({
           spreadsheetId,
@@ -320,7 +324,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, title, rowCount, columnCount }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -365,7 +369,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, sheetId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -394,7 +398,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, sourceSheetId, newSheetName, insertSheetIndex }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -438,7 +442,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, sheetId, title, index, hidden, tabColor, frozenRowCount, frozenColumnCount, rowCount, columnCount }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const properties: any = { sheetId };
         const fields: string[] = [];
@@ -518,7 +522,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, range, ...format }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const built = buildCellFormat(format);
         if (built.fields.length === 0) {
@@ -567,7 +571,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, range, top, bottom, left, right, innerHorizontal, innerVertical }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const borders: any = { range };
         if (top) borders.top = toBorder(top);
@@ -609,7 +613,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, range, mergeType }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -638,7 +642,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, range }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -694,7 +698,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
             'Pass booleanRule for a condition-based rule, or gradientRule for a color scale.',
           );
         }
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
 
         const rule: any = { ranges };
@@ -759,7 +763,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, range, sortSpecs }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -795,7 +799,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, range, sortSpecs, filterSpecs }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const filter: any = { range };
         if (sortSpecs) filter.sortSpecs = sortSpecs;
@@ -839,7 +843,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, sheetId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -876,7 +880,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, find, replacement, scope, sheetId, range, matchCase, matchEntireCell, searchByRegex, includeFormulas }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const findReplace: any = {
           find,
@@ -943,7 +947,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, sheetId, dimension, startIndex, endIndex }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const dimensions: any = { sheetId, dimension };
         if (startIndex !== undefined) dimensions.startIndex = startIndex;
@@ -977,7 +981,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, sheetId, dimension, startIndex, endIndex, inheritFromBefore }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -1014,7 +1018,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, sheetId, dimension, startIndex, endIndex }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -1054,7 +1058,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, range, conditionType, conditionValues, inputMessage, strict, showCustomUi }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const rule: any = {
           condition: {
@@ -1096,7 +1100,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, name, range }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -1126,7 +1130,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, namedRangeId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -1155,7 +1159,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, ranges }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.values.batchClear({
           spreadsheetId,
@@ -1189,7 +1193,7 @@ export function registerSheetsTools(server: ToolRegistry): void {
     },
     async ({ account, spreadsheetId, requests, includeSpreadsheetInResponse, responseRanges, responseIncludeGridData }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const sheets = sheetsClient({ version: 'v4', auth });
         const res = await sheets.spreadsheets.batchUpdate({
           spreadsheetId,

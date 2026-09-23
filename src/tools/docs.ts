@@ -2,13 +2,12 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceBoolean, coerceJson } from './_coerce.js';
 import { docs as docsClient } from '@googleapis/docs';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams } from './_errors.js';
 import { capText } from '../trim.js';
 
-const accountEnum = accountAliasSchema.optional();
 
 // A single very large insertText has been observed to apply only partially while
 // the request still returns success, silently dropping the tail. Split a large
@@ -178,7 +177,12 @@ export function listTabs(tabs: any[] | undefined): { tabId: string; title: strin
   return out;
 }
 
-export function registerDocsTools(server: ToolRegistry): void {
+export function registerDocsTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   server.registerTool(
     'docs_create',
     {
@@ -190,7 +194,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, title }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.create({
           requestBody: { title },
@@ -226,7 +230,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, includeTabsContent, suggestionsViewMode }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.get({
           documentId,
@@ -276,7 +280,7 @@ export function registerDocsTools(server: ToolRegistry): void {
             'Pass heading to look a section up by its text, or headingIndex to address one by position. Not both.',
           );
         }
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.get({
           documentId,
@@ -383,7 +387,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, text, index }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
 
         const requests = buildInsertRequests(text, index);
@@ -429,7 +433,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, findText, replaceText, matchCase }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.batchUpdate({
           documentId,
@@ -468,7 +472,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, startIndex, endIndex }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.batchUpdate({
           documentId,
@@ -510,7 +514,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, startIndex, endIndex, bold, italic, underline, fontSize, fontFamily }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
 
         const textStyle: any = {};
@@ -576,7 +580,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, rows, columns, index }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
 
         const request: any = { insertTable: { rows, columns } };
@@ -618,7 +622,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, name, startIndex, endIndex }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.batchUpdate({
           documentId,
@@ -661,7 +665,7 @@ export function registerDocsTools(server: ToolRegistry): void {
             'Pass namedRangeId to delete one specific range, or name to delete every range carrying that name.',
           );
         }
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const req: any = {};
         if (namedRangeId) req.namedRangeId = namedRangeId;
@@ -701,7 +705,7 @@ export function registerDocsTools(server: ToolRegistry): void {
             'Pass namedRangeId to replace one specific range, or namedRangeName to replace every range carrying that name.',
           );
         }
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const req: any = { text };
         if (namedRangeId) req.namedRangeId = namedRangeId;
@@ -750,7 +754,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, startIndex, endIndex, ...style }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const built = buildParagraphStyle(style);
         if (built.fields.length === 0) {
@@ -804,7 +808,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, ...style }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const built = buildDocumentStyle(style);
         if (built.fields.length === 0) {
@@ -866,7 +870,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, startIndex, endIndex, bulletPreset }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         await docs.documents.batchUpdate({
           documentId,
@@ -901,7 +905,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, startIndex, endIndex }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         await docs.documents.batchUpdate({
           documentId,
@@ -939,7 +943,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, uri, index, width, height }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const request: any = { uri };
         if (index !== undefined) request.location = { index };
@@ -976,7 +980,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, index }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const request: any = {};
         if (index !== undefined) request.location = { index };
@@ -1007,7 +1011,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, index, sectionType }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const request: any = { sectionType: sectionType ?? 'NEXT_PAGE' };
         if (index !== undefined) request.location = { index };
@@ -1039,7 +1043,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, sectionBreakIndex }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const request: any = { type: 'DEFAULT' };
         if (sectionBreakIndex !== undefined) request.sectionBreakLocation = { index: sectionBreakIndex };
@@ -1069,7 +1073,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, headerId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         await docs.documents.batchUpdate({
           documentId,
@@ -1096,7 +1100,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, sectionBreakIndex }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const request: any = { type: 'DEFAULT' };
         if (sectionBreakIndex !== undefined) request.sectionBreakLocation = { index: sectionBreakIndex };
@@ -1126,7 +1130,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, footerId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         await docs.documents.batchUpdate({
           documentId,
@@ -1164,7 +1168,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, operation, tableStartIndex, rowIndex, columnIndex, insertBelow, insertRight, rowSpan, columnSpan }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const cellLoc = {
           tableStartLocation: { index: tableStartIndex },
@@ -1237,7 +1241,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, title, parentTabId, index }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const tabProperties: any = { title };
         if (parentTabId) tabProperties.parentTabId = parentTabId;
@@ -1268,7 +1272,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, tabId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         await docs.documents.batchUpdate({
           documentId,
@@ -1298,7 +1302,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, tabId, title, index, parentTabId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const tabProperties: any = { tabId };
         const fields: string[] = [];
@@ -1352,7 +1356,7 @@ export function registerDocsTools(server: ToolRegistry): void {
     },
     async ({ account, documentId, requests, writeControl }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.batchUpdate({
           documentId,
