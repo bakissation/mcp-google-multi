@@ -48,7 +48,7 @@ export async function purgeTenantTokens(
   const store = createTokenStore(dir, { tenantId, resolveKey: opts.resolveKey });
   const removed: string[] = [];
   let revoked = 0;
-  let names: string[] = [];
+  let names: string[];
   try {
     names = fs.readdirSync(dir);
   } catch {
