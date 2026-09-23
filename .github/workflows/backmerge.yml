@@ -17,10 +17,15 @@ jobs:
        github.event.workflow_run.head_branch == 'staging')
     runs-on: ubuntu-latest
     steps:
+      # Pinned SHA (the branch could move between the release and this run),
+      # and no persisted ambient token: the resync step authenticates ONLY via
+      # BACKMERGE_TOKEN, and nothing from the checkout ever executes. The job
+      # `if` above already restricts triggers to main/staging releases.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+          persist-credentials: false
       - name: Open + merge the post-release resync PRs
         env:
           GH_TOKEN: ${{ secrets.BACKMERGE_TOKEN }}
