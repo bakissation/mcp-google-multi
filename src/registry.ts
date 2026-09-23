@@ -313,6 +313,12 @@ export class ToolRegistry {
     return [...new Set(this.tools.filter((t) => !t.meta).map((t) => t.service))];
   }
 
+  /** The registry's OWN alias list: registration-time schema builders (the
+   * generated account enums) read this, never the process global. */
+  accountAliases(): readonly string[] {
+    return this.accounts().aliases;
+  }
+
   /** Declared input-schema keys + scalar kinds for one tool (tools/call arg
    * normalization; the kind drives value coercion on renamed keys). */
   argShape(name: string): ArgShape | undefined {

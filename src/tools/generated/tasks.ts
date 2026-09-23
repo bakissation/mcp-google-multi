@@ -2,9 +2,9 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../../registry.js';
 import { coerceJson } from '../_coerce.js';
-import { accountField, registerGeneratedTool } from './_shared.js';
+import { accountField, registerGeneratedTool, type ExecuteDeps } from './_shared.js';
 
-export function registerTasksGeneratedTools(registry: ToolRegistry): void {
+export function registerTasksGeneratedTools(registry: ToolRegistry, deps: ExecuteDeps = {}): void {
   // Interned method scope sets (shared across tools; see scope-observability).
   const S_tasks_v1: readonly (readonly string[])[] = [
     ["https://www.googleapis.com/auth/tasks"],
@@ -18,7 +18,7 @@ export function registerTasksGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     bodyParams: [{"field":"etag","api":"etag"},{"field":"id","api":"id"},{"field":"kind","api":"kind"},{"field":"selfLink","api":"selfLink"},{"field":"title","api":"title"},{"field":"updated","api":"updated"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       tasklist: z.string().min(1).describe("Task list identifier."),
       etag: z.string().describe("ETag of the resource.").optional(),
       id: z.string().describe("Task list identifier.").optional(),
@@ -28,7 +28,7 @@ export function registerTasksGeneratedTools(registry: ToolRegistry): void {
       updated: z.string().describe("Output only. Last modification time of the task list (as a RFC 3339 timestamp).").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "tasks_tasks_update",
     cud: "update",
@@ -37,11 +37,11 @@ export function registerTasksGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"task","api":"task","location":"path"},{"field":"tasklist","api":"tasklist","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       task: z.string().min(1).describe("Task identifier."),
       tasklist: z.string().min(1).describe("Task list identifier."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Task JSON request body. Top-level fields: assignmentInfo, completed, deleted, due, etag, hidden, id, kind, links, notes, parent, position, +5 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
 }

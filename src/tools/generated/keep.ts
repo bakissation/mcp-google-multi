@@ -2,9 +2,9 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../../registry.js';
 import { coerceArray, coerceJson } from '../_coerce.js';
-import { accountField, registerGeneratedTool } from './_shared.js';
+import { accountField, registerGeneratedTool, type ExecuteDeps } from './_shared.js';
 
-export function registerKeepGeneratedTools(registry: ToolRegistry): void {
+export function registerKeepGeneratedTools(registry: ToolRegistry, deps: ExecuteDeps = {}): void {
   // Interned method scope sets (shared across tools; see scope-observability).
   const S_keep_v1: readonly (readonly string[])[] = [
     ["https://www.googleapis.com/auth/keep","https://www.googleapis.com/auth/keep.readonly"],
@@ -18,12 +18,12 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"name","api":"name","location":"path"},{"field":"mimeType","api":"mimeType","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the attachment."),
       mimeType: z.string().describe("The IANA MIME type format requested. The requested MIME type must be one specified in the attachment.mime_type. Required when downloading attachment media and ignored otherwise.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "keep_notes_create",
     cud: "create",
@@ -32,11 +32,11 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Note JSON request body. Top-level fields: attachments, body, createTime, name, permissions, title, trashTime, trashed, updateTime."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "keep_notes_delete",
     cud: "delete",
@@ -45,11 +45,11 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. Name of the note to delete."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "keep_notes_get",
     cud: "read",
@@ -58,11 +58,11 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. Name of the resource."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "keep_notes_list",
     cud: "read",
@@ -71,13 +71,13 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       filter: z.string().describe("Filter for list results. If no filter is supplied, the `trashed` filter is applied by default. Valid fields to filter by are: `create_time`, `update_time`, `trash_time`, and `trashed`. Filter syntax f").optional(),
       pageSize: z.number().describe("The maximum number of results to return.").optional(),
       pageToken: z.string().describe("The previous page's `next_page_token` field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "keep_notes_permissions_batch_create",
     cud: "create",
@@ -86,12 +86,12 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("The parent resource shared by all Permissions being created. Format: `notes/{note}` If this is set, the parent field in the CreatePermission messages must either be empty or match this field."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchCreatePermissionsRequest JSON request body. Top-level fields: requests."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "keep_notes_permissions_batch_delete",
     cud: "delete",
@@ -101,10 +101,10 @@ export function registerKeepGeneratedTools(registry: ToolRegistry): void {
     hasBody: true,
     bodyParams: [{"field":"names","api":"names"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("The parent resource shared by all permissions being deleted. Format: `notes/{note}` If this is set, the parent of all of the permissions specified in the DeletePermissionRequest messages must match th"),
       names: coerceArray(z.string()).describe("Required. The names of the permissions to delete. Format: `notes/{note}/permissions/{permission}`").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
 }

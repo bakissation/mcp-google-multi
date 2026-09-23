@@ -2,9 +2,9 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../../registry.js';
 import { coerceBoolean, coerceJson } from '../_coerce.js';
-import { accountField, registerGeneratedTool } from './_shared.js';
+import { accountField, registerGeneratedTool, type ExecuteDeps } from './_shared.js';
 
-export function registerCloudidentityGeneratedTools(registry: ToolRegistry): void {
+export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps: ExecuteDeps = {}): void {
   // Interned method scope sets (shared across tools; see scope-observability).
   const S_cloudidentity_v1: readonly (readonly string[])[] = [
     ["https://www.googleapis.com/auth/cloud-identity.devices"],
@@ -26,11 +26,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. `UserInvitation` name in the format `customers/{customer}/userinvitations/{user_email_address}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_customers_userinvitations_get",
     cud: "read",
@@ -39,11 +39,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. `UserInvitation` name in the format `customers/{customer}/userinvitations/{user_email_address}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_customers_userinvitations_is_invitable_user",
     cud: "read",
@@ -52,11 +52,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. `UserInvitation` name in the format `customers/{customer}/userinvitations/{user_email_address}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_customers_userinvitations_list",
     cud: "read",
@@ -65,7 +65,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"filter","api":"filter","location":"query"},{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The customer ID of the Google Workspace or Cloud Identity account the UserInvitation resources are associated with."),
       filter: z.string().describe("Optional. A query string for filtering `UserInvitation` results by their current state, in the format: `\"state=='invited'\"`.").optional(),
       orderBy: z.string().describe("Optional. The sort order of the list results. You can sort the results in descending order based on either email or last update timestamp but not both, using `order_by=\"email desc\"`. Currently, sortin").optional(),
@@ -73,7 +73,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListUserInvitations` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListBooks` must match the ").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_customers_userinvitations_send",
     cud: "create",
@@ -83,11 +83,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. `UserInvitation` name in the format `customers/{customer}/userinvitations/{user_email_address}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_cancel_wipe",
     cud: "update",
@@ -97,12 +97,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Device in format: `devices/{device}`, where device is the unique ID assigned to the Device."),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_create",
     cud: "create",
@@ -111,12 +111,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsCloudidentityDevicesV1Device JSON request body. Top-level fields: androidSpecificAttributes, assetTag, basebandVersion, bootloaderVersion, brand, buildNumber, compromisedState, createTime, deviceId, deviceType, enabledDeveloperOptions, enabledUsbDebugging, +20 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_delete",
     cud: "delete",
@@ -125,12 +125,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Device in format: `devices/{device}`, where device is the unique ID assigned to the Device."),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_approve",
     cud: "update",
@@ -140,12 +140,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Device in format: `devices/{device}/deviceUsers/{device_user}`, where device is the unique ID assigned to the Devi"),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_block",
     cud: "create",
@@ -155,12 +155,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Device in format: `devices/{device}/deviceUsers/{device_user}`, where device is the unique ID assigned to the Devi"),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_cancel_wipe",
     cud: "update",
@@ -170,12 +170,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Device in format: `devices/{device}/deviceUsers/{device_user}`, where device is the unique ID assigned to the Devi"),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_client_states_get",
     cud: "read",
@@ -184,12 +184,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the ClientState in format: `devices/{device}/deviceUsers/{device_user}/clientStates/{partner}`, where `device` is the "),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_client_states_list",
     cud: "read",
@@ -198,7 +198,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"filter","api":"filter","location":"query"},{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("Required. To list all ClientStates, set this to \"devices/-/deviceUsers/-\". To list all ClientStates owned by a DeviceUser, set this to the resource name of the DeviceUser. Format: devices/{device}/dev"),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       filter: z.string().describe("Optional. Additional restrictions when fetching list of client states.").optional(),
@@ -206,7 +206,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListClientStates` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListClientStates` must match ").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_client_states_patch",
     cud: "update",
@@ -215,14 +215,14 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Output only. [Resource name](https://cloud.google.com/apis/design/resource_names) of the ClientState in format: `devices/{device}/deviceUsers/{device_user}/clientState/{partner}`, where partner corres"),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       updateMask: z.string().describe("Optional. Comma-separated list of fully qualified names of fields to be updated. If not specified, all updatable fields in ClientState are updated.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsCloudidentityDevicesV1ClientState JSON request body. Top-level fields: assetTags, complianceState, createTime, customId, etag, healthScore, keyValuePairs, lastUpdateTime, managed, name, ownerType, scoreReason."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_delete",
     cud: "delete",
@@ -231,12 +231,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Device in format: `devices/{device}/deviceUsers/{device_user}`, where device is the unique ID assigned to the Devi"),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_get",
     cud: "read",
@@ -245,12 +245,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Device in format: `devices/{device}/deviceUsers/{device_user}`, where device is the unique ID assigned to the Devi"),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_list",
     cud: "read",
@@ -259,7 +259,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"filter","api":"filter","location":"query"},{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("Required. To list all DeviceUsers, set this to \"devices/-\". To list all DeviceUsers owned by a device, set this to the resource name of the device. Format: devices/{device}"),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       filter: z.string().describe("Optional. Additional restrictions when fetching list of devices. For a list of search fields, refer to [Mobile device search fields](https://developers.google.com/admin-sdk/directory/v1/search-operato").optional(),
@@ -268,7 +268,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListDeviceUsers` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListBooks` must match the call").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_lookup",
     cud: "read",
@@ -277,7 +277,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"androidId","api":"androidId","location":"query"},{"field":"iosDeviceId","api":"iosDeviceId","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"partner","api":"partner","location":"query"},{"field":"rawResourceId","api":"rawResourceId","location":"query"},{"field":"userId","api":"userId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("Must be set to \"devices/-/deviceUsers\" to search across all DeviceUser belonging to the user."),
       androidId: z.string().describe("Android Id returned by [Settings.Secure#ANDROID_ID](https://developer.android.com/reference/android/provider/Settings.Secure.html#ANDROID_ID).").optional(),
       iosDeviceId: z.string().describe("Optional. The partner-specified device identifier assigned to the iOS device that initiated the Lookup API call. This string must match the value of the iosDeviceId key in the app config dictionary pr").optional(),
@@ -288,7 +288,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
       userId: z.string().describe("The user whose DeviceUser's resource name will be fetched. Must be set to 'me' to fetch the DeviceUser's resource name for the calling user.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_device_users_wipe",
     cud: "delete",
@@ -298,12 +298,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Device in format: `devices/{device}/deviceUsers/{device_user}`, where device is the unique ID assigned to the Devi"),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_get",
     cud: "read",
@@ -312,12 +312,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Device in the format: `devices/{device}`, where device is the unique ID assigned to the Device."),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Customer in the format: `customers/{customer}`, where customer is the customer to whom the device belongs. If you'").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_list",
     cud: "read",
@@ -326,7 +326,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"customer","api":"customer","location":"query"},{"field":"filter","api":"filter","location":"query"},{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer in the format: `customers/{customer}`, where customer is the customer to whom the device belongs. If you'").optional(),
       filter: z.string().describe("Optional. Additional restrictions when fetching list of devices. For a list of search fields, refer to [Mobile device search fields](https://developers.google.com/admin-sdk/directory/v1/search-operato").optional(),
       orderBy: z.string().describe("Optional. Order specification for devices in the response. Only one of the following field names may be used to specify the order: `create_time`, `last_sync_time`, `model`, `os_version`, `device_type`").optional(),
@@ -335,7 +335,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
       view: z.enum(["VIEW_UNSPECIFIED","COMPANY_INVENTORY","USER_ASSIGNED_DEVICES"]).describe("Optional. The view to use for the List request.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_devices_wipe",
     cud: "delete",
@@ -345,13 +345,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"},{"field":"removeResetLock","api":"removeResetLock"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Device in format: `devices/{device}/deviceUsers/{device_user}`, where device is the unique ID assigned to the Devi"),
       customer: z.string().describe("Optional. [Resource name](https://cloud.google.com/apis/design/resource_names) of the customer. If you're using this API for your own organization, use `customers/my_customer` If you're using this API").optional(),
       removeResetLock: coerceBoolean.describe("Optional. Specifies if a user is able to factory reset a device after a Device Wipe. On iOS, this is called \"Activation Lock\", while on Android, this is known as \"Factory Reset Protection\". If true, t").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_create",
     cud: "create",
@@ -360,12 +360,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"initialGroupConfig","api":"initialGroupConfig","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       initialGroupConfig: z.enum(["INITIAL_GROUP_CONFIG_UNSPECIFIED","WITH_INITIAL_OWNER","EMPTY"]).describe("Optional. The initial configuration option for the `Group`.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Group JSON request body. Top-level fields: additionalGroupKeys, createTime, description, displayName, dynamicGroupMetadata, groupKey, labels, name, parent, updateTime."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_delete",
     cud: "delete",
@@ -374,11 +374,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the `Group` to retrieve. Must be of the form `groups/{group}`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_get",
     cud: "read",
@@ -387,11 +387,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the `Group` to retrieve. Must be of the form `groups/{group}`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_get_security_settings",
     cud: "read",
@@ -400,12 +400,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"readMask","api":"readMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The security settings to retrieve. Format: `groups/{group_id}/securitySettings`"),
       readMask: z.string().describe("Field-level read mask of which fields to return. \"*\" returns all fields. If not specified, all fields will be returned. May only contain the following field: `member_restriction`.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_list",
     cud: "read",
@@ -414,14 +414,14 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"parent","api":"parent","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       pageSize: z.number().describe("The maximum number of results to return. Note that the number of results returned may be less than this value even if there are more available results. To fetch all results, clients must continue call").optional(),
       pageToken: z.string().describe("The `next_page_token` value returned from a previous list request, if any.").optional(),
       parent: z.string().describe("Required. The parent resource under which to list all `Group` resources. Must be of the form `identitysources/{identity_source}` for external- identity-mapped groups or `customers/{customer_id}` for G").optional(),
       view: z.enum(["VIEW_UNSPECIFIED","BASIC","FULL"]).describe("The level of detail to be returned. If unspecified, defaults to `View.BASIC`.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_lookup",
     cud: "read",
@@ -430,12 +430,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"groupKey.id","api":"groupKey.id","location":"query"},{"field":"groupKey.namespace","api":"groupKey.namespace","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       "groupKey.id": z.string().describe("The ID of the entity. For Google-managed entities, the `id` should be the email address of an existing group or user. Email addresses need to adhere to [name guidelines for users and groups](https://s").optional(),
       "groupKey.namespace": z.string().describe("The namespace in which the entity exists. If not specified, the `EntityKey` represents a Google-managed entity such as a Google user or a Google Group. If specified, the `EntityKey` represents an exte").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_memberships_check_transitive_membership",
     cud: "read",
@@ -444,12 +444,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"query","api":"query","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("[Resource name](https://cloud.google.com/apis/design/resource_names) of the group to check the transitive membership in. Format: `groups/{group}`, where `group` is the unique id assigned to the Group "),
       query: z.string().describe("Required. A CEL expression that MUST include member specification. This is a `required` field. Certain groups are uniquely identified by both a 'member_key_id' and a 'member_key_namespace', which requ").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_memberships_create",
     cud: "create",
@@ -458,12 +458,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent `Group` resource under which to create the `Membership`. Must be of the form `groups/{group}`."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Membership JSON request body. Top-level fields: createTime, deliverySetting, name, preferredMemberKey, roles, type, updateTime."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_memberships_delete",
     cud: "delete",
@@ -472,11 +472,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the `Membership` to delete. Must be of the form `groups/{group}/memberships/{membership}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_memberships_get",
     cud: "read",
@@ -485,11 +485,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the `Membership` to retrieve. Must be of the form `groups/{group}/memberships/{membership}`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_memberships_get_membership_graph",
     cud: "read",
@@ -498,12 +498,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"query","api":"query","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("Required. [Resource name](https://cloud.google.com/apis/design/resource_names) of the group to search transitive memberships in. Format: `groups/{group}`, where `group` is the unique ID assigned to th"),
       query: z.string().describe("Required. A CEL expression that MUST include member specification AND label(s). Certain groups are uniquely identified by both a 'member_key_id' and a 'member_key_namespace', which requires an additio").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_memberships_list",
     cud: "read",
@@ -512,14 +512,14 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent `Group` resource under which to lookup the `Membership` name. Must be of the form `groups/{group}`."),
       pageSize: z.number().describe("The maximum number of results to return. Note that the number of results returned may be less than this value even if there are more available results. To fetch all results, clients must continue call").optional(),
       pageToken: z.string().describe("The `next_page_token` value returned from a previous search request, if any.").optional(),
       view: z.enum(["VIEW_UNSPECIFIED","BASIC","FULL"]).describe("The level of detail to be returned. If unspecified, defaults to `View.BASIC`.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_memberships_lookup",
     cud: "read",
@@ -528,13 +528,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"memberKey.id","api":"memberKey.id","location":"query"},{"field":"memberKey.namespace","api":"memberKey.namespace","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent `Group` resource under which to lookup the `Membership` name. Must be of the form `groups/{group}`."),
       "memberKey.id": z.string().describe("The ID of the entity. For Google-managed entities, the `id` should be the email address of an existing group or user. Email addresses need to adhere to [name guidelines for users and groups](https://s").optional(),
       "memberKey.namespace": z.string().describe("The namespace in which the entity exists. If not specified, the `EntityKey` represents a Google-managed entity such as a Google user or a Google Group. If specified, the `EntityKey` represents an exte").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_memberships_modify_membership_roles",
     cud: "update",
@@ -543,12 +543,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the `Membership` whose roles are to be modified. Must be of the form `groups/{group}/memberships/{membership}`."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ModifyMembershipRolesRequest JSON request body. Top-level fields: addRoles, removeRoles, updateRolesParams."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_memberships_search_direct_groups",
     cud: "read",
@@ -557,7 +557,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"query","api":"query","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("[Resource name](https://cloud.google.com/apis/design/resource_names) of the group to search transitive memberships in. Format: groups/{group_id}, where group_id is always '-' as this API will search a"),
       orderBy: z.string().describe("The ordering of membership relation for the display name or email in the response. The syntax for this field can be found at https://cloud.google.com/apis/design/design_patterns#sorting_order. Example").optional(),
       pageSize: z.number().describe("The default page size is 200 (max 1000).").optional(),
@@ -565,7 +565,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
       query: z.string().describe("Required. A CEL expression that MUST include member specification AND label(s). Users can search on label attributes of groups. CONTAINS match ('in') is supported on labels. Identity-mapped groups are").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_memberships_search_transitive_groups",
     cud: "read",
@@ -574,14 +574,14 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"query","api":"query","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("[Resource name](https://cloud.google.com/apis/design/resource_names) of the group to search transitive memberships in. Format: `groups/{group}`, where `group` is always '-' as this API will search acr"),
       pageSize: z.number().describe("The default page size is 200 (max 1000).").optional(),
       pageToken: z.string().describe("The `next_page_token` value returned from a previous list request, if any.").optional(),
       query: z.string().describe("Required. A CEL expression that MUST include member specification AND label(s). This is a `required` field. Users can search on label attributes of groups. CONTAINS match ('in') is supported on labels").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_memberships_search_transitive_memberships",
     cud: "read",
@@ -590,13 +590,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("[Resource name](https://cloud.google.com/apis/design/resource_names) of the group to search transitive memberships in. Format: `groups/{group}`, where `group` is the unique ID assigned to the Group."),
       pageSize: z.number().describe("The default page size is 200 (max 1000).").optional(),
       pageToken: z.string().describe("The `next_page_token` value returned from a previous list request, if any.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_patch",
     cud: "update",
@@ -605,13 +605,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Output only. The [resource name](https://cloud.google.com/apis/design/resource_names) of the `Group`. Shall be of the form `groups/{group}`."),
       updateMask: z.string().describe("Required. The names of fields to update. May only contain the following field names: `display_name`, `description`, `labels`.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Group JSON request body. Top-level fields: additionalGroupKeys, createTime, description, displayName, dynamicGroupMetadata, groupKey, labels, name, parent, updateTime."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_search",
     cud: "read",
@@ -620,14 +620,14 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"query","api":"query","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       pageSize: z.number().describe("The maximum number of results to return. Note that the number of results returned may be less than this value even if there are more available results. To fetch all results, clients must continue call").optional(),
       pageToken: z.string().describe("The `next_page_token` value returned from a previous search request, if any.").optional(),
       query: z.string().describe("Required. The search query. * Must be specified in [Common Expression Language](https://opensource.google/projects/cel). * Must contain equality operators on the parent, e.g. `parent == 'customers/{cu").optional(),
       view: z.enum(["VIEW_UNSPECIFIED","BASIC","FULL"]).describe("The level of detail to be returned. If unspecified, defaults to `View.BASIC`.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_groups_update_security_settings",
     cud: "update",
@@ -636,13 +636,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Output only. The resource name of the security settings. Shall be of the form `groups/{group_id}/securitySettings`."),
       updateMask: z.string().describe("Required. The fully-qualified names of fields to update. May only contain the following field: `member_restriction.query`.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SecuritySettings JSON request body. Top-level fields: memberRestriction, name."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_oidc_sso_profiles_create",
     cud: "create",
@@ -651,11 +651,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("InboundOidcSsoProfile JSON request body. Top-level fields: customer, displayName, idpConfig, name, rpConfig."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_oidc_sso_profiles_delete",
     cud: "delete",
@@ -664,11 +664,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the InboundOidcSsoProfile to delete. Format: `inboundOidcSsoProfiles/{sso_profile_id}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_oidc_sso_profiles_get",
     cud: "read",
@@ -677,11 +677,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the InboundOidcSsoProfile to get. Format: `inboundOidcSsoProfiles/{sso_profile_id}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_oidc_sso_profiles_list",
     cud: "read",
@@ -690,13 +690,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       filter: z.string().describe("A [Common Expression Language](https://github.com/google/cel-spec) expression to filter the results. The only supported filter is filtering by customer. For example: `customer==\"customers/C0123abc\"`. ").optional(),
       pageSize: z.number().describe("The maximum number of InboundOidcSsoProfiles to return. The service may return fewer than this value. If omitted (or defaulted to zero) the server will use a sensible default. This default may change ").optional(),
       pageToken: z.string().describe("A page token, received from a previous `ListInboundOidcSsoProfiles` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListInboundOidcSsoProfiles` m").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_oidc_sso_profiles_patch",
     cud: "update",
@@ -705,13 +705,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Output only. [Resource name](https://cloud.google.com/apis/design/resource_names) of the OIDC SSO profile."),
       updateMask: z.string().describe("Required. The list of fields to be updated.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("InboundOidcSsoProfile JSON request body. Top-level fields: customer, displayName, idpConfig, name, rpConfig."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_saml_sso_profiles_create",
     cud: "create",
@@ -720,11 +720,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("InboundSamlSsoProfile JSON request body. Top-level fields: customer, displayName, idpConfig, name, spConfig."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_saml_sso_profiles_delete",
     cud: "delete",
@@ -733,11 +733,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the InboundSamlSsoProfile to delete. Format: `inboundSamlSsoProfiles/{sso_profile_id}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_saml_sso_profiles_get",
     cud: "read",
@@ -746,11 +746,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the InboundSamlSsoProfile to get. Format: `inboundSamlSsoProfiles/{sso_profile_id}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_saml_sso_profiles_idp_credentials_add",
     cud: "create",
@@ -760,12 +760,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     hasBody: true,
     bodyParams: [{"field":"pemData","api":"pemData"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The InboundSamlSsoProfile that owns the IdpCredential. Format: `inboundSamlSsoProfiles/{sso_profile_id}`"),
       pemData: z.string().describe("PEM encoded x509 certificate containing the public key for verifying IdP signatures.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_saml_sso_profiles_idp_credentials_delete",
     cud: "delete",
@@ -774,11 +774,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the IdpCredential to delete. Format: `inboundSamlSsoProfiles/{sso_profile_id}/idpCredentials/{idp_credential_id}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_saml_sso_profiles_idp_credentials_get",
     cud: "read",
@@ -787,11 +787,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the IdpCredential to retrieve. Format: `inboundSamlSsoProfiles/{sso_profile_id}/idpCredentials/{idp_credential_id}"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_saml_sso_profiles_idp_credentials_list",
     cud: "read",
@@ -800,13 +800,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent, which owns this collection of `IdpCredential`s. Format: `inboundSamlSsoProfiles/{sso_profile_id}`"),
       pageSize: z.number().describe("The maximum number of `IdpCredential`s to return. The service may return fewer than this value.").optional(),
       pageToken: z.string().describe("A page token, received from a previous `ListIdpCredentials` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListIdpCredentials` must match the ca").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_saml_sso_profiles_list",
     cud: "read",
@@ -815,13 +815,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       filter: z.string().describe("A [Common Expression Language](https://github.com/google/cel-spec) expression to filter the results. The only supported filter is filtering by customer. For example: `customer==\"customers/C0123abc\"`. ").optional(),
       pageSize: z.number().describe("The maximum number of InboundSamlSsoProfiles to return. The service may return fewer than this value. If omitted (or defaulted to zero) the server will use a sensible default. This default may change ").optional(),
       pageToken: z.string().describe("A page token, received from a previous `ListInboundSamlSsoProfiles` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListInboundSamlSsoProfiles` m").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_saml_sso_profiles_patch",
     cud: "update",
@@ -830,13 +830,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Output only. [Resource name](https://cloud.google.com/apis/design/resource_names) of the SAML SSO profile."),
       updateMask: z.string().describe("Required. The list of fields to be updated.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("InboundSamlSsoProfile JSON request body. Top-level fields: customer, displayName, idpConfig, name, spConfig."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_sso_assignments_create",
     cud: "create",
@@ -845,11 +845,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("InboundSsoAssignment JSON request body. Top-level fields: customer, name, oidcSsoInfo, rank, samlSsoInfo, signInBehavior, ssoMode, targetGroup, targetOrgUnit."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_sso_assignments_delete",
     cud: "delete",
@@ -858,11 +858,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the InboundSsoAssignment to delete. Format: `inboundSsoAssignments/{assignment}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_sso_assignments_get",
     cud: "read",
@@ -871,11 +871,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The [resource name](https://cloud.google.com/apis/design/resource_names) of the InboundSsoAssignment to fetch. Format: `inboundSsoAssignments/{assignment}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_sso_assignments_list",
     cud: "read",
@@ -884,13 +884,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       filter: z.string().describe("A CEL expression to filter the results. The only supported filter is filtering by customer. For example: `customer==customers/C0123abc`. Omitting the filter or specifying a filter of `customer==custom").optional(),
       pageSize: z.number().describe("The maximum number of assignments to return. The service may return fewer than this value. If omitted (or defaulted to zero) the server will use a sensible default. This default may change over time. ").optional(),
       pageToken: z.string().describe("A page token, received from a previous `ListInboundSsoAssignments` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListInboundSsoAssignments` mus").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_inbound_sso_assignments_patch",
     cud: "update",
@@ -899,13 +899,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Output only. [Resource name](https://cloud.google.com/apis/design/resource_names) of the Inbound SSO Assignment."),
       updateMask: z.string().describe("Required. The list of fields to be updated.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("InboundSsoAssignment JSON request body. Top-level fields: customer, name, oidcSsoInfo, rank, samlSsoInfo, signInBehavior, ssoMode, targetGroup, targetOrgUnit."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_policies_create",
     cud: "create",
@@ -914,11 +914,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Policy JSON request body. Top-level fields: customer, name, policyQuery, setting, type."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_policies_delete",
     cud: "delete",
@@ -927,11 +927,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the policy to delete. Format: `policies/{policy}`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_policies_get",
     cud: "read",
@@ -940,11 +940,11 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the policy to retrieve. Format: `policies/{policy}`."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_policies_list",
     cud: "read",
@@ -953,13 +953,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       filter: z.string().describe("Optional. A CEL expression for filtering the results. Policies can be filtered using the expression in the following ways: - Filter by application: `setting.type.matches('^settings/gmail\\\\..*$')` - Fi").optional(),
       pageSize: z.number().describe("Optional. The maximum number of results to return. The service can return fewer than this number. If omitted or set to `0`, the default is `50` results per page. The maximum allowed value is `100`. `p").optional(),
       pageToken: z.string().describe("Optional. The pagination token received from a prior call to PoliciesService.ListPolicies to retrieve the next page of results. When paginating, all other parameters provided to `ListPoliciesRequest` ").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_policies_patch",
     cud: "update",
@@ -968,10 +968,10 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry): voi
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Output only. Identifier. The [resource name](https://cloud.google.com/apis/design/resource_names) of the Policy. Format: policies/{policy}."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Policy JSON request body. Top-level fields: customer, name, policyQuery, setting, type."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
 }

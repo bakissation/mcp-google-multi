@@ -2,9 +2,9 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../../registry.js';
 import { coerceBoolean, coerceJson } from '../_coerce.js';
-import { accountField, registerGeneratedTool } from './_shared.js';
+import { accountField, registerGeneratedTool, type ExecuteDeps } from './_shared.js';
 
-export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void {
+export function registerCloudsearchGeneratedTools(registry: ToolRegistry, deps: ExecuteDeps = {}): void {
   // Interned method scope sets (shared across tools; see scope-observability).
   const S_cloudsearch_v1: readonly (readonly string[])[] = [
     ["https://www.googleapis.com/auth/cloud_search","https://www.googleapis.com/auth/cloud_search.debug"],
@@ -23,13 +23,13 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Item name, format: datasources/{source_id}/items/{item_id}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Principal JSON request body. Top-level fields: groupResourceName, gsuitePrincipal, userResourceName."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_debug_datasources_items_search_by_view_url",
     cud: "read",
@@ -38,12 +38,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Source name, format: datasources/{source_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchItemsByViewUrlRequest JSON request body. Top-level fields: debugOptions, pageToken, viewUrl."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_debug_datasources_items_unmappedids_list",
     cud: "read",
@@ -52,14 +52,14 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("The name of the item, in the following format: datasources/{source_id}/items/{ID}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       pageSize: z.number().describe("Maximum number of items to fetch in a request. Defaults to 100.").optional(),
       pageToken: z.string().describe("The next_page_token value returned from a previous List request, if any.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_debug_identitysources_items_list_forunmappedidentity",
     cud: "read",
@@ -68,7 +68,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"groupResourceName","api":"groupResourceName","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"userResourceName","api":"userResourceName","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("The name of the identity source, in the following format: identitysources/{source_id}}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       groupResourceName: z.string().optional(),
@@ -77,7 +77,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       userResourceName: z.string().optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_debug_identitysources_unmappedids_list",
     cud: "read",
@@ -86,7 +86,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"resolutionStatusCode","api":"resolutionStatusCode","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       parent: z.string().min(1).describe("The name of the identity source, in the following format: identitysources/{source_id}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       pageSize: z.number().describe("Maximum number of items to fetch in a request. Defaults to 100.").optional(),
@@ -94,7 +94,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       resolutionStatusCode: z.enum(["CODE_UNSPECIFIED","NOT_FOUND","IDENTITY_SOURCE_NOT_FOUND","IDENTITY_SOURCE_MISCONFIGURED","TOO_MANY_MAPPINGS_FOUND","INTERNAL_ERROR"]).describe("Limit users selection to this status.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_delete_schema",
     cud: "delete",
@@ -103,12 +103,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the data source to delete Schema. Format: datasources/{source_id}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_get_schema",
     cud: "read",
@@ -117,12 +117,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the data source to get Schema. Format: datasources/{source_id}"),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_items_delete",
     cud: "delete",
@@ -131,7 +131,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"connectorName","api":"connectorName","location":"query"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"mode","api":"mode","location":"query"},{"field":"version","api":"version","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the item to delete. Format: datasources/{source_id}/items/{item_id}"),
       connectorName: z.string().describe("The name of connector making this call. Format: datasources/{source_id}/connectors/{ID}").optional(),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
@@ -139,7 +139,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       version: z.string().describe("Required. The incremented version of the item to delete from the index. The indexing system stores the version from the datasource as a byte string and compares the Item version in the index to the ve").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_items_delete_queue_items",
     cud: "delete",
@@ -148,12 +148,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the Data Source to delete items in a queue. Format: datasources/{source_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("DeleteQueueItemsRequest JSON request body. Top-level fields: connectorName, debugOptions, queue."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_items_get",
     cud: "read",
@@ -162,13 +162,13 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"connectorName","api":"connectorName","location":"query"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the item to get info. Format: datasources/{source_id}/items/{item_id}"),
       connectorName: z.string().describe("The name of connector making this call. Format: datasources/{source_id}/connectors/{ID}").optional(),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_items_index",
     cud: "create",
@@ -177,12 +177,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the Item. Format: datasources/{source_id}/items/{item_id} This is a required field. The maximum length is 1536 characters."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("IndexItemRequest JSON request body. Top-level fields: connectorName, debugOptions, indexItemOptions, item, mode."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_items_list",
     cud: "read",
@@ -191,7 +191,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"brief","api":"brief","location":"query"},{"field":"connectorName","api":"connectorName","location":"query"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the Data Source to list Items. Format: datasources/{source_id}"),
       brief: coerceBoolean.describe("When set to true, the indexing system only populates the following fields: name, version, queue. metadata.hash, metadata.title, metadata.sourceRepositoryURL, metadata.objectType, metadata.createTime, ").optional(),
       connectorName: z.string().describe("The name of connector making this call. Format: datasources/{source_id}/connectors/{ID}").optional(),
@@ -200,7 +200,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       pageToken: z.string().describe("The next_page_token value returned from a previous List request, if any.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_items_poll",
     cud: "create",
@@ -209,12 +209,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the Data Source to poll items. Format: datasources/{source_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("PollItemsRequest JSON request body. Top-level fields: connectorName, debugOptions, limit, queue, statusCodes."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_items_push",
     cud: "create",
@@ -223,12 +223,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the item to push into the indexing queue. Format: datasources/{source_id}/items/{ID} This is a required field. The maximum length is 1536 characters."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("PushItemRequest JSON request body. Top-level fields: connectorName, debugOptions, item."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_items_unreserve",
     cud: "delete",
@@ -237,12 +237,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the Data Source to unreserve all items. Format: datasources/{source_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("UnreserveItemsRequest JSON request body. Top-level fields: connectorName, debugOptions, queue."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_items_upload",
     cud: "create",
@@ -251,12 +251,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the Item to start a resumable upload. Format: datasources/{source_id}/items/{item_id}. The maximum length is 1536 bytes."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("StartUploadItemRequest JSON request body. Top-level fields: connectorName, debugOptions."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_indexing_datasources_update_schema",
     cud: "update",
@@ -265,12 +265,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the data source to update Schema. Format: datasources/{source_id}"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("UpdateSchemaRequest JSON request body. Top-level fields: debugOptions, schema, validateOnly."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_initialize_customer",
     cud: "create",
@@ -280,10 +280,10 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_media_upload",
     cud: "create",
@@ -293,12 +293,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     hasBody: true,
     bodyParams: [{"field":"resourceName_","api":"resourceName"}],
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       resourceName: z.string().min(1).describe("Name of the media that is being downloaded. See ReadRequest.resource_name."),
       resourceName_: z.string().describe("Name of the media resource.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_operations_get",
     cud: "read",
@@ -307,11 +307,11 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the operation resource."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_operations_lro_list",
     cud: "read",
@@ -320,7 +320,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"returnPartialSuccess","api":"returnPartialSuccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the operation's parent resource."),
       filter: z.string().describe("The standard list filter.").optional(),
       pageSize: z.number().describe("The standard list page size.").optional(),
@@ -328,7 +328,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       returnPartialSuccess: coerceBoolean.describe("When set to `true`, operations that are reachable are returned as normal, and those that are unreachable are returned in the ListOperationsResponse.unreachable field. This can only be `true` when read").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_query_remove_activity",
     cud: "delete",
@@ -337,11 +337,11 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("RemoveActivityRequest JSON request body. Top-level fields: requestOptions, userActivity."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_query_search",
     cud: "read",
@@ -350,11 +350,11 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchRequest JSON request body. Top-level fields: contextAttributes, dataSourceRestrictions, facetOptions, pageSize, query, queryInterpretationOptions, requestOptions, sortOptions, start."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_query_sources_list",
     cud: "read",
@@ -363,7 +363,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"pageToken","api":"pageToken","location":"query"},{"field":"requestOptions.clientDisplayLanguageCode","api":"requestOptions.clientDisplayLanguageCode","location":"query"},{"field":"requestOptions.countryCode","api":"requestOptions.countryCode","location":"query"},{"field":"requestOptions.debugOptions.enableDebugging","api":"requestOptions.debugOptions.enableDebugging","location":"query"},{"field":"requestOptions.languageCode","api":"requestOptions.languageCode","location":"query"},{"field":"requestOptions.searchApplicationId","api":"requestOptions.searchApplicationId","location":"query"},{"field":"requestOptions.timeZone","api":"requestOptions.timeZone","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       pageToken: z.string().describe("Number of sources to return in the response.").optional(),
       "requestOptions.clientDisplayLanguageCode": z.string().describe("The BCP-47 language code, such as \"pt\" or \"en\". It represents the user's preferred Display Language.").optional(),
       "requestOptions.countryCode": z.string().describe("Optional. Specifies the country/region where the query originated, as a lowercase ISO 3166-1 alpha-2 region code (using 'uk' instead of 'gb' for the United Kingdom).").optional(),
@@ -373,7 +373,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       "requestOptions.timeZone": z.string().describe("Current user's time zone id, such as \"America/Los_Angeles\" or \"Australia/Sydney\". These IDs are defined by [Unicode Common Locale Data Repository (CLDR)](http://cldr.unicode.org/) project, and current").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_query_suggest",
     cud: "read",
@@ -382,11 +382,11 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SuggestRequest JSON request body. Top-level fields: dataSourceRestrictions, query, requestOptions."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_datasources_create",
     cud: "create",
@@ -395,11 +395,11 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("DataSource JSON request body. Top-level fields: disableModifications, disableServing, displayName, indexingServiceAccounts, itemsVisibility, name, operationIds, returnThumbnailUrls, shortName."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_datasources_delete",
     cud: "delete",
@@ -408,12 +408,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the datasource. Format: datasources/{source_id}."),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_datasources_get",
     cud: "read",
@@ -422,12 +422,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the datasource resource. Format: datasources/{source_id}."),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_datasources_list",
     cud: "read",
@@ -436,13 +436,13 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       pageSize: z.number().describe("Maximum number of datasources to fetch in a request. The max value is 1000. The default value is 1000.").optional(),
       pageToken: z.string().describe("Starting index of the results.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_datasources_patch",
     cud: "update",
@@ -451,14 +451,14 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the datasource resource. Format: datasources/{source_id}. The name is ignored when creating a datasource."),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       updateMask: z.string().describe("Only applies to [`settings.datasources.patch`](https://developers.google.com/workspace/cloud-search/docs/reference/rest/v1/settings.datasources/patch). Update mask to control which fields to update. E").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("DataSource JSON request body. Top-level fields: disableModifications, disableServing, displayName, indexingServiceAccounts, itemsVisibility, name, operationIds, returnThumbnailUrls, shortName."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_datasources_update",
     cud: "update",
@@ -467,12 +467,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the datasource resource. Format: datasources/{source_id}. The name is ignored when creating a datasource."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("UpdateDataSourceRequest JSON request body. Top-level fields: debugOptions, source, updateMask."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_get_customer",
     cud: "read",
@@ -481,10 +481,10 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_searchapplications_create",
     cud: "create",
@@ -493,11 +493,11 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchApplication JSON request body. Top-level fields: dataSourceRestrictions, defaultFacetOptions, defaultSortOptions, displayName, enableAuditLog, name, operationIds, queryInterpretationConfig, returnResultThumbnailUrls, scoringConfig, sourceConfig."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_searchapplications_delete",
     cud: "delete",
@@ -506,12 +506,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the search application to be deleted. Format: applications/{application_id}."),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_searchapplications_get",
     cud: "read",
@@ -520,12 +520,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the search application. Format: searchapplications/{application_id}."),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_searchapplications_list",
     cud: "read",
@@ -534,13 +534,13 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"debugOptions.enableDebugging","api":"debugOptions.enableDebugging","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       "debugOptions.enableDebugging": coerceBoolean.describe("If you are asked by Google to help with debugging, set this field. Otherwise, ignore this field.").optional(),
       pageSize: z.number().describe("The maximum number of items to return.").optional(),
       pageToken: z.string().describe("The next_page_token value returned from a previous List request, if any. The default value is 10").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_searchapplications_patch",
     cud: "update",
@@ -549,13 +549,13 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the Search Application. Format: searchapplications/{application_id}."),
       updateMask: z.string().describe("Only applies to [`settings.searchapplications.patch`](https://developers.google.com/workspace/cloud-search/docs/reference/rest/v1/settings.searchapplications/patch). Update mask to control which field").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchApplication JSON request body. Top-level fields: dataSourceRestrictions, defaultFacetOptions, defaultSortOptions, displayName, enableAuditLog, name, operationIds, queryInterpretationConfig, returnResultThumbnailUrls, scoringConfig, sourceConfig."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_searchapplications_reset",
     cud: "delete",
@@ -564,12 +564,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the search application to be reset. Format: applications/{application_id}."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("ResetSearchApplicationRequest JSON request body. Top-level fields: debugOptions."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_searchapplications_update",
     cud: "update",
@@ -578,13 +578,13 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The name of the Search Application. Format: searchapplications/{application_id}."),
       updateMask: z.string().describe("Only applies to [`settings.searchapplications.patch`](https://developers.google.com/workspace/cloud-search/docs/reference/rest/v1/settings.searchapplications/patch). Update mask to control which field").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SearchApplication JSON request body. Top-level fields: dataSourceRestrictions, defaultFacetOptions, defaultSortOptions, displayName, enableAuditLog, name, operationIds, queryInterpretationConfig, returnResultThumbnailUrls, scoringConfig, sourceConfig."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_settings_update_customer",
     cud: "update",
@@ -593,12 +593,12 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       updateMask: z.string().describe("Update mask to control which fields get updated. If you specify a field in the update_mask but don't specify its value here, that field will be cleared. If the mask is not present or empty, all fields").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CustomerSettings JSON request body. Top-level fields: auditLoggingSettings, vpcSettings."),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_stats_get_index",
     cud: "read",
@@ -607,7 +607,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
       "fromDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
@@ -616,7 +616,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       "toDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_stats_get_query",
     cud: "read",
@@ -625,7 +625,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
       "fromDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
@@ -634,7 +634,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       "toDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_stats_get_searchapplication",
     cud: "read",
@@ -643,7 +643,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"endDate.day","api":"endDate.day","location":"query"},{"field":"endDate.month","api":"endDate.month","location":"query"},{"field":"endDate.year","api":"endDate.year","location":"query"},{"field":"startDate.day","api":"startDate.day","location":"query"},{"field":"startDate.month","api":"startDate.month","location":"query"},{"field":"startDate.year","api":"startDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       "endDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "endDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
       "endDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
@@ -652,7 +652,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       "startDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_stats_get_session",
     cud: "read",
@@ -661,7 +661,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
       "fromDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
@@ -670,7 +670,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       "toDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_stats_get_user",
     cud: "read",
@@ -679,7 +679,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
       "fromDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
@@ -688,7 +688,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       "toDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_stats_index_datasources_get",
     cud: "read",
@@ -697,7 +697,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The resource id of the data source to retrieve statistics for, in the following format: \"datasources/{source_id}\""),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
@@ -707,7 +707,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       "toDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_stats_query_searchapplications_get",
     cud: "read",
@@ -716,7 +716,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The resource id of the search application query stats, in the following format: searchapplications/{application_id}"),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
@@ -726,7 +726,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       "toDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_stats_session_searchapplications_get",
     cud: "read",
@@ -735,7 +735,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The resource id of the search application session stats, in the following format: searchapplications/{application_id}"),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
@@ -745,7 +745,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       "toDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudsearch_stats_user_searchapplications_get",
     cud: "read",
@@ -754,7 +754,7 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fromDate.day","api":"fromDate.day","location":"query"},{"field":"fromDate.month","api":"fromDate.month","location":"query"},{"field":"fromDate.year","api":"fromDate.year","location":"query"},{"field":"toDate.day","api":"toDate.day","location":"query"},{"field":"toDate.month","api":"toDate.month","location":"query"},{"field":"toDate.year","api":"toDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(),
+      account: accountField(registry.accountAliases()),
       name: z.string().min(1).describe("The resource id of the search application session stats, in the following format: searchapplications/{application_id}"),
       "fromDate.day": z.number().describe("Day of month. Must be from 1 to 31 and valid for the year and month.").optional(),
       "fromDate.month": z.number().describe("Month of date. Must be from 1 to 12.").optional(),
@@ -764,5 +764,5 @@ export function registerCloudsearchGeneratedTools(registry: ToolRegistry): void 
       "toDate.year": z.number().describe("Year of date. Must be from 1 to 9999.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
-  });
+  }, deps);
 }
