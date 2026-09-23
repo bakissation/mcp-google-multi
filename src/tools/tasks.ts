@@ -2,14 +2,18 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceBoolean } from './_coerce.js';
 import { tasks as tasksClient } from '@googleapis/tasks';
-import { accountAliasSchema } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
-import { getClient } from '../client.js';
+import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams } from './_errors.js';
 
-const accountEnum = accountAliasSchema.optional();
 
-export function registerTasksTools(server: ToolRegistry): void {
+export function registerTasksTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
+  // Per-registry, LIVE account enum + injectable client (S1.10): the
+  // schema follows the registry's account view at parse time, and the
+  // custody path is the context's, not the process global.
+  const accountEnum = accountArgLive(() => server.accountAliases()).optional();
+  const getClientFn = deps.getClientFn ?? getClient;
   // ─── Tasklists ─────────────────────────────────────────────────────────
 
   server.registerTool(
@@ -24,7 +28,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, maxResults, pageToken }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasklists.list({
           maxResults: maxResults ?? 100,
@@ -50,7 +54,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, tasklistId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasklists.get({ tasklist: tasklistId });
         return {
@@ -73,7 +77,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, title }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasklists.insert({
           requestBody: { title },
@@ -99,7 +103,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, tasklistId, title }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasklists.patch({
           tasklist: tasklistId,
@@ -125,7 +129,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, tasklistId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         await tasks.tasklists.delete({ tasklist: tasklistId });
         return {
@@ -161,7 +165,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, tasklistId, ...params }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasks.list({
           tasklist: tasklistId,
@@ -188,7 +192,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, tasklistId, taskId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasks.get({ tasklist: tasklistId, task: taskId });
         return {
@@ -217,7 +221,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, tasklistId, title, notes, due, status, parent, previous }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         const requestBody: any = { title };
         if (notes !== undefined) requestBody.notes = notes;
@@ -255,7 +259,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, tasklistId, taskId, title, notes, due, status }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         const requestBody: any = {};
         if (title !== undefined) requestBody.title = title;
@@ -297,7 +301,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, tasklistId, taskId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         await tasks.tasks.delete({ tasklist: tasklistId, task: taskId });
         return {
@@ -324,7 +328,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, tasklistId, taskId, parent, previous, destinationTasklist }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         const res = await tasks.tasks.move({
           tasklist: tasklistId,
@@ -353,7 +357,7 @@ export function registerTasksTools(server: ToolRegistry): void {
     },
     async ({ account, tasklistId }) => {
       try {
-        const auth = await getClient(account as Account);
+        const auth = await getClientFn(account as Account);
         const tasks = tasksClient({ version: 'v1', auth });
         await tasks.tasks.clear({ tasklist: tasklistId });
         return {
