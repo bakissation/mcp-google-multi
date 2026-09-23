@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { resolveAccounts } from '../src/accounts.js';
+import { fileStamp, getTokenDir, resolveAccounts } from '../src/accounts.js';
 import { ConfigFileError } from '../src/config-file.js';
 import { loadConfigFile, mutateConfigFile, CONFIG_VERSION } from '../src/config-file.js';
 import { atomicWriteWithLock, withFileLock } from '../src/fs-atomic.js';
@@ -109,6 +109,31 @@ describe('resolveAccounts', () => {
     expect(() => resolveAccounts({ GOOGLE_ACCOUNTS: 'a:1@x.com,a:2@x.com' } as NodeJS.ProcessEnv, cfgPath)).toThrow(
       'Duplicate alias',
     );
+  });
+});
+
+describe('resolveAccounts tokenDir threading (S1.6)', () => {
+  it('opts.tokenDir scopes every tokenPath/encPath; default stays the global dir', () => {
+    writeFileSync(cfgPath, JSON.stringify({ version: 1, accounts: { work: { email: 'w@x.com' } } }));
+    const scoped = resolveAccounts({} as NodeJS.ProcessEnv, cfgPath, 'exit', { tokenDir: path.join(base, 'tenant-tokens') });
+    expect(scoped.configs.work.encPath).toBe(path.join(base, 'tenant-tokens', 'work.enc'));
+    expect(scoped.configs.work.tokenPath).toBe(path.join(base, 'tenant-tokens', 'work', 'token.json'));
+    const global = resolveAccounts({} as NodeJS.ProcessEnv, cfgPath);
+    expect(global.configs.work.encPath).toBe(path.join(getTokenDir(), 'work.enc'));
+  });
+
+  it('env-sourced accounts honor opts.tokenDir too', () => {
+    const set = resolveAccounts({ GOOGLE_ACCOUNTS: 'work:w@x.com' } as NodeJS.ProcessEnv, cfgPath, 'exit', { tokenDir: path.join(base, 't') });
+    expect(set.configs.work.encPath).toBe(path.join(base, 't', 'work.enc'));
+  });
+});
+
+describe('fileStamp (exported for tenant-scoped resolvers, S1.6)', () => {
+  it('stamps version:mtime for an existing file and version:0 for a missing one', () => {
+    writeFileSync(cfgPath, '{}');
+    const stamped = fileStamp(cfgPath, CONFIG_VERSION);
+    expect(stamped).toBe(`${CONFIG_VERSION}:${statSync(cfgPath).mtimeMs}`);
+    expect(fileStamp(path.join(base, 'nope.json'), CONFIG_VERSION)).toBe(`${CONFIG_VERSION}:0`);
   });
 });
 

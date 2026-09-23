@@ -14,6 +14,42 @@ export function configFilePath(env: NodeJS.ProcessEnv = process.env): string {
   return path.join(configDir(env), 'config.json');
 }
 
+export function tenantsDir(env: NodeJS.ProcessEnv = process.env): string {
+  return path.join(configDir(env), 'tenants');
+}
+
+// A tenant id becomes a filesystem path segment exactly like an account
+// alias, so it rides the same traversal guard.
+function assertTenantId(tenantId: string): void {
+  if (!ALIAS_RE.test(tenantId) || isReservedAlias(tenantId)) {
+    throw new Error(`E_TENANT_ID_INVALID: invalid tenant id "${tenantId}".`);
+  }
+}
+
+export function tenantConfigFilePath(tenantId: string, env: NodeJS.ProcessEnv = process.env): string {
+  assertTenantId(tenantId);
+  return path.join(tenantsDir(env), tenantId, 'config.json');
+}
+
+export function tenantTokenDir(tenantId: string, env: NodeJS.ProcessEnv = process.env): string {
+  assertTenantId(tenantId);
+  return path.join(tenantsDir(env), tenantId, 'tokens');
+}
+
+/** Create and permission-harden the tenant directory chain. mkdirSync's
+ * recursive mode only stamps the DEEPEST newly-created dir, so every level
+ * gets an explicit chmod: the shared tenants/ root (created by whichever
+ * tenant provisions first) must never stay group-readable. */
+export function ensureTenantDirs(tenantId: string, env: NodeJS.ProcessEnv = process.env): { configFile: string; tokenDir: string } {
+  const tokenDir = tenantTokenDir(tenantId, env);
+  const levels = [configDir(env), tenantsDir(env), path.join(tenantsDir(env), tenantId), tokenDir];
+  for (const dir of levels) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    if (process.platform !== 'win32') fs.chmodSync(dir, 0o700);
+  }
+  return { configFile: tenantConfigFilePath(tenantId, env), tokenDir };
+}
+
 // Alias charset is load-bearing security, not cosmetics: the alias becomes a
 // tokenDir path segment (encPath), so this guard blocks path traversal.
 export const ALIAS_RE = /^[a-zA-Z0-9_-]+$/;
