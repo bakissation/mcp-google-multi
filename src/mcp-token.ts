@@ -63,13 +63,18 @@ export async function verifyAccessToken(token: string, base: string, secret: Uin
 // --- Signed state + authorization code (self-contained artifacts) -----------
 
 export interface StatePayload {
-  flow: 'owner_gate' | 'alias_reauth';
+  flow: 'owner_gate' | 'alias_reauth' | 'alias_add';
   client_id: string;
   redirect_uri: string;
   code_challenge: string;
   client_state?: string;
   resource: string;
   alias?: string;
+  /** alias_add only: the tenant the new alias binds under. Signed server-side
+   * at mint time — never caller-supplied at /authorize or /callback. */
+  tenantId?: string;
+  /** alias_add only: scope bundles chosen when the link was minted. */
+  bundles?: string[];
 }
 
 export interface CodePayload {

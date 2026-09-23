@@ -8,7 +8,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { resolveHttpConfig } from '../src/http-config.js';
 import { HttpTransportHost } from '../src/http-transport.js';
 import { buildAuthServer, redirectAllowed, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServerDeps } from '../src/oauth-as.js';
-import { jwtSecretFrom, signAccessToken } from '../src/mcp-token.js';
+import { jwtSecretFrom, signAccessToken, verifyAccessToken } from '../src/mcp-token.js';
 import { SsrfBlockedError } from '../src/ssrf-guard.js';
 import { z } from "zod";
 
@@ -404,5 +404,115 @@ describe('DCR /register bounds (unbounded-store DoS guard)', () => {
     expect(registeredClients.size).toBe(DCR_MAX_CLIENTS); // did not grow past the cap
     expect(registeredClients.has('seed-0')).toBe(false); // oldest evicted
     expect(registeredClients.has(newId)).toBe(true); // newest present
+  });
+});
+
+describe('alias_add flow + resolveSubject seam (S1.14)', () => {
+  const binds: Record<string, unknown>[] = [];
+  afterEach(() => void binds.splice(0));
+
+  async function startMt(configOver: Record<string, unknown> = {}, depOverrides: Partial<AuthServerDeps> = {}) {
+    const cfg = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http', MCP_PUBLIC_URL: BASE }), port: 0 };
+    const deps: AuthServerDeps = {
+      fetchCimd: async (cid) => {
+        if (cid === CLIENT_ID) return { client_id: cid, redirect_uris: [REDIRECT] };
+        throw new SsrfBlockedError('blocked or unknown client');
+      },
+      buildGoogleAuthUrl: ({ state }) => `https://google.test/auth?state=${encodeURIComponent(state)}`,
+      exchangeCode: async (code) => ({
+        tokens: { refresh_token: 'g-rt', access_token: 'g-at' },
+        email: code === 'owner-code' ? 'owner@x.example' : 'member@x.example',
+      }),
+      bindTenantAlias: (b) => void binds.push(b as unknown as Record<string, unknown>),
+      now: () => Date.now(),
+      ...depOverrides,
+    };
+    const as = buildAuthServer(
+      { base: BASE, resourceUri: `${BASE}/mcp`, secret, ownerEmails: ['owner@x.example'], cimdIssuers: ['claude.ai'], masterKey: 'mk', refreshStorePath: path.join(tmp, 'mcp-tokens.enc'), ...configOver },
+      deps,
+    );
+    const server = new McpServer({ name: 'as-test', version: '0' });
+    server.registerTool('ping', { description: 'p', inputSchema: z.object({}) }, async () => ({ content: [{ type: 'text' as const, text: 'pong' }] }));
+    const host = new HttpTransportHost({ server, config: cfg, version: '0', ownerConfigured: true, authenticate: as.authenticate, routes: as.routes });
+    await host.start();
+    hosts.push(host);
+    return { port: host.address()!.port, as };
+  }
+
+  it('happy path: minted link -> Google -> callback binds under the RIGHT tenant, sibling untouched', async () => {
+    const { port, as } = await startMt();
+    const url = new URL(await as.mintFlowState({ flow: 'alias_add', alias: 'work', tenantId: 'tenant-a', bundles: ['forms'] }));
+    expect(url.pathname).toBe('/authorize');
+    expect(url.searchParams.get('flow')).toBe('alias_add');
+    const authz = await req(port, 'GET', `${url.pathname}${url.search}`);
+    expect(authz.status).toBe(302);
+    const googleState = stateFrom(authz.headers.location as string);
+    const cb = await req(port, 'GET', `/callback?code=member-code&state=${encodeURIComponent(googleState)}`);
+    expect(cb.status).toBe(200);
+    expect(cb.text).toContain('Connected "work"');
+    expect(binds).toHaveLength(1);
+    expect(binds[0]).toMatchObject({ tenantId: 'tenant-a', alias: 'work', email: 'member@x.example', bundles: ['forms'] });
+    // exactly one bind, under exactly the minted tenant - no sibling writes
+    expect(binds.filter((b) => b.tenantId !== 'tenant-a')).toHaveLength(0);
+  });
+
+  it('a tampered tenantId breaks the signature: E_STATE_INVALID, nothing bound', async () => {
+    const { port, as } = await startMt();
+    const url = new URL(await as.mintFlowState({ flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+    const state = url.searchParams.get('state')!;
+    const [h, payload, sig] = state.split('.');
+    const flipped = payload.slice(0, -4) + (payload.endsWith('AAAA') ? 'BBBB' : 'AAAA');
+    const r = await req(port, 'GET', `/authorize?flow=alias_add&state=${encodeURIComponent([h, flipped, sig].join('.'))}`);
+    expect(r.status).toBe(400);
+    expect(r.text).toContain('E_STATE_INVALID');
+    expect(binds).toHaveLength(0);
+  });
+
+  it('the minted link is single-use: a second click is refused', async () => {
+    const { port, as } = await startMt();
+    const url = new URL(await as.mintFlowState({ flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+    const linkPath = `${url.pathname}${url.search}`;
+    expect((await req(port, 'GET', linkPath)).status).toBe(302);
+    const again = await req(port, 'GET', linkPath);
+    expect(again.status).toBe(400);
+    expect(again.text).toContain('already used');
+  });
+
+  it('callback without a bind seam refuses cleanly (free core stays inert)', async () => {
+    const { port, as } = await startMt({}, { bindTenantAlias: undefined });
+    const url = new URL(await as.mintFlowState({ flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+    const authz = await req(port, 'GET', `${url.pathname}${url.search}`);
+    const cb = await req(port, 'GET', `/callback?code=member-code&state=${encodeURIComponent(stateFrom(authz.headers.location as string))}`);
+    expect(cb.status).toBe(500);
+    expect(cb.text).toContain('E_ALIAS_ADD_UNAVAILABLE');
+  });
+
+  it('legacyAliasReauth:false disables the alias-only clientless branch with 403', async () => {
+    const { port } = await startMt({ legacyAliasReauth: false }, { aliasEmail: (a) => (a === 'work' ? 'work@x.example' : undefined) });
+    const r = await req(port, 'GET', '/authorize?flow=alias_reauth&alias=work');
+    expect(r.status).toBe(403);
+    expect(r.text).toContain('E_LEGACY_REAUTH_DISABLED');
+  });
+
+  it('resolveSubject threads a non-owner sub end-to-end into access AND refreshed tokens', async () => {
+    const { port } = await startMt({}, { resolveSubject: (email) => (email === 'member@x.example' ? { sub: 'tenant-9' } : null) });
+    const authz = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
+    const state = stateFrom(authz.headers.location as string);
+    const cb = await req(port, 'GET', `/callback?code=member-code&state=${encodeURIComponent(state)}`);
+    expect(cb.status).toBe(302);
+    const code = new URL(cb.headers.location as string).searchParams.get('code')!;
+    const tok = JSON.parse((await req(port, 'POST', '/token', form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, code_verifier: verifier, resource: `${BASE}/mcp` }))).text);
+    expect((await verifyAccessToken(tok.access_token, BASE, secret)).sub).toBe('tenant-9');
+    const ref = JSON.parse((await req(port, 'POST', '/token', form({ grant_type: 'refresh_token', refresh_token: tok.refresh_token }))).text);
+    expect((await verifyAccessToken(ref.access_token, BASE, secret)).sub).toBe('tenant-9');
+  });
+
+  it('the default resolveSubject reproduces the owner allowlist exactly (non-owner denied)', async () => {
+    const { port } = await startMt();
+    const authz = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
+    const state = stateFrom(authz.headers.location as string);
+    const cb = await req(port, 'GET', `/callback?code=member-code&state=${encodeURIComponent(state)}`);
+    expect(cb.status).toBe(302);
+    expect(new URL(cb.headers.location as string).searchParams.get('error')).toBe('access_denied');
   });
 });
