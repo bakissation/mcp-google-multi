@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
-const pkg = JSON.parse(spawnSync('cat', [path.join(repoRoot, 'package.json')], { encoding: 'utf8' }).stdout) as {
+const pkg = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as {
   exports: Record<string, string>;
   files: string[];
   main: string;
