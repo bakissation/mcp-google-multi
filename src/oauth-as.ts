@@ -42,6 +42,11 @@ export interface AuthServerConfig {
   accessTtlSec?: number;
   masterKey: string;
   refreshStorePath: string;
+  /** Default true. The clientless alias-only `flow=alias_reauth` link carries
+   * no tenant binding, so a multi-tenant deployment sets false: with several
+   * tenants an alias name alone is ambiguous and the branch becomes a
+   * cross-tenant re-auth vector. Server-minted signed flows are unaffected. */
+  legacyAliasReauth?: boolean;
 }
 
 export interface AuthServerDeps {
@@ -62,11 +67,24 @@ export interface AuthServerDeps {
   log?: (line: string) => void;
   /** The alias's configured Google email, for the alias_reauth identity binding. */
   aliasEmail?: (alias: string) => string | undefined;
+  /** Map a verified sign-in email to the subject its tokens are minted under.
+   * Default = the MCP_OWNER_EMAILS allowlist -> {sub:'owner'}; null = denied.
+   * The tenant resolver (invite claim / email->tenant lookup) plugs in here. */
+  resolveSubject?: (email: string) => { sub: string } | null;
+  /** alias_add completion: persist the config row AND the tokens for the new
+   * alias under its tenant in ONE call, atomically — /callback invokes it only
+   * after a successful Google exchange, so no pre-write orphan can exist. */
+  bindTenantAlias?: (bind: { tenantId: string; alias: string; email: string; bundles?: string[]; tokens: Record<string, unknown> }) => void;
 }
 
 export interface AuthServer {
   routes: Record<string, RouteHandler>;
   authenticate: (req: IncomingMessage) => Promise<AuthOutcome>;
+  /** Mint a signed, single-use, TTL-bound clientless flow URL
+   * (`${base}/authorize?flow=...&state=<signed>`). The tenantId/bundles ride
+   * INSIDE the signed state, so nothing at /authorize or /callback trusts a
+   * caller-supplied identity. Inert unless something calls it (EE wizard). */
+  mintFlowState: (opts: { flow: 'alias_add' | 'alias_reauth'; alias: string; tenantId?: string; bundles?: string[] }) => Promise<string>;
 }
 
 // --- helpers ----------------------------------------------------------------
@@ -173,6 +191,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   const now = deps.now ?? (() => Date.now());
   const log = deps.log ?? (() => undefined);
   const nowSec = () => Math.floor(now() / 1000);
+  const resolveSubject = deps.resolveSubject ?? ((email: string) => (config.ownerEmails.includes(email) ? { sub: 'owner' } : null));
   const issHeader = { 'Cache-Control': 'no-store' };
 
   const prm = {
@@ -286,12 +305,38 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     const clientState = q.get('state') ?? undefined;
     const aliasParam = q.get('alias') ?? undefined;
 
+    // Server-minted alias_add link: the whole request identity (tenant, alias,
+    // bundles) lives inside the SIGNED state — verify, spend it (single-use),
+    // then re-sign fresh for the Google leg. A tampered tenantId breaks the
+    // signature; a caller cannot supply one at all.
+    if (q.get('flow') === 'alias_add' && !clientId) {
+      let minted: StatePayload & { jti: string };
+      try {
+        minted = await verifyState(q.get('state') ?? '', base, secret);
+      } catch {
+        return errorPage(res, 400, 'E_STATE_INVALID', 'the add-account link is invalid, expired, or tampered');
+      }
+      if (minted.flow !== 'alias_add' || !minted.alias || !minted.tenantId) {
+        return errorPage(res, 400, 'E_STATE_INVALID', 'the add-account link is malformed');
+      }
+      if (!replay.consume(minted.jti, STATE_TTL_DEFAULT * 1000, now())) {
+        return errorPage(res, 400, 'E_STATE_INVALID', 'this add-account link was already used');
+      }
+      const { jti: _spent, ...sp } = minted;
+      void _spent;
+      return toGoogle(res, sp as StatePayload);
+    }
+
     // In-call re-auth (BV-1): a user-clicked `flow=alias_reauth` link has NO
     // client leg — no code is delivered to any client, the refreshed token is
     // written server-side for the alias — so it skips the client_id/redirect/
     // PKCE requirements. Safe because /callback binds the completing Google
     // identity to the alias's configured email before writing anything.
     if (q.get('flow') === 'alias_reauth' && aliasParam && !clientId) {
+      if (config.legacyAliasReauth === false) {
+        // Alias-only, tenant-ambiguous: disabled on multi-tenant deployments.
+        return errorPage(res, 403, 'E_LEGACY_REAUTH_DISABLED', 'alias re-auth links are disabled on this deployment; ask the server for a fresh account link');
+      }
       if (!deps.aliasEmail?.(aliasParam)) {
         return errorPage(res, 400, 'invalid_request', `unknown account "${aliasParam}"`);
       }
@@ -370,6 +415,23 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       return errorPage(res, 400, 'invalid_grant', `Google code exchange failed: ${(e as Error).message}`);
     }
 
+    if (st.flow === 'alias_add') {
+      if (!st.alias || !st.tenantId) return errorPage(res, 400, 'invalid_request', 'alias_add without an alias/tenant binding');
+      if (!deps.bindTenantAlias) return errorPage(res, 500, 'E_ALIAS_ADD_UNAVAILABLE', 'account linking is not enabled on this server');
+      const boundEmail = (exchanged.email ?? '').toLowerCase();
+      if (!boundEmail) return errorPage(res, 403, 'access_denied', 'Google did not return an email for the signed-in account');
+      try {
+        deps.bindTenantAlias({ tenantId: st.tenantId, alias: st.alias, email: boundEmail, bundles: st.bundles, tokens: exchanged.tokens });
+      } catch (e) {
+        log(`alias_add bind failed for "${st.alias}": ${(e as Error).message}`);
+        return errorPage(res, 500, 'E_ALIAS_ADD_FAILED', 'the account could not be saved; try the link again or ask for a fresh one');
+      }
+      log(`callback ok flow=alias_add alias=${st.alias}`);
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`<!doctype html><meta charset=utf-8><p>Connected "${st.alias}". You can close this window and retry your request.</p>`);
+      return true;
+    }
+
     if (st.flow === 'alias_reauth') {
       if (!st.alias) return errorPage(res, 400, 'invalid_request', 'alias_reauth without an alias');
       // C13 / identity binding (#2/#6): only overwrite the alias's tokens if the
@@ -390,16 +452,19 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       return true;
     }
 
-    // owner_gate: verify the email is an allowlisted owner, discard Google tokens
+    // owner_gate: resolve the verified email to its subject (default = the
+    // owner allowlist -> 'owner'), discard Google tokens. The resolved sub is
+    // signed into the authz code and flows into every token minted from it.
     const email = (exchanged.email ?? '').toLowerCase();
     const iss = encodeURIComponent(base);
-    if (!email || !config.ownerEmails.includes(email)) {
+    const subject = email ? resolveSubject(email) : null;
+    if (!subject) {
       const sep = st.redirect_uri.includes('?') ? '&' : '?';
       const s = st.client_state ? `&state=${encodeURIComponent(st.client_state)}` : '';
       return redirect(res, `${st.redirect_uri}${sep}error=access_denied${s}&iss=${iss}`);
     }
     const authzCode = await signAuthzCode(
-      { redirect_uri: st.redirect_uri, code_challenge: st.code_challenge, resource: st.resource, sub: 'owner' },
+      { redirect_uri: st.redirect_uri, code_challenge: st.code_challenge, resource: st.resource, sub: subject.sub },
       base,
       secret,
       nowSec(),
@@ -506,5 +571,15 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     }
   };
 
-  return { routes, authenticate };
+  const mintFlowState: AuthServer['mintFlowState'] = async ({ flow, alias, tenantId, bundles }) => {
+    const state = await signState(
+      { flow, client_id: '', redirect_uri: '', code_challenge: '', resource, alias, tenantId, bundles },
+      base,
+      secret,
+      nowSec(),
+    );
+    return `${base}/authorize?flow=${flow}&state=${encodeURIComponent(state)}`;
+  };
+
+  return { routes, authenticate, mintFlowState };
 }
