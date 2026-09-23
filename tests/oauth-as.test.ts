@@ -8,7 +8,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { resolveHttpConfig } from '../src/http-config.js';
 import { HttpTransportHost } from '../src/http-transport.js';
 import { buildAuthServer, redirectAllowed, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServerDeps } from '../src/oauth-as.js';
-import { jwtSecretFrom } from '../src/mcp-token.js';
+import { jwtSecretFrom, signAccessToken } from '../src/mcp-token.js';
 import { SsrfBlockedError } from '../src/ssrf-guard.js';
 import { z } from "zod";
 
@@ -92,6 +92,35 @@ function stateFrom(location: string): string {
 const authorizeQuery = (over: Record<string, string> = {}) =>
   new URLSearchParams({ client_id: CLIENT_ID, redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256', resource: `${BASE}/mcp`, state: 'client-xyz', ...over }).toString();
 const form = (o: Record<string, string>) => ({ headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(o).toString() });
+
+describe('authenticate threads verified claims (S1.4)', () => {
+  const buildAs = () =>
+    buildAuthServer(
+      { base: BASE, resourceUri: `${BASE}/mcp`, secret, ownerEmails: ['owner@x.example'], cimdIssuers: ['claude.ai'], masterKey: 'mk', refreshStorePath: path.join(tmp, 'mcp-tokens.enc') },
+      {
+        fetchCimd: async () => {
+          throw new SsrfBlockedError('unused');
+        },
+        buildGoogleAuthUrl: () => 'https://google.test/auth',
+        exchangeCode: async () => ({ tokens: {}, email: 'unused@x.example' }),
+        now: () => Date.now(),
+      },
+    );
+
+  it('returns the token sub on success instead of discarding the claims', async () => {
+    const as = buildAs();
+    const token = await signAccessToken({ base: BASE, secret, iat: Math.floor(Date.now() / 1000), sub: 'tenant-7' });
+    const out = await as.authenticate({ headers: { authorization: `Bearer ${token}` } } as never);
+    expect(out).toEqual({ ok: true, sub: 'tenant-7' });
+  });
+
+  it('still rejects an invalid token with 401 (no sub leaks on failure)', async () => {
+    const as = buildAs();
+    const out = await as.authenticate({ headers: { authorization: 'Bearer not-a-token' } } as never);
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.status).toBe(401);
+  });
+});
 
 describe('redirectAllowed (C6)', () => {
   it('exact match, fixed claude.ai, and port-agnostic loopback', () => {

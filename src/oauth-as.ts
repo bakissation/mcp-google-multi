@@ -438,15 +438,15 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       if (!form.code_verifier || pkceS256(form.code_verifier) !== code.code_challenge) {
         return json(res, 400, { error: 'invalid_grant', message: 'PKCE verification failed' });
       }
-      const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl, sub: 'owner' });
-      const refreshToken = refresh.issue(now(), 'owner');
+      const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl, sub: code.sub });
+      const refreshToken = refresh.issue(now(), code.sub);
       log('token issued grant=authorization_code');
       return json(res, 200, { access_token: access, token_type: 'Bearer', expires_in: accessTtl, refresh_token: refreshToken, scope: 'mcp:use' });
     }
     if (grant === 'refresh_token') {
       const next = refresh.rotate(form.refresh_token ?? '', now());
       if (!next) return json(res, 400, { error: 'invalid_grant', message: 'unknown or rotated refresh token' });
-      const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl, sub: 'owner' });
+      const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl, sub: next.sub });
       log('token issued grant=refresh_token');
       return json(res, 200, { access_token: access, token_type: 'Bearer', expires_in: accessTtl, refresh_token: next.token, scope: 'mcp:use' });
     }
@@ -499,8 +499,8 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       return { ok: false, status: 401, headers: { 'WWW-Authenticate': wwwAuth }, body: JSON.stringify({ error: 'E_MCP_TOKEN_INVALID', message: 'missing bearer token' }) };
     }
     try {
-      await verifyAccessToken(header.slice(7), base, secret);
-      return { ok: true };
+      const claims = await verifyAccessToken(header.slice(7), base, secret);
+      return { ok: true, sub: claims.sub };
     } catch {
       return { ok: false, status: 401, headers: { 'WWW-Authenticate': wwwAuth }, body: JSON.stringify({ error: 'E_MCP_TOKEN_INVALID', message: 'invalid or expired token' }) };
     }
