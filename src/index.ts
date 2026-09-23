@@ -94,7 +94,7 @@ function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Discovery
   registerDiscoverTools(registry, policy);
   registerEscapeTools(registry, policy);
   registerAccountTools(registry);
-  registerDiagnoseTool(registry);
+  registerDiagnoseTool(registry, ctx);
   registerAccountWizardTools(registry, server);
   return registry;
 }

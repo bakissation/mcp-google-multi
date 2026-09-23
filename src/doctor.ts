@@ -374,7 +374,14 @@ export function overallVerdict(sections: DiagnosticSection[]): Verdict {
   return worst;
 }
 
-export async function runDiagnostics(deps: DiagnosticsDeps = DEFAULT_DEPS): Promise<DiagnosticsReport> {
+export async function runDiagnostics(
+  deps: DiagnosticsDeps = DEFAULT_DEPS,
+  opts: { scope?: 'operator' | 'tenant' } = {},
+): Promise<DiagnosticsReport> {
+  // Tenant scope omits the OPERATOR sections: §3 (key provenance = box
+  // infrastructure) and §7 (its owner-gate lines print MCP_OWNER_EMAILS
+  // values — other people's addresses from a tenant's seat).
+  const tenantScope = opts.scope === 'tenant';
   const sections: DiagnosticSection[] = [];
   sections.push(sectionRuntime(deps));
 
@@ -382,7 +389,7 @@ export async function runDiagnostics(deps: DiagnosticsDeps = DEFAULT_DEPS): Prom
   sections.push(sectionConfig(deps, set));
   const aliases = set?.aliases ?? [];
 
-  sections.push(sectionKeys(deps, aliases));
+  if (!tenantScope) sections.push(sectionKeys(deps, aliases));
 
   if (aliases.length > 0) {
     const [tokens, scopes] = sectionsTokensAndScopes(deps, aliases);
@@ -390,8 +397,10 @@ export async function runDiagnostics(deps: DiagnosticsDeps = DEFAULT_DEPS): Prom
     sections.push(await sectionApiEnablement(deps, aliases));
   }
 
-  const http = await sectionHttp(deps, aliases);
-  if (http) sections.push(http);
+  if (!tenantScope) {
+    const http = await sectionHttp(deps, aliases);
+    if (http) sections.push(http);
+  }
 
   return { verdict: overallVerdict(sections), sections };
 }
@@ -443,7 +452,10 @@ export function exitCodeFor(report: DiagnosticsReport, strict: boolean): number 
  * from already-registered services, and this runs after that), so it was
  * advertised only once something else expanded the surface. The README sends
  * people here when they are stuck, so it has to be findable. */
-export function registerDiagnoseTool(registry: ToolRegistry): void {
+export function registerDiagnoseTool(registry: ToolRegistry, ctx?: { subject: string }): void {
+  // A non-owner context gets the tenant-scoped report; the free core's single
+  // 'owner' context keeps today's full operator report.
+  const scope: 'operator' | 'tenant' = ctx && ctx.subject !== 'owner' ? 'tenant' : 'operator';
   registry.registerMeta(
     'diagnose',
     {
@@ -453,7 +465,7 @@ export function registerDiagnoseTool(registry: ToolRegistry): void {
     },
     async () => {
       try {
-        const result = await runDiagnostics();
+        const result = await runDiagnostics(undefined, { scope });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (e: any) {
         return { content: [{ type: 'text' as const, text: stringifyEnvelope({
