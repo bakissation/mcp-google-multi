@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ToolRegistry } from '../src/registry.js';
 import type { Policy } from '../src/write-control.js';
 import type { AccountSet } from '../src/accounts.js';
+import type { Metrics } from '../src/usage-metrics.js';
 
 // S1.8 containment (the #162 shape): a '*' selector against a registry built
 // with one alias set must never enumerate another registry's (or the global)
@@ -22,7 +23,7 @@ const set = (aliases: string[]): AccountSet =>
 
 type Handler = (...args: unknown[]) => Promise<{ content: { text: string }[]; isError?: boolean }>;
 
-function buildRegistryWith(aliases: string[]): { registry: ToolRegistry; handlers: Record<string, Handler> } {
+function buildRegistryWith(aliases: string[], metrics: Metrics | null = null): { registry: ToolRegistry; handlers: Record<string, Handler> } {
   const handlers: Record<string, Handler> = {};
   const stub = {
     registerTool: (name: string, _cfg: unknown, h: Handler) => {
@@ -32,7 +33,7 @@ function buildRegistryWith(aliases: string[]): { registry: ToolRegistry; handler
     sendToolListChanged: vi.fn(),
     server: { setRequestHandler: () => {} },
   };
-  const registry = new ToolRegistry(stub as never, POLICY, 'eager', null, () => set(aliases));
+  const registry = new ToolRegistry(stub as never, POLICY, 'eager', metrics, () => set(aliases));
   registry.registerTool(
     'thing_search',
     {
@@ -84,5 +85,20 @@ describe('fan-out containment (S1.8, #162 shape)', () => {
     // the GLOBAL set's alias is invalid here even though getAccountSet() knows it
     const bad = await a.handlers['thing_search']({ account: 'test' });
     expect(bad.isError).toBe(true);
+  });
+
+  it('the metrics fan-out width counts the registry aliases, not the global set', async () => {
+    const widths: number[] = [];
+    const metrics = {
+      wrap: (_e: unknown, h: (...a: unknown[]) => Promise<unknown>, width: (a: unknown) => number) =>
+        async (...a: unknown[]) => {
+          widths.push(width(a[0]));
+          return h(...a);
+        },
+    } as unknown as Metrics;
+    const x = buildRegistryWith(['x1', 'x2'], metrics);
+    expect(x.registry.accountSet().aliases).toEqual(['x1', 'x2']);
+    await x.handlers['thing_search']({ account: 'x1,x2' });
+    expect(widths).toEqual([2]);
   });
 });

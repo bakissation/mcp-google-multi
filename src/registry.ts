@@ -290,7 +290,7 @@ export class ToolRegistry {
             (a) => {
               const v = (a as { account?: unknown } | undefined)?.account;
               if (typeof v !== 'string' || (v !== '*' && !v.includes(','))) return 1;
-              const sel = parseAccountSelector(v);
+              const sel = parseAccountSelector(v, this.accounts().aliases);
               return sel.ok ? sel.aliases.length : 1;
             },
           )
@@ -317,6 +317,12 @@ export class ToolRegistry {
    * generated account enums) read this, never the process global. */
   accountAliases(): readonly string[] {
     return this.accounts().aliases;
+  }
+
+  /** The registry's OWN account set: handlers needing an account's email or
+   * profile read this, never the process global. */
+  accountSet(): AccountSet {
+    return this.accounts();
   }
 
   /** Declared input-schema keys + scalar kinds for one tool (tools/call arg
