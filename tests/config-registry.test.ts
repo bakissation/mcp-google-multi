@@ -128,6 +128,25 @@ describe('resolveAccounts tokenDir threading (S1.6)', () => {
   });
 });
 
+describe('resolveAccounts emptyOk (a context with nothing linked yet)', () => {
+  it("'throw' refuses an empty set by default but returns one with emptyOk", () => {
+    writeFileSync(cfgPath, JSON.stringify({ version: 1, accounts: {} }));
+    expect(() => resolveAccounts({} as NodeJS.ProcessEnv, cfgPath, 'throw')).toThrow(/E_NO_ACCOUNTS_CONFIGURED/);
+    const set = resolveAccounts({} as NodeJS.ProcessEnv, cfgPath, 'throw', { emptyOk: true });
+    expect(set.aliases).toEqual([]);
+    expect(set.source).toBe('file');
+  });
+
+  it('a missing file is an empty set with emptyOk', () => {
+    expect(resolveAccounts({} as NodeJS.ProcessEnv, path.join(base, 'absent.json'), 'throw', { emptyOk: true }).aliases).toEqual([]);
+  });
+
+  it('an invalid file still throws with emptyOk', () => {
+    writeFileSync(cfgPath, JSON.stringify({ version: 1, accounts: {}, clientSecret: 'x' }));
+    expect(() => resolveAccounts({} as NodeJS.ProcessEnv, cfgPath, 'throw', { emptyOk: true })).toThrow();
+  });
+});
+
 describe('fileStamp (exported for tenant-scoped resolvers, S1.6)', () => {
   it('stamps version:mtime for an existing file and version:0 for a missing one', () => {
     writeFileSync(cfgPath, '{}');

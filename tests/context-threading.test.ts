@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { buildRegistry } from '../src/compose.js';
+import { buildRegistry, requestHooksFor } from '../src/compose.js';
 import { buildIdentityContext, isOwnerContext, type IdentityContext } from '../src/identity.js';
 import { clearDiscoveryMemoryCache } from '../src/discovery-client.js';
 import type { AccountSet } from '../src/accounts.js';
@@ -360,3 +360,27 @@ describe('the owner context keeps the single-owner surface', () => {
     expect(s2.lines.some((l: string) => l.startsWith('local usage metrics:'))).toBe(true);
   });
 });
+
+describe('requestHooksFor binds the per-request hooks to one registry', () => {
+  it('names the context default account and screens against its registry', () => {
+    const { server } = fakeServer();
+    const ctx = contextFor('ctx-h', setWith({ only: { email: 'h@ctx-h.example' } }, { defaultAccount: 'only' })).ctx;
+    const registry = buildRegistry(server as never, ctx, 'eager');
+    const hooks = requestHooksFor(registry, ctx, null, {} as NodeJS.ProcessEnv);
+    expect(hooks.validationEnvelope?.defaultAccount?.()).toBe('only');
+    expect(hooks.validationEnvelope?.isKnownTool?.('gmail_search')).toBe(true);
+    expect(hooks.validationEnvelope?.isKnownTool?.('nope_tool')).toBe(false);
+    expect(hooks.argShapeFor?.('gmail_search')).toBeDefined();
+    expect(hooks.strictArgs?.declaredFor('gmail_search')).toContain('query');
+  });
+
+  it('turns each hook off with its env switch', () => {
+    const { server } = fakeServer();
+    const ctx = contextFor('ctx-i', setWith({ only: { email: 'i@ctx-i.example' } })).ctx;
+    const registry = buildRegistry(server as never, ctx, 'eager');
+    const hooks = requestHooksFor(registry, ctx, null, { GOOGLE_ARG_NORMALIZE: 'off', GOOGLE_ARG_UNKNOWN: 'off' } as NodeJS.ProcessEnv);
+    expect(hooks.argShapeFor).toBeUndefined();
+    expect(hooks.strictArgs).toBeUndefined();
+  });
+});
+

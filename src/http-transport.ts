@@ -20,6 +20,17 @@ export type Authenticator = (req: IncomingMessage) => AuthOutcome | Promise<Auth
 /** A mounted extra route (the AS endpoints, B13). Return true if it wrote a response. */
 export type RouteHandler = (req: IncomingMessage, res: ServerResponse, url: URL) => boolean | Promise<boolean>;
 
+/** What a verified subject resolves to: ITS server plus the per-request hooks
+ * bound to that server's registry (tool shapes, declared keys, the default
+ * account a validation envelope names). The metrics observers (metricsTap,
+ * onArgRename) stay host-wide and must not be bound to any one registry. */
+export interface ServerTarget {
+  server: McpServer;
+  argShapeFor?: (tool: string) => ArgShape | undefined;
+  strictArgs?: StrictArgOptions;
+  validationEnvelope?: ValidationEnvelopeOptions;
+}
+
 export interface HttpHostOptions {
   /** The ONE McpServer + registry built at boot (P1 / BV gap #4: never per request). */
   server: McpServer;
@@ -30,8 +41,11 @@ export interface HttpHostOptions {
   /** Tenant-resolution seam: map the verified subject to ITS server. Absent
    * (free core) = every request dispatches to the one boot `server`. Return
    * null for an unknown subject -> 403 tenant_not_found. Each distinct
-   * resolved server gets its own serialize key. */
-  resolveServer?: (claims: { sub: string }) => Promise<{ server: McpServer } | null> | { server: McpServer } | null;
+   * resolved server gets its own dispatch lane. With a resolver, the
+   * per-request hooks come from the resolved target ONLY: the host-level
+   * argShapeFor / strictArgs / validationEnvelope describe the boot server's
+   * registry, never another subject's. */
+  resolveServer?: (claims: { sub: string }) => Promise<ServerTarget | null> | ServerTarget | null;
   /** Extra routes keyed by exact pathname (AS endpoints mount here in B13). */
   routes?: Record<string, RouteHandler>;
   log?: (line: string) => void;
@@ -93,26 +107,30 @@ export function jsonRpcMethod(body: unknown): string {
 
 export class HttpTransportHost {
   private httpServer?: Server;
-  // Serialize the connect→dispatch critical section PER KEY: a McpServer
+  // Serialize the connect→dispatch critical section PER SERVER: a McpServer
   // captures its transport per request (protocol.js), but the gap between
   // connect() and the dispatch capturing it would still race under true
   // concurrency, so all traffic to ONE server runs under one mutex. The free
-  // core uses a single key (one boot server); with resolveServer each subject
-  // gets its own server and therefore its own independent lock lane.
-  private readonly locks = new Map<string, Promise<unknown>>();
+  // core has one lane (the boot server); with resolveServer each resolved
+  // server gets its own, however subjects map onto servers.
+  private readonly locks = new Map<McpServer, Promise<unknown>>();
 
   constructor(private readonly opts: HttpHostOptions) {}
 
-  private serializeFor<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  private serializeFor<T>(key: McpServer, fn: () => Promise<T>): Promise<T> {
     const prev = this.locks.get(key) ?? Promise.resolve();
     const run = prev.then(fn, fn);
-    this.locks.set(
-      key,
-      run.then(
-        () => undefined,
-        () => undefined,
-      ),
+    const tail = run.then(
+      () => undefined,
+      () => undefined,
     );
+    this.locks.set(key, tail);
+    // An idle lane drops out, so the map holds only in-flight subjects rather
+    // than every subject ever seen. A request that chained on this tail has
+    // already replaced it, so the identity check never frees a live lane.
+    void tail.then(() => {
+      if (this.locks.get(key) === tail) this.locks.delete(key);
+    });
     return run as Promise<T>;
   }
 
@@ -218,7 +236,12 @@ export class HttpTransportHost {
 
     // Tenant resolution (the seam EE fills): map the verified subject to ITS
     // server. Absent resolver = the one boot server for every subject.
-    let target: { server: McpServer } | null = { server: this.opts.server };
+    let target: ServerTarget | null = {
+      server: this.opts.server,
+      argShapeFor: this.opts.argShapeFor,
+      strictArgs: this.opts.strictArgs,
+      validationEnvelope: this.opts.validationEnvelope,
+    };
     if (this.opts.resolveServer) {
       try {
         target = await this.opts.resolveServer({ sub });
@@ -269,12 +292,11 @@ export class HttpTransportHost {
     // releases. (A shared initialized-state persists across stateless requests;
     // benign for the single-owner design.)
     const deadlineMs = this.opts.dispatchTimeoutMs ?? DISPATCH_TIMEOUT_DEFAULT;
-    // The lock lane must match the SERVER identity, not the subject: without a
-    // resolver every subject shares the one boot server, so keying on sub
-    // would let two subjects race one server through the connect gap.
-    const serializeKey = this.opts.resolveServer ? sub : '__single__';
-    const mcpServer = target.server;
-    await this.serializeFor(serializeKey, async () => {
+    // The lock lane is the SERVER identity, never the subject: two subjects
+    // reaching one server (the boot server, or a resolver mapping several
+    // subjects to one) would otherwise race it through the connect gap.
+    const { server: mcpServer, argShapeFor, strictArgs, validationEnvelope } = target;
+    await this.serializeFor(mcpServer, async () => {
       const disconnected = new Promise<'closed'>((resolve) => res.once('close', () => resolve('closed')));
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timedOut = new Promise<'timeout'>((resolve) => {
@@ -283,11 +305,11 @@ export class HttpTransportHost {
       });
       // Same composition as the stdio leg: the envelope rewrite is innermost,
       // so the tap above it still classifies the original validation prose.
-      const enveloped = withValidationEnvelope(transport, this.opts.validationEnvelope ?? {});
+      const enveloped = withValidationEnvelope(transport, validationEnvelope ?? {});
       const tapped = this.opts.metricsTap ? this.opts.metricsTap(enveloped) : enveloped;
       await mcpServer.connect(
-        this.opts.argShapeFor || this.opts.strictArgs
-          ? withArgNormalization(tapped, this.opts.argShapeFor ?? (() => undefined), this.opts.log, this.opts.onArgRename, this.opts.strictArgs)
+        argShapeFor || strictArgs
+          ? withArgNormalization(tapped, argShapeFor ?? (() => undefined), this.opts.log, this.opts.onArgRename, strictArgs)
           : tapped,
       );
       // Reflect the dispatch into a non-rejecting arm: if the deadline wins the
