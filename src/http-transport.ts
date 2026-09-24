@@ -119,13 +119,17 @@ export class HttpTransportHost {
   private serializeFor<T>(key: string, fn: () => Promise<T>): Promise<T> {
     const prev = this.locks.get(key) ?? Promise.resolve();
     const run = prev.then(fn, fn);
-    this.locks.set(
-      key,
-      run.then(
-        () => undefined,
-        () => undefined,
-      ),
+    const tail = run.then(
+      () => undefined,
+      () => undefined,
     );
+    this.locks.set(key, tail);
+    // An idle lane drops out, so the map holds only in-flight subjects rather
+    // than every subject ever seen. A request that chained on this tail has
+    // already replaced it, so the identity check never frees a live lane.
+    void tail.then(() => {
+      if (this.locks.get(key) === tail) this.locks.delete(key);
+    });
     return run as Promise<T>;
   }
 

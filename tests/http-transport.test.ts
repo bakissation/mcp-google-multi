@@ -219,6 +219,29 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
     expect(JSON.parse(unknown.text).error).toBe('tenant_not_found');
   });
 
+  it('an idle subject lane leaves the lock map', async () => {
+    const servers: Record<string, McpServer> = { 'tenant-a': makeServer(), 'tenant-b': makeServer() };
+    const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
+    const host = new HttpTransportHost({
+      server: makeServer(),
+      config,
+      version: '9.9.9',
+      ownerConfigured: true,
+      authenticate: (req) => ({ ok: true, sub: String(req.headers['x-test-sub'] ?? '') }),
+      resolveServer: ({ sub }) => (servers[sub] ? { server: servers[sub] } : null),
+    });
+    await host.start();
+    hosts.push(host);
+    const port = host.address()!.port;
+    await Promise.all(
+      ['tenant-a', 'tenant-b', 'tenant-a'].map((sub) =>
+        request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT, 'x-test-sub': sub }, body: initBody }),
+      ),
+    );
+    await new Promise((r) => setImmediate(r));
+    expect((host as unknown as { locks: Map<string, unknown> }).locks.size).toBe(0);
+  });
+
   it('a resolved target carries its own request hooks; the host-level ones never serve another subject', async () => {
     const named = () => {
       const s = new McpServer({ name: 'srv', version: '0.0.0' });
