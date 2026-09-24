@@ -131,7 +131,9 @@ export function resolveAccounts(
   env: NodeJS.ProcessEnv = process.env,
   filePath = configFilePath(),
   onInvalid: 'exit' | 'throw' = 'exit',
-  opts: { tokenDir?: string } = {},
+  // emptyOk: zero accounts is a valid set, not an error, even with 'throw'
+  // (a context that has linked nothing yet). An invalid file still fails.
+  opts: { tokenDir?: string; emptyOk?: boolean } = {},
 ): AccountSet {
   const dir = opts.tokenDir ?? tokenDir;
   const adminEnv = parseCsv(env.GOOGLE_ADMIN_ACCOUNTS);
@@ -199,7 +201,7 @@ export function resolveAccounts(
     // empty (BR-4), enforced by assertServerAccountsConfigured() in index.ts.
     // The dispatch-path reload ('throw') still throws so a mid-session emptied
     // config.json keeps the last-good registry (BR-7) instead of dropping tools.
-    if (onInvalid === 'throw') {
+    if (onInvalid === 'throw' && !opts.emptyOk) {
       throw new Error(`E_NO_ACCOUNTS_CONFIGURED: ${noAccountsMessage()}`);
     }
     return {
