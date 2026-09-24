@@ -6,7 +6,10 @@
 
 import type { McpServer } from "@modelcontextprotocol/server";
 import { GENERATED_SERVICES } from './tools/generated/index.js';
-import { GENERATED_GATES, SERVICES } from './services.js';
+import { GENERATED_GATES, SERVICES, unknownToolMessage } from './services.js';
+import { argNormalizationEnabled } from './arg-normalize.js';
+import { unknownArgMode } from './arg-strict.js';
+import type { ServerTarget } from './http-transport.js';
 import { ToolRegistry, type DiscoveryMode } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
@@ -86,4 +89,34 @@ export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Di
   // context has neither.
   if (owner) registerAccountWizardTools(registry, server);
   return registry;
+}
+
+/** The per-request hooks bound to one registry: argument shapes, unknown-
+ * argument screening and the account a validation envelope names. Both
+ * transports and every resolved server target build them here, so a mistyped
+ * argument behaves the same wherever it arrives. */
+export function requestHooksFor(
+  registry: ToolRegistry,
+  ctx: Pick<IdentityContext, 'accounts'>,
+  metrics: Metrics | null = null,
+  env: NodeJS.ProcessEnv = process.env,
+): Omit<ServerTarget, 'server'> {
+  const mode = unknownArgMode(env);
+  return {
+    argShapeFor: argNormalizationEnabled(env) ? (tool) => registry.argShape(tool) : undefined,
+    strictArgs:
+      mode === 'off'
+        ? undefined
+        : {
+            mode,
+            declaredFor: (tool) => registry.declaredKeys(tool),
+            siblingsFor: (tool, keys) => registry.siblingSpellings(tool, keys),
+            unknownTool: (name) => unknownToolMessage(registry, name),
+            onDrop: metrics ? (tool, keys) => metrics.recordArgDrop(tool, keys) : undefined,
+          },
+    validationEnvelope: {
+      isKnownTool: (name) => registry.hasTool(name),
+      defaultAccount: () => ctx.accounts.defaultAccount,
+    },
+  };
 }

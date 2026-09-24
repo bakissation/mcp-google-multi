@@ -357,7 +357,9 @@ single-owner behavior is unchanged.
 `HttpHostOptions.resolveServer` now returns a `ServerTarget`: the server plus
 the per-request hooks bound to that server's registry (`argShapeFor`,
 `strictArgs`, `validationEnvelope`). With a resolver, only the target's hooks
-apply; the host-level ones describe the boot server alone.
+apply; the host-level ones describe the boot server alone. `requestHooksFor(registry, ctx)`
+in `/compose` builds those hooks for one registry, exactly as both built-in
+transports do.
 
 ## 5. Auth changes
 

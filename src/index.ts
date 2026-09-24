@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // First import: triggers accounts.js module load (env files + registry) before
 // anything else. Named to also pull the server-only empty-registry guard (BR-4).
-import { assertServerAccountsConfigured, getAccountSet } from './accounts.js';
+import { assertServerAccountsConfigured } from './accounts.js';
 import { accountsAssertRequired, assertNoEnvAccountsMode, assertNoEnvOptionalScopesMode, isMultiTenantBoot, mtBootGates } from './boot-gates.js';
 
 import { readFileSync } from 'node:fs';
@@ -10,15 +10,13 @@ import path from 'node:path';
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { McpServer } from "@modelcontextprotocol/server";
 import type { Transport } from "@modelcontextprotocol/server";
-import { unknownToolMessage } from './services.js';
-import { type ToolRegistry, resolveDiscoveryMode } from './registry.js';
+import { resolveDiscoveryMode } from './registry.js';
 import { isAllowed, describePolicy } from './write-control.js';
 import { buildIdentityContext } from './identity.js';
-import { buildRegistry } from './compose.js';
+import { buildRegistry, requestHooksFor } from './compose.js';
 import { registerSetupPrompt } from './setup-prompt.js';
 import { applyNetTuning } from './net-tuning.js';
-import { argNormalizationEnabled, withArgNormalization, withValidationEnvelope, type StrictArgOptions } from './arg-normalize.js';
-import { unknownArgMode } from './arg-strict.js';
+import { withArgNormalization, withValidationEnvelope } from './arg-normalize.js';
 import { envValueSource } from './env-load.js';
 import { loadConfigFile } from './config-file.js';
 import { initUsageMetrics, resolveUsageMetrics, sourceLabel, type Metrics } from './usage-metrics.js';
@@ -27,20 +25,6 @@ applyNetTuning();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
-
-/** Unknown-argument screening options, or undefined when the feature is off.
- * Shared by both transports so a mistyped argument behaves identically. */
-function strictArgOptions(registry: ToolRegistry, metrics: Metrics | null): StrictArgOptions | undefined {
-  const mode = unknownArgMode();
-  if (mode === 'off') return undefined;
-  return {
-    mode,
-    declaredFor: (tool) => registry.declaredKeys(tool),
-    siblingsFor: (tool, keys) => registry.siblingSpellings(tool, keys),
-    unknownTool: (name) => unknownToolMessage(registry, name),
-    onDrop: metrics ? (tool, keys) => metrics.recordArgDrop(tool, keys) : undefined,
-  };
-}
 
 async function main() {
   if (process.argv.includes('auth')) {
@@ -225,35 +209,33 @@ async function main() {
   if (wantStdio) {
     const server = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
     const stdioMetrics = initMetricsFor('stdio', resolveDiscoveryMode());
-    const registry = buildRegistry(server, buildIdentityContext(process.env, { transport: 'stdio' }), undefined, stdioMetrics);
+    const stdioCtx = buildIdentityContext(process.env, { transport: 'stdio' });
+    const registry = buildRegistry(server, stdioCtx, undefined, stdioMetrics);
     registry.installListHandler();
     registerSetupPrompt(server);
+    const stdioHooks = requestHooksFor(registry, stdioCtx, stdioMetrics);
     // Outbound runs outermost-first, so the composition is deliberate: the
     // envelope rewrite is INNERMOST (last to touch the frame), the tap sits
     // above it (classifying the ORIGINAL validation prose), arg normalization
     // outermost. The tap only counts outbound JSON-RPC error frames (no
     // handler ran) plus id->tool names.
-    let transport: Transport = withValidationEnvelope(new StdioServerTransport(), {
-      isKnownTool: (n) => registry.hasTool(n),
-      defaultAccount: () => getAccountSet().defaultAccount,
-    });
+    let transport: Transport = withValidationEnvelope(new StdioServerTransport(), stdioHooks.validationEnvelope);
     if (stdioMetrics) {
       const { tapUsageMetrics } = await import('./metrics-tap.js');
       transport = tapUsageMetrics(transport, stdioMetrics, (n) => registry.hasTool(n));
     }
-    const strictStdio = strictArgOptions(registry, stdioMetrics);
     await server.connect(
-      argNormalizationEnabled() || strictStdio
+      stdioHooks.argShapeFor || stdioHooks.strictArgs
         ? withArgNormalization(
             transport,
             // Gated exactly as the HTTP leg gates `argShapeFor`. Passing the
             // shape unconditionally made stdio rename keys while
             // GOOGLE_ARG_NORMALIZE=off, so the same call succeeded on stdio
             // and failed on HTTP once screening rejects.
-            argNormalizationEnabled() ? (n) => registry.argShape(n) : () => undefined,
+            stdioHooks.argShapeFor ?? (() => undefined),
             undefined,
             stdioMetrics ? (tool, n) => stdioMetrics.recordArgFix(tool, n) : undefined,
-            strictStdio,
+            stdioHooks.strictArgs,
           )
         : transport,
     );
@@ -285,7 +267,8 @@ async function main() {
     }
     const httpServer = new McpServer({ name: 'mcp-google-multi', version: pkg.version });
     const httpMetrics = initMetricsFor('http', 'curated');
-    const registry = buildRegistry(httpServer, buildIdentityContext(process.env, { transport: 'http' }), 'curated', httpMetrics);
+    const httpCtx = buildIdentityContext(process.env, { transport: 'http' });
+    const registry = buildRegistry(httpServer, httpCtx, 'curated', httpMetrics);
     registry.installListHandler();
     registerSetupPrompt(httpServer);
 
@@ -375,14 +358,9 @@ async function main() {
       authenticate: authServer.authenticate,
       routes: authServer.routes,
       log: (l) => process.stderr.write(`[http] ${l}\n`),
-      argShapeFor: argNormalizationEnabled() ? (n) => registry.argShape(n) : undefined,
+      ...requestHooksFor(registry, httpCtx, httpMetrics),
       metricsTap: httpTap,
-      validationEnvelope: {
-        isKnownTool: (n: string) => registry.hasTool(n),
-        defaultAccount: () => getAccountSet().defaultAccount,
-      },
       onArgRename: httpMetrics ? (tool: string, n: number) => httpMetrics.recordArgFix(tool, n) : undefined,
-      strictArgs: strictArgOptions(registry, httpMetrics),
     });
     await host.start();
     process.stderr.write(`HTTP transport listening on http://${httpCfg.host}:${httpCfg.port} (public ${httpCfg.publicUrl})\n`);
