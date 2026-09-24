@@ -6,7 +6,7 @@ import { getClient } from '../client.js';
 import { coerceJson } from './_coerce.js';
 import { getToolsets, toolsetEnabled, type Toolsets } from '../toolsets.js';
 import { editDistance } from '../scope-catalog.js';
-import { executeApiMethod, jsonResult, type QueryParams } from '../executor.js';
+import { executeApiMethod, jsonResult, type ExecuteDeps, type QueryParams } from '../executor.js';
 import {
   SUPPORTED_APIS,
   resolveApiAliases,
@@ -43,8 +43,7 @@ const SERVICE_FOR_ALIAS: Record<string, string> = {
   analyticsdata: 'analytics',
 };
 
-export interface EscapeDeps extends DiscoveryDeps {
-  getClientFn?: typeof getClient;
+export interface EscapeDeps extends DiscoveryDeps, ExecuteDeps {
   toolsets?: Toolsets;
 }
 
@@ -250,7 +249,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
           queryParams: queryParams as QueryParams | undefined,
           body,
         },
-        { getClientFn },
+        { getClientFn, scopeDeps: deps.scopeDeps },
       );
     },
   );

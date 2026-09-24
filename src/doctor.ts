@@ -3,14 +3,15 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import type { ToolRegistry } from './registry.js';
 import { getAccountSet } from './accounts.js';
-import { deriveAccountHealth, type AccountHealth } from './tools/accounts-tool.js';
+import { accountHealthDepsFor, deriveAccountHealth, type AccountHealth } from './tools/accounts-tool.js';
+import { isOwnerContext, type IdentityContext } from './identity.js';
 import { peekMasterKeyProvenance, deleteMasterKeyMaterial } from './master-key.js';
 import { hasToken } from './token-store.js';
 import { configDir, loadConfigFile } from './config-file.js';
 import { envValueSource } from './env-load.js';
 import { reauthHint } from './reauth-hint.js';
 import { describeMetricsDir, resolveUsageMetrics, sourceLabel } from './usage-metrics.js';
-import { probeApiEnablement } from './api-probe.js';
+import { apiProbeDepsFor, probeApiEnablement } from './api-probe.js';
 import { safeMessage, stringifyEnvelope } from './tools/_errors.js';
 import { resolveHttpConfig, HttpConfigError, type HttpConfig } from './http-config.js';
 import { parseOwnerEmails } from './http-transport.js';
@@ -148,7 +149,7 @@ function sectionRuntime(deps: DiagnosticsDeps): DiagnosticSection {
   return { id: 1, title: 'Runtime', verdict: 'ok', lines: [`Node.js ${deps.nodeVersion} (>= ${MIN_NODE_MAJOR})`] };
 }
 
-function sectionConfig(deps: DiagnosticsDeps, set: ReturnType<typeof getAccountSet> | null): DiagnosticSection {
+function sectionConfig(deps: DiagnosticsDeps, set: ReturnType<typeof getAccountSet> | null, tenantScope = false): DiagnosticSection {
   const lines: string[] = [];
   let verdict: Verdict = 'ok';
   let hint: string | undefined;
@@ -161,8 +162,13 @@ function sectionConfig(deps: DiagnosticsDeps, set: ReturnType<typeof getAccountS
       verdict: 'fail',
       slug: 'E_NO_ACCOUNTS_CONFIGURED',
       lines: ['No accounts configured.'],
-      hint: 'Add an account: run `npx mcp-google-multi migrate-config` or set GOOGLE_ACCOUNTS.',
+      ...(tenantScope ? {} : { hint: 'Add an account: run `npx mcp-google-multi migrate-config` or set GOOGLE_ACCOUNTS.' }),
     };
+  }
+  // The config file, process env, working directory and metrics store below
+  // are the operator's host, not the context's: a tenant sees its own count.
+  if (tenantScope) {
+    return { id: 2, title: 'Config', verdict: 'ok', lines: [`${set.aliases.length} account(s) configured`] };
   }
 
   const cfgPath = path.join(configDir(), 'config.json');
@@ -380,13 +386,14 @@ export async function runDiagnostics(
 ): Promise<DiagnosticsReport> {
   // Tenant scope omits the OPERATOR sections: §3 (key provenance = box
   // infrastructure) and §7 (its owner-gate lines print MCP_OWNER_EMAILS
-  // values — other people's addresses from a tenant's seat).
+  // values — other people's addresses from a tenant's seat), and trims §2 to
+  // the context's own account count.
   const tenantScope = opts.scope === 'tenant';
   const sections: DiagnosticSection[] = [];
   sections.push(sectionRuntime(deps));
 
   const set = deps.accountSet();
-  sections.push(sectionConfig(deps, set));
+  sections.push(sectionConfig(deps, set, tenantScope));
   const aliases = set?.aliases ?? [];
 
   if (!tenantScope) sections.push(sectionKeys(deps, aliases));
@@ -470,6 +477,28 @@ export function exitCodeFor(report: DiagnosticsReport, strict: boolean): number 
   return 0;
 }
 
+export type DiagnoseContext = Pick<IdentityContext, 'subject' | 'accounts' | 'getClient' | 'tokenStore'>;
+
+/** The engine's account, token and probe reads bound to one context, so a
+ * report never shows (or probes with) another context's accounts. */
+function diagnosticsDepsFor(ctx: DiagnoseContext): DiagnosticsDeps {
+  const health = accountHealthDepsFor(ctx.tokenStore, () => ctx.accounts);
+  const probe = apiProbeDepsFor(ctx.tokenStore.readToken, ctx.getClient);
+  return {
+    ...DEFAULT_DEPS,
+    accountSet: () => {
+      try {
+        return ctx.accounts;
+      } catch {
+        return null;
+      }
+    },
+    accountHealth: (alias) => deriveAccountHealth(alias, health),
+    anyTokensExist: (aliases) => aliases.some((a) => ctx.tokenStore.hasToken(a)),
+    probeApi: (alias) => probeApiEnablement(alias, probe),
+  };
+}
+
 /** Agent-callable structured health report (read-only). Mirrors `doctor`'s
  * engine. Registered as a META tool, like `account_list`: it introspects this
  * server rather than Google data, and as a normal tool it became a service of
@@ -477,10 +506,11 @@ export function exitCodeFor(report: DiagnosticsReport, strict: boolean): number 
  * from already-registered services, and this runs after that), so it was
  * advertised only once something else expanded the surface. The README sends
  * people here when they are stuck, so it has to be findable. */
-export function registerDiagnoseTool(registry: ToolRegistry, ctx?: { subject: string }): void {
-  // A non-owner context gets the tenant-scoped report; the free core's single
-  // 'owner' context keeps today's full operator report.
-  const scope: 'operator' | 'tenant' = ctx && ctx.subject !== 'owner' ? 'tenant' : 'operator';
+export function registerDiagnoseTool(registry: ToolRegistry, ctx?: DiagnoseContext): void {
+  // A non-owner context gets the tenant-scoped report; only the owner context
+  // (or the context-free CLI surface) keeps the full operator report.
+  const scope: 'operator' | 'tenant' = ctx && !isOwnerContext(ctx) ? 'tenant' : 'operator';
+  const deps = ctx ? diagnosticsDepsFor(ctx) : DEFAULT_DEPS;
   registry.registerMeta(
     'diagnose',
     {
@@ -490,7 +520,7 @@ export function registerDiagnoseTool(registry: ToolRegistry, ctx?: { subject: st
     },
     async () => {
       try {
-        const result = await runDiagnostics(undefined, { scope });
+        const result = await runDiagnostics(deps, { scope });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (e: any) {
         return { content: [{ type: 'text' as const, text: stringifyEnvelope({

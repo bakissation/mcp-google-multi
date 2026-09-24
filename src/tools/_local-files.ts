@@ -1,5 +1,24 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { stringifyEnvelope } from './_errors.js';
+
+/** Refusal for a host-file argument on a context that may not touch the
+ * server's disk: the host belongs to its operator, not to every caller. */
+export function hostFilesRefused(account: string | undefined, what: string) {
+  return {
+    content: [{
+      type: 'text' as const,
+      text: stringifyEnvelope({
+        error: 'forbidden',
+        message: `${what}: this caller may not read files on the machine running the server.`,
+        hint: 'Put the file in Drive first and work from its Drive id.',
+        retriable: false,
+        account,
+      }),
+    }],
+    isError: true as const,
+  };
+}
 
 // path.basename() is a traversal guard — a caller-supplied filename must never escape savePath.
 export function prepareLocalDest(savePath: string, filename: string): string {

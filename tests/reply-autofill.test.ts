@@ -100,4 +100,15 @@ describe('resolveReply (A8 auto-fill)', () => {
     expect(r.to).toBeUndefined();
     expect(r.subject).toBeUndefined();
   });
+
+  it('two mailboxes sharing an alias name never share an own-address set', async () => {
+    const headers = H({ From: 'alice@ext.com', To: 'first@one.example, second@two.example', Subject: 'S' });
+    const one = fakeGmail({ headers, sendAs: ['first@one.example'] });
+    const two = fakeGmail({ headers, sendAs: ['second@two.example'] });
+    const r1 = await resolveReply(one, 'acct-shared', 'first@one.example', 'M1', true);
+    const r2 = await resolveReply(two, 'acct-shared', 'second@two.example', 'M2', true);
+    expect(r1.cc).toBe('second@two.example');
+    expect(r2.cc).toBe('first@one.example');
+  });
 });
+

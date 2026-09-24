@@ -96,7 +96,8 @@ describe('token-store crypto', () => {
     });
 
     it('rejects traversal-shaped and reserved tenant ids at the path helper', () => {
-      for (const bad of ['..', 'a/b', 'a\\b', '', '__proto__', 'constructor', '.hidden!']) {
+      // 'owner' is the single-owner context's subject and client lane.
+      for (const bad of ['..', 'a/b', 'a\\b', '', '__proto__', 'constructor', '.hidden!', 'owner']) {
         expect(() => tenantTokenDir(bad)).toThrow(/E_TENANT_ID_INVALID/);
         expect(() => tenantConfigFilePath(bad)).toThrow(/E_TENANT_ID_INVALID/);
       }

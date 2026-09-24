@@ -108,8 +108,8 @@ export function getAdminAccounts(set: AccountSet = getAccountSet()): string[] {
  * legacy env) changes its consent set and requires re-running auth. Evaluated
  * per account: `work` can carry admin + gmail_settings while `personal` is
  * never asked for them. */
-export function resolveScopesForAccount(alias: string): string[] {
-  const profile = profileForAccount(alias);
+export function resolveScopesForAccount(alias: string, set: AccountSet = getAccountSet()): string[] {
+  const profile = profileForAccount(alias, set);
   const scopes = profile.includesBase === false ? [] : [...BASE_SCOPES];
 
   for (const bundle of profile.bundles) {
@@ -117,7 +117,7 @@ export function resolveScopesForAccount(alias: string): string[] {
     scopes.push(...BUNDLE_CATALOG[bundle].scopes);
   }
 
-  if (getAdminAccounts().includes(alias)) {
+  if (getAdminAccounts(set).includes(alias)) {
     scopes.push(...ADMIN_SCOPES);
   }
 
