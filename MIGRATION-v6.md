@@ -354,6 +354,11 @@ path helpers in `/config-file` (`tenantTokenDir`, `tenantConfigFilePath`,
 `ensureTenantDirs`) reject it with `E_TENANT_ID_INVALID`. The free core's
 single-owner behavior is unchanged.
 
+`HttpHostOptions.resolveServer` now returns a `ServerTarget`: the server plus
+the per-request hooks bound to that server's registry (`argShapeFor`,
+`strictArgs`, `validationEnvelope`). With a resolver, only the target's hooks
+apply; the host-level ones describe the boot server alone.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)
