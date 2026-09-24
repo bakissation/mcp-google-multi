@@ -3,14 +3,15 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import type { ToolRegistry } from './registry.js';
 import { getAccountSet } from './accounts.js';
-import { deriveAccountHealth, type AccountHealth } from './tools/accounts-tool.js';
+import { accountHealthDepsFor, deriveAccountHealth, type AccountHealth } from './tools/accounts-tool.js';
+import { isOwnerContext, type IdentityContext } from './identity.js';
 import { peekMasterKeyProvenance, deleteMasterKeyMaterial } from './master-key.js';
 import { hasToken } from './token-store.js';
 import { configDir, loadConfigFile } from './config-file.js';
 import { envValueSource } from './env-load.js';
 import { reauthHint } from './reauth-hint.js';
 import { describeMetricsDir, resolveUsageMetrics, sourceLabel } from './usage-metrics.js';
-import { probeApiEnablement } from './api-probe.js';
+import { apiProbeDepsFor, probeApiEnablement } from './api-probe.js';
 import { safeMessage, stringifyEnvelope } from './tools/_errors.js';
 import { resolveHttpConfig, HttpConfigError, type HttpConfig } from './http-config.js';
 import { parseOwnerEmails } from './http-transport.js';
@@ -477,10 +478,33 @@ export function exitCodeFor(report: DiagnosticsReport, strict: boolean): number 
  * from already-registered services, and this runs after that), so it was
  * advertised only once something else expanded the surface. The README sends
  * people here when they are stuck, so it has to be findable. */
-export function registerDiagnoseTool(registry: ToolRegistry, ctx?: { subject: string }): void {
-  // A non-owner context gets the tenant-scoped report; the free core's single
-  // 'owner' context keeps today's full operator report.
-  const scope: 'operator' | 'tenant' = ctx && ctx.subject !== 'owner' ? 'tenant' : 'operator';
+type DiagnoseContext = Pick<IdentityContext, 'subject' | 'accounts' | 'getClient' | 'tokenStore'>;
+
+/** The engine's account, token and probe reads bound to one context, so a
+ * report never shows (or probes with) another context's accounts. */
+function diagnosticsDepsFor(ctx: DiagnoseContext): DiagnosticsDeps {
+  const health = accountHealthDepsFor(ctx.tokenStore, () => ctx.accounts);
+  const probe = apiProbeDepsFor(ctx.tokenStore.readToken, ctx.getClient);
+  return {
+    ...DEFAULT_DEPS,
+    accountSet: () => {
+      try {
+        return ctx.accounts;
+      } catch {
+        return null;
+      }
+    },
+    accountHealth: (alias) => deriveAccountHealth(alias, health),
+    anyTokensExist: (aliases) => aliases.some((a) => ctx.tokenStore.hasToken(a)),
+    probeApi: (alias) => probeApiEnablement(alias, probe),
+  };
+}
+
+export function registerDiagnoseTool(registry: ToolRegistry, ctx?: DiagnoseContext): void {
+  // A non-owner context gets the tenant-scoped report; only the owner context
+  // (or the context-free CLI surface) keeps the full operator report.
+  const scope: 'operator' | 'tenant' = ctx && !isOwnerContext(ctx) ? 'tenant' : 'operator';
+  const deps = ctx ? diagnosticsDepsFor(ctx) : DEFAULT_DEPS;
   registry.registerMeta(
     'diagnose',
     {
@@ -490,7 +514,7 @@ export function registerDiagnoseTool(registry: ToolRegistry, ctx?: { subject: st
     },
     async () => {
       try {
-        const result = await runDiagnostics(undefined, { scope });
+        const result = await runDiagnostics(deps, { scope });
         return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
       } catch (e: any) {
         return { content: [{ type: 'text' as const, text: stringifyEnvelope({

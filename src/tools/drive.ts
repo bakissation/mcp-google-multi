@@ -2,11 +2,11 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceArray, coerceBoolean, coerceNumber } from './_coerce.js';
 import { drive as driveClient, type drive_v3 } from '@googleapis/drive';
-import { accountArgLive, getAccountSet } from '../accounts.js';
+import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } from './_errors.js';
-import { openLocalReadStream, prepareLocalDest } from './_local-files.js';
+import { hostFilesRefused, openLocalReadStream, prepareLocalDest } from './_local-files.js';
 import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
 import { capText, listResult } from '../trim.js';
@@ -142,6 +142,8 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
   const accountEnum = accountArgLive(() => server.accountAliases()).optional();
   const requiredAccountEnum = accountArgLive(() => server.accountAliases());
   const getClientFn = deps.getClientFn ?? getClient;
+  const localFiles = deps.localFiles ?? true;
+  const registerHostFileTool = localFiles ? server.registerTool : (() => undefined) as unknown as typeof server.registerTool;
   // ─── Read / search / list ──────────────────────────────────────────────
 
   server.registerTool(
@@ -390,7 +392,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
 
   // ─── Write / upload / download ─────────────────────────────────────────
 
-  server.registerTool(
+  registerHostFileTool(
     'drive_upload',
     {
       description: 'Upload a local file to Google Drive. Pass `convertTo` to import it as a native, editable Google Doc/Sheet/Slides/Drawing instead of storing the raw bytes.',
@@ -434,7 +436,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
     },
   );
 
-  server.registerTool(
+  registerHostFileTool(
     'drive_download',
     {
       description: 'Download a binary file from Drive to local disk. For Google Workspace formats (Docs, Sheets, Slides), use drive_export instead.',
@@ -472,7 +474,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
     },
   );
 
-  server.registerTool(
+  registerHostFileTool(
     'drive_export',
     {
       description: 'Export a Google Workspace document (Doc, Sheet, Slide) to a standard format and save to disk. Supported: PDF, DOCX, XLSX, PPTX, TXT, CSV, Markdown (text/markdown for Docs).',
@@ -561,6 +563,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       },
     },
     async ({ account, fileId, newName, newParentFolderId, localPath: localPathArg, mimeType: mimeTypeArg, convertTo }) => {
+      if (localPathArg && !localFiles) return hostFilesRefused(account, 'localPath');
       try {
         const auth = await getClientFn(account as Account);
         const drive = driveClient({ version: 'v3', auth });
@@ -1501,7 +1504,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           };
         }
         const intendedName = newName ?? meta.data.name ?? 'transferred-file';
-        const targetEmail = getAccountSet().configs[toAccount as Account].email;
+        const targetEmail = server.accountSet().configs[toAccount as Account].email;
 
         const finish = async (
           data: drive_v3.Schema$File,

@@ -52,20 +52,26 @@ export interface ApiProbeDeps {
   request: (alias: string, url: string) => Promise<void>;
 }
 
-const DEFAULT_DEPS: ApiProbeDeps = {
-  grantedScopes: (alias) => {
-    try {
-      const scope = readToken(alias)?.scope;
-      return typeof scope === 'string' ? scope.split(' ').filter(Boolean) : [];
-    } catch {
-      return [];
-    }
-  },
-  request: async (alias, url) => {
-    const auth = await getClient(alias as Account);
-    await auth.request({ url, timeout: 10_000 });
-  },
-};
+/** Probe deps over one context's token reads and client; the module-level
+ * pair is the single owner's. */
+export function apiProbeDepsFor(readTokenFn: typeof readToken, getClientFn: typeof getClient): ApiProbeDeps {
+  return {
+    grantedScopes: (alias) => {
+      try {
+        const scope = readTokenFn(alias)?.scope;
+        return typeof scope === 'string' ? scope.split(' ').filter(Boolean) : [];
+      } catch {
+        return [];
+      }
+    },
+    request: async (alias, url) => {
+      const auth = await getClientFn(alias as Account);
+      await auth.request({ url, timeout: 10_000 });
+    },
+  };
+}
+
+const DEFAULT_DEPS: ApiProbeDeps = apiProbeDepsFor(readToken, getClient);
 
 export async function probeApiEnablement(alias: string, deps: ApiProbeDeps = DEFAULT_DEPS): Promise<ApiProbeResult[]> {
   const results: ApiProbeResult[] = [];

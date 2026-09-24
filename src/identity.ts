@@ -24,6 +24,16 @@ export interface IdentityContext {
   };
 }
 
+// Only buildIdentityContext mints the owner brand. The subject string alone
+// never unlocks the owner-only surfaces (account wizard, host-file tools, the
+// operator diagnose report): a hand-built context claiming 'owner' stays a
+// non-owner context.
+const ownerContexts = new WeakSet<object>();
+
+export function isOwnerContext(ctx: object | undefined): boolean {
+  return ctx !== undefined && ownerContexts.has(ctx);
+}
+
 export function buildIdentityContext(
   env: NodeJS.ProcessEnv = process.env,
   opts: { transport?: Transport } = {},
@@ -32,7 +42,7 @@ export function buildIdentityContext(
   // instantiates per tenant), bound here to the global registry + token dir —
   // behavior-identical to the module-level functions for the free core.
   const tokenStore = createTokenStore(getTokenDir());
-  return {
+  const ctx: IdentityContext = {
     subject: 'owner',
     // Live getter: the seam must always see the current registry, never a
     // snapshot pinned from before a wizard mutation or cross-process reload.
@@ -50,4 +60,6 @@ export function buildIdentityContext(
     }),
     tokenStore,
   };
+  ownerContexts.add(ctx);
+  return ctx;
 }

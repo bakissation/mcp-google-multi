@@ -19,9 +19,10 @@ export function tenantsDir(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 // A tenant id becomes a filesystem path segment exactly like an account
-// alias, so it rides the same traversal guard.
+// alias, so it rides the same traversal guard. 'owner' is the single-owner
+// context's subject and client lane, so no tenant may take it.
 function assertTenantId(tenantId: string): void {
-  if (!ALIAS_RE.test(tenantId) || isReservedAlias(tenantId)) {
+  if (!ALIAS_RE.test(tenantId) || isReservedAlias(tenantId) || tenantId === 'owner') {
     throw new Error(`E_TENANT_ID_INVALID: invalid tenant id "${tenantId}".`);
   }
 }

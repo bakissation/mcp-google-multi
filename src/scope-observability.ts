@@ -141,12 +141,16 @@ export interface AccountScopeSets {
   profile: Set<string>;
 }
 
+/** Where a scope hint reads the granted token and the configured profile;
+ * absent = the single-owner token store and global registry. */
+export interface ScopeSetDeps {
+  readTokenFn?: typeof readToken;
+  profileFn?: (alias: string) => string[];
+}
+
 /** Best-effort per-account sets; null when the token/profile is unreadable
  * (decrypt error, missing token) — callers fall back to generic hints. */
-export function accountScopeSets(
-  alias: string,
-  deps: { readTokenFn?: typeof readToken; profileFn?: typeof resolveScopesForAccount } = {},
-): AccountScopeSets | null {
+export function accountScopeSets(alias: string, deps: ScopeSetDeps = {}): AccountScopeSets | null {
   try {
     const token = (deps.readTokenFn ?? readToken)(alias);
     const granted = new Set(typeof token?.scope === 'string' ? token.scope.split(' ').filter(Boolean) : []);
@@ -167,7 +171,7 @@ export function accountScopeSets(
 export function scopeHintForMethod(
   required: readonly string[],
   alias: string,
-  deps: Parameters<typeof accountScopeSets>[1] = {},
+  deps: ScopeSetDeps = {},
 ): { hint: string; retriable: boolean } | null {
   const sets = accountScopeSets(alias, deps);
   if (!sets || required.length === 0) return null;

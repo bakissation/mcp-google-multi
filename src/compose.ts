@@ -10,11 +10,14 @@ import { GENERATED_GATES, SERVICES } from './services.js';
 import { ToolRegistry, type DiscoveryMode } from './registry.js';
 import { registerDiscoverTools } from './discover.js';
 import { registerEscapeTools } from './tools/google-api.js';
-import { registerAccountTools } from './tools/accounts-tool.js';
+import { accountHealthDepsFor, registerAccountTools } from './tools/accounts-tool.js';
 import { registerDiagnoseTool } from './doctor.js';
 import { registerAccountWizardTools } from './tools/account-wizard.js';
 import { getToolsets, toolsetEnabled } from './toolsets.js';
-import type { IdentityContext } from './identity.js';
+import { isOwnerContext, type IdentityContext } from './identity.js';
+import { resolveScopesForAccount } from './auth.js';
+import type { CuratedToolDeps } from './client.js';
+import type { ExecuteDeps } from './executor.js';
 import type { Metrics } from './usage-metrics.js';
 
 export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: DiscoveryMode, metrics: Metrics | null = null): ToolRegistry {
@@ -23,6 +26,18 @@ export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Di
   // selector validation and default-account injection all follow this
   // context, not the process global (identical for the free core's one ctx).
   const registry = new ToolRegistry(server, policy, mode, metrics, () => ctx.accounts);
+  // Every handler resolves its client, token reads and scope hints through
+  // this context; ctx.accounts is read per call, never snapshotted here, so
+  // the owner's live getter stays live.
+  const owner = isOwnerContext(ctx);
+  const clientDeps: CuratedToolDeps = { getClientFn: ctx.getClient, localFiles: owner };
+  const execDeps: ExecuteDeps = {
+    getClientFn: ctx.getClient,
+    scopeDeps: {
+      readTokenFn: ctx.tokenStore.readToken,
+      profileFn: (alias) => resolveScopesForAccount(alias, ctx.accounts),
+    },
+  };
   const toolsets = getToolsets();
   if (toolsets !== 'all') {
     const known = new Set([...SERVICES.map((s) => s.name), ...GENERATED_SERVICES.map((s) => s.name)]);
@@ -41,7 +56,7 @@ export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Di
       }
       continue;
     }
-    svc.register(registry);
+    svc.register(registry, clientDeps);
   }
   for (const gen of GENERATED_SERVICES) {
     if (!toolsetEnabled(toolsets, gen.name)) continue;
@@ -53,7 +68,7 @@ export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Di
       }
       continue;
     }
-    gen.register(registry);
+    gen.register(registry, execDeps);
   }
   if (registry.services().length === 0) {
     const known = [...new Set([...SERVICES.map((s) => s.name), ...GENERATED_SERVICES.map((s) => s.name)])].sort();
@@ -64,9 +79,11 @@ export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Di
     );
   }
   registerDiscoverTools(registry, policy);
-  registerEscapeTools(registry, policy);
-  registerAccountTools(registry);
+  registerEscapeTools(registry, policy, execDeps);
+  registerAccountTools(registry, accountHealthDepsFor(ctx.tokenStore));
   registerDiagnoseTool(registry, ctx);
-  registerAccountWizardTools(registry, server);
+  // The wizard edits the owner's config.json and token store; any other
+  // context has neither.
+  if (owner) registerAccountWizardTools(registry, server);
   return registry;
 }

@@ -7,7 +7,7 @@ import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
-import { prepareLocalDest } from './_local-files.js';
+import { hostFilesRefused, prepareLocalDest } from './_local-files.js';
 import { checkOutbound } from '../outbound-allowlist.js';
 import addressparser from 'nodemailer/lib/addressparser/index.js';
 import { lookup as lookupMime } from 'mime-types';
@@ -120,9 +120,11 @@ export function deriveReplySubject(sourceSubject: string): string {
 // The account's own-address set (primary + Gmail send-as aliases) used to
 // exclude the caller from reply-all. Send-as rarely changes, so memoize per
 // process; a stale miss only costs one extra self-copy, never a wrong send.
+// Keyed by alias AND mailbox: two contexts can share an alias name.
 const ownAddressCache = new Map<string, Promise<Set<string>>>();
 function getOwnAddresses(gmail: any, account: string, primaryEmail: string): Promise<Set<string>> {
-  let cached = ownAddressCache.get(account);
+  const key = `${account} ${normAddr(primaryEmail)}`;
+  let cached = ownAddressCache.get(key);
   if (!cached) {
     cached = (async () => {
       const set = new Set<string>([normAddr(primaryEmail)]);
@@ -136,7 +138,7 @@ function getOwnAddresses(gmail: any, account: string, primaryEmail: string): Pro
       }
       return set;
     })();
-    ownAddressCache.set(account, cached);
+    ownAddressCache.set(key, cached);
   }
   return cached;
 }
@@ -492,6 +494,8 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
   // custody path is the context's, not the process global.
   const accountEnum = accountArgLive(() => server.accountAliases()).optional();
   const getClientFn = deps.getClientFn ?? getClient;
+  const localFiles = deps.localFiles ?? true;
+  const registerHostFileTool = localFiles ? server.registerTool : (() => undefined) as unknown as typeof server.registerTool;
   server.registerTool(
     'gmail_search',
     {
@@ -711,10 +715,11 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
       },
     },
     async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, replyToThreadId, attachments }) => {
+      if (!localFiles && (attachments as unknown[] | undefined)?.length) return hostFilesRefused(account, 'attachments');
       try {
         const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
-        const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
+        const config = server.accountSet().configs[account as Account];
 
         if (htmlBody !== undefined) {
           throw new GmailComposeError('E_HTMLBODY_REMOVED', 'htmlBody was removed in v6: author Markdown in `body`; for literal HTML pass `allowRawHtml: true`.');
@@ -783,7 +788,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
       }
     },
   );
-  server.registerTool(
+  registerHostFileTool(
     'gmail_download_attachment',
     {
       description: 'Download an email attachment to local disk. Use gmail_read first to get the attachmentId.',
@@ -846,10 +851,11 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
       },
     },
     async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, replyToThreadId, attachments }) => {
+      if (!localFiles && (attachments as unknown[] | undefined)?.length) return hostFilesRefused(account, 'attachments');
       try {
         const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
-        const config = (await import('../accounts.js')).getAccountSet().configs[account as Account];
+        const config = server.accountSet().configs[account as Account];
 
         if (htmlBody !== undefined) {
           throw new GmailComposeError('E_HTMLBODY_REMOVED', 'htmlBody was removed in v6: author Markdown in `body`; for literal HTML pass `allowRawHtml: true`.');
