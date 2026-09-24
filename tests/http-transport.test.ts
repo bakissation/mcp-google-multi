@@ -219,6 +219,39 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
     expect(JSON.parse(unknown.text).error).toBe('tenant_not_found');
   });
 
+  it('two subjects resolving to ONE server share its lane and never overlap on it', async () => {
+    let active = 0;
+    let peak = 0;
+    const shared = new McpServer({ name: 'shared', version: '0.0.0' });
+    shared.registerTool('work', { description: 'do work', inputSchema: z.object({}) }, async () => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 150));
+      active--;
+      return { content: [{ type: 'text' as const, text: 'done' }] };
+    });
+    const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
+    const host = new HttpTransportHost({
+      server: makeServer(),
+      config,
+      version: '9.9.9',
+      ownerConfigured: true,
+      authenticate: (req) => ({ ok: true, sub: String(req.headers['x-test-sub'] ?? '') }),
+      resolveServer: () => ({ server: shared }),
+    });
+    await host.start();
+    hosts.push(host);
+    const port = host.address()!.port;
+    const work = (sub: string) =>
+      request(port, 'POST', '/mcp', {
+        headers: { accept: MCP_ACCEPT, 'x-test-sub': sub },
+        body: { jsonrpc: '2.0', id: 12, method: 'tools/call', params: { name: 'work', arguments: {} } },
+      });
+    const results = await Promise.all([work('sub-1'), work('sub-2')]);
+    expect(results.map((r) => JSON.parse(r.text).result.content[0].text)).toEqual(['done', 'done']);
+    expect(peak).toBe(1);
+  });
+
   it('an idle subject lane leaves the lock map', async () => {
     const servers: Record<string, McpServer> = { 'tenant-a': makeServer(), 'tenant-b': makeServer() };
     const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
@@ -239,7 +272,7 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
       ),
     );
     await new Promise((r) => setImmediate(r));
-    expect((host as unknown as { locks: Map<string, unknown> }).locks.size).toBe(0);
+    expect((host as unknown as { locks: Map<unknown, unknown> }).locks.size).toBe(0);
   });
 
   it('a resolved target carries its own request hooks; the host-level ones never serve another subject', async () => {

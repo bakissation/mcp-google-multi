@@ -22,7 +22,8 @@ export type RouteHandler = (req: IncomingMessage, res: ServerResponse, url: URL)
 
 /** What a verified subject resolves to: ITS server plus the per-request hooks
  * bound to that server's registry (tool shapes, declared keys, the default
- * account a validation envelope names). */
+ * account a validation envelope names). The metrics observers (metricsTap,
+ * onArgRename) stay host-wide and must not be bound to any one registry. */
 export interface ServerTarget {
   server: McpServer;
   argShapeFor?: (tool: string) => ArgShape | undefined;
@@ -40,7 +41,7 @@ export interface HttpHostOptions {
   /** Tenant-resolution seam: map the verified subject to ITS server. Absent
    * (free core) = every request dispatches to the one boot `server`. Return
    * null for an unknown subject -> 403 tenant_not_found. Each distinct
-   * resolved server gets its own serialize key. With a resolver, the
+   * resolved server gets its own dispatch lane. With a resolver, the
    * per-request hooks come from the resolved target ONLY: the host-level
    * argShapeFor / strictArgs / validationEnvelope describe the boot server's
    * registry, never another subject's. */
@@ -106,17 +107,17 @@ export function jsonRpcMethod(body: unknown): string {
 
 export class HttpTransportHost {
   private httpServer?: Server;
-  // Serialize the connect→dispatch critical section PER KEY: a McpServer
+  // Serialize the connect→dispatch critical section PER SERVER: a McpServer
   // captures its transport per request (protocol.js), but the gap between
   // connect() and the dispatch capturing it would still race under true
   // concurrency, so all traffic to ONE server runs under one mutex. The free
-  // core uses a single key (one boot server); with resolveServer each subject
-  // gets its own server and therefore its own independent lock lane.
-  private readonly locks = new Map<string, Promise<unknown>>();
+  // core has one lane (the boot server); with resolveServer each resolved
+  // server gets its own, however subjects map onto servers.
+  private readonly locks = new Map<McpServer, Promise<unknown>>();
 
   constructor(private readonly opts: HttpHostOptions) {}
 
-  private serializeFor<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  private serializeFor<T>(key: McpServer, fn: () => Promise<T>): Promise<T> {
     const prev = this.locks.get(key) ?? Promise.resolve();
     const run = prev.then(fn, fn);
     const tail = run.then(
@@ -291,12 +292,11 @@ export class HttpTransportHost {
     // releases. (A shared initialized-state persists across stateless requests;
     // benign for the single-owner design.)
     const deadlineMs = this.opts.dispatchTimeoutMs ?? DISPATCH_TIMEOUT_DEFAULT;
-    // The lock lane must match the SERVER identity, not the subject: without a
-    // resolver every subject shares the one boot server, so keying on sub
-    // would let two subjects race one server through the connect gap.
-    const serializeKey = this.opts.resolveServer ? sub : '__single__';
+    // The lock lane is the SERVER identity, never the subject: two subjects
+    // reaching one server (the boot server, or a resolver mapping several
+    // subjects to one) would otherwise race it through the connect gap.
     const { server: mcpServer, argShapeFor, strictArgs, validationEnvelope } = target;
-    await this.serializeFor(serializeKey, async () => {
+    await this.serializeFor(mcpServer, async () => {
       const disconnected = new Promise<'closed'>((resolve) => res.once('close', () => resolve('closed')));
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timedOut = new Promise<'timeout'>((resolve) => {

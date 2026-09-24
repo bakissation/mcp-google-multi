@@ -359,7 +359,9 @@ the per-request hooks bound to that server's registry (`argShapeFor`,
 `strictArgs`, `validationEnvelope`). With a resolver, only the target's hooks
 apply; the host-level ones describe the boot server alone. `requestHooksFor(registry, ctx)`
 in `/compose` builds those hooks for one registry, exactly as both built-in
-transports do.
+transports do; the metrics observers (`metricsTap`, `onArgRename`) stay
+host-wide. Dispatch is serialized per resolved server, so a resolver may map
+several subjects to one server safely.
 
 ## 5. Auth changes
 
