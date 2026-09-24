@@ -27,6 +27,7 @@
     "./boot-gates": "./dist/boot-gates.js",
     "./tenant-purge": "./dist/tenant-purge.js",
     "./doctor": "./dist/doctor.js",
+    "./write-control": "./dist/write-control.js",
     "./package.json": "./package.json"
   },
   "files": [

@@ -332,11 +332,24 @@ v6 adds a package `exports` map. The supported programmatic entry points are
 declared explicitly (`mcp-google-multi/identity`, `/compose`, `/registry`,
 `/oauth-as`, `/accounts`, `/token-store`, `/http-transport`, `/http-config`,
 `/client`, `/config-file`, `/fs-atomic`, `/master-key`, `/mcp-token`,
-`/boot-gates`, `/tenant-purge`, `/doctor`). Any OTHER deep import into `dist/` (previously unrestricted, e.g.
+`/boot-gates`, `/tenant-purge`, `/doctor`, `/write-control`). Any OTHER deep import into `dist/` (previously unrestricted, e.g.
 `mcp-google-multi/dist/trim.js`) now fails with
 `ERR_PACKAGE_PATH_NOT_EXPORTED`. The CLI (`npx mcp-google-multi ...`) and the
 MCP server entry are unaffected. If you relied on an undeclared deep import,
 open an issue naming the module so it can be promoted to a declared entry.
+
+`buildRegistry(server, ctx)` resolves every registered tool through `ctx`:
+the client, token reads, account emails (the From header, `drive_transfer`'s
+share target), scope hints, `account_list` and `diagnose`. Only the owner
+context from `buildIdentityContext()` (see `isOwnerContext`) gets the account
+wizard and the tools that read or write the server's own disk
+(`drive_upload`, `drive_download`, `drive_export`, `gmail_download_attachment`,
+`drive_update`'s `localPath`, `gmail_send`/`gmail_create_draft` attachments);
+a context built any other way is served without them. `registerDiagnoseTool`
+now takes `{ subject, accounts, getClient, tokenStore }` (an `IdentityContext`
+satisfies it), and `ToolRegistry#accountSet()` is new. `/write-control`
+exports `resolvePolicy`, `isAllowed` and the `Policy` type for callers that
+build their own context. The free core's single-owner behavior is unchanged.
 
 ## 5. Auth changes
 

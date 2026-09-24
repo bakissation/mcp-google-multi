@@ -41,7 +41,7 @@ server.registerTool(
   },
   async ({ account, /* … */ }) => {
     try {
-      const auth = await getClient(account as Account);
+      const auth = await getClientFn(account as Account);   // deps.getClientFn ?? getClient
       const svc = <service>Client({ version: '<v>', auth });
       const res = await svc.<resource>.<method>({ /* … */ });
       return { content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }] };
@@ -57,6 +57,7 @@ server.registerTool(
 - `cud` is inferred from the tool name (no manual flag). CUD tools are auto-gated by write-control; **never** add your own write gate. Fix a misclassified verb in `CUD_OVERRIDES` (`registry.ts`). Two sanctioned exceptions self-check via `isAllowed`: `google_api_call` (per-method cud) and `drive_transfer`'s `move` flag (delete inside a create-classified tool, checked against `registry.policy`).
 - Wrap handlers in try/catch → `handle<Service>Error` (→ `mapGoogleError`); errors return `{error, message, hint?, retriable, account}` with `isError: true`. **Never embed the raw error / `error.config` / `error.response`** — token-leak.
 - Return `{ content: [{ type: 'text', text: JSON.stringify(...) }] }`.
+- Resolve everything through the registry's context: `getClientFn` from the injected `CuratedToolDeps`, account emails from `server.accountSet()`. **Never** read `getAccountSet()`, the token-store module functions or the bare `getClient` from a handler: a registry built over another context would silently use the owner's. A tool that touches the server's disk registers only when `deps.localFiles` allows it.
 
 ## Adding a service
 
@@ -77,7 +78,7 @@ server.registerTool(
 ## Auth / tokens
 
 - Tokens are **encrypted at rest** — never write plaintext. `MASTER_KEY` resolves ONLY through `resolveMasterKey()` in `src/master-key.ts` (env > keychain > 0600 file > generate; hard guard: never generate while `<alias>.enc` exist). Never read the env var directly, never log key bytes (provenance label only).
-- Always go through `getClient(account)` (handles refresh + re-encrypt). Token files are `0600`.
+- Always go through the injected `getClientFn(account)` (handles refresh + re-encrypt). Token files are `0600`.
 - Secret-injection patterns (why `MASTER_KEY` shouldn't live in `.env` long-term): `docs/secrets.md`.
 
 ## Write-control
