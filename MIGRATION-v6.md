@@ -349,7 +349,10 @@ a context built any other way is served without them. `registerDiagnoseTool`
 now takes `{ subject, accounts, getClient, tokenStore }` (an `IdentityContext`
 satisfies it), and `ToolRegistry#accountSet()` is new. `/write-control`
 exports `resolvePolicy`, `isAllowed` and the `Policy` type for callers that
-build their own context. The free core's single-owner behavior is unchanged.
+build their own context. `owner` is now a reserved tenant id: the tenant
+path helpers in `/config-file` (`tenantTokenDir`, `tenantConfigFilePath`,
+`ensureTenantDirs`) reject it with `E_TENANT_ID_INVALID`. The free core's
+single-owner behavior is unchanged.
 
 ## 5. Auth changes
 

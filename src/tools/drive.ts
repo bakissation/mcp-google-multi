@@ -557,12 +557,23 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         fileId: z.string().min(1).describe('Google Drive file ID'),
         newName: z.string().optional().describe('New filename'),
         newParentFolderId: z.string().optional().describe('Move to this folder, named newParentFolderId here, not parentFolderId'),
-        localPath: z.string().optional().describe('Replace file content with this local file (path on the machine running the server)'),
-        mimeType: z.string().optional().describe('MIME type of the replacement file (required if localPath is provided)'),
-        convertTo: z.enum(CONVERT_TO_VALUES).optional().describe('When replacing content via localPath, convert the new content into this native Google Workspace type on import: "document" | "spreadsheet" | "presentation" | "drawing" (full application/vnd.google-apps.* ids also accepted).'),
+        ...(localFiles
+          ? {
+              localPath: z.string().optional().describe('Replace file content with this local file (path on the machine running the server)'),
+              mimeType: z.string().optional().describe('MIME type of the replacement file (required if localPath is provided)'),
+              convertTo: z.enum(CONVERT_TO_VALUES).optional().describe('When replacing content via localPath, convert the new content into this native Google Workspace type on import: "document" | "spreadsheet" | "presentation" | "drawing" (full application/vnd.google-apps.* ids also accepted).'),
+            }
+          : {}),
       },
     },
-    async ({ account, fileId, newName, newParentFolderId, localPath: localPathArg, mimeType: mimeTypeArg, convertTo }) => {
+    async (args) => {
+      const { account, fileId, newName, newParentFolderId } = args;
+      // Declared only when the context may read host files (see the shape).
+      const { localPath: localPathArg, mimeType: mimeTypeArg, convertTo } = args as {
+        localPath?: string;
+        mimeType?: string;
+        convertTo?: (typeof CONVERT_TO_VALUES)[number];
+      };
       if (localPathArg && !localFiles) return hostFilesRefused(account, 'localPath');
       try {
         const auth = await getClientFn(account as Account);

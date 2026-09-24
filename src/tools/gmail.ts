@@ -711,7 +711,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           .describe('With replyToMessageId: include the source To+Cc (minus your own addresses) in cc. Default false (reply to sender only).'),
         replyToThreadId: z.string().optional()
           .describe('Thread ID to send the message in'),
-        attachments: coerceJson(attachmentSchema),
+        ...(localFiles ? { attachments: coerceJson(attachmentSchema) } : {}),
       },
     },
     async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, replyToThreadId, attachments }) => {
@@ -847,7 +847,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           .describe('With replyToMessageId: include the source To+Cc (minus your own addresses) in cc. Default false (reply to sender only).'),
         replyToThreadId: z.string().optional()
           .describe('Thread ID to associate the draft with'),
-        attachments: coerceJson(attachmentSchema),
+        ...(localFiles ? { attachments: coerceJson(attachmentSchema) } : {}),
       },
     },
     async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, replyToThreadId, attachments }) => {

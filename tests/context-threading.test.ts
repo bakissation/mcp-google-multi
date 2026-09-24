@@ -48,15 +48,17 @@ function setWith(rows: Record<string, Row>, opts: { defaultAccount?: string; sco
 
 function fakeServer() {
   const handlers: Record<string, Handler> = {};
+  const schemas: Record<string, Record<string, unknown>> = {};
   const server = {
-    registerTool: (name: string, _config: unknown, handler: Handler) => {
+    registerTool: (name: string, config: { inputSchema?: Record<string, unknown> }, handler: Handler) => {
       handlers[name] = handler;
+      schemas[name] = config.inputSchema ?? {};
       return 'ok';
     },
     sendToolListChanged: vi.fn(),
     server: { setRequestHandler: () => {}, getClientCapabilities: () => undefined },
   };
-  return { server, handlers };
+  return { server, handlers, schemas };
 }
 
 const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
@@ -88,9 +90,9 @@ function contextFor(
     getClient,
     tokenStore,
   } as unknown as IdentityContext;
-  const { server, handlers } = fakeServer();
+  const { server, handlers, schemas } = fakeServer();
   buildRegistry(server as never, ctx, 'eager');
-  return { ctx, request, getClient, tokenStore, handlers };
+  return { ctx, request, getClient, tokenStore, handlers, schemas };
 }
 
 type Built = ReturnType<typeof contextFor>;
@@ -175,12 +177,23 @@ describe('buildRegistry resolves every handler through its context', () => {
     expect(text).not.toContain('ctx-b');
   });
 
+  const decodeRaw = (req: Req | undefined): string => {
+    expect(req).toBeDefined();
+    const data = req!.data as { raw?: string; message?: { raw: string } };
+    return Buffer.from(data.message?.raw ?? data.raw ?? '', 'base64url').toString('utf-8');
+  };
+
+  it('gmail_send sends From the context account', async () => {
+    await A.handlers.gmail_send({ account: 'test', to: 'x@y.example', subject: 's', body: 'b' });
+    const mime = decodeRaw(A.request.mock.calls.map(([r]) => r as Req).find((r) => r.url.includes('/messages/send')));
+    expect(mime).toMatch(/^From: .*a-test@ctx-a\.example/m);
+    expect(mime).not.toContain('test@example.com');
+    untouched(B);
+  });
+
   it('gmail_create_draft sends From the context account', async () => {
     await A.handlers.gmail_create_draft({ account: 'test', to: 'x@y.example', subject: 's', body: 'b' });
-    const post = A.request.mock.calls.map(([r]) => r as Req).find((r) => r.url.includes('/drafts'));
-    expect(post).toBeDefined();
-    const raw = (post!.data as { message: { raw: string } }).message.raw;
-    const mime = Buffer.from(raw, 'base64url').toString('utf-8');
+    const mime = decodeRaw(A.request.mock.calls.map(([r]) => r as Req).find((r) => r.url.includes('/drafts')));
     expect(mime).toMatch(/^From: .*a-test@ctx-a\.example/m);
     expect(mime).not.toContain('test@example.com');
     untouched(B);
@@ -226,28 +239,36 @@ describe('buildRegistry resolves every handler through its context', () => {
     untouched(B);
   });
 
-  it('a non-owner context gets no account wizard, even one claiming the owner subject', () => {
+  it('a context claiming the owner subject gets none of the owner surfaces', async () => {
     for (const name of WIZARD) expect(A.handlers[name]).toBeUndefined();
     const forged = contextFor('owner', setWith({ test: { email: 'f-test@ctx-f.example' } }));
     expect(isOwnerContext(forged.ctx)).toBe(false);
-    for (const name of WIZARD) expect(forged.handlers[name]).toBeUndefined();
+    for (const name of [...WIZARD, ...HOST_FILE_TOOLS]) expect(forged.handlers[name], name).toBeUndefined();
+    expect(forged.schemas.drive_update).not.toHaveProperty('localPath');
+    const ids = parse(await forged.handlers.diagnose({})).sections.map((s: { id: number }) => s.id);
+    expect(ids).not.toContain(3);
+    expect(ids).not.toContain(7);
   });
 
-  it('a non-owner context gets no host-file tools and refuses local paths', async () => {
-    for (const name of HOST_FILE_TOOLS) expect(A.handlers[name]).toBeUndefined();
+  it('a non-owner context gets no host-file tools, params or reads', async () => {
+    for (const name of HOST_FILE_TOOLS) expect(A.handlers[name], name).toBeUndefined();
+    expect(A.schemas.drive_update).not.toHaveProperty('localPath');
+    expect(A.schemas.gmail_send).not.toHaveProperty('attachments');
+    expect(A.schemas.gmail_create_draft).not.toHaveProperty('attachments');
     const upd = await A.handlers.drive_update({ account: 'test', fileId: 'F1', localPath: '/etc/hostname' });
     expect(upd.isError).toBe(true);
-    expect(parse(upd).error).toBe('forbidden');
-    const send = await A.handlers.gmail_send({
-      account: 'test',
-      to: 'x@y.example',
-      subject: 's',
-      body: 'b',
-      attachments: [{ path: '/etc/hostname' }],
-    });
-    expect(send.isError).toBe(true);
-    expect(parse(send).error).toBe('forbidden');
+    const mail = { account: 'test', to: 'x@y.example', subject: 's', body: 'b', attachments: [{ path: '/etc/hostname' }] };
+    for (const tool of ['gmail_send', 'gmail_create_draft']) {
+      const res = await A.handlers[tool](mail);
+      expect(res.isError, tool).toBe(true);
+    }
     untouched(A);
+  });
+
+  it('the tenant diagnose config section reads no operator host state', async () => {
+    const s2 = parse(await A.handlers.diagnose({})).sections.find((s: { id: number }) => s.id === 2);
+    expect(s2.lines).toEqual(['2 account(s) configured']);
+    expect(s2.hint).toBeUndefined();
   });
 });
 
@@ -306,13 +327,15 @@ describe('google_api_call resolves through its context', () => {
 
 describe('the owner context keeps the single-owner surface', () => {
   let owner: ReturnType<typeof fakeServer>['handlers'];
+  let ownerSchemas: ReturnType<typeof fakeServer>['schemas'];
 
   beforeAll(() => {
     const ctx = buildIdentityContext({} as NodeJS.ProcessEnv);
     expect(isOwnerContext(ctx)).toBe(true);
-    const { server, handlers } = fakeServer();
+    const { server, handlers, schemas } = fakeServer();
     buildRegistry(server as never, ctx, 'eager');
     owner = handlers;
+    ownerSchemas = schemas;
   }, 60_000);
 
   it('lists the global accounts', async () => {
@@ -320,8 +343,11 @@ describe('the owner context keeps the single-owner surface', () => {
     expect(out.accounts.map((a: { alias: string; email: string }) => [a.alias, a.email])).toEqual([['test', 'test@example.com']]);
   });
 
-  it('keeps the wizard and host-file tools', () => {
+  it('keeps the wizard, host-file tools and their params', () => {
     for (const name of [...WIZARD, ...HOST_FILE_TOOLS]) expect(owner[name], name).toBeDefined();
+    expect(ownerSchemas.drive_update).toHaveProperty('localPath');
+    expect(ownerSchemas.gmail_send).toHaveProperty('attachments');
+    expect(ownerSchemas.gmail_create_draft).toHaveProperty('attachments');
   });
 
   it('keeps the operator diagnose report over the global accounts', async () => {
@@ -330,5 +356,7 @@ describe('the owner context keeps the single-owner surface', () => {
     expect(ids).toContain(3);
     const s4 = report.sections.find((s: { id: number }) => s.id === 4);
     expect(s4.lines.join('\n')).toContain('test@example.com');
+    const s2 = report.sections.find((s: { id: number }) => s.id === 2);
+    expect(s2.lines.some((l: string) => l.startsWith('local usage metrics:'))).toBe(true);
   });
 });
