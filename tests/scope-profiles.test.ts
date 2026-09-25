@@ -205,6 +205,16 @@ describe('per-account scope profiles (file registry)', () => {
     expect(exit).not.toHaveBeenCalled();
   });
 
+  it('a bundle named after an Object.prototype member is an unknown bundle, not a crash', () => {
+    for (const name of ['constructor', 'toString', 'hasOwnProperty']) {
+      writeFileSync(
+        cfgPath,
+        JSON.stringify({ version: 1, accounts: { a: { email: 'a@x.com', scopeProfile: 'p1' } }, scopeProfiles: { p1: { bundles: [name] } } }),
+      );
+      expect(() => resolveAccounts({} as NodeJS.ProcessEnv, cfgPath, 'throw'), name).toThrow(/E_UNKNOWN_BUNDLE/);
+    }
+  });
+
   it('an account referencing an undefined profile fails E_CONFIG_INVALID', () => {
     writeFileSync(
       cfgPath,

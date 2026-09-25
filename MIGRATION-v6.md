@@ -371,7 +371,7 @@ a 500 `E_ALIAS_ADD_FAILED`. Its argument type is exported as `TenantAliasBind`
 and the refusal as `AliasBindRefusal`. `mintFlowState`, `StatePayload` and
 `TenantAliasBind` gain an optional signed `nonce`, and `buildGoogleAuthUrl`
 now receives the signed `bundles`. `verifiedEmailFromIdToken` is exported.
-`/scope-catalog` (`BUNDLE_CATALOG`, `resolveBundleAliases`, `closestBundle`)
+`/scope-catalog` (`BUNDLE_CATALOG`, `isKnownBundle`, `resolveBundleAliases`, `closestBundle`)
 and `/auth` (`BASE_SCOPES`, `resolveScopesForAccount`) are new declared
 entries.
 

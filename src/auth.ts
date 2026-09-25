@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { openUrl } from './open-url.js';
 import { ACCOUNTS, getAccountSet } from './accounts.js';
 import type { AccountSet } from './accounts.js';
-import { ADMIN_SCOPES, BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from './scope-catalog.js';
+import { ADMIN_SCOPES, BUNDLE_CATALOG, closestBundle, isKnownBundle, resolveBundleAliases } from './scope-catalog.js';
 import { resolveMasterKey } from './master-key.js';
 import type { ScopeProfile } from './scope-catalog.js';
 import { writeToken } from './token-store.js';
@@ -59,7 +59,7 @@ function legacyGlobalProfile(): ScopeProfile | null {
         'E_UNKNOWN_BUNDLE: "admin" is not a global bundle: grant it per account via GOOGLE_ADMIN_ACCOUNTS or an "admin: true" scope profile.',
       );
     }
-    if (!(bundle in BUNDLE_CATALOG)) {
+    if (!isKnownBundle(bundle)) {
       const hint = closestBundle(bundle);
       throw new Error(
         `E_UNKNOWN_BUNDLE: unknown bundle "${bundle}" in GOOGLE_OPTIONAL_SCOPES${hint ? ` — did you mean "${hint}"?` : ''}`,

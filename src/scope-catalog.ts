@@ -178,9 +178,15 @@ export const BUNDLE_ALIASES: Record<string, string> = {};
 
 const warnedAliases = new Set<string>();
 
+/** Bundle names are user input: an Object.prototype member ("constructor",
+ * "toString") passes a plain `in` or index lookup, so membership is own-key only. */
+export function isKnownBundle(name: string): boolean {
+  return Object.hasOwn(BUNDLE_CATALOG, name);
+}
+
 export function resolveBundleAliases(bundles: string[]): string[] {
   return bundles.map((name) => {
-    const target = BUNDLE_ALIASES[name];
+    const target = Object.hasOwn(BUNDLE_ALIASES, name) ? BUNDLE_ALIASES[name] : undefined;
     if (!target) return name;
     if (!warnedAliases.has(name)) {
       warnedAliases.add(name);
