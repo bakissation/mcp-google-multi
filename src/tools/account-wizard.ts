@@ -182,7 +182,7 @@ interface ConsentFailure { ok: false; slug: string; message: string; hint?: stri
  * present, runConsent NEVER binds a server-side loopback listener — the
  * user's browser cannot reach the daemon's loopback — and instead hands out
  * a clientless AS consent URL. The injector decides the flow (single-owner =
- * the legacy alias_reauth link; a tenancy host mints a signed alias_add URL). */
+ * the legacy alias_reauth link). */
 export interface WizardHttpConsent {
   mintConsentUrl: (alias: string) => Promise<string> | string;
 }
