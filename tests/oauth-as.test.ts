@@ -7,7 +7,7 @@ import path from 'node:path';
 import { McpServer } from "@modelcontextprotocol/server";
 import { resolveHttpConfig } from '../src/http-config.js';
 import { HttpTransportHost } from '../src/http-transport.js';
-import { buildAuthServer, redirectAllowed, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServerDeps } from '../src/oauth-as.js';
+import { buildAuthServer, redirectAllowed, verifiedEmailFromIdToken, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServerDeps } from '../src/oauth-as.js';
 import { jwtSecretFrom, signAccessToken, verifyAccessToken } from '../src/mcp-token.js';
 import { SsrfBlockedError } from '../src/ssrf-guard.js';
 import { z } from "zod";
@@ -407,6 +407,8 @@ describe('DCR /register bounds (unbounded-store DoS guard)', () => {
   });
 });
 
+type AuthServerDepsMint = ReturnType<typeof buildAuthServer>['mintFlowState'];
+
 describe('alias_add flow + resolveSubject seam (S1.14)', () => {
   const binds: Record<string, unknown>[] = [];
   afterEach(() => void binds.splice(0));
@@ -507,6 +509,104 @@ describe('alias_add flow + resolveSubject seam (S1.14)', () => {
     expect((await verifyAccessToken(ref.access_token, BASE, secret)).sub).toBe('tenant-9');
   });
 
+  async function googleLegState(port: number, as: { mintFlowState: AuthServerDepsMint }, opts: Parameters<AuthServerDepsMint>[0]) {
+    const url = new URL(await as.mintFlowState(opts));
+    const authz = await req(port, 'GET', `${url.pathname}${url.search}`);
+    expect(authz.status).toBe(302);
+    return stateFrom(authz.headers.location as string);
+  }
+  const complete = (port: number, state: string) => req(port, 'GET', `/callback?code=member-code&state=${encodeURIComponent(state)}`);
+
+  it('a returned refusal answers 403 with its slug and message, never the Connected page', async () => {
+    const { port, as } = await startMt({}, { bindTenantAlias: () => ({ refused: { slug: 'E_ALIAS_EXISTS', message: 'that name is taken' } }) });
+    const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+    expect(cb.status).toBe(403);
+    expect(cb.text).toBe('E_ALIAS_EXISTS: that name is taken');
+  });
+
+  it('a refusal slug that is not a bare identifier renders as access_denied', async () => {
+    const { port, as } = await startMt({}, { bindTenantAlias: () => ({ refused: { slug: '<script>', message: 'no' } }) });
+    const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+    expect(cb.status).toBe(403);
+    expect(cb.text).toBe('access_denied: no');
+  });
+
+  it('an async bind that rejects answers 500 E_ALIAS_ADD_FAILED, never 200', async () => {
+    const { port, as } = await startMt({}, { bindTenantAlias: async () => { throw new Error('disk full'); } });
+    const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+    expect(cb.status).toBe(500);
+    expect(cb.text).toContain('E_ALIAS_ADD_FAILED');
+  });
+
+  it('an async bind answers only after it settles', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let settled = false;
+    const { port, as } = await startMt({}, { bindTenantAlias: async () => { await gate; settled = true; } });
+    const state = await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' });
+    let answered = false;
+    const pending = complete(port, state).then((r) => { answered = true; return r; });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(answered).toBe(false);
+    release();
+    const cb = await pending;
+    expect(settled).toBe(true);
+    expect(cb.status).toBe(200);
+  });
+
+  it('a malformed refusal still answers 403 with a readable message', async () => {
+    for (const refused of [{ slug: 'E_X' }, {}, { slug: 'E_Y', message: { a: 1 } }, { slug: 'E_Z', message: Object.create(null) }]) {
+      const { port, as } = await startMt({}, { bindTenantAlias: () => ({ refused }) as never });
+      const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+      expect(cb.status, JSON.stringify(refused)).toBe(403);
+      expect(cb.text).toMatch(/^[A-Za-z0-9_]+: the account could not be linked$/);
+    }
+  });
+
+  it('a rejection with no reason, or a thrown null, still answers 500 E_ALIAS_ADD_FAILED', async () => {
+    for (const bindTenantAlias of [() => Promise.reject(undefined), async () => { throw null; }, () => { throw undefined; }]) {
+      const { port, as } = await startMt({}, { bindTenantAlias: bindTenantAlias as never });
+      const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+      expect(cb.status).toBe(500);
+      expect(cb.text).toContain('E_ALIAS_ADD_FAILED');
+    }
+  });
+
+  it('a thrown bind error still answers 500 E_ALIAS_ADD_FAILED', async () => {
+    const { port, as } = await startMt({}, { bindTenantAlias: () => { throw new Error('boom'); } });
+    const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+    expect(cb.status).toBe(500);
+    expect(cb.text).toContain('E_ALIAS_ADD_FAILED');
+  });
+
+  it('buildGoogleAuthUrl receives the signed bundles for alias_add and none for owner_gate', async () => {
+    const seen: { flow: string; bundles?: string[] }[] = [];
+    const { port, as } = await startMt({}, {
+      buildGoogleAuthUrl: ({ flow, state, bundles }) => {
+        seen.push({ flow, bundles });
+        return `https://google.test/auth?state=${encodeURIComponent(state)}`;
+      },
+    });
+    await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a', bundles: ['forms', 'chat'] });
+    await req(port, 'GET', `/authorize?${authorizeQuery()}`);
+    expect(seen).toEqual([{ flow: 'alias_add', bundles: ['forms', 'chat'] }, { flow: 'owner_gate', bundles: undefined }]);
+  });
+
+  it('the minted nonce survives the /authorize re-sign and reaches the binder', async () => {
+    const { port, as } = await startMt();
+    const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a', nonce: 'n-123' }));
+    expect(cb.status).toBe(200);
+    expect(binds[0]).toMatchObject({ tenantId: 'tenant-a', alias: 'work', nonce: 'n-123' });
+  });
+
+  it('the alias_add success page escapes the alias', async () => {
+    const { port, as } = await startMt();
+    const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: '<b>x</b>', tenantId: 'tenant-a' }));
+    expect(cb.status).toBe(200);
+    expect(cb.text).not.toContain('<b>');
+    expect(cb.text).toContain('&lt;b&gt;x&lt;/b&gt;');
+  });
+
   it('the default resolveSubject reproduces the owner allowlist exactly (non-owner denied)', async () => {
     const { port } = await startMt();
     const authz = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
@@ -514,5 +614,19 @@ describe('alias_add flow + resolveSubject seam (S1.14)', () => {
     const cb = await req(port, 'GET', `/callback?code=member-code&state=${encodeURIComponent(state)}`);
     expect(cb.status).toBe(302);
     expect(new URL(cb.headers.location as string).searchParams.get('error')).toBe('access_denied');
+  });
+});
+
+describe('verifiedEmailFromIdToken', () => {
+  const idToken = (claims: Record<string, unknown>) => `h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`;
+
+  it('trusts only email_verified true or "true"', () => {
+    expect(verifiedEmailFromIdToken(idToken({ email: 'a@x.example', email_verified: true }))).toBe('a@x.example');
+    expect(verifiedEmailFromIdToken(idToken({ email: 'a@x.example', email_verified: 'true' }))).toBe('a@x.example');
+    expect(verifiedEmailFromIdToken(idToken({ email: 'a@x.example', email_verified: false }))).toBeUndefined();
+    expect(verifiedEmailFromIdToken(idToken({ email: 'a@x.example' }))).toBeUndefined();
+    expect(verifiedEmailFromIdToken('not-a-jwt')).toBeUndefined();
+    expect(verifiedEmailFromIdToken(undefined)).toBeUndefined();
+    expect(verifiedEmailFromIdToken(null)).toBeUndefined();
   });
 });

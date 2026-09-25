@@ -273,7 +273,7 @@ async function main() {
     registerSetupPrompt(httpServer);
 
     // B13: mount the OAuth 2.1 AS (legs A + B) + the Bearer authenticator.
-    const { buildAuthServer } = await import('./oauth-as.js');
+    const { buildAuthServer, verifiedEmailFromIdToken } = await import('./oauth-as.js');
     const { jwtSecretFrom } = await import('./mcp-token.js');
     const { resolveJwtKey, resolveMasterKeyForDispatch } = await import('./master-key.js');
     const { OAuth2Client } = await import('googleapis-common');
@@ -283,18 +283,6 @@ async function main() {
     const { getAccountSet } = await import('./accounts.js');
     const googleClient = () =>
       new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, `${httpCfg.publicUrl}/callback`);
-    // Only trust the id_token email when Google marks it verified (#8).
-    const verifiedEmailFromIdToken = (idToken?: string): string | undefined => {
-      if (!idToken) return undefined;
-      try {
-        const [, payload] = idToken.split('.');
-        const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8')) as { email?: string; email_verified?: boolean | string };
-        const verified = claims.email_verified === true || claims.email_verified === 'true';
-        return verified ? claims.email : undefined;
-      } catch {
-        return undefined;
-      }
-    };
     const authServer = buildAuthServer(
       {
         base: httpCfg.publicUrl,
@@ -338,8 +326,7 @@ async function main() {
     const { setHttpReauthBase } = await import('./reauth-hint.js');
     setHttpReauthBase(httpCfg.publicUrl);
     // Wizard consent over HTTP: hand out the clientless AS link instead of
-    // binding a loopback listener (single-owner flow; a tenancy host installs
-    // its own signed-mint context here).
+    // binding a loopback listener.
     const { setWizardHttpConsent } = await import('./tools/account-wizard.js');
     setWizardHttpConsent({
       mintConsentUrl: (alias) => `${httpCfg.publicUrl}/authorize?flow=alias_reauth&alias=${encodeURIComponent(alias)}`,

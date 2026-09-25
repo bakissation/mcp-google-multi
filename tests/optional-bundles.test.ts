@@ -45,6 +45,11 @@ describe('optional scope bundles', () => {
     expect(() => getOptionalBundles()).toThrow(/E_UNKNOWN_BUNDLE.*"bogus"/);
   });
 
+  it('an Object.prototype member name in GOOGLE_OPTIONAL_SCOPES is an unknown bundle, not a crash', () => {
+    process.env.GOOGLE_OPTIONAL_SCOPES = 'constructor';
+    expect(() => getOptionalBundles()).toThrow(/E_UNKNOWN_BUNDLE.*"constructor"/);
+  });
+
   it('E_UNKNOWN_BUNDLE suggests the closest catalog key', () => {
     process.env.GOOGLE_OPTIONAL_SCOPES = 'slide';
     expect(() => getOptionalBundles()).toThrow(/did you mean "slides"/);

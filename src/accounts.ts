@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { loadEnvFiles } from './env-load.js';
 import { ALIAS_RE, CONFIG_VERSION, configDir, configFilePath, failStartup, isReservedAlias, loadConfigFile, mutateConfigFile } from './config-file.js';
 import type { ConfigFile } from './config-file.js';
-import { BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from './scope-catalog.js';
+import { closestBundle, isKnownBundle, resolveBundleAliases } from './scope-catalog.js';
 import type { ScopeProfile } from './scope-catalog.js';
 
 const envLoad = loadEnvFiles();
@@ -156,7 +156,7 @@ export function resolveAccounts(
           '"admin" is not a global bundle: grant it per account via GOOGLE_ADMIN_ACCOUNTS or an "admin: true" scope profile.',
         );
       }
-      if (!(bundle in BUNDLE_CATALOG)) {
+      if (!isKnownBundle(bundle)) {
         const hint = closestBundle(bundle);
         fail(
           'E_UNKNOWN_BUNDLE',
@@ -221,7 +221,7 @@ export function resolveAccounts(
   for (const [name, profile] of Object.entries(config?.scopeProfiles ?? {})) {
     const bundles = resolveBundleAliases(profile.bundles);
     for (const bundle of bundles) {
-      if (!(bundle in BUNDLE_CATALOG)) {
+      if (!isKnownBundle(bundle)) {
         const hint = closestBundle(bundle);
         fail(
           'E_UNKNOWN_BUNDLE',

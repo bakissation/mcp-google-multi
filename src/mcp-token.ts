@@ -75,6 +75,9 @@ export interface StatePayload {
   tenantId?: string;
   /** alias_add only: scope bundles chosen when the link was minted. */
   bundles?: string[];
+  /** alias_add only: an opaque value the minting caller chose, signed like
+   * tenantId and handed back to its binder (e.g. a server-side link record). */
+  nonce?: string;
 }
 
 export interface CodePayload {

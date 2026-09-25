@@ -49,6 +49,37 @@ export interface AuthServerConfig {
   legacyAliasReauth?: boolean;
 }
 
+/** What /callback hands the alias_add binder once Google returned a verified
+ * identity for a server-minted link. */
+export interface TenantAliasBind {
+  tenantId: string;
+  alias: string;
+  email: string;
+  bundles?: string[];
+  nonce?: string;
+  tokens: Record<string, unknown>;
+}
+
+/** A binder's deliberate refusal (policy, not failure): /callback answers 403
+ * with this slug and message. The message reaches an unauthenticated browser. */
+export interface AliasBindRefusal {
+  refused: { slug: string; message: string };
+}
+
+/** Only trust the id_token email when Google marks it verified (#8). The token
+ * comes straight from Google's token endpoint, so its claims are read unsigned. */
+export function verifiedEmailFromIdToken(idToken?: string | null): string | undefined {
+  if (!idToken) return undefined;
+  try {
+    const [, payload] = idToken.split('.');
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8')) as { email?: string; email_verified?: boolean | string };
+    const verified = claims.email_verified === true || claims.email_verified === 'true';
+    return verified ? claims.email : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface AuthServerDeps {
   fetchCimd?: (clientId: string) => Promise<Record<string, unknown>>;
   /** Exchange a Google auth code at `${base}/callback` for tokens (+ owner email). */
@@ -57,7 +88,7 @@ export interface AuthServerDeps {
    *  The impl chooses scope/prompt/login_hint from the flow: owner_gate =
    *  `openid email` + select_account; alias_reauth = the alias's resource scopes
    *  + consent. */
-  buildGoogleAuthUrl?: (opts: { flow: StatePayload['flow']; alias?: string; state: string }) => string;
+  buildGoogleAuthUrl?: (opts: { flow: StatePayload['flow']; alias?: string; state: string; bundles?: string[] }) => string;
   writeToken?: (alias: string, tokens: Record<string, unknown>) => void;
   registeredClients?: Map<string, { redirect_uris: string[] }>;
   replayGuard?: ReplayGuard;
@@ -71,10 +102,11 @@ export interface AuthServerDeps {
    * Default = the MCP_OWNER_EMAILS allowlist -> {sub:'owner'}; null = denied.
    * The tenant resolver (invite claim / email->tenant lookup) plugs in here. */
   resolveSubject?: (email: string) => { sub: string } | null;
-  /** alias_add completion: persist the config row AND the tokens for the new
-   * alias under its tenant in ONE call, atomically — /callback invokes it only
-   * after a successful Google exchange, so no pre-write orphan can exist. */
-  bindTenantAlias?: (bind: { tenantId: string; alias: string; email: string; bundles?: string[]; tokens: Record<string, unknown> }) => void;
+  /** alias_add completion: persist the new alias's config row and tokens under
+   * its tenant. /callback awaits it only after a successful Google exchange.
+   * A returned refusal answers 403 with its slug; a throw or rejection answers
+   * 500 E_ALIAS_ADD_FAILED. */
+  bindTenantAlias?: (bind: TenantAliasBind) => void | AliasBindRefusal | Promise<void | AliasBindRefusal>;
 }
 
 export interface AuthServer {
@@ -83,8 +115,8 @@ export interface AuthServer {
   /** Mint a signed, single-use, TTL-bound clientless flow URL
    * (`${base}/authorize?flow=...&state=<signed>`). The tenantId/bundles ride
    * INSIDE the signed state, so nothing at /authorize or /callback trusts a
-   * caller-supplied identity. Inert unless something calls it (EE wizard). */
-  mintFlowState: (opts: { flow: 'alias_add' | 'alias_reauth'; alias: string; tenantId?: string; bundles?: string[] }) => Promise<string>;
+   * caller-supplied identity. Inert unless something calls it. */
+  mintFlowState: (opts: { flow: 'alias_add' | 'alias_reauth'; alias: string; tenantId?: string; bundles?: string[]; nonce?: string }) => Promise<string>;
 }
 
 // --- helpers ----------------------------------------------------------------
@@ -268,7 +300,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   async function toGoogle(res: ServerResponse, sp: StatePayload): Promise<true> {
     const state = await signState(sp, base, secret, nowSec());
     const authUrl = deps.buildGoogleAuthUrl
-      ? deps.buildGoogleAuthUrl({ flow: sp.flow, alias: sp.alias, state })
+      ? deps.buildGoogleAuthUrl({ flow: sp.flow, alias: sp.alias, state, bundles: sp.bundles })
       : `https://accounts.google.com/o/oauth2/v2/auth?state=${encodeURIComponent(state)}`;
     return redirect(res, authUrl);
   }
@@ -420,15 +452,25 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       if (!deps.bindTenantAlias) return errorPage(res, 500, 'E_ALIAS_ADD_UNAVAILABLE', 'account linking is not enabled on this server');
       const boundEmail = (exchanged.email ?? '').toLowerCase();
       if (!boundEmail) return errorPage(res, 403, 'access_denied', 'Google did not return an email for the signed-in account');
+      let refusal: AliasBindRefusal['refused'] | undefined;
       try {
-        deps.bindTenantAlias({ tenantId: st.tenantId, alias: st.alias, email: boundEmail, bundles: st.bundles, tokens: exchanged.tokens });
+        const out = await deps.bindTenantAlias({ tenantId: st.tenantId, alias: st.alias, email: boundEmail, bundles: st.bundles, nonce: st.nonce, tokens: exchanged.tokens });
+        refusal = (out as AliasBindRefusal | undefined)?.refused;
       } catch (e) {
-        log(`alias_add bind failed for "${st.alias}": ${(e as Error).message}`);
+        // Any rejection reason, even none, must still reach this answer.
+        log(`alias_add bind failed for "${st.alias}": ${e instanceof Error ? e.message : typeof e === 'string' ? e : 'non-Error rejection'}`);
         return errorPage(res, 500, 'E_ALIAS_ADD_FAILED', 'the account could not be saved; try the link again or ask for a fresh one');
+      }
+      if (refusal) {
+        // The slug lands in a text/plain body; keep it a bare identifier.
+        const slug = typeof refusal.slug === 'string' && /^[A-Za-z0-9_]+$/.test(refusal.slug) ? refusal.slug : 'access_denied';
+        const message = typeof refusal.message === 'string' && refusal.message ? refusal.message : 'the account could not be linked';
+        log(`alias_add refused for "${st.alias}": ${slug}`);
+        return errorPage(res, 403, slug, message);
       }
       log(`callback ok flow=alias_add alias=${st.alias}`);
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`<!doctype html><meta charset=utf-8><p>Connected "${st.alias}". You can close this window and retry your request.</p>`);
+      res.end(`<!doctype html><meta charset=utf-8><p>Connected "${escapeHtml(st.alias)}". You can close this window and retry your request.</p>`);
       return true;
     }
 
@@ -448,7 +490,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       deps.writeToken?.(st.alias, exchanged.tokens);
       log(`callback ok flow=alias_reauth alias=${st.alias}`);
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`<!doctype html><meta charset=utf-8><p>Re-authenticated "${st.alias}". You can close this window.</p>`);
+      res.end(`<!doctype html><meta charset=utf-8><p>Re-authenticated "${escapeHtml(st.alias)}". You can close this window.</p>`);
       return true;
     }
 
@@ -571,9 +613,9 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     }
   };
 
-  const mintFlowState: AuthServer['mintFlowState'] = async ({ flow, alias, tenantId, bundles }) => {
+  const mintFlowState: AuthServer['mintFlowState'] = async ({ flow, alias, tenantId, bundles, nonce }) => {
     const state = await signState(
-      { flow, client_id: '', redirect_uri: '', code_challenge: '', resource, alias, tenantId, bundles },
+      { flow, client_id: '', redirect_uri: '', code_challenge: '', resource, alias, tenantId, bundles, nonce },
       base,
       secret,
       nowSec(),

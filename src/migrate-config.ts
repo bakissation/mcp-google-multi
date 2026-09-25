@@ -1,6 +1,6 @@
 import { CONFIG_VERSION, configFilePath, loadConfigFile, mutateConfigFile } from './config-file.js';
 import type { ConfigFile } from './config-file.js';
-import { BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from './scope-catalog.js';
+import { closestBundle, isKnownBundle, resolveBundleAliases } from './scope-catalog.js';
 
 function parseCsv(value: string | undefined): string[] {
   return (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -52,7 +52,7 @@ export function runMigrateConfig(env: NodeJS.ProcessEnv = process.env): void {
         process.exitCode = 1;
         return;
       }
-      if (!(bundle in BUNDLE_CATALOG)) {
+      if (!isKnownBundle(bundle)) {
         const hint = closestBundle(bundle);
         console.error(
           `E_UNKNOWN_BUNDLE: unknown bundle "${bundle}" in GOOGLE_OPTIONAL_SCOPES${hint ? ` — did you mean "${hint}"?` : ''}. Nothing written.`,

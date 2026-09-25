@@ -5,7 +5,7 @@ import { getAccountSet, invalidateAccountSet } from '../accounts.js';
 import { ALIAS_RE, mutateConfigFile } from '../config-file.js';
 import { writeToken } from '../token-store.js';
 import { resolveScopesForAccount } from '../auth.js';
-import { BUNDLE_CATALOG, closestBundle, resolveBundleAliases } from '../scope-catalog.js';
+import { BUNDLE_CATALOG, closestBundle, isKnownBundle, resolveBundleAliases } from '../scope-catalog.js';
 import { openUrl } from '../open-url.js';
 import { coerceBoolean } from './_coerce.js';
 import { safeMessage, stringifyEnvelope } from './_errors.js';
@@ -90,7 +90,7 @@ export function validateAddForm(input: Partial<AddForm>, existingAliases: string
     if (b === 'admin') {
       return { ok: false, slug: 'E_UNKNOWN_BUNDLE', message: '"admin" is not a scope bundle.', hint: 'Use the admin checkbox instead, or pass "admin": true.', alias };
     }
-    if (!(b in BUNDLE_CATALOG)) {
+    if (!isKnownBundle(b)) {
       const closest = closestBundle(b);
       const known = Object.keys(BUNDLE_CATALOG).filter((n) => n !== 'admin').join(', ');
       return {
@@ -182,7 +182,7 @@ interface ConsentFailure { ok: false; slug: string; message: string; hint?: stri
  * present, runConsent NEVER binds a server-side loopback listener — the
  * user's browser cannot reach the daemon's loopback — and instead hands out
  * a clientless AS consent URL. The injector decides the flow (single-owner =
- * the legacy alias_reauth link; a tenancy host mints a signed alias_add URL). */
+ * the legacy alias_reauth link). */
 export interface WizardHttpConsent {
   mintConsentUrl: (alias: string) => Promise<string> | string;
 }

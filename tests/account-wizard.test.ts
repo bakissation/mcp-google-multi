@@ -81,6 +81,14 @@ describe('validateAddForm', () => {
     }
   });
 
+  it('rejects an Object.prototype member name as an unknown bundle', () => {
+    for (const name of ['constructor', 'toString']) {
+      const r = validateAddForm({ alias: 'work', email: 'a@b.com', otherBundles: name }, existing);
+      expect(r.ok, name).toBe(false);
+      if (!r.ok) expect(r.slug).toBe('E_UNKNOWN_BUNDLE');
+    }
+  });
+
   it('rejects "admin" as a bundle (use the checkbox)', () => {
     const r = validateAddForm({ alias: 'work', email: 'a@b.com', otherBundles: 'admin' }, existing);
     expect(r.ok).toBe(false);

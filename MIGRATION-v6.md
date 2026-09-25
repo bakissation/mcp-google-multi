@@ -332,7 +332,8 @@ v6 adds a package `exports` map. The supported programmatic entry points are
 declared explicitly (`mcp-google-multi/identity`, `/compose`, `/registry`,
 `/oauth-as`, `/accounts`, `/token-store`, `/http-transport`, `/http-config`,
 `/client`, `/config-file`, `/fs-atomic`, `/master-key`, `/mcp-token`,
-`/boot-gates`, `/tenant-purge`, `/doctor`, `/write-control`). Any OTHER deep import into `dist/` (previously unrestricted, e.g.
+`/boot-gates`, `/tenant-purge`, `/doctor`, `/write-control`,
+`/scope-catalog`, `/auth`). Any OTHER deep import into `dist/` (previously unrestricted, e.g.
 `mcp-google-multi/dist/trim.js`) now fails with
 `ERR_PACKAGE_PATH_NOT_EXPORTED`. The CLI (`npx mcp-google-multi ...`) and the
 MCP server entry are unaffected. If you relied on an undeclared deep import,
@@ -362,6 +363,17 @@ in `/compose` builds those hooks for one registry, exactly as both built-in
 transports do; the metrics observers (`metricsTap`, `onArgRename`) stay
 host-wide. Dispatch is serialized per resolved server, so a resolver may map
 several subjects to one server safely.
+
+`/oauth-as`: `/callback` now awaits `bindTenantAlias`. A binder that returns
+`{ refused: { slug, message } }` gets a 403 with that slug (a slug that is not
+a bare identifier renders as `access_denied`); a throw or a rejection is still
+a 500 `E_ALIAS_ADD_FAILED`. Its argument type is exported as `TenantAliasBind`
+and the refusal as `AliasBindRefusal`. `mintFlowState`, `StatePayload` and
+`TenantAliasBind` gain an optional signed `nonce`, and `buildGoogleAuthUrl`
+now receives the signed `bundles`. `verifiedEmailFromIdToken` is exported.
+`/scope-catalog` (`BUNDLE_CATALOG`, `isKnownBundle`, `resolveBundleAliases`, `closestBundle`)
+and `/auth` (`BASE_SCOPES`, `resolveScopesForAccount`) are new declared
+entries.
 
 ## 5. Auth changes
 
