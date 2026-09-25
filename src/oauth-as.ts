@@ -457,14 +457,16 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
         const out = await deps.bindTenantAlias({ tenantId: st.tenantId, alias: st.alias, email: boundEmail, bundles: st.bundles, nonce: st.nonce, tokens: exchanged.tokens });
         refusal = (out as AliasBindRefusal | undefined)?.refused;
       } catch (e) {
-        log(`alias_add bind failed for "${st.alias}": ${(e as Error).message}`);
+        // Any rejection reason, even none, must still reach this answer.
+        log(`alias_add bind failed for "${st.alias}": ${e instanceof Error ? e.message : typeof e === 'string' ? e : 'non-Error rejection'}`);
         return errorPage(res, 500, 'E_ALIAS_ADD_FAILED', 'the account could not be saved; try the link again or ask for a fresh one');
       }
       if (refusal) {
         // The slug lands in a text/plain body; keep it a bare identifier.
         const slug = typeof refusal.slug === 'string' && /^[A-Za-z0-9_]+$/.test(refusal.slug) ? refusal.slug : 'access_denied';
+        const message = typeof refusal.message === 'string' && refusal.message ? refusal.message : 'the account could not be linked';
         log(`alias_add refused for "${st.alias}": ${slug}`);
-        return errorPage(res, 403, slug, String(refusal.message));
+        return errorPage(res, 403, slug, message);
       }
       log(`callback ok flow=alias_add alias=${st.alias}`);
       res.writeHead(200, { 'Content-Type': 'text/html' });

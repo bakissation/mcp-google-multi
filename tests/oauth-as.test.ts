@@ -554,6 +554,24 @@ describe('alias_add flow + resolveSubject seam (S1.14)', () => {
     expect(cb.status).toBe(200);
   });
 
+  it('a malformed refusal still answers 403 with a readable message', async () => {
+    for (const refused of [{ slug: 'E_X' }, {}, { slug: 'E_Y', message: { a: 1 } }, { slug: 'E_Z', message: Object.create(null) }]) {
+      const { port, as } = await startMt({}, { bindTenantAlias: () => ({ refused }) as never });
+      const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+      expect(cb.status, JSON.stringify(refused)).toBe(403);
+      expect(cb.text).toMatch(/^[A-Za-z0-9_]+: the account could not be linked$/);
+    }
+  });
+
+  it('a rejection with no reason, or a thrown null, still answers 500 E_ALIAS_ADD_FAILED', async () => {
+    for (const bindTenantAlias of [() => Promise.reject(undefined), async () => { throw null; }, () => { throw undefined; }]) {
+      const { port, as } = await startMt({}, { bindTenantAlias: bindTenantAlias as never });
+      const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+      expect(cb.status).toBe(500);
+      expect(cb.text).toContain('E_ALIAS_ADD_FAILED');
+    }
+  });
+
   it('a thrown bind error still answers 500 E_ALIAS_ADD_FAILED', async () => {
     const { port, as } = await startMt({}, { bindTenantAlias: () => { throw new Error('boom'); } });
     const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
