@@ -363,6 +363,14 @@ transports do; the metrics observers (`metricsTap`, `onArgRename`) stay
 host-wide. Dispatch is serialized per resolved server, so a resolver may map
 several subjects to one server safely.
 
+`/oauth-as`: `/callback` now awaits `bindTenantAlias`. A binder that returns
+`{ refused: { slug, message } }` gets a 403 with that slug (a slug that is not
+a bare identifier renders as `access_denied`); a throw or a rejection is still
+a 500 `E_ALIAS_ADD_FAILED`. Its argument type is exported as `TenantAliasBind`
+and the refusal as `AliasBindRefusal`. `mintFlowState`, `StatePayload` and
+`TenantAliasBind` gain an optional signed `nonce`, and `buildGoogleAuthUrl`
+now receives the signed `bundles`. `verifiedEmailFromIdToken` is exported.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)
