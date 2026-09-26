@@ -32,6 +32,10 @@ const DCR_MAX_URI_LEN = 2048;
 export interface GoogleExchangeResult {
   tokens: Record<string, unknown>;
   email?: string;
+  /** Google's stable account id; unlike the address it is never reassigned. */
+  sub?: string;
+  /** Google Workspace hosted domain; absent for a consumer account. */
+  hd?: string;
 }
 
 export interface AuthServerConfig {
@@ -59,6 +63,7 @@ export interface TenantAliasBind {
   bundles?: string[];
   nonce?: string;
   tokens: Record<string, unknown>;
+  sub?: string;
 }
 
 /** A binder's deliberate refusal (policy, not failure): /callback answers 403
@@ -67,18 +72,36 @@ export interface AliasBindRefusal {
   refused: { slug: string; message: string };
 }
 
-/** Only trust the id_token email when Google marks it verified (#8). The token
- * comes straight from Google's token endpoint, so its claims are read unsigned. */
-export function verifiedEmailFromIdToken(idToken?: string | null): string | undefined {
+export interface GoogleIdentity {
+  email?: string;
+  sub?: string;
+  hd?: string;
+}
+
+const OIDC_SUB = /^[\x21-\x7e]{1,255}$/;
+const HOSTED_DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
+
+/** Only trust the id_token identity when Google marks the email verified (#8).
+ * The token comes straight from Google's token endpoint, so its claims are
+ * read unsigned. A malformed sub or hd is dropped, never passed on. */
+export function verifiedIdentityFromIdToken(idToken?: string | null): GoogleIdentity | undefined {
   if (!idToken) return undefined;
   try {
     const [, payload] = idToken.split('.');
-    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8')) as { email?: string; email_verified?: boolean | string };
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8')) as { email?: string; email_verified?: boolean | string; sub?: unknown; hd?: unknown };
     const verified = claims.email_verified === true || claims.email_verified === 'true';
-    return verified ? claims.email : undefined;
+    if (!verified) return undefined;
+    const identity: GoogleIdentity = { email: claims.email };
+    if (typeof claims.sub === 'string' && OIDC_SUB.test(claims.sub)) identity.sub = claims.sub;
+    if (typeof claims.hd === 'string' && claims.hd.length <= 253 && HOSTED_DOMAIN.test(claims.hd)) identity.hd = claims.hd;
+    return identity;
   } catch {
     return undefined;
   }
+}
+
+export function verifiedEmailFromIdToken(idToken?: string | null): string | undefined {
+  return verifiedIdentityFromIdToken(idToken)?.email;
 }
 
 export interface AuthServerDeps {
@@ -107,8 +130,11 @@ export interface AuthServerDeps {
   aliasEmail?: (alias: string) => string | undefined;
   /** Map a verified sign-in email to the subject its tokens are minted under.
    * Default = the MCP_OWNER_EMAILS allowlist -> {sub:'owner'}; null = denied.
-   * The tenant resolver (invite claim / email->tenant lookup) plugs in here. */
-  resolveSubject?: (email: string) => { sub: string } | null;
+   * The tenant resolver (invite claim / email->tenant lookup) plugs in here.
+   * `identity` carries Google's `sub` and `hd` when the exchange returned
+   * them, so a resolver can key on the stable account id rather than an
+   * address that can be reassigned. */
+  resolveSubject?: (email: string, identity?: { sub?: string; hd?: string }) => { sub: string } | null;
   /** alias_add completion: persist the new alias's config row and tokens under
    * its tenant. /callback awaits it only after a successful Google exchange.
    * A returned refusal answers 403 with its slug; a throw or rejection answers
@@ -476,7 +502,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       if (!boundEmail) return errorPage(res, 403, 'access_denied', 'Google did not return an email for the signed-in account');
       let refusal: AliasBindRefusal['refused'] | undefined;
       try {
-        const out = await deps.bindTenantAlias({ tenantId: st.tenantId, alias: st.alias, email: boundEmail, bundles: st.bundles, nonce: st.nonce, tokens: exchanged.tokens });
+        const out = await deps.bindTenantAlias({ tenantId: st.tenantId, alias: st.alias, email: boundEmail, bundles: st.bundles, nonce: st.nonce, tokens: exchanged.tokens, sub: exchanged.sub });
         refusal = (out as AliasBindRefusal | undefined)?.refused;
       } catch (e) {
         // Any rejection reason, even none, must still reach this answer.
@@ -545,7 +571,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     // signed into the authz code and flows into every token minted from it.
     const email = (exchanged.email ?? '').toLowerCase();
     const iss = encodeURIComponent(base);
-    const subject = email ? resolveSubject(email) : null;
+    const subject = email ? resolveSubject(email, { sub: exchanged.sub, hd: exchanged.hd }) : null;
     if (!subject) {
       const sep = st.redirect_uri.includes('?') ? '&' : '?';
       const s = st.client_state ? `&state=${encodeURIComponent(st.client_state)}` : '';

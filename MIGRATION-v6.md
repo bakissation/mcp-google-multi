@@ -387,6 +387,15 @@ next tool error hands out a fresh one. `mintFlowState` is typed for
 completion page name the scopes Google's consent left out; a narrower grant
 keeps a stored token instead of replacing it.
 
+`/oauth-as`: `resolveSubject` receives an optional second argument
+`{ sub, hd }`, Google's stable account id and Workspace hosted domain, when the
+code exchange returned them, so a tenant resolver can key on the account
+rather than an address that can be reassigned. `GoogleExchangeResult` gains
+optional `sub` and `hd`, and `TenantAliasBind` gains `sub`.
+`verifiedIdentityFromIdToken` returns `{ email, sub, hd }` under the same
+verified-email rule as `verifiedEmailFromIdToken`, dropping a malformed `sub`
+or `hd`. The default resolver and the owner's own exchange are unchanged.
+
 `/accounts` exports `liveAccountCheck` and `isLiveAccountField`: an `account`
 field built on the live check (as `accountArgLive` builds it) validates
 against the registry's current aliases at parse time and counts as a
