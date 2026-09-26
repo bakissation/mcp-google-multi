@@ -91,6 +91,12 @@ export interface AuthServerDeps {
    *  consent, and no login_hint (the link needs no authentication). */
   buildGoogleAuthUrl?: (opts: { flow: StatePayload['flow']; alias?: string; state: string; bundles?: string[] }) => string;
   writeToken?: (alias: string, tokens: Record<string, unknown>) => void;
+  /** Scopes the alias asked for that `grantedScope` lacks, so the alias_reauth
+   * completion page can say what Google's granular consent left out. */
+  missingScopes?: (alias: string, grantedScope: string | undefined) => string[];
+  /** Whether a readable token is stored for the alias; a narrower re-auth
+   * grant keeps it rather than replace it. */
+  hasToken?: (alias: string) => boolean;
   registeredClients?: Map<string, { redirect_uris: string[] }>;
   replayGuard?: ReplayGuard;
   refreshStore?: RefreshStore;
@@ -511,10 +517,26 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
         log(`alias_reauth for "${st.alias}" returned no refresh token; stored token kept`);
         return errorPage(res, 400, 'E_REAUTH_INCOMPLETE', 'Google did not return a long-lived token, so the stored one was kept. Open the re-auth link again and approve access.');
       }
+      const granted = typeof exchanged.tokens.scope === 'string' ? exchanged.tokens.scope : undefined;
+      const missing = deps.missingScopes?.(st.alias, granted) ?? [];
+      const listed = missing.map((m) => `<code>${escapeHtml(m)}</code>`).join(', ');
+      // A narrower grant replaces nothing that works. The link can be reused
+      // for an hour and the Google URL's scope is not signed, so a narrower
+      // grant is not necessarily the account holder's choice.
+      if (missing.length > 0 && deps.hasToken?.(st.alias)) {
+        log(`alias_reauth for "${st.alias}" granted ${missing.length} fewer scope(s); stored token kept`);
+        res.writeHead(400, { 'Content-Type': 'text/html' });
+        res.end(`<!doctype html><meta charset=utf-8><p>E_SCOPE_NOT_GRANTED: Google did not grant ${missing.length} requested scope(s): ${listed}, so the stored access for "${escapeHtml(st.alias)}" was kept. Ask for a fresh re-auth link and leave every box ticked.</p>`);
+        return true;
+      }
       deps.writeToken?.(st.alias, exchanged.tokens);
       log(`callback ok flow=alias_reauth alias=${st.alias}`);
+      // With no stored token a partial grant still beats none; say what is missing.
+      const gap = missing.length
+        ? `<p>Google did not grant ${missing.length} requested scope(s): ${listed}. Ask for a fresh re-auth link and leave every box ticked to restore them.</p>`
+        : '';
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(`<!doctype html><meta charset=utf-8><p>Re-authenticated "${escapeHtml(st.alias)}". You can close this window.</p>`);
+      res.end(`<!doctype html><meta charset=utf-8><p>Re-authenticated "${escapeHtml(st.alias)}". You can close this window.</p>${gap}`);
       return true;
     }
 

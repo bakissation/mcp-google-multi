@@ -277,10 +277,10 @@ async function main() {
     const { jwtSecretFrom } = await import('./mcp-token.js');
     const { resolveJwtKey, resolveMasterKeyForDispatch } = await import('./master-key.js');
     const { OAuth2Client } = await import('googleapis-common');
-    const { writeToken } = await import('./token-store.js');
+    const { readToken, writeToken } = await import('./token-store.js');
     const { resolveScopesForAccount } = await import('./auth.js');
     const { ownerAuthUrlOptions } = await import('./oauth-consent.js');
-    const { setWizardHttpConsent } = await import('./tools/account-wizard.js');
+    const { scopeGrantDiff, setWizardHttpConsent } = await import('./tools/account-wizard.js');
     const { configDir } = await import('./config-file.js');
     const { getAccountSet } = await import('./accounts.js');
     const googleClient = () =>
@@ -307,6 +307,14 @@ async function main() {
           return { tokens: flow === 'owner_gate' ? {} : (tokens as Record<string, unknown>), email };
         },
         writeToken: (alias, tokens) => writeToken(alias, tokens),
+        missingScopes: (alias, granted) => scopeGrantDiff(resolveScopesForAccount(alias), granted),
+        hasToken: (alias) => {
+          try {
+            return readToken(alias) != null;
+          } catch {
+            return false; // undecryptable: nothing usable to keep
+          }
+        },
         aliasEmail: (alias) => getAccountSet().configs[alias]?.email,
         log: (l) => process.stderr.write(`[as] ${l}\n`),
       },

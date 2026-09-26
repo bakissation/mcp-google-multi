@@ -455,6 +455,38 @@ describe('negative paths (one per §5.12 MUST)', () => {
     expect(written.work).toBeUndefined();
   });
 
+  it('alias_reauth names the scopes Google left out when there is no stored token to keep', async () => {
+    const port = await start({
+      exchangeCode: async () => ({ tokens: { refresh_token: 'g-rt', access_token: 'g-at', scope: 'openid email' }, email: 'work@x.example' }),
+      missingScopes: (alias, granted) => (alias === 'work' && granted === 'openid email' ? ['https://www.googleapis.com/auth/drive'] : []),
+      hasToken: () => false,
+    });
+    const authz = await req(port, 'GET', reauthPath('work'));
+    const cb = await req(port, 'GET', `/callback?code=work-code&state=${encodeURIComponent(stateFrom(authz.headers.location as string))}`);
+    expect(cb.status).toBe(200);
+    expect(cb.text).toContain('Google did not grant 1 requested scope(s): <code>https://www.googleapis.com/auth/drive</code>');
+    expect(written.work).toMatchObject({ scope: 'openid email' });
+  });
+
+  // The link is reusable and the Google URL's scope is not signed, so a
+  // narrower grant must not replace a working token.
+  it('alias_reauth keeps a stored token when the new grant is narrower', async () => {
+    const logs: string[] = [];
+    const port = await start({
+      exchangeCode: async () => ({ tokens: { refresh_token: 'narrow-rt', access_token: 'narrow-at', scope: 'openid email' }, email: 'work@x.example' }),
+      missingScopes: () => ['https://www.googleapis.com/auth/drive'],
+      hasToken: (alias) => alias === 'work',
+      log: (l) => logs.push(l),
+    });
+    const authz = await req(port, 'GET', reauthPath('work'));
+    const cb = await req(port, 'GET', `/callback?code=work-code&state=${encodeURIComponent(stateFrom(authz.headers.location as string))}`);
+    expect(cb.status).toBe(400);
+    expect(cb.text).toContain('E_SCOPE_NOT_GRANTED');
+    expect(cb.text).toContain('was kept');
+    expect(written.work).toBeUndefined();
+    expect(logs).toContain('alias_reauth for "work" granted 1 fewer scope(s); stored token kept');
+  });
+
   it('a present-but-invalid Origin on an AS route -> 403 (front guard)', async () => {
     const port = await start();
     const r = await req(port, 'GET', '/.well-known/oauth-authorization-server', { headers: { origin: 'https://evil.example' } });

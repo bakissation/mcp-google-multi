@@ -383,7 +383,9 @@ any link the server did not sign, and a client leg no longer accepts
 caller can neither start a re-auth nor learn which aliases exist or what
 scopes they hold. Re-auth links issued before this release stop working; the
 next tool error hands out a fresh one. `mintFlowState` is typed for
-`alias_add` only.
+`alias_add` only. `AuthServerDeps.missingScopes` and `hasToken` let the
+completion page name the scopes Google's consent left out; a narrower grant
+keeps a stored token instead of replacing it.
 
 `/accounts` exports `liveAccountCheck` and `isLiveAccountField`: an `account`
 field built on the live check (as `accountArgLive` builds it) validates
