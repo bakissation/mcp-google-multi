@@ -332,6 +332,21 @@ describe('negative paths (one per §5.12 MUST)', () => {
     expect(written.work).toEqual({ refresh_token: 'g-rt', access_token: 'g-at' });
   });
 
+  it('alias_reauth keeps the stored token when Google returns no refresh token', async () => {
+    const logs: string[] = [];
+    const port = await start({
+      exchangeCode: async () => ({ tokens: { access_token: 'short-lived' }, email: 'work@x.example' }),
+      log: (l) => logs.push(l),
+    });
+    const authz = await req(port, 'GET', `/authorize?${authorizeQuery({ flow: 'alias_reauth', alias: 'work' })}`);
+    const state = stateFrom(authz.headers.location as string);
+    const cb = await req(port, 'GET', `/callback?code=work-code&state=${encodeURIComponent(state)}`);
+    expect(cb.status).toBe(400);
+    expect(cb.text).toContain('E_REAUTH_INCOMPLETE');
+    expect(written.work).toBeUndefined();
+    expect(logs).toContain('alias_reauth for "work" returned no refresh token; stored token kept');
+  });
+
   it('alias_reauth REFUSES a mismatched Google identity (no token injection, #2)', async () => {
     const port = await start();
     const authz = await req(port, 'GET', `/authorize?${authorizeQuery({ flow: 'alias_reauth', alias: 'work' })}`);

@@ -85,9 +85,9 @@ export interface AuthServerDeps {
   /** Exchange a Google auth code at `${base}/callback` for tokens (+ owner email). */
   exchangeCode?: (code: string, flow: StatePayload['flow']) => Promise<GoogleExchangeResult>;
   /** Build the Google authorization URL (redirect back to `${base}/callback`).
-   *  The impl chooses scope/prompt/login_hint from the flow: owner_gate =
-   *  `openid email` + select_account; alias_reauth = the alias's resource scopes
-   *  + consent. */
+   *  The impl chooses scope/prompt from the flow: owner_gate = `openid email`
+   *  + select_account; alias_reauth = the alias's resource scopes + select_account
+   *  consent, and no login_hint (the link needs no authentication). */
   buildGoogleAuthUrl?: (opts: { flow: StatePayload['flow']; alias?: string; state: string; bundles?: string[] }) => string;
   writeToken?: (alias: string, tokens: Record<string, unknown>) => void;
   registeredClients?: Map<string, { redirect_uris: string[] }>;
@@ -486,6 +486,14 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       if (!expected || !gotEmail || gotEmail !== expected) {
         log(`alias_reauth identity mismatch for "${st.alias}" (got ${gotEmail || 'none'})`);
         return errorPage(res, 403, 'access_denied', 'the Google account you signed in with is not the one configured for this alias');
+      }
+      // A completion without a refresh token (a Google URL built without
+      // offline access, say) would replace a working credential with one that
+      // dies within the hour. Keep the stored token instead.
+      const refreshToken = exchanged.tokens.refresh_token;
+      if (typeof refreshToken !== 'string' || refreshToken === '') {
+        log(`alias_reauth for "${st.alias}" returned no refresh token; stored token kept`);
+        return errorPage(res, 400, 'E_REAUTH_INCOMPLETE', 'Google did not return a long-lived token, so the stored one was kept. Open the re-auth link again and approve access.');
       }
       deps.writeToken?.(st.alias, exchanged.tokens);
       log(`callback ok flow=alias_reauth alias=${st.alias}`);

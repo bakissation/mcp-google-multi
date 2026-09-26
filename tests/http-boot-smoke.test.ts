@@ -149,6 +149,9 @@ describe('index.ts HTTP bootstrap smoke (S1.23, subprocess)', () => {
     const loc = String(authz.headers.location);
     expect(loc).toContain('accounts.google.com');
     expect(loc).toContain('state=');
+    // the unauthenticated link must not disclose the alias's address
+    expect(new URL(loc).searchParams.get('login_hint')).toBeNull();
+    expect(new URL(loc).searchParams.get('prompt')).toBe('select_account consent');
 
     // 6. /token rejects garbage without touching the network
     const badGrant = await request(port, 'POST', '/token', {

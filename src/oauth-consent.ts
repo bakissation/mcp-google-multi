@@ -10,6 +10,26 @@ import type { AddressInfo } from 'node:net';
 // Google Desktop clients accept any http://localhost:<port> redirect), so a
 // second local process on a fixed port can never break auth.
 
+/** Google authorize-URL options for the owner's HTTP authorization server.
+ * alias_reauth asks for the alias's scopes plus openid/email, which /callback
+ * needs to bind the returned identity to the alias. It carries no login_hint:
+ * the link works without authentication, so a hint would hand the alias's
+ * address to anyone who opens it. Every other flow is identity-only. */
+export function ownerAuthUrlOptions(
+  opts: { flow: string; alias?: string; state: string },
+  scopesFor: (alias: string) => string[],
+): Parameters<OAuth2Client['generateAuthUrl']>[0] {
+  if (opts.flow === 'alias_reauth' && opts.alias) {
+    return {
+      access_type: 'offline',
+      prompt: 'select_account consent',
+      scope: [...new Set([...scopesFor(opts.alias), 'openid', 'email'])],
+      state: opts.state,
+    };
+  }
+  return { scope: ['openid', 'email'], prompt: 'select_account', state: opts.state };
+}
+
 /** GOOGLE_CLIENT_ID/SECRET absent — caller maps to E_CLIENT_CREDENTIALS_MISSING. */
 export class ClientCredentialsMissingError extends Error {
   constructor() {
