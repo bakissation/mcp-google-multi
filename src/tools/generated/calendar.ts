@@ -31,7 +31,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"ruleId","api":"ruleId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       ruleId: z.string().min(1).describe("ACL rule identifier."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -45,7 +45,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"ruleId","api":"ruleId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       ruleId: z.string().min(1).describe("ACL rule identifier."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -59,7 +59,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"sendNotifications","api":"sendNotifications","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       sendNotifications: coerceBoolean.describe("Whether to send notifications about the calendar sharing change. Optional. The default is True.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AclRule JSON request body. Top-level fields: etag, id, kind, role, scope."),
@@ -74,7 +74,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"showDeleted","api":"showDeleted","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       maxResults: z.number().describe("Maximum number of entries returned on one result page. By default the value is 100 entries. The page size can never be larger than 250 entries. Optional.").optional(),
       pageToken: z.string().describe("Token specifying which result page to return. Optional.").optional(),
@@ -91,7 +91,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"ruleId","api":"ruleId","location":"path"},{"field":"sendNotifications","api":"sendNotifications","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       ruleId: z.string().min(1).describe("ACL rule identifier."),
       sendNotifications: coerceBoolean.describe("Whether to send notifications about the calendar sharing change. Note that there are no notifications on access removal. Optional. The default is True.").optional(),
@@ -107,7 +107,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"ruleId","api":"ruleId","location":"path"},{"field":"sendNotifications","api":"sendNotifications","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       ruleId: z.string().min(1).describe("ACL rule identifier."),
       sendNotifications: coerceBoolean.describe("Whether to send notifications about the calendar sharing change. Note that there are no notifications on access removal. Optional. The default is True.").optional(),
@@ -123,7 +123,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"showDeleted","api":"showDeleted","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       maxResults: z.number().describe("Maximum number of entries returned on one result page. By default the value is 100 entries. The page size can never be larger than 250 entries. Optional.").optional(),
       pageToken: z.string().describe("Token specifying which result page to return. Optional.").optional(),
@@ -141,7 +141,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -154,7 +154,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -167,7 +167,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"colorRgbFormat","api":"colorRgbFormat","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       colorRgbFormat: coerceBoolean.describe("Whether to use the foregroundColor and backgroundColor fields to write the calendar colors (RGB). If this feature is used, the index-based colorId field will be set to the best matching option automat").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CalendarListEntry JSON request body. Top-level fields: accessRole, autoAcceptInvitations, backgroundColor, colorId, conferenceProperties, dataOwner, defaultReminders, deleted, description, etag, foregroundColor, hidden, +9 more."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -181,7 +181,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"colorRgbFormat","api":"colorRgbFormat","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       colorRgbFormat: coerceBoolean.describe("Whether to use the foregroundColor and backgroundColor fields to write the calendar colors (RGB). If this feature is used, the index-based colorId field will be set to the best matching option automat").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CalendarListEntry JSON request body. Top-level fields: accessRole, autoAcceptInvitations, backgroundColor, colorId, conferenceProperties, dataOwner, defaultReminders, deleted, description, etag, foregroundColor, hidden, +9 more."),
@@ -196,7 +196,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"colorRgbFormat","api":"colorRgbFormat","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       colorRgbFormat: coerceBoolean.describe("Whether to use the foregroundColor and backgroundColor fields to write the calendar colors (RGB). If this feature is used, the index-based colorId field will be set to the best matching option automat").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CalendarListEntry JSON request body. Top-level fields: accessRole, autoAcceptInvitations, backgroundColor, colorId, conferenceProperties, dataOwner, defaultReminders, deleted, description, etag, foregroundColor, hidden, +9 more."),
@@ -211,7 +211,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"maxResults","api":"maxResults","location":"query"},{"field":"minAccessRole","api":"minAccessRole","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"showDeleted","api":"showDeleted","location":"query"},{"field":"showHidden","api":"showHidden","location":"query"},{"field":"showOwnOrganizationOnly","api":"showOwnOrganizationOnly","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       maxResults: z.number().describe("Maximum number of entries returned on one result page. By default the value is 100 entries. The page size can never be larger than 250 entries. Optional.").optional(),
       minAccessRole: z.enum(["freeBusyReader","owner","reader","writer","writerWithoutPrivateAccess"]).describe("The minimum access role for the user in the returned entries. Optional. The default is no restriction.").optional(),
       pageToken: z.string().describe("Token specifying which result page to return. Optional.").optional(),
@@ -231,7 +231,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -244,7 +244,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -257,7 +257,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -270,7 +270,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Calendar JSON request body. Top-level fields: autoAcceptInvitations, conferenceProperties, dataOwner, description, etag, id, kind, labelProperties, location, summary, timeZone."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -284,7 +284,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"newDataOwner","api":"newDataOwner","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs, call the calendarList.list method."),
       newDataOwner: z.string().min(1).describe("The email address of a user who will become the data owner of the calendar."),
       useAdminAccess: coerceBoolean.describe("When true, the method runs using the user's Google Workspace administrator privileges. The calling user must be a Google Workspace administrator with the Manage Calendars privilege. This method curren"),
@@ -299,7 +299,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Calendar JSON request body. Top-level fields: autoAcceptInvitations, conferenceProperties, dataOwner, description, etag, id, kind, labelProperties, location, summary, timeZone."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -313,7 +313,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Channel JSON request body. Top-level fields: address, expiration, id, kind, params, payload, resourceId, resourceUri, token, type."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -326,7 +326,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -338,7 +338,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"conferenceDataVersion","api":"conferenceDataVersion","location":"query"},{"field":"eventLabelVersion","api":"eventLabelVersion","location":"query"},{"field":"supportsAttachments","api":"supportsAttachments","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       conferenceDataVersion: z.number().describe("Version number of conference data supported by the API client. Version 0 assumes no conference data support and ignores conference data in the event's body. Version 1 enables support for copying of Co").optional(),
       eventLabelVersion: z.number().describe("Version number of the event label feature supported by the API client. Version 0 assumes no event label support and processes the colorId field for color management. Version 1 enables support for even").optional(),
@@ -355,7 +355,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"eventId","api":"eventId","location":"path"},{"field":"alwaysIncludeEmail","api":"alwaysIncludeEmail","location":"query"},{"field":"conferenceDataVersion","api":"conferenceDataVersion","location":"query"},{"field":"eventLabelVersion","api":"eventLabelVersion","location":"query"},{"field":"maxAttendees","api":"maxAttendees","location":"query"},{"field":"sendNotifications","api":"sendNotifications","location":"query"},{"field":"sendUpdates","api":"sendUpdates","location":"query"},{"field":"supportsAttachments","api":"supportsAttachments","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       eventId: z.string().min(1).describe("Event identifier."),
       alwaysIncludeEmail: coerceBoolean.describe("Deprecated and ignored. A value will always be returned in the email field for the organizer, creator and attendees, even if no real email address is available (i.e. a generated, non-working value wil").optional(),
@@ -377,7 +377,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"alwaysIncludeEmail","api":"alwaysIncludeEmail","location":"query"},{"field":"eventTypes","api":"eventTypes","location":"query"},{"field":"iCalUID","api":"iCalUID","location":"query"},{"field":"maxAttendees","api":"maxAttendees","location":"query"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"privateExtendedProperty","api":"privateExtendedProperty","location":"query"},{"field":"q","api":"q","location":"query"},{"field":"sharedExtendedProperty","api":"sharedExtendedProperty","location":"query"},{"field":"showDeleted","api":"showDeleted","location":"query"},{"field":"showHiddenInvitations","api":"showHiddenInvitations","location":"query"},{"field":"singleEvents","api":"singleEvents","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"timeMax","api":"timeMax","location":"query"},{"field":"timeMin","api":"timeMin","location":"query"},{"field":"timeZone","api":"timeZone","location":"query"},{"field":"updatedMin","api":"updatedMin","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
       alwaysIncludeEmail: coerceBoolean.describe("Deprecated and ignored.").optional(),
       eventTypes: coerceArray(z.enum(["birthday","default","focusTime","fromGmail","outOfOffice","workingLocation"])).describe("Event types to return. Optional. This parameter can be repeated multiple times to return events of different types. If unset, returns all event types.").optional(),
@@ -409,7 +409,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"setting","api":"setting","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       setting: z.string().min(1).describe("The id of the user setting."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -422,7 +422,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       maxResults: z.number().describe("Maximum number of entries returned on one result page. By default the value is 100 entries. The page size can never be larger than 250 entries. Optional.").optional(),
       pageToken: z.string().describe("Token specifying which result page to return. Optional.").optional(),
       syncToken: z.string().describe("Token obtained from the nextSyncToken field returned on the last page of results from the previous list request. It makes the result of this list request contain only entries that have changed since t").optional(),
@@ -437,7 +437,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     params: [{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       maxResults: z.number().describe("Maximum number of entries returned on one result page. By default the value is 100 entries. The page size can never be larger than 250 entries. Optional.").optional(),
       pageToken: z.string().describe("Token specifying which result page to return. Optional.").optional(),
       syncToken: z.string().describe("Token obtained from the nextSyncToken field returned on the last page of results from the previous list request. It makes the result of this list request contain only entries that have changed since t").optional(),

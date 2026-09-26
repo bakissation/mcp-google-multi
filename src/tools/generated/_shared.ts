@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { accountAliasSchema, accountAliasSchemaFor } from '../../accounts.js';
+import { accountAliasSchema, accountAliasSchemaFor, accountArgLive } from '../../accounts.js';
 import { executeApiMethod, type ApiMethodRef, type ExecuteDeps, type QueryParams } from '../../executor.js';
 import type { Cud, ToolRegistry } from '../../registry.js';
 
@@ -24,11 +24,13 @@ export interface GeneratedToolDef {
   shape: z.ZodRawShape;
 }
 
-export function accountField(aliases?: readonly string[]) {
-  // Per-registry enum when the caller supplies its alias list (regenerated
-  // code passes registry.accountAliases()); the no-arg form keeps the
-  // global-bound schema for compatibility.
-  return (aliases ? accountAliasSchemaFor(aliases) : accountAliasSchema).optional().describe('Google account alias (omit for the default account)');
+export function accountField(aliases?: readonly string[] | (() => readonly string[])) {
+  // Generated code passes a getter over registry.accountAliases(), so the field
+  // validates against the registry's CURRENT set, as curated tools do. An
+  // array bakes that set; the no-arg form keeps the global-bound schema.
+  const schema =
+    typeof aliases === 'function' ? accountArgLive(aliases) : aliases ? accountAliasSchemaFor(aliases) : accountAliasSchema;
+  return schema.optional().describe('Google account alias (omit for the default account)');
 }
 
 export type { ExecuteDeps } from '../../executor.js';

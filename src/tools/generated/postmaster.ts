@@ -16,7 +16,7 @@ export function registerPostmasterGeneratedTools(registry: ToolRegistry, deps: E
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("The resource name of the domain. It should have the form `domains/{domain_name}`, where domain_name is the fully qualified domain name."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -29,7 +29,7 @@ export function registerPostmasterGeneratedTools(registry: ToolRegistry, deps: E
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       pageSize: z.number().describe("Requested page size. Server may return fewer domains than requested. If unspecified, server will pick an appropriate default.").optional(),
       pageToken: z.string().describe("The next_page_token value returned from a previous List request, if any. This is the value of ListDomainsResponse.next_page_token returned from the previous call to `ListDomains` method.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -43,7 +43,7 @@ export function registerPostmasterGeneratedTools(registry: ToolRegistry, deps: E
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("The resource name of the traffic statistics to get. E.g., domains/mymail.mydomain.com/trafficStats/20160807."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -56,7 +56,7 @@ export function registerPostmasterGeneratedTools(registry: ToolRegistry, deps: E
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"endDate.day","api":"endDate.day","location":"query"},{"field":"endDate.month","api":"endDate.month","location":"query"},{"field":"endDate.year","api":"endDate.year","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"startDate.day","api":"startDate.day","location":"query"},{"field":"startDate.month","api":"startDate.month","location":"query"},{"field":"startDate.year","api":"startDate.year","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("The resource name of the domain whose traffic statistics we'd like to list. It should have the form `domains/{domain_name}`, where domain_name is the fully qualified domain name."),
       "endDate.day": z.number().describe("Day of a month. Must be from 1 to 31 and valid for the year and month, or 0 to specify a year by itself or a year and month where the day isn't significant.").optional(),
       "endDate.month": z.number().describe("Month of a year. Must be from 1 to 12, or 0 to specify a year without a month and day.").optional(),

@@ -18,7 +18,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"languageCode","api":"languageCode","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       languageCode: z.string().describe("The BCP-47 language code to use for evaluating localized field labels in response. When not specified, values in the default configured language will be used.").optional(),
       useAdminAccess: coerceBoolean.describe("Set to `true` in order to use the user's admin privileges. The server will verify the user is an admin before allowing access.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsDriveLabelsV2Label JSON request body. Top-level fields: appliedCapabilities, appliedLabelPolicy, createTime, creator, customer, disableTime, disabler, displayHints, enabledAppSettings, fields, id, labelType, +11 more."),
@@ -33,7 +33,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"name","api":"name","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"writeControl.requiredRevisionId","api":"writeControl.requiredRevisionId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. Label resource name."),
       useAdminAccess: coerceBoolean.describe("Set to `true` in order to use the user's admin credentials. The server will verify the user is an admin for the label before allowing access.").optional(),
       "writeControl.requiredRevisionId": z.string().describe("The revision ID of the label that the write request will be applied to. If this isn't the latest revision of the label, the request will not be processed and will return a 400 Bad Request error.").optional(),
@@ -48,7 +48,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The resource name of the label to update."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsDriveLabelsV2DeltaUpdateLabelRequest JSON request body. Top-level fields: languageCode, requests, useAdminAccess, view, writeControl."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -62,7 +62,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. Label resource name."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsDriveLabelsV2DisableLabelRequest JSON request body. Top-level fields: disabledPolicy, languageCode, updateMask, useAdminAccess, writeControl."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -76,7 +76,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. Label resource name."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsDriveLabelsV2EnableLabelRequest JSON request body. Top-level fields: languageCode, useAdminAccess, writeControl."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -90,7 +90,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"name","api":"name","location":"path"},{"field":"languageCode","api":"languageCode","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. Label resource name. May be any of: * `labels/{id}` (equivalent to labels/{id}@latest) * `labels/{id}@latest` * `labels/{id}@published` * `labels/{id}@{revision_id}`"),
       languageCode: z.string().describe("The BCP-47 language code to use for evaluating localized field labels. When not specified, values in the default configured language are used.").optional(),
       useAdminAccess: coerceBoolean.describe("Set to `true` in order to use the user's admin credentials. The server verifies that the user is an admin for the label before allowing access.").optional(),
@@ -106,7 +106,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"customer","api":"customer","location":"query"},{"field":"languageCode","api":"languageCode","location":"query"},{"field":"minimumRole","api":"minimumRole","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"publishedOnly","api":"publishedOnly","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       customer: z.string().describe("The customer to scope this list request to. For example: `customers/abcd1234`. If unset, will return all labels within the current customer.").optional(),
       languageCode: z.string().describe("The BCP-47 language code to use for evaluating localized field labels. When not specified, values in the default configured language are used.").optional(),
       minimumRole: z.enum(["LABEL_ROLE_UNSPECIFIED","READER","APPLIER","ORGANIZER","EDITOR"]).describe("Specifies the level of access the user must have on the returned labels. The minimum role a user must have on a label. Defaults to `READER`.").optional(),
@@ -126,7 +126,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Label on which locks are applied. Format: `labels/{label}`."),
       pageSize: z.number().describe("Maximum number of locks to return per page. Default: 100. Max: 200.").optional(),
       pageToken: z.string().describe("The token of the page to return.").optional(),
@@ -141,7 +141,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent label resource name shared by all permissions being deleted. Format: `labels/{label}`. If this is set, the parent field in the `UpdateLabelPermissionRequest` messages must either "),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsDriveLabelsV2BatchDeleteLabelPermissionsRequest JSON request body. Top-level fields: requests, useAdminAccess."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -155,7 +155,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent label resource name shared by all permissions being updated. Format: `labels/{label}`. If this is set, the parent field in the `UpdateLabelPermissionRequest` messages must either "),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsDriveLabelsV2BatchUpdateLabelPermissionsRequest JSON request body. Top-level fields: requests, useAdminAccess."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -170,7 +170,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     hasBody: true,
     bodyParams: [{"field":"audience","api":"audience"},{"field":"email","api":"email"},{"field":"group","api":"group"},{"field":"name","api":"name"},{"field":"person","api":"person"},{"field":"role","api":"role"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent label resource name on the label permission is created. Format: `labels/{label}`."),
       useAdminAccess: coerceBoolean.describe("Set to `true` in order to use the user's admin credentials. The server will verify the user is an admin for the label before allowing access.").optional(),
       audience: z.string().describe("Audience to grant a role to. The magic value of `audiences/default` may be used to apply the role to the default audience in the context of the organization that owns the label.").optional(),
@@ -190,7 +190,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"name","api":"name","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. Label permission resource name."),
       useAdminAccess: coerceBoolean.describe("Set to `true` in order to use the user's admin credentials. The server will verify the user is an admin for the label before allowing access.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -204,7 +204,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent label resource name on which label permissions are listed. Format: `labels/{label}`."),
       pageSize: z.number().describe("Maximum number of permissions to return per page. Default: 50. Max: 200.").optional(),
       pageToken: z.string().describe("The token of the page to return.").optional(),
@@ -220,7 +220,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. Label resource name."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsDriveLabelsV2PublishLabelRequest JSON request body. Top-level fields: languageCode, useAdminAccess, writeControl."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -234,7 +234,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Label on which locks are applied. Format: `labels/{label}`."),
       pageSize: z.number().describe("Maximum number of locks to return per page. Default: 100. Max: 200.").optional(),
       pageToken: z.string().describe("The token of the page to return.").optional(),
@@ -249,7 +249,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent label resource name shared by all permissions being deleted. Format: `labels/{label}`. If this is set, the parent field in the `UpdateLabelPermissionRequest` messages must either "),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsDriveLabelsV2BatchDeleteLabelPermissionsRequest JSON request body. Top-level fields: requests, useAdminAccess."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -263,7 +263,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent label resource name shared by all permissions being updated. Format: `labels/{label}`. If this is set, the parent field in the `UpdateLabelPermissionRequest` messages must either "),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsDriveLabelsV2BatchUpdateLabelPermissionsRequest JSON request body. Top-level fields: requests, useAdminAccess."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -278,7 +278,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     hasBody: true,
     bodyParams: [{"field":"audience","api":"audience"},{"field":"email","api":"email"},{"field":"group","api":"group"},{"field":"name","api":"name"},{"field":"person","api":"person"},{"field":"role","api":"role"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent label resource name on the label permission is created. Format: `labels/{label}`."),
       useAdminAccess: coerceBoolean.describe("Set to `true` in order to use the user's admin credentials. The server will verify the user is an admin for the label before allowing access.").optional(),
       audience: z.string().describe("Audience to grant a role to. The magic value of `audiences/default` may be used to apply the role to the default audience in the context of the organization that owns the label.").optional(),
@@ -298,7 +298,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"name","api":"name","location":"path"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. Label permission resource name."),
       useAdminAccess: coerceBoolean.describe("Set to `true` in order to use the user's admin credentials. The server will verify the user is an admin for the label before allowing access.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -312,7 +312,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent label resource name on which label permissions are listed. Format: `labels/{label}`."),
       pageSize: z.number().describe("Maximum number of permissions to return per page. Default: 50. Max: 200.").optional(),
       pageToken: z.string().describe("The token of the page to return.").optional(),
@@ -329,7 +329,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     hasBody: true,
     bodyParams: [{"field":"audience","api":"audience"},{"field":"email","api":"email"},{"field":"group","api":"group"},{"field":"name","api":"name"},{"field":"person","api":"person"},{"field":"role","api":"role"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent label resource name."),
       useAdminAccess: coerceBoolean.describe("Set to `true` in order to use the user's admin credentials. The server will verify the user is an admin for the label before allowing access.").optional(),
       audience: z.string().describe("Audience to grant a role to. The magic value of `audiences/default` may be used to apply the role to the default audience in the context of the organization that owns the label.").optional(),
@@ -350,7 +350,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     hasBody: true,
     bodyParams: [{"field":"copyMode","api":"copyMode"},{"field":"languageCode","api":"languageCode"},{"field":"useAdminAccess","api":"useAdminAccess"},{"field":"view","api":"view"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The resource name of the label to update."),
       copyMode: z.enum(["COPY_MODE_UNSPECIFIED","DO_NOT_COPY","ALWAYS_COPY","COPY_APPLIABLE"]).describe("Required. Indicates how the applied label and field values should be copied when a Drive item is copied.").optional(),
       languageCode: z.string().describe("The BCP-47 language code to use for evaluating localized field labels. When not specified, values in the default configured language will be used.").optional(),
@@ -367,7 +367,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The resource name of the label to update. The resource name of the label to update."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAppsDriveLabelsV2UpdateLabelEnabledAppSettingsRequest JSON request body. Top-level fields: enabledAppSettings, languageCode, useAdminAccess, view."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -382,7 +382,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     hasBody: true,
     bodyParams: [{"field":"audience","api":"audience"},{"field":"email","api":"email"},{"field":"group","api":"group"},{"field":"name","api":"name"},{"field":"person","api":"person"},{"field":"role","api":"role"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent label resource name."),
       useAdminAccess: coerceBoolean.describe("Set to `true` in order to use the user's admin credentials. The server will verify the user is an admin for the label before allowing access.").optional(),
       audience: z.string().describe("Audience to grant a role to. The magic value of `audiences/default` may be used to apply the role to the default audience in the context of the organization that owns the label.").optional(),
@@ -402,7 +402,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"name","api":"name","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().describe("Required. Label revision resource name must be: \"limits/label\".").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -415,7 +415,7 @@ export function registerDrivelabelsGeneratedTools(registry: ToolRegistry, deps: 
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The resource name of the user. Only \"users/me/capabilities\" is supported."),
       customer: z.string().describe("The customer to scope this request to. For example: `customers/abcd1234`. If unset, it will return settings within the current customer.").optional(),
       fields: z.string().optional().describe('Response field mask.'),

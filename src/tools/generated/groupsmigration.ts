@@ -16,7 +16,7 @@ export function registerGroupsmigrationGeneratedTools(registry: ToolRegistry, de
     params: [{"field":"groupId","api":"groupId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       groupId: z.string().min(1).describe("The group ID"),
       fields: z.string().optional().describe('Response field mask.'),
     },

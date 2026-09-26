@@ -17,7 +17,7 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry, dep
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       groupUniqueId: z.string().min(1).describe("The group's email address."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -30,7 +30,7 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry, dep
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       groupUniqueId: z.string().min(1).describe("The group's email address."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Groups JSON request body. Top-level fields: allowExternalMembers, allowGoogleCommunication, allowWebPosting, archiveOnly, customFooterText, customReplyTo, customRolesEnabledForSettingsToBeMerged, defaultMessageDenyNotificationText, default_sender, description, email, enableCollaborativeInbox, +51 more."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -44,7 +44,7 @@ export function registerGroupssettingsGeneratedTools(registry: ToolRegistry, dep
     params: [{"field":"groupUniqueId","api":"groupUniqueId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       groupUniqueId: z.string().min(1).describe("The group's email address."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Groups JSON request body. Top-level fields: allowExternalMembers, allowGoogleCommunication, allowWebPosting, archiveOnly, customFooterText, customReplyTo, customRolesEnabledForSettingsToBeMerged, defaultMessageDenyNotificationText, default_sender, description, email, enableCollaborativeInbox, +51 more."),
       fields: z.string().optional().describe('Response field mask.'),

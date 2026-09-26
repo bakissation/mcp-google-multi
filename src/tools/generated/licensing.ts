@@ -16,7 +16,7 @@ export function registerLicensingGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"productId","api":"productId","location":"path"},{"field":"skuId","api":"skuId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       productId: z.string().min(1).describe("A product's unique identifier. For more information about products in this version of the API, see Products and SKUs."),
       skuId: z.string().min(1).describe("A product SKU's unique identifier. For more information about available SKUs in this version of the API, see Products and SKUs."),
       userId: z.string().min(1).describe("The user's current primary email address. If the user's email address changes, use the new email address in your API requests. Since a `userId` is subject to change, do not use a `userId` value as a k"),
@@ -31,7 +31,7 @@ export function registerLicensingGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"productId","api":"productId","location":"path"},{"field":"skuId","api":"skuId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       productId: z.string().min(1).describe("A product's unique identifier. For more information about products in this version of the API, see Products and SKUs."),
       skuId: z.string().min(1).describe("A product SKU's unique identifier. For more information about available SKUs in this version of the API, see Products and SKUs."),
       userId: z.string().min(1).describe("The user's current primary email address. If the user's email address changes, use the new email address in your API requests. Since a `userId` is subject to change, do not use a `userId` value as a k"),
@@ -47,7 +47,7 @@ export function registerLicensingGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"userId","api":"userId"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       productId: z.string().min(1).describe("A product's unique identifier. For more information about products in this version of the API, see Products and SKUs."),
       skuId: z.string().min(1).describe("A product SKU's unique identifier. For more information about available SKUs in this version of the API, see Products and SKUs."),
       userId: z.string().min(1).describe("Email id of the user"),
@@ -62,7 +62,7 @@ export function registerLicensingGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"productId","api":"productId","location":"path"},{"field":"customerId","api":"customerId","location":"query"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       productId: z.string().min(1).describe("A product's unique identifier. For more information about products in this version of the API, see Products and SKUs."),
       customerId: z.string().min(1).describe("The customer's unique ID as defined in the Admin console, such as `C00000000`. If the customer is suspended, the server returns an error."),
       maxResults: z.number().describe("The `maxResults` query string determines how many entries are returned on each page of a large response. This is an optional parameter. The value must be a positive number.").optional(),
@@ -78,7 +78,7 @@ export function registerLicensingGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"productId","api":"productId","location":"path"},{"field":"skuId","api":"skuId","location":"path"},{"field":"customerId","api":"customerId","location":"query"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       productId: z.string().min(1).describe("A product's unique identifier. For more information about products in this version of the API, see Products and SKUs."),
       skuId: z.string().min(1).describe("A product SKU's unique identifier. For more information about available SKUs in this version of the API, see Products and SKUs."),
       customerId: z.string().min(1).describe("The customer's unique ID as defined in the Admin console, such as `C00000000`. If the customer is suspended, the server returns an error."),
@@ -96,7 +96,7 @@ export function registerLicensingGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"etags","api":"etags"},{"field":"kind","api":"kind"},{"field":"productId_","api":"productId"},{"field":"productName","api":"productName"},{"field":"selfLink","api":"selfLink"},{"field":"skuId_","api":"skuId"},{"field":"skuName","api":"skuName"},{"field":"userId_","api":"userId"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       productId: z.string().min(1).describe("A product's unique identifier. For more information about products in this version of the API, see Products and SKUs."),
       skuId: z.string().min(1).describe("A product SKU's unique identifier. For more information about available SKUs in this version of the API, see Products and SKUs."),
       userId: z.string().min(1).describe("The user's current primary email address. If the user's email address changes, use the new email address in your API requests. Since a `userId` is subject to change, do not use a `userId` value as a k"),
@@ -120,7 +120,7 @@ export function registerLicensingGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"productId_","api":"productId"},{"field":"skuId_","api":"skuId"},{"field":"userId_","api":"userId"},{"field":"etags","api":"etags"},{"field":"kind","api":"kind"},{"field":"productName","api":"productName"},{"field":"selfLink","api":"selfLink"},{"field":"skuName","api":"skuName"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       productId: z.string().min(1).describe("A product's unique identifier. For more information about products in this version of the API, see Products and SKUs."),
       skuId: z.string().min(1).describe("A product SKU's unique identifier. For more information about available SKUs in this version of the API, see Products and SKUs."),
       userId: z.string().min(1).describe("The user's current primary email address. If the user's email address changes, use the new email address in your API requests. Since a `userId` is subject to change, do not use a `userId` value as a k"),

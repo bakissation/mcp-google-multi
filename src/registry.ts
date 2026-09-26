@@ -1,9 +1,9 @@
 import type { ListToolsResult, McpServer } from "@modelcontextprotocol/server";
 import { z } from 'zod';
 import { type Policy, isAllowed, writeDisabledResult, IRREVERSIBLE_TOOLS } from './write-control.js';
-import { getAccountSet, refreshAccountSetIfStale, type AccountSet } from './accounts.js';
+import { getAccountSet, isLiveAccountField, refreshAccountSetIfStale, type AccountSet } from './accounts.js';
 import { compactResult, trimEnabled } from './trim.js';
-import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFanout } from './fanout.js';
+import { fanoutAccountField, invalidAccountsResult, noAccountsResult, parseAccountSelector, runFanout } from './fanout.js';
 import { MAX_RESPONSE_CHARS } from './executor.js';
 import type { ArgKind, ArgShape } from './arg-normalize.js';
 import type { Metrics } from './usage-metrics.js';
@@ -124,7 +124,10 @@ function scalarKindOf(field: unknown): ArgKind {
   return 'other';
 }
 
-function isAccountEnum(field: unknown): boolean {
+/** A field naming one of the registry's accounts: a baked enum or a live
+ * account check (curated tools and generated tools both validate live). */
+function isAccountSelector(field: unknown): boolean {
+  if (isLiveAccountField(field)) return true;
   type Def = { type?: string; innerType?: { _zod?: { def?: Def } } };
   const def = (field as { _zod?: { def?: Def } } | undefined)?._zod?.def;
   if (!def) return false;
@@ -206,13 +209,14 @@ export class ToolRegistry {
       let inputShape = config.inputSchema ?? {};
       let baseHandler = handler;
       const hasAccountField = 'account' in inputShape && !DEFAULT_ACCOUNT_EXCLUDE.has(name);
-      if (cud === 'read' && !this.registeringMeta && !FANOUT_EXCLUDE.has(name) && isAccountEnum(inputShape.account)) {
+      if (cud === 'read' && !this.registeringMeta && !FANOUT_EXCLUDE.has(name) && isAccountSelector(inputShape.account)) {
         const description = (inputShape.account as z.ZodType).description ?? 'Google account alias';
-        inputShape = { ...inputShape, account: fanoutAccountField(description, this.accounts().aliases) };
+        inputShape = { ...inputShape, account: fanoutAccountField(description, () => this.accounts().aliases) };
         baseHandler = async (...args: unknown[]) => {
           const first = args[0] as { account?: string } | undefined;
           const parsed = parseAccountSelector(typeof first?.account === 'string' ? first.account : '', this.accounts().aliases);
           if (!parsed.ok) return invalidAccountsResult(parsed.invalid, this.accounts().aliases);
+          if (parsed.aliases.length === 0) return noAccountsResult();
           if (!parsed.fanout) return handler({ ...first, account: parsed.aliases[0] }, ...args.slice(1));
           return runFanout(handler, args, parsed.aliases);
         };
@@ -549,10 +553,11 @@ export class ToolRegistry {
     const aliases = this.accounts().aliases;
     if (aliases.length === 0) return schema;
     if (Array.isArray(account.anyOf)) {
-      // fan-out union: refresh the enum branch ('*' + aliases), keep the CSV branch
-      const hasEnumBranch = account.anyOf.some((b) => Array.isArray((b as { enum?: unknown[] }).enum));
-      if (!hasEnumBranch) return schema;
-      const anyOf = account.anyOf.map((b) => (Array.isArray((b as { enum?: unknown[] }).enum) ? { ...(b as object), enum: ['*', ...aliases] } : b));
+      // fan-out union: advertise '*' + the live aliases on the selector branch
+      // (the one without the CSV pattern), keep the CSV branch as is
+      const isSelector = (b: unknown) => (b as { pattern?: unknown }).pattern === undefined;
+      if (!account.anyOf.some(isSelector)) return schema;
+      const anyOf = account.anyOf.map((b) => (isSelector(b) ? { ...(b as object), enum: ['*', ...aliases] } : b));
       return { ...s, properties: { ...s.properties, account: { ...account, anyOf } } };
     }
     return { ...s, properties: { ...s.properties, account: { ...account, enum: [...aliases] } } };
