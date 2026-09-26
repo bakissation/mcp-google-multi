@@ -98,6 +98,11 @@ const SERVICE_OVERRIDES: Record<string, string> = {
   reports_activities_list: 'admin',
 };
 
+/** The service a tool name belongs to: its prefix, unless overridden. */
+export function serviceOf(name: string): string {
+  return Object.hasOwn(SERVICE_OVERRIDES, name) ? SERVICE_OVERRIDES[name] : name.includes('_') ? name.slice(0, name.indexOf('_')) : name;
+}
+
 // read tools that write local files — same savePath fanned across accounts would clobber
 const FANOUT_EXCLUDE = new Set(['gmail_download_attachment', 'drive_download', 'drive_export']);
 
@@ -180,8 +185,7 @@ export class ToolRegistry {
     this.policy = policy;
     this.mode = mode;
     this.registerTool = ((name: string, config: ToolConfig, handler: (...a: unknown[]) => unknown) => {
-      const service =
-        SERVICE_OVERRIDES[name] ?? (name.includes('_') ? name.slice(0, name.indexOf('_')) : name);
+      const service = serviceOf(name);
       const cud = config.cud ?? inferCud(name);
       // destructiveHint=false claims "additive only" (MCP spec) — updates overwrite, so they stay true.
       // idempotent: reads trivially, deletes (already-gone = same), updates

@@ -6,7 +6,7 @@
 
 import type { McpServer } from "@modelcontextprotocol/server";
 import { GENERATED_SERVICES } from './tools/generated/index.js';
-import { GENERATED_GATES, SERVICES, unknownToolMessage } from './services.js';
+import { GENERATED_GATES, SERVICES, servicesAwaitingRestart, unknownToolMessage } from './services.js';
 import { argNormalizationEnabled } from './arg-normalize.js';
 import { unknownArgMode } from './arg-strict.js';
 import type { ServerTarget } from './http-transport.js';
@@ -87,7 +87,7 @@ export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Di
   registerDiagnoseTool(registry, ctx);
   // The wizard edits the owner's config.json and token store; any other
   // context has neither.
-  if (owner) registerAccountWizardTools(registry, server);
+  if (owner) registerAccountWizardTools(registry, server, () => servicesAwaitingRestart(registry));
   return registry;
 }
 

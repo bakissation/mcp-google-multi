@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { ToolRegistry } from '../registry.js';
-import { getAccountSet, invalidateAccountSet } from '../accounts.js';
+import { getAccountSet, invalidateAccountSet, refreshAccountSetIfStale } from '../accounts.js';
 import { ALIAS_RE, mutateConfigFile } from '../config-file.js';
 import { writeToken } from '../token-store.js';
 import { resolveScopesForAccount } from '../auth.js';
@@ -193,11 +193,21 @@ export function setWizardHttpConsent(ctx: WizardHttpConsent | null): void {
   httpConsent = ctx;
 }
 
-function pendingText(alias: string, url: string): string {
+/** Services register their tools at startup, so one first enabled by this
+ * account stays unregistered until a restart; say so rather than claim the
+ * whole account works without one. */
+function restartNote(pending: readonly string[]): string {
+  if (pending.length === 0) return '';
+  const names = pending.map((s) => `"${s}"`).join(', ');
+  const what = pending.length > 1 ? `services ${names} register their` : `service ${names} registers its`;
+  return `\nThe ${what} tools when the server starts: restart the server to use them. Until then, google_api_call can reach the same API.`;
+}
+
+function pendingText(alias: string, url: string, pending: readonly string[]): string {
   return (
     `Account "${alias}" is ready to authorize. Open this link in a browser (it belongs to whoever owns the Google account):\n${url}\n` +
     `On completion the token is stored server-side and the account is usable immediately — no restart. ` +
-    `If the link expires, run account_reauth for a fresh one.\n${TESTING_MODE_WARNING}`
+    `If the link expires, run account_reauth for a fresh one.${restartNote(pending)}\n${TESTING_MODE_WARNING}`
   );
 }
 
@@ -295,16 +305,20 @@ async function runConsent(server: McpServer, alias: string): Promise<{ ok: true;
   return { ok: true, missing: scopeGrantDiff(scopes, typeof tokens.scope === 'string' ? tokens.scope : undefined) };
 }
 
-function s4Text(alias: string, missing: string[]): string {
+function s4Text(alias: string, missing: string[], pending: readonly string[]): string {
   const outcome = missing.length === 0
     ? `✔ "${alias}" authenticated; all requested scopes granted. It is now usable without a restart.`
     : `⚠ "${alias}" authenticated, but ${missing.length} requested scope(s) were NOT granted (E_SCOPE_NOT_GRANTED). You may have unchecked some on the consent screen. Re-run account_reauth to grant them. The account is usable for the granted scopes.`;
-  return `${outcome}\n${TESTING_MODE_WARNING}`;
+  return `${outcome}${restartNote(pending)}\n${TESTING_MODE_WARNING}`;
 }
 
 const REQUIRES_INTERACTION = { 'anthropic/requiresUserInteraction': true };
 
-export function registerAccountWizardTools(registry: ToolRegistry, server: McpServer): void {
+export function registerAccountWizardTools(
+  registry: ToolRegistry,
+  server: McpServer,
+  awaitingRestart: () => string[] = () => [],
+): void {
   // Registered as META (always-visible, like account_list) so onboarding tools
   // are reachable in lazy mode without discover_all first; registerMeta still
   // preserves the requiresUserInteraction clientMeta and skips the fan-out path.
@@ -319,7 +333,7 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
     {
       _meta: REQUIRES_INTERACTION,
       annotations: { openWorldHint: true },
-      description: 'Add a new Google account: pass alias + email directly (plus optional bundles/allBundles/admin), or pass nothing for an interactive form where the client supports elicitation. Writes the registry and runs Google consent in the browser. No file editing or restart needed. Requires GOOGLE_CLIENT_ID/SECRET (run the `setup` prompt first if missing).',
+      description: 'Add a new Google account: pass alias + email directly (plus optional bundles/allBundles/admin), or pass nothing for an interactive form where the client supports elicitation. Writes the registry and runs Google consent in the browser. No file editing or restart needed to use the account (tools of a service it newly enables register at the next restart). Requires GOOGLE_CLIENT_ID/SECRET (run the `setup` prompt first if missing).',
       inputSchema: {
         alias: z.string().optional().describe('Account alias (letters, digits, _ or -). Pass with email to add directly, skipping the form.'),
         account: z.string().optional().describe('Alias for the new account (same as `alias`; every other tool spells it `account`)'),
@@ -388,11 +402,11 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
 
         // S3 + S4: consent + validate.
         const consent = await runConsent(server, validated.alias);
-        if (consent.ok === 'pending') return textResult(pendingText(validated.alias, consent.url));
+        if (consent.ok === 'pending') return textResult(pendingText(validated.alias, consent.url, awaitingRestart()));
         if (!consent.ok) return errorResult(consent.slug, consent.message, consent.hint, validated.alias);
         // B15: offer to register the server with another MCP client.
         return textResult(
-          `${s4Text(validated.alias, consent.missing)}\nTip: run account_write_config to register this server with another MCP client (Claude Desktop / Cursor / Claude Code).`,
+          `${s4Text(validated.alias, consent.missing, awaitingRestart())}\nTip: run account_write_config to register this server with another MCP client (Claude Desktop / Cursor / Claude Code).`,
         );
       } catch (e: unknown) {
         // safeMessage, not error.message: an arbitrary throw here can carry a
@@ -423,6 +437,9 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
       try {
         const a = args as { alias?: string; account?: string };
         const alias = a.alias ?? a.account ?? '';
+        // No default-account wrapper runs for this tool, so pick up a
+        // hand-edited config.json here: that edit is why a re-auth is asked for.
+        refreshAccountSetIfStale();
         if (!hasClientCredentials()) {
           return errorResult(
             'invalid_client',
@@ -439,9 +456,9 @@ export function registerAccountWizardTools(registry: ToolRegistry, server: McpSe
           );
         }
         const consent = await runConsent(server, alias);
-        if (consent.ok === 'pending') return textResult(pendingText(alias, consent.url));
+        if (consent.ok === 'pending') return textResult(pendingText(alias, consent.url, awaitingRestart()));
         if (!consent.ok) return errorResult(consent.slug, consent.message, consent.hint, alias);
-        return textResult(s4Text(alias, consent.missing));
+        return textResult(s4Text(alias, consent.missing, awaitingRestart()));
       } catch (e: unknown) {
         return errorResult('internal', `account_reauth failed: ${safeMessage(e)}`);
       }

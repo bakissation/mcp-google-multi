@@ -20,7 +20,7 @@ import { applyFileEntry } from '../src/client-config.js';
 
 type Handler = (args: unknown) => Promise<{ content: { text: string }[]; isError?: boolean }>;
 
-function captureHandlers(): { handlers: Record<string, Handler>; registry: ToolRegistry; server: McpServer } {
+function captureHandlers(awaitingRestart?: () => string[]): { handlers: Record<string, Handler>; registry: ToolRegistry; server: McpServer } {
   const handlers: Record<string, Handler> = {};
   const registry = {
     registerMeta: (name: string, _cfg: unknown, h: Handler) => {
@@ -28,7 +28,7 @@ function captureHandlers(): { handlers: Record<string, Handler>; registry: ToolR
     },
   } as unknown as ToolRegistry;
   const server = { server: { getClientCapabilities: () => undefined }, sendToolListChanged: vi.fn() } as unknown as McpServer;
-  registerAccountWizardTools(registry, server);
+  registerAccountWizardTools(registry, server, awaitingRestart);
   return { handlers, registry, server };
 }
 
@@ -64,6 +64,16 @@ describe('runConsent over HTTP (S1.20)', () => {
     expect(text).toContain('https://mcp.example.com/authorize?flow=alias_reauth&alias=test');
     expect(text).toContain('stored server-side');
     expect(minted).toEqual(['test']);
+  });
+
+  it('says when a service the account enables needs a restart, and stays quiet otherwise', async () => {
+    setWizardHttpConsent({ mintConsentUrl: (alias) => `https://mcp.example.com/authorize?flow=alias_reauth&alias=${alias}` });
+    const withForms = await captureHandlers(() => ['forms']).handlers.account_reauth({ alias: 'test' });
+    expect(withForms.content[0].text).toContain('The service "forms" registers its tools when the server starts: restart the server to use them.');
+    const two = await captureHandlers(() => ['forms', 'chat']).handlers.account_reauth({ alias: 'test' });
+    expect(two.content[0].text).toContain('The services "forms", "chat" register their tools');
+    const none = await captureHandlers().handlers.account_reauth({ alias: 'test' });
+    expect(none.content[0].text).not.toContain('restart the server');
   });
 
   it('a mint failure surfaces as a clean envelope, not a hang', async () => {
