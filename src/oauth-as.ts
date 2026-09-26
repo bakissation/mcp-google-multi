@@ -12,6 +12,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AuthOutcome, RouteHandler } from './http-transport.js';
 import {
   signAccessToken, verifyAccessToken, signState, verifyState, signAuthzCode, verifyAuthzCode,
+  signReauthLink, verifyReauthLink,
   signPending, verifyPending,
   ReplayGuard, RefreshStore, STATE_TTL_DEFAULT, CODE_TTL_DEFAULT, ACCESS_TTL_DEFAULT,
   type StatePayload,
@@ -42,10 +43,10 @@ export interface AuthServerConfig {
   accessTtlSec?: number;
   masterKey: string;
   refreshStorePath: string;
-  /** Default true. The clientless alias-only `flow=alias_reauth` link carries
+  /** Default true. The clientless `flow=alias_reauth` link names an alias with
    * no tenant binding, so a multi-tenant deployment sets false: with several
    * tenants an alias name alone is ambiguous and the branch becomes a
-   * cross-tenant re-auth vector. Server-minted signed flows are unaffected. */
+   * cross-tenant re-auth vector. Server-minted alias_add flows are unaffected. */
   legacyAliasReauth?: boolean;
 }
 
@@ -116,7 +117,12 @@ export interface AuthServer {
    * (`${base}/authorize?flow=...&state=<signed>`). The tenantId/bundles ride
    * INSIDE the signed state, so nothing at /authorize or /callback trusts a
    * caller-supplied identity. Inert unless something calls it. */
-  mintFlowState: (opts: { flow: 'alias_add' | 'alias_reauth'; alias: string; tenantId?: string; bundles?: string[]; nonce?: string }) => Promise<string>;
+  mintFlowState: (opts: { flow: 'alias_add'; alias: string; tenantId?: string; bundles?: string[]; nonce?: string }) => Promise<string>;
+  /** The owner's re-auth link for `alias`: HMAC-signed, expiring, not single
+   * use (a chat client may prefetch it). /authorize refuses any alias_reauth
+   * request without a valid one, so an unauthenticated caller can neither
+   * start a re-auth nor learn which aliases exist or what they hold. */
+  reauthLink: (alias: string) => string;
 }
 
 // --- helpers ----------------------------------------------------------------
@@ -321,6 +327,11 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       } catch {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the approval is invalid or expired');
       }
+      // Only the client leg signs pendings, and it is always the owner sign-in;
+      // a pending signed before that rule (flow=alias_reauth) is refused here.
+      if (pending.flow !== 'owner_gate') {
+        return errorPage(res, 400, 'E_STATE_INVALID', 'the approval is invalid or expired');
+      }
       if (!replay.consume(pending.jti, STATE_TTL_DEFAULT * 1000, now())) {
         return errorPage(res, 400, 'E_STATE_INVALID', 'this approval was already used');
       }
@@ -362,17 +373,20 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     // In-call re-auth (BV-1): a user-clicked `flow=alias_reauth` link has NO
     // client leg — no code is delivered to any client, the refreshed token is
     // written server-side for the alias — so it skips the client_id/redirect/
-    // PKCE requirements. Safe because /callback binds the completing Google
-    // identity to the alias's configured email before writing anything.
-    if (q.get('flow') === 'alias_reauth' && aliasParam && !clientId) {
+    // PKCE requirements. The link must be one this server signed (reauthLink),
+    // and /callback still binds the completing identity to the alias's email.
+    if (q.get('flow') === 'alias_reauth' && !clientId) {
       if (config.legacyAliasReauth === false) {
         // Alias-only, tenant-ambiguous: disabled on multi-tenant deployments.
         return errorPage(res, 403, 'E_LEGACY_REAUTH_DISABLED', 'alias re-auth links are disabled on this deployment; ask the server for a fresh account link');
       }
-      if (!deps.aliasEmail?.(aliasParam)) {
-        return errorPage(res, 400, 'invalid_request', `unknown account "${aliasParam}"`);
+      const alias = verifyReauthLink(base, secret, { alias: aliasParam ?? '', exp: q.get('exp') ?? '', sig: q.get('sig') ?? '' }, nowSec());
+      // One answer for an unsigned, forged, expired or stale link, so a
+      // request the server did not issue learns nothing about its aliases.
+      if (!alias || !deps.aliasEmail?.(alias)) {
+        return errorPage(res, 400, 'E_STATE_INVALID', 'this re-auth link is invalid or expired; ask the server for a fresh one');
       }
-      return toGoogle(res, { flow: 'alias_reauth', client_id: '', redirect_uri: '', code_challenge: '', resource, alias: aliasParam });
+      return toGoogle(res, { flow: 'alias_reauth', client_id: '', redirect_uri: '', code_challenge: '', resource, alias });
     }
 
     if (!clientId) return json(res, 400, { error: 'invalid_request', message: 'client_id required', iss: base }, issHeader);
@@ -392,14 +406,16 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       return json(res, 400, { error: 'invalid_request', message: `resource must be ${resource}`, iss: base }, issHeader);
     }
     // (5) only after full validation do we build the request artifact.
+    // A client leg is always the owner sign-in. Re-auth has its own signed
+    // link: accepting flow=alias_reauth here let any client (a self-registered
+    // one, or a public CIMD client_id) start it and read the alias's scopes.
     const statePayload: StatePayload = {
-      flow: (q.get('flow') as StatePayload['flow']) === 'alias_reauth' ? 'alias_reauth' : 'owner_gate',
+      flow: 'owner_gate',
       client_id: clientId,
       redirect_uri: redirectUri,
       code_challenge: codeChallenge,
       client_state: clientState,
       resource,
-      alias: q.get('alias') ?? undefined,
     };
     // Confused-deputy defense (#3): a self-registered DCR client can pick an
     // arbitrary redirect_uri, so before we send the owner to Google (whose
@@ -622,6 +638,9 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   };
 
   const mintFlowState: AuthServer['mintFlowState'] = async ({ flow, alias, tenantId, bundles, nonce }) => {
+    // /authorize has a signed branch for alias_add only; anything else minted
+    // here would be a state no route verifies the way its flow needs.
+    if (flow !== 'alias_add') throw new Error(`mintFlowState supports alias_add only, not ${String(flow)}`);
     const state = await signState(
       { flow, client_id: '', redirect_uri: '', code_challenge: '', resource, alias, tenantId, bundles, nonce },
       base,
@@ -631,5 +650,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     return `${base}/authorize?flow=${flow}&state=${encodeURIComponent(state)}`;
   };
 
-  return { routes, authenticate, mintFlowState };
+  const reauthLink: AuthServer['reauthLink'] = (alias) => `${base}/authorize?flow=alias_reauth&${signReauthLink(base, secret, alias, nowSec())}`;
+
+  return { routes, authenticate, mintFlowState, reauthLink };
 }

@@ -7,8 +7,8 @@ import path from 'node:path';
 import { McpServer } from "@modelcontextprotocol/server";
 import { resolveHttpConfig } from '../src/http-config.js';
 import { HttpTransportHost } from '../src/http-transport.js';
-import { buildAuthServer, redirectAllowed, verifiedEmailFromIdToken, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServerDeps } from '../src/oauth-as.js';
-import { jwtSecretFrom, signAccessToken, verifyAccessToken } from '../src/mcp-token.js';
+import { buildAuthServer, redirectAllowed, verifiedEmailFromIdToken, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServer, type AuthServerDeps } from '../src/oauth-as.js';
+import { jwtSecretFrom, signAccessToken, signPending, signReauthLink, verifyAccessToken } from '../src/mcp-token.js';
 import { SsrfBlockedError } from '../src/ssrf-guard.js';
 import { z } from "zod";
 
@@ -33,6 +33,13 @@ afterEach(async () => {
   for (const k of Object.keys(written)) delete written[k];
 });
 
+let currentAs: AuthServer | undefined;
+/** Path + query of the owner's signed re-auth link from the last start(). */
+const reauthPath = (alias: string) => {
+  const u = new URL(currentAs!.reauthLink(alias));
+  return `${u.pathname}${u.search}`;
+};
+
 async function start(depOverrides: Partial<AuthServerDeps> = {}): Promise<number> {
   const cfg = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http', MCP_PUBLIC_URL: BASE }), port: 0 };
   const deps: AuthServerDeps = {
@@ -56,6 +63,7 @@ async function start(depOverrides: Partial<AuthServerDeps> = {}): Promise<number
     { base: BASE, resourceUri: `${BASE}/mcp`, secret, ownerEmails: ['owner@x.example'], cimdIssuers: ['claude.ai'], masterKey: 'mk', refreshStorePath: path.join(tmp, 'mcp-tokens.enc') },
     deps,
   );
+  currentAs = as;
   const server = new McpServer({ name: 'as-test', version: '0' });
   server.registerTool('ping', { description: 'p', inputSchema: z.object({}) }, async () => ({ content: [{ type: 'text' as const, text: 'pong' }] }));
   const host = new HttpTransportHost({ server, config: cfg, version: '0', ownerConfigured: true, authenticate: as.authenticate, routes: as.routes, log: deps.log });
@@ -210,7 +218,7 @@ describe('success-path observability (logs completions, not just failures)', () 
   it('logs the /callback alias_reauth completion by alias (no email)', async () => {
     const logs: string[] = [];
     const port = await start({ log: (l) => logs.push(l) });
-    const state = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery({ flow: 'alias_reauth', alias: 'work' })}`)).headers.location as string);
+    const state = stateFrom((await req(port, 'GET', reauthPath('work'))).headers.location as string);
     await req(port, 'GET', `/callback?code=work-code&state=${encodeURIComponent(state)}`);
     expect(logs).toContain('callback ok flow=alias_reauth alias=work');
     expect(logs.join('\n')).not.toMatch(/work@x\.example/);
@@ -325,7 +333,7 @@ describe('negative paths (one per §5.12 MUST)', () => {
 
   it('alias_reauth writes the alias tokens when the Google identity matches', async () => {
     const port = await start();
-    const authz = await req(port, 'GET', `/authorize?${authorizeQuery({ flow: 'alias_reauth', alias: 'work' })}`);
+    const authz = await req(port, 'GET', reauthPath('work'));
     const state = stateFrom(authz.headers.location as string);
     const cb = await req(port, 'GET', `/callback?code=work-code&state=${encodeURIComponent(state)}`);
     expect(cb.status).toBe(200);
@@ -338,7 +346,7 @@ describe('negative paths (one per §5.12 MUST)', () => {
       exchangeCode: async () => ({ tokens: { access_token: 'short-lived' }, email: 'work@x.example' }),
       log: (l) => logs.push(l),
     });
-    const authz = await req(port, 'GET', `/authorize?${authorizeQuery({ flow: 'alias_reauth', alias: 'work' })}`);
+    const authz = await req(port, 'GET', reauthPath('work'));
     const state = stateFrom(authz.headers.location as string);
     const cb = await req(port, 'GET', `/callback?code=work-code&state=${encodeURIComponent(state)}`);
     expect(cb.status).toBe(400);
@@ -349,7 +357,7 @@ describe('negative paths (one per §5.12 MUST)', () => {
 
   it('alias_reauth REFUSES a mismatched Google identity (no token injection, #2)', async () => {
     const port = await start();
-    const authz = await req(port, 'GET', `/authorize?${authorizeQuery({ flow: 'alias_reauth', alias: 'work' })}`);
+    const authz = await req(port, 'GET', reauthPath('work'));
     const state = stateFrom(authz.headers.location as string);
     // attacker logs in with their own account (stranger@x.example != work@x.example)
     const cb = await req(port, 'GET', `/callback?code=stranger-code&state=${encodeURIComponent(state)}`);
@@ -376,15 +384,75 @@ describe('negative paths (one per §5.12 MUST)', () => {
 
   it('clientless alias_reauth link (BV-1 in-call re-auth) redirects to Google with no client leg', async () => {
     const port = await start();
-    const r = await req(port, 'GET', `/authorize?flow=alias_reauth&alias=work`);
+    const r = await req(port, 'GET', reauthPath('work'));
     expect(r.status).toBe(302);
     expect(new URL(r.headers.location as string).searchParams.get('state')).toBeTruthy();
   });
 
-  it('clientless alias_reauth for an unknown alias -> 400', async () => {
+  // The link needs no authentication, so an unsigned request must learn
+  // nothing: the same 400 for an unsigned, forged, expired or unknown alias.
+  it('clientless alias_reauth refuses every link the server did not sign, alike', async () => {
     const port = await start();
-    const r = await req(port, 'GET', `/authorize?flow=alias_reauth&alias=nope`);
+    const known = new URL(currentAs!.reauthLink('work'));
+    const forged = new URL(known);
+    forged.searchParams.set('alias', 'other');
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expired = `/authorize?flow=alias_reauth&${signReauthLink(BASE, secret, 'work', nowSec - 7200)}`;
+    const answers = await Promise.all(
+      ['/authorize?flow=alias_reauth&alias=work', '/authorize?flow=alias_reauth&alias=nope', `${forged.pathname}${forged.search}`, expired, reauthPath('nope')].map((p) => req(port, 'GET', p)),
+    );
+    for (const r of answers) {
+      expect(r.status).toBe(400);
+      expect(r.text).toBe('E_STATE_INVALID: this re-auth link is invalid or expired; ask the server for a fresh one');
+      expect(r.headers.location).toBeUndefined();
+    }
+  });
+
+  // alpha.57 signed a DCR pending with flow=alias_reauth; one still inside its
+  // TTL at upgrade must not start the old unauthenticated re-auth.
+  it('POST /authorize refuses a pending that is not an owner sign-in', async () => {
+    const asked: string[] = [];
+    const port = await start({
+      buildGoogleAuthUrl: ({ flow, state }) => {
+        asked.push(flow);
+        return `https://google.test/auth?state=${encodeURIComponent(state)}`;
+      },
+    });
+    const old = await signPending(
+      { flow: 'alias_reauth', client_id: 'dcr', redirect_uri: 'https://x.example/cb', code_challenge: challenge, resource: `${BASE}/mcp`, alias: 'work' },
+      BASE,
+      secret,
+      Math.floor(Date.now() / 1000),
+    );
+    const r = await req(port, 'POST', '/authorize', form({ pending: old }));
     expect(r.status).toBe(400);
+    expect(r.text).toContain('E_STATE_INVALID');
+    expect(asked).toEqual([]);
+    await expect(currentAs!.mintFlowState({ flow: 'alias_reauth' as never, alias: 'work' })).rejects.toThrow('alias_add only');
+  });
+
+  it('a signed re-auth link survives a prefetch: it is not single-use', async () => {
+    const port = await start();
+    const link = reauthPath('work');
+    expect((await req(port, 'GET', link)).status).toBe(302);
+    expect((await req(port, 'GET', link)).status).toBe(302);
+  });
+
+  it('a client leg can no longer start a re-auth or learn an alias scope set', async () => {
+    const asked: Array<{ flow: string; alias?: string }> = [];
+    const port = await start({
+      buildGoogleAuthUrl: ({ flow, alias, state }) => {
+        asked.push({ flow, alias });
+        return `https://google.test/auth?state=${encodeURIComponent(state)}`;
+      },
+    });
+    const r = await req(port, 'GET', `/authorize?${authorizeQuery({ flow: 'alias_reauth', alias: 'work' })}`);
+    expect(r.status).toBe(302);
+    expect(asked).toEqual([{ flow: 'owner_gate', alias: undefined }]);
+    // completing it is an owner sign-in, never a token write for the alias
+    const cb = await req(port, 'GET', `/callback?code=work-code&state=${encodeURIComponent(stateFrom(r.headers.location as string))}`);
+    expect(cb.status).not.toBe(200);
+    expect(written.work).toBeUndefined();
   });
 
   it('a present-but-invalid Origin on an AS route -> 403 (front guard)', async () => {

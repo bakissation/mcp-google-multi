@@ -10,6 +10,9 @@ import {
   verifyState,
   signAuthzCode,
   verifyAuthzCode,
+  signReauthLink,
+  verifyReauthLink,
+  REAUTH_LINK_TTL_SEC,
   ReplayGuard,
   RefreshStore,
   type StatePayload,
@@ -148,5 +151,34 @@ describe('RefreshStore (C14 rotation)', () => {
     // ...while tenant-b's chain still rotates, sub intact
     const rB = s.rotate(tB, 5000);
     expect(rB!.sub).toBe('tenant-b');
+  });
+});
+
+describe('signed alias_reauth link', () => {
+  const secret = jwtSecretFrom('reauth-link-test-key');
+  const base = 'https://mcp.test';
+  const parse = (q: string) => {
+    const p = new URLSearchParams(q);
+    return { alias: p.get('alias') ?? '', exp: p.get('exp') ?? '', sig: p.get('sig') ?? '' };
+  };
+  const now = 1_800_000_000;
+
+  it('round-trips the alias until it expires', () => {
+    const link = parse(signReauthLink(base, secret, 'work', now));
+    expect(verifyReauthLink(base, secret, link, now)).toBe('work');
+    expect(verifyReauthLink(base, secret, link, now + REAUTH_LINK_TTL_SEC)).toBe('work');
+    expect(verifyReauthLink(base, secret, link, now + REAUTH_LINK_TTL_SEC + 1)).toBeNull();
+  });
+
+  it('refuses a changed alias, a stretched expiry, another server, another key or a mangled signature', () => {
+    const link = parse(signReauthLink(base, secret, 'work', now));
+    expect(verifyReauthLink(base, secret, { ...link, alias: 'other' }, now)).toBeNull();
+    expect(verifyReauthLink(base, secret, { ...link, exp: String(Number(link.exp) + 3600) }, now)).toBeNull();
+    expect(verifyReauthLink('https://other.test', secret, link, now)).toBeNull();
+    expect(verifyReauthLink(base, jwtSecretFrom('another-key'), link, now)).toBeNull();
+    expect(verifyReauthLink(base, secret, { ...link, sig: link.sig.slice(0, -2) }, now)).toBeNull();
+    expect(verifyReauthLink(base, secret, { ...link, sig: '' }, now)).toBeNull();
+    expect(verifyReauthLink(base, secret, { ...link, exp: `${link.exp}.5` }, now)).toBeNull();
+    expect(verifyReauthLink(base, secret, { ...link, alias: '' }, now)).toBeNull();
   });
 });

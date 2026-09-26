@@ -199,7 +199,7 @@ Once the server answers on `https://mcp.example.com/health`:
 1. In [claude.ai](https://claude.ai) → **Settings → Connectors → Add custom connector**, paste the **MCP endpoint**: `https://mcp.example.com/mcp`.
 2. Claude discovers the authorization server (protected-resource metadata → AS metadata → `/authorize`) and opens a sign-in window.
 3. Sign in with an account listed in `MCP_OWNER_EMAILS`. That gates access; it does **not** by itself grant any Gmail/Drive scope.
-4. Each Google alias is authorized separately the first time a tool touches it (per-alias re-auth), so a connector can drive several accounts without re-running the owner gate.
+4. Each Google alias is authorized separately the first time a tool touches it (per-alias re-auth), so a connector can drive several accounts without re-running the owner gate. The re-auth link in the tool's error is signed by the server and valid for an hour; an expired or hand-built link is refused, so ask the tool again for a fresh one.
 
 For **Claude Code** over HTTP: `claude mcp add --transport http gmulti https://mcp.example.com/mcp`.
 

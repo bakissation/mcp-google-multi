@@ -280,6 +280,7 @@ async function main() {
     const { writeToken } = await import('./token-store.js');
     const { resolveScopesForAccount } = await import('./auth.js');
     const { ownerAuthUrlOptions } = await import('./oauth-consent.js');
+    const { setWizardHttpConsent } = await import('./tools/account-wizard.js');
     const { configDir } = await import('./config-file.js');
     const { getAccountSet } = await import('./accounts.js');
     const googleClient = () =>
@@ -310,16 +311,13 @@ async function main() {
         log: (l) => process.stderr.write(`[as] ${l}\n`),
       },
     );
-    // BV-1: over HTTP, a dead/missing per-account token surfaces a clickable
-    // re-auth link into the AS's alias_reauth flow instead of a stdio CLI hint.
-    const { setHttpReauthBase } = await import('./reauth-hint.js');
-    setHttpReauthBase(httpCfg.publicUrl);
-    // Wizard consent over HTTP: hand out the clientless AS link instead of
+    // BV-1: over HTTP, a dead/missing per-account token surfaces a clickable,
+    // signed re-auth link into the AS's alias_reauth flow instead of a CLI hint.
+    const { setHttpReauthLink } = await import('./reauth-hint.js');
+    setHttpReauthLink((alias) => authServer.reauthLink(alias));
+    // Wizard consent over HTTP: hand out the same signed link instead of
     // binding a loopback listener.
-    const { setWizardHttpConsent } = await import('./tools/account-wizard.js');
-    setWizardHttpConsent({
-      mintConsentUrl: (alias) => `${httpCfg.publicUrl}/authorize?flow=alias_reauth&alias=${encodeURIComponent(alias)}`,
-    });
+    setWizardHttpConsent({ mintConsentUrl: (alias) => authServer.reauthLink(alias) });
 
     let httpTap: ((t: Transport) => Transport) | undefined;
     if (httpMetrics) {
