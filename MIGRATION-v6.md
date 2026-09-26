@@ -375,6 +375,18 @@ now receives the signed `bundles`. `verifiedEmailFromIdToken` is exported.
 and `/auth` (`BASE_SCOPES`, `resolveScopesForAccount`) are new declared
 entries.
 
+`/oauth-as`: `AuthServer.reauthLink(alias)` returns the owner's re-auth link,
+signed with the server key and valid for an hour (`signReauthLink` /
+`verifyReauthLink` in `/mcp-token`). `/authorize?flow=alias_reauth` now refuses
+any link the server did not sign, and a client leg no longer accepts
+`flow=alias_reauth` (it is always the owner sign-in), so an unauthenticated
+caller can neither start a re-auth nor learn which aliases exist or what
+scopes they hold. Re-auth links issued before this release stop working; the
+next tool error hands out a fresh one. `mintFlowState` is typed for
+`alias_add` only. `AuthServerDeps.missingScopes` and `hasToken` let the
+completion page name the scopes Google's consent left out; a narrower grant
+keeps a stored token instead of replacing it.
+
 `/accounts` exports `liveAccountCheck` and `isLiveAccountField`: an `account`
 field built on the live check (as `accountArgLive` builds it) validates
 against the registry's current aliases at parse time and counts as a

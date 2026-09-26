@@ -4,7 +4,7 @@
 // the opaque rotated refresh-token store. Keyed by the provisioned MCP_JWT_KEY
 // (B5), so tokens survive a restart as long as the key persists.
 
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { SignJWT, jwtVerify } from 'jose';
 import { deriveKey, encryptToken, decryptToken } from './token-store.js';
@@ -109,6 +109,39 @@ export function signState(payload: StatePayload, base: string, secret: Uint8Arra
 
 export async function verifyState(token: string, base: string, secret: Uint8Array): Promise<StatePayload & { jti: string }> {
   return (await verifyArtifact(token, 'mcp_state', base, secret)) as unknown as StatePayload & { jti: string };
+}
+
+// --- alias_reauth link -------------------------------------------------------
+
+/** A re-auth link is handed out in a tool error, so it has to survive until
+ * the user clicks it; an hour, not the 10-minute state TTL. */
+export const REAUTH_LINK_TTL_SEC = 3600;
+
+function reauthMac(base: string, secret: Uint8Array, alias: string, exp: number): Buffer {
+  // The newline-separated input can never be a JWT signing input (two
+  // base64url segments and one dot), so the shared key stays unambiguous.
+  return createHmac('sha256', secret).update(`alias_reauth\n${base}\n${alias}\n${exp}`).digest();
+}
+
+/** Query string of a server-issued alias_reauth link: the alias, an expiry and
+ * an HMAC over both. Synchronous, so the error hints that carry it stay so. */
+export function signReauthLink(base: string, secret: Uint8Array, alias: string, nowSec: number): string {
+  const exp = nowSec + REAUTH_LINK_TTL_SEC;
+  return `alias=${encodeURIComponent(alias)}&exp=${exp}&sig=${reauthMac(base, secret, alias, exp).toString('base64url')}`;
+}
+
+/** The alias a link was issued for, or null when it is missing, forged or expired. */
+export function verifyReauthLink(
+  base: string,
+  secret: Uint8Array,
+  params: { alias: string; exp: string; sig: string },
+  nowSec: number,
+): string | null {
+  const exp = Number(params.exp);
+  if (!params.alias || !/^\d+$/.test(params.exp) || exp < nowSec) return null;
+  const want = reauthMac(base, secret, params.alias, exp);
+  const got = Buffer.from(params.sig, 'base64url');
+  return got.length === want.length && timingSafeEqual(got, want) ? params.alias : null;
 }
 
 /** A pending-authorization artifact for the DCR consent interstitial (same

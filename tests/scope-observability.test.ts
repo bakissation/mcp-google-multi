@@ -6,7 +6,7 @@ import {
   scopeHintForMethod,
   buildScopesReport,
 } from '../src/scope-observability.js';
-import { setHttpReauthBase } from '../src/reauth-hint.js';
+import { setHttpReauthLink } from '../src/reauth-hint.js';
 import { ADMIN_SCOPES, BUNDLE_CATALOG } from '../src/scope-catalog.js';
 import { deriveAccountHealth } from '../src/tools/accounts-tool.js';
 
@@ -64,7 +64,7 @@ describe('classifyMethodScopes (Discovery scopes are ANY-OF alternatives)', () =
 });
 
 describe('remediation hints (gh-CLI style, honest retriable)', () => {
-  afterEach(() => setHttpReauthBase(null));
+  afterEach(() => setHttpReauthLink(null));
 
   it('requestable: re-auth same account, retriable (CLI default)', () => {
     const h = scopeHint(FORMS_BODY, { state: 'requestable_not_granted' }, 'work');
@@ -73,7 +73,7 @@ describe('remediation hints (gh-CLI style, honest retriable)', () => {
   });
 
   it('requestable over HTTP: the hint becomes a clickable AS re-auth link (S1.18)', () => {
-    setHttpReauthBase('https://mcp.example.com');
+    setHttpReauthLink((a) => `https://mcp.example.com/authorize?flow=alias_reauth&alias=${encodeURIComponent(a)}&exp=1&sig=s`);
     const h = scopeHint(FORMS_BODY, { state: 'requestable_not_granted' }, 'work');
     expect(h.hint).toContain('https://mcp.example.com/authorize?flow=alias_reauth&alias=work');
     expect(h.hint).not.toContain('npx mcp-google-multi');
