@@ -201,6 +201,7 @@ export function closestBundle(name: string): string | undefined {
   let best: string | undefined;
   let bestDist = 3;
   for (const key of Object.keys(BUNDLE_CATALOG)) {
+    if (Math.abs(name.length - key.length) >= bestDist) continue;
     const d = editDistance(name.toLowerCase(), key);
     if (d < bestDist) {
       bestDist = d;
@@ -210,17 +211,24 @@ export function closestBundle(name: string): string | undefined {
   return best;
 }
 
+/** Longest input any did-you-mean compares. Every name it suggests (tool,
+ * argument key, bundle, Discovery method id) is far shorter, and the inputs
+ * are caller-controlled: an unbounded comparison let one oversized name block
+ * the event loop for minutes. */
+export const SUGGEST_MAX_INPUT = 128;
+
+/** Levenshtein distance. Past SUGGEST_MAX_INPUT it returns the longer length
+ * without comparing: an upper bound on the true distance, and above every
+ * caller's accept threshold, so a capped pair is never suggested. */
 export function editDistance(a: string, b: string): number {
-  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
-  for (let j = 1; j <= b.length; j++) dp[0][j] = j;
+  if (a.length > SUGGEST_MAX_INPUT || b.length > SUGGEST_MAX_INPUT) return Math.max(a.length, b.length);
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
+    const row = [i];
     for (let j = 1; j <= b.length; j++) {
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
-      );
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
     }
+    prev = row;
   }
-  return dp[a.length][b.length];
+  return prev[b.length];
 }

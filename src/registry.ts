@@ -1,13 +1,13 @@
 import type { ListToolsResult, McpServer } from "@modelcontextprotocol/server";
 import { z } from 'zod';
 import { type Policy, isAllowed, writeDisabledResult, IRREVERSIBLE_TOOLS } from './write-control.js';
-import { getAccountSet, refreshAccountSetIfStale, type AccountSet } from './accounts.js';
+import { getAccountSet, isLiveAccountField, refreshAccountSetIfStale, type AccountSet } from './accounts.js';
 import { compactResult, trimEnabled } from './trim.js';
-import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFanout } from './fanout.js';
+import { fanoutAccountField, invalidAccountsResult, noAccountsResult, parseAccountSelector, runFanout } from './fanout.js';
 import { MAX_RESPONSE_CHARS } from './executor.js';
 import type { ArgKind, ArgShape } from './arg-normalize.js';
 import type { Metrics } from './usage-metrics.js';
-import { suggestKeys } from './arg-strict.js';
+import { MAX_SUGGESTED_KEYS, suggestKeys } from './arg-strict.js';
 import { classifyScope } from './scope-observability.js';
 
 /** Nothing granted, no profile: asks the BUNDLE CATALOG whether a scope is
@@ -98,6 +98,11 @@ const SERVICE_OVERRIDES: Record<string, string> = {
   reports_activities_list: 'admin',
 };
 
+/** The service a tool name belongs to: its prefix, unless overridden. */
+export function serviceOf(name: string): string {
+  return Object.hasOwn(SERVICE_OVERRIDES, name) ? SERVICE_OVERRIDES[name] : name.includes('_') ? name.slice(0, name.indexOf('_')) : name;
+}
+
 // read tools that write local files — same savePath fanned across accounts would clobber
 const FANOUT_EXCLUDE = new Set(['gmail_download_attachment', 'drive_download', 'drive_export']);
 
@@ -124,7 +129,10 @@ function scalarKindOf(field: unknown): ArgKind {
   return 'other';
 }
 
-function isAccountEnum(field: unknown): boolean {
+/** A field naming one of the registry's accounts: a baked enum or a live
+ * account check (curated tools and generated tools both validate live). */
+function isAccountSelector(field: unknown): boolean {
+  if (isLiveAccountField(field)) return true;
   type Def = { type?: string; innerType?: { _zod?: { def?: Def } } };
   const def = (field as { _zod?: { def?: Def } } | undefined)?._zod?.def;
   if (!def) return false;
@@ -177,8 +185,7 @@ export class ToolRegistry {
     this.policy = policy;
     this.mode = mode;
     this.registerTool = ((name: string, config: ToolConfig, handler: (...a: unknown[]) => unknown) => {
-      const service =
-        SERVICE_OVERRIDES[name] ?? (name.includes('_') ? name.slice(0, name.indexOf('_')) : name);
+      const service = serviceOf(name);
       const cud = config.cud ?? inferCud(name);
       // destructiveHint=false claims "additive only" (MCP spec) — updates overwrite, so they stay true.
       // idempotent: reads trivially, deletes (already-gone = same), updates
@@ -206,13 +213,14 @@ export class ToolRegistry {
       let inputShape = config.inputSchema ?? {};
       let baseHandler = handler;
       const hasAccountField = 'account' in inputShape && !DEFAULT_ACCOUNT_EXCLUDE.has(name);
-      if (cud === 'read' && !this.registeringMeta && !FANOUT_EXCLUDE.has(name) && isAccountEnum(inputShape.account)) {
+      if (cud === 'read' && !this.registeringMeta && !FANOUT_EXCLUDE.has(name) && isAccountSelector(inputShape.account)) {
         const description = (inputShape.account as z.ZodType).description ?? 'Google account alias';
-        inputShape = { ...inputShape, account: fanoutAccountField(description, this.accounts().aliases) };
+        inputShape = { ...inputShape, account: fanoutAccountField(description, () => this.accounts().aliases) };
         baseHandler = async (...args: unknown[]) => {
           const first = args[0] as { account?: string } | undefined;
           const parsed = parseAccountSelector(typeof first?.account === 'string' ? first.account : '', this.accounts().aliases);
           if (!parsed.ok) return invalidAccountsResult(parsed.invalid, this.accounts().aliases);
+          if (parsed.aliases.length === 0) return noAccountsResult();
           if (!parsed.fanout) return handler({ ...first, account: parsed.aliases[0] }, ...args.slice(1));
           return runFanout(handler, args, parsed.aliases);
         };
@@ -374,7 +382,7 @@ export class ToolRegistry {
     // case (parentId against parentFolderId) fails containment and edit
     // distance alike, which is the whole reason that matcher exists.
     const keys = candidates.map(([key]) => key);
-    const hits = new Set(unknownKeys.flatMap((k) => suggestKeys(k, keys)));
+    const hits = new Set(unknownKeys.slice(0, MAX_SUGGESTED_KEYS).flatMap((k) => suggestKeys(k, keys)));
     return candidates
       .filter(([key]) => hits.has(key))
       .slice(0, 2)
@@ -549,10 +557,11 @@ export class ToolRegistry {
     const aliases = this.accounts().aliases;
     if (aliases.length === 0) return schema;
     if (Array.isArray(account.anyOf)) {
-      // fan-out union: refresh the enum branch ('*' + aliases), keep the CSV branch
-      const hasEnumBranch = account.anyOf.some((b) => Array.isArray((b as { enum?: unknown[] }).enum));
-      if (!hasEnumBranch) return schema;
-      const anyOf = account.anyOf.map((b) => (Array.isArray((b as { enum?: unknown[] }).enum) ? { ...(b as object), enum: ['*', ...aliases] } : b));
+      // fan-out union: advertise '*' + the live aliases on the selector branch
+      // (the one without the CSV pattern), keep the CSV branch as is
+      const isSelector = (b: unknown) => (b as { pattern?: unknown }).pattern === undefined;
+      if (!account.anyOf.some(isSelector)) return schema;
+      const anyOf = account.anyOf.map((b) => (isSelector(b) ? { ...(b as object), enum: ['*', ...aliases] } : b));
       return { ...s, properties: { ...s.properties, account: { ...account, anyOf } } };
     }
     return { ...s, properties: { ...s.properties, account: { ...account, enum: [...aliases] } } };

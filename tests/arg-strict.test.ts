@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
+  echoNames,
   isExemptKey,
+  MAX_SUGGESTED_KEYS,
   screenArguments,
   suggestKeys,
   unknownArgEnvelope,
   unknownArgMode,
 } from '../src/arg-strict.js';
+import { editDistance, SUGGEST_MAX_INPUT } from '../src/scope-catalog.js';
 
 // Declared key lists copied from the real tool schemas (src/tools/drive.ts).
 const DRIVE_CREATE_FOLDER = ['account', 'name', 'parentFolderId'];
@@ -114,6 +117,73 @@ describe('screenArguments', () => {
   it('ignores exempt keys', () => {
     const r = screenArguments('drive_list', { account: 'w', _meta: {}, 'anthropic/x': 1 }, DRIVE_LIST);
     expect(r.unknown).toEqual([]);
+  });
+});
+
+// Caller-controlled names reach an O(n*m) edit distance. Unbounded, one
+// megabyte-long key blocked the event loop for seconds (and a tool name for
+// minutes); these budgets are orders of magnitude above the bounded cost.
+describe('suggestion work is bounded on caller input', () => {
+  it('computes edit distance exactly inside the bound and caps it outside', () => {
+    expect(editDistance('kitten', 'sitting')).toBe(3);
+    expect(editDistance('', 'abc')).toBe(3);
+    expect(editDistance('parentid', 'parentfolderid')).toBe(6);
+    const long = 'a'.repeat(SUGGEST_MAX_INPUT + 1);
+    expect(editDistance(long, 'a')).toBe(long.length);
+    expect(editDistance('a', long)).toBe(long.length);
+  });
+
+  it('gives up on a name no declared key could be a typo of', () => {
+    const t0 = performance.now();
+    expect(suggestKeys('9'.repeat(1_000_000), DRIVE_UPLOAD)).toEqual([]);
+    expect(performance.now() - t0).toBeLessThan(250);
+  });
+
+  it('ranks only the first few unknown keys of a call and still rejects all of them', () => {
+    const args: Record<string, unknown> = { account: 'w' };
+    for (let i = 0; i < 20_000; i++) args[`${'9'.repeat(30)}${i}`] = 1;
+    args.parentId = 'F';
+    const t0 = performance.now();
+    const r = screenArguments('drive_create_folder', args, DRIVE_CREATE_FOLDER);
+    expect(performance.now() - t0).toBeLessThan(1000);
+    expect(r.unknown).toHaveLength(20_001);
+    // Beyond the budget a key is still unknown, just without a suggestion.
+    expect(r.unknown.at(-1)).toEqual({ sent: 'parentId', suggestions: [] });
+  });
+
+  it('recognises a redundant twin past the ranking budget, so a working call still forwards', () => {
+    // Each camelCase key sent alongside its snake_case twin: the declared one
+    // wins, as it always has. The 9th twin must not become an unknown key.
+    const declared = Array.from({ length: 10 }, (_, i) => `indentLevel${String.fromCharCode(65 + i)}`);
+    const args: Record<string, unknown> = {};
+    for (const k of declared) {
+      args[k] = 1;
+      args[k.replace(/([A-Z])/g, '_$1').toLowerCase()] = 1;
+    }
+    const r = screenArguments('docs_update_paragraph_style', args, declared);
+    expect(r.unknown).toEqual([]);
+    expect(r.redundant).toHaveLength(10);
+  });
+
+  it('a max-length unknown name against every tool name costs almost nothing', () => {
+    const names = Array.from({ length: 400 }, (_, i) => `service${i % 20}_resource_method_${i}`);
+    const t0 = performance.now();
+    for (let i = 0; i < 200; i++) suggestKeys(`${'q'.repeat(SUGGEST_MAX_INPUT - 4)}${i}`.slice(0, SUGGEST_MAX_INPUT), names, 3);
+    // 200 full DPs against 400 names took seconds; the length-gap skip avoids them
+    expect(performance.now() - t0).toBeLessThan(500);
+  });
+
+  it('keeps suggesting for a call inside the budget', () => {
+    const r = screenArguments('drive_create_folder', { account: 'w', parentId: 'F', nme: 'R' }, DRIVE_CREATE_FOLDER);
+    expect(r.unknown.map((u) => u.suggestions)).toEqual([['parentFolderId'], ['name']]);
+  });
+
+  it('echoes a bounded prefix of what was sent', () => {
+    const names = Array.from({ length: MAX_SUGGESTED_KEYS + 5 }, (_, i) => `k${i}`);
+    expect(echoNames(names)).toBe(`${names.slice(0, MAX_SUGGESTED_KEYS).join(', ')} and 5 more`);
+    expect(echoNames(['x'.repeat(10_000)], true)).toBe(`"${'x'.repeat(64)}..."`);
+    const e = unknownArgEnvelope('drive_list', [{ sent: 'q'.repeat(1_000_000), suggestions: [] }], DRIVE_LIST, 'w');
+    expect(e.message.length).toBeLessThan(200);
   });
 });
 

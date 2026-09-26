@@ -375,6 +375,17 @@ now receives the signed `bundles`. `verifiedEmailFromIdToken` is exported.
 and `/auth` (`BASE_SCOPES`, `resolveScopesForAccount`) are new declared
 entries.
 
+`/accounts` exports `liveAccountCheck` and `isLiveAccountField`: an `account`
+field built on the live check (as `accountArgLive` builds it) validates
+against the registry's current aliases at parse time and counts as a
+fan-out selector on read tools, as a baked alias enum always did.
+`/registry` exports `serviceOf(name)`. `/scope-catalog` exports
+`SUGGEST_MAX_INPUT` (128): `editDistance` returns the longer length, without
+comparing, when either input is longer. `/http-transport`: `/mcp` answers
+400 `batch_too_large` to a JSON-RPC batch of more than 16 messages (MCP
+2025-06-18 has no batching; one body could otherwise multiply per-call
+work).
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)

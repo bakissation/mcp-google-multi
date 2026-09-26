@@ -129,6 +129,20 @@ const initBody = {
 };
 
 describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
+  // Every frame of a batch is screened synchronously in one tick, so an
+  // uncapped batch multiplied any per-call cost by the frames in one body.
+  it('refuses a JSON-RPC batch above the frame cap before dispatching any of it', async () => {
+    const port = await startHost();
+    const frame = (id: number) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'ping', arguments: {} } });
+    const big = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: Array.from({ length: 17 }, (_, i) => frame(i)) });
+    expect(big.status).toBe(400);
+    expect(JSON.parse(big.text).error).toBe('batch_too_large');
+    const small = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: [initBody] });
+    expect(small.status).not.toBe(400);
+    const atCap = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: Array.from({ length: 16 }, (_, i) => frame(i)) });
+    expect(atCap.status).not.toBe(400);
+  });
+
   it('POST /mcp initialize returns a JSON-RPC result', async () => {
     const port = await startHost();
     const res = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: initBody });

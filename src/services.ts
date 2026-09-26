@@ -15,9 +15,11 @@ import { registerChatTools } from './tools/chat.js';
 import { registerAdminTools } from './tools/admin.js';
 import { registerAnalyticsTools } from './tools/analytics.js';
 import { getOptionalBundles, getAdminAccounts } from './auth.js';
-import type { ToolRegistry } from './registry.js';
+import { serviceOf, type ToolRegistry } from './registry.js';
+import { getToolsets, toolsetEnabled } from './toolsets.js';
 import { GENERATED_SERVICES } from './tools/generated/index.js';
 import { suggestKeys } from './arg-strict.js';
+import { sliceClean } from './trim.js';
 
 export interface ServiceEntry {
   name: string;
@@ -75,20 +77,49 @@ export const GENERATED_GATES: Record<string, { enabled: (set?: AccountSet) => bo
  * never heard of. Those need different next steps, and the server knows which
  * is which: it composed the enabled-service list at boot.
  */
-export function unknownToolMessage(registry: ToolRegistry, name: string): string {
-  const near = suggestKeys(name, registry.toolNames(), 3);
-  if (near.length > 0) return `Tool ${name} not found. Did you mean: ${near.join(', ')}?`;
+const MAX_TOOL_NAME_ECHO = 64;
 
-  // A service that EXISTS in the build but registered nothing is gated, not
-  // misspelled, and the fix is a scope bundle rather than a different name.
-  const service = name.split('_')[0];
+export function unknownToolMessage(registry: ToolRegistry, rawName: string): string {
+  // The name is the caller's, unvalidated: echo a bounded prefix only.
+  const name = rawName.length > MAX_TOOL_NAME_ECHO ? `${sliceClean(rawName, MAX_TOOL_NAME_ECHO)}...` : rawName;
+
+  // A service that EXISTS in the build but registered nothing is off, not
+  // misspelled. Checked before the did-you-mean, which would otherwise point
+  // chat_spaces_get at meet_spaces_get.
+  const service = serviceOf(name);
   const known = SERVICES.some((s) => s.name === service) || GENERATED_SERVICES.some((s) => s.name === service);
   if (known && !registry.services().includes(service)) {
+    if (!toolsetEnabled(getToolsets(), service)) {
+      return `Tool ${name} not found: the "${service}" service is turned off in this deployment (GOOGLE_TOOLSETS).`;
+    }
+    if (servicesAwaitingRestart(registry).includes(service)) {
+      return `Tool ${name} not found: the "${service}" service was enabled after this server started, and tools register at startup. Restart the server to use them. Until then, google_api_call can reach the same API.`;
+    }
     const hint =
       service === 'admin'
         ? 'set admin on an account/profile (or GOOGLE_ADMIN_ACCOUNTS), then re-auth'
         : (GENERATED_GATES[service]?.hint ?? `add "${service}" to an account's scope profile (or legacy GOOGLE_OPTIONAL_SCOPES), then re-auth`);
     return `Tool ${name} not found: the "${service}" service is not enabled in this deployment. To enable it, ${hint}. Until then, google_api_call can reach the same API.`;
   }
+
+  const near = suggestKeys(rawName, registry.toolNames(), 3);
+  if (near.length > 0) return `Tool ${name} not found. Did you mean: ${near.join(', ')}?`;
   return `Tool ${name} not found. Call {service}_discover to list a service's tools, or google_api_search to find a method on any Google API.`;
+}
+
+/**
+ * Gated services the registry's CURRENT accounts enable but that registered
+ * nothing: an account added mid-session unlocked them after buildRegistry
+ * decided the gates. Mirrors compose.ts gate for gate, so an ungated or
+ * toolset-excluded service is never reported.
+ */
+export function servicesAwaitingRestart(registry: ToolRegistry): string[] {
+  const toolsets = getToolsets();
+  const registered = new Set(registry.services());
+  const live = registry.accountSet();
+  const names = [...new Set([...SERVICES.map((s) => s.name), ...GENERATED_SERVICES.map((g) => g.name)])];
+  return names.filter((n) => {
+    const gate = SERVICES.find((s) => s.name === n)?.enabled ?? GENERATED_GATES[n]?.enabled;
+    return gate !== undefined && toolsetEnabled(toolsets, n) && !registered.has(n) && gate(live);
+  });
 }

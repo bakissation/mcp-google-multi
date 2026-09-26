@@ -14,7 +14,7 @@ export function registerSearchconsoleGeneratedTools(registry: ToolRegistry, deps
     hasBody: true,
     bodyParams: [{"field":"requestScreenshot","api":"requestScreenshot"},{"field":"url","api":"url"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       requestScreenshot: coerceBoolean.describe("Whether or not screenshot is requested. Default is false.").optional(),
       url: z.string().describe("URL for inspection.").optional(),
       fields: z.string().optional().describe('Response field mask.'),

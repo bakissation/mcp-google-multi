@@ -3,8 +3,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ToolRegistry } from '../src/registry.js';
-import { registerEscapeTools } from '../src/tools/google-api.js';
-import { clearDiscoveryMemoryCache } from '../src/discovery-client.js';
+import { nearestMethodIds, registerEscapeTools } from '../src/tools/google-api.js';
+import { clearDiscoveryMemoryCache, searchMethods } from '../src/discovery-client.js';
 import type { Policy } from '../src/write-control.js';
 
 const FIXTURE = {
@@ -354,6 +354,49 @@ describe('google_api_call', () => {
     expect(payload.error).toBe('unknown_method');
     expect(payload.hint).toContain('Did you mean');
     expect(payload.hint).toContain('gmail.users.messages.list');
+  });
+
+  it('bounds methodId: the schema caps it and the suggestion sweep skips oversized ids', async () => {
+    const index = Array.from({ length: 40 }, (_, i) => ({ id: `drive.files.method${i}` })) as never;
+    const t0 = performance.now();
+    expect(nearestMethodIds('9'.repeat(1_000_000), index)).toEqual([]);
+    expect(performance.now() - t0).toBeLessThan(250);
+    expect(nearestMethodIds('drive.files.method3x', index)).toContain('drive.files.method3');
+    // a name at the cap skips the DP for every id whose length alone rules it out
+    const wide = Array.from({ length: 1000 }, (_, i) => ({ id: `drive.files.m${i}` })) as never;
+    const t1 = performance.now();
+    for (let i = 0; i < 200; i++) nearestMethodIds(`${i}`.padStart(128, '9'), wide);
+    expect(performance.now() - t1).toBeLessThan(500);
+
+    let schema: Record<string, { safeParse: (v: unknown) => { success: boolean } }> = {};
+    const server = {
+      registerTool: (name: string, config: { inputSchema: typeof schema }) => {
+        if (name === 'google_api_call') schema = config.inputSchema;
+        return 'ok';
+      },
+      sendToolListChanged: vi.fn(),
+      server: { setRequestHandler: () => {} },
+    };
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'escape-test-'));
+    cleanupDirs.push(dir);
+    registerEscapeTools(new ToolRegistry(server as never, FULL), FULL, { cacheDir: dir, toolsets: 'all' });
+    expect(schema.methodId.safeParse('drive.files.list').success).toBe(true);
+    expect(schema.methodId.safeParse('d'.repeat(257)).success).toBe(false);
+    expect(schema.api.safeParse('d'.repeat(65)).success).toBe(false);
+  });
+
+  it('bounds google_api_search: a caller-sized query scans only a capped keyword set', () => {
+    const index = Array.from({ length: 3000 }, (_, i) => ({ id: `api.res.method${i}`, description: 'a '.repeat(200) + `word${i}` })) as never;
+    // distinct words: repeating one word collapses to one token and tests nothing
+    const t0 = performance.now();
+    searchMethods(index, Array.from({ length: 200_000 }, (_, i) => `w${i}`).join(' '));
+    expect(performance.now() - t0).toBeLessThan(500);
+    // only the first 16 distinct words score
+    const words = Array.from({ length: 16 }, (_, i) => `zz${i}`).join(' ');
+    expect(searchMethods(index, `${words} method42`, 1)).toEqual([]);
+    expect(searchMethods(index, `zz0 method42`, 1).map((m: { id: string }) => m.id)).toEqual(['api.res.method42']);
+    // a normal query still ranks by id and description
+    expect(searchMethods(index, 'method42 word42', 1).map((m: { id: string }) => m.id)).toEqual(['api.res.method42']);
   });
 
   it('reports missing path params with the required list', async () => {

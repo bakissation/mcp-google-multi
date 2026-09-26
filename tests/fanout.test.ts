@@ -59,6 +59,15 @@ describe('invalidAccountsResult', () => {
     expect(payload.message).toContain('bogus');
     expect(payload.hint).toContain('alpha, beta, gamma');
   });
+
+  it('echoes a bounded prefix of an oversized CSV', () => {
+    const csv = Array.from({ length: 50_000 }, (_, i) => `nope${i}`).join(',') + `,${'x'.repeat(100_000)}`;
+    const sel = parseAccountSelector(csv, ACCOUNTS);
+    expect(sel.ok).toBe(false);
+    const payload = JSON.parse(invalidAccountsResult((sel as { invalid: string[] }).invalid, ACCOUNTS).content[0].text);
+    expect(payload.message).toBe('Unknown account alias(es): nope0, nope1, nope2, nope3, nope4, nope5, nope6, nope7 and 49993 more.');
+    expect(payload.account).toBe('nope0,nope1,nope2,nope3,nope4,nope5,nope6,nope7');
+  });
 });
 
 describe('runFanout', () => {

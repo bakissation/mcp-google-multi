@@ -318,8 +318,14 @@ export function expandPath(template: string, pathParams: Record<string, string>)
   });
 }
 
+/** Search keywords are a few words; the caps keep a caller-sized query from
+ * driving index-size x token-count substring scans on the event loop. */
+export const MAX_SEARCH_QUERY = 500;
+const MAX_SEARCH_TOKENS = 16;
+
 export function searchMethods(index: DiscoveryMethod[], query: string, limit = 10): DiscoveryMethod[] {
-  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const words = query.slice(0, MAX_SEARCH_QUERY).toLowerCase().split(/\s+/).filter(Boolean);
+  const tokens = [...new Set(words)].slice(0, MAX_SEARCH_TOKENS);
   if (tokens.length === 0) return index.slice(0, limit);
   const scored = index
     .map((m) => {

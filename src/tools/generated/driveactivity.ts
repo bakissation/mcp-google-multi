@@ -17,7 +17,7 @@ export function registerDriveactivityGeneratedTools(registry: ToolRegistry, deps
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("QueryDriveActivityRequest JSON request body. Top-level fields: ancestorName, consolidationStrategy, filter, itemName, pageSize, pageToken."),
       fields: z.string().optional().describe('Response field mask.'),
     },

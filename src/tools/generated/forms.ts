@@ -17,7 +17,7 @@ export function registerFormsGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"formId","api":"formId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       formId: z.string().min(1).describe("Required. ID of the Form to watch."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CreateWatchRequest JSON request body. Top-level fields: watch, watchId."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -31,7 +31,7 @@ export function registerFormsGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"formId","api":"formId","location":"path"},{"field":"watchId","api":"watchId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       formId: z.string().min(1).describe("Required. The ID of the Form."),
       watchId: z.string().min(1).describe("Required. The ID of the Watch to delete."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -46,7 +46,7 @@ export function registerFormsGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       formId: z.string().min(1).describe("Required. The ID of the Form."),
       watchId: z.string().min(1).describe("Required. The ID of the Watch to renew."),
       fields: z.string().optional().describe('Response field mask.'),

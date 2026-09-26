@@ -28,7 +28,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The ID of the draft to delete."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -42,7 +42,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The ID of the draft to update."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Draft JSON request body. Top-level fields: id, message."),
@@ -57,7 +57,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The ID of the label to retrieve."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -71,7 +71,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The ID of the label to update."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Label JSON request body. Top-level fields: color, id, labelListVisibility, messageListVisibility, messagesTotal, messagesUnread, name, threadsTotal, threadsUnread, type."),
@@ -86,7 +86,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The ID of the label to update."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Label JSON request body. Top-level fields: color, id, labelListVisibility, messageListVisibility, messagesTotal, messagesUnread, name, threadsTotal, threadsUnread, type."),
@@ -101,7 +101,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"deleted","api":"deleted","location":"query"},{"field":"internalDateSource","api":"internalDateSource","location":"query"},{"field":"neverMarkSpam","api":"neverMarkSpam","location":"query"},{"field":"processForCalendar","api":"processForCalendar","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       deleted: coerceBoolean.describe("Mark the email as permanently deleted (not TRASH) and only visible in Google Vault to a Vault administrator. Only used for Google Workspace accounts.").optional(),
       internalDateSource: z.enum(["receivedTime","dateHeader"]).describe("Source for Gmail's internal date of the message.").optional(),
@@ -119,7 +119,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"deleted","api":"deleted","location":"query"},{"field":"internalDateSource","api":"internalDateSource","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       deleted: coerceBoolean.describe("Mark the email as permanently deleted (not TRASH) and only visible in Google Vault to a Vault administrator. Only used for Google Workspace accounts.").optional(),
       internalDateSource: z.enum(["receivedTime","dateHeader"]).describe("Source for Gmail's internal date of the message.").optional(),
@@ -135,7 +135,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The ID of the message to remove from Trash."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -149,7 +149,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CseIdentity JSON request body. Top-level fields: emailAddress, primaryKeyPairId, signAndEncryptKeyPairs."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -163,7 +163,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"cseEmailAddress","api":"cseEmailAddress","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       cseEmailAddress: z.string().min(1).describe("The primary email address associated with the client-side encryption identity configuration that's removed."),
       userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -177,7 +177,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"cseEmailAddress","api":"cseEmailAddress","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       cseEmailAddress: z.string().min(1).describe("The primary email address associated with the client-side encryption identity configuration that's retrieved."),
       userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -191,7 +191,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       pageSize: z.number().describe("The number of identities to return. If not provided, the page size will default to 20 entries.").optional(),
       pageToken: z.string().describe("Pagination token indicating which page of identities to return. If the token is not supplied, then the API will return the first page of results.").optional(),
@@ -206,7 +206,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"emailAddress","api":"emailAddress","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       emailAddress: z.string().min(1).describe("The email address of the client-side encryption identity to update."),
       userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CseIdentity JSON request body. Top-level fields: emailAddress, primaryKeyPairId, signAndEncryptKeyPairs."),
@@ -221,7 +221,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"chainValidation","api":"chainValidation","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       chainValidation: z.enum(["all","none"]).describe("The type of certificate chain validation to perform at creation. The request will be rejected if the uploaded chain fails to satisfy the requested validation checks. When unspecified, this parameter d").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CseKeyPair JSON request body. Top-level fields: disableTime, enablementState, keyPairId, pem, pkcs7, privateKeyMetadata, subjectEmailAddresses."),
@@ -237,7 +237,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       keyPairId: z.string().min(1).describe("The identifier of the key pair to turn off."),
       userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -252,7 +252,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       keyPairId: z.string().min(1).describe("The identifier of the key pair to turn on."),
       userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -266,7 +266,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"keyPairId","api":"keyPairId","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       keyPairId: z.string().min(1).describe("The identifier of the key pair to retrieve."),
       userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -280,7 +280,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       pageSize: z.number().describe("The number of key pairs to return. If not provided, the page size will default to 20 entries.").optional(),
       pageToken: z.string().describe("Pagination token indicating which page of key pairs to return. If the token is not supplied, then the API will return the first page of results.").optional(),
@@ -296,7 +296,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       keyPairId: z.string().min(1).describe("The identifier of the key pair to obliterate."),
       userId: z.string().min(1).describe("The requester's primary email address. To indicate the authenticated user, you can use the special value `me`."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -311,7 +311,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"delegateEmail","api":"delegateEmail"},{"field":"verificationStatus","api":"verificationStatus"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       delegateEmail: z.string().describe("The email address of the delegate.").optional(),
       verificationStatus: z.enum(["verificationStatusUnspecified","accepted","pending","rejected","expired"]).describe("Indicates whether this address has been verified and can act as a delegate for the account. Read-only.").optional(),
@@ -326,7 +326,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"delegateEmail","api":"delegateEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       delegateEmail: z.string().min(1).describe("The email address of the user to be removed as a delegate."),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -340,7 +340,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"delegateEmail","api":"delegateEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       delegateEmail: z.string().min(1).describe("The email address of the user whose delegate relationship is to be retrieved."),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -354,7 +354,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -367,7 +367,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Filter JSON request body. Top-level fields: action, criteria, id."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -381,7 +381,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The ID of the filter to be deleted."),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -395,7 +395,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The ID of the filter to be fetched."),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -409,7 +409,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -423,7 +423,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"forwardingEmail","api":"forwardingEmail"},{"field":"verificationStatus","api":"verificationStatus"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       forwardingEmail: z.string().describe("An email address to which messages can be forwarded.").optional(),
       verificationStatus: z.enum(["verificationStatusUnspecified","accepted","pending"]).describe("Indicates whether this address has been verified and is usable for forwarding. Read-only.").optional(),
@@ -438,7 +438,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"forwardingEmail","api":"forwardingEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       forwardingEmail: z.string().min(1).describe("The forwarding address to be deleted."),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -452,7 +452,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"forwardingEmail","api":"forwardingEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       forwardingEmail: z.string().min(1).describe("The forwarding address to be retrieved."),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -466,7 +466,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -479,7 +479,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -492,7 +492,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -505,7 +505,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -518,7 +518,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -531,7 +531,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SendAs JSON request body. Top-level fields: displayName, isDefault, isPrimary, replyToAddress, sendAsEmail, signature, smtpMsa, treatAsAlias, verificationStatus."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -545,7 +545,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       sendAsEmail: z.string().min(1).describe("The send-as alias to be deleted."),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -559,7 +559,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       sendAsEmail: z.string().min(1).describe("The send-as alias to be retrieved."),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -573,7 +573,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -586,7 +586,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       sendAsEmail: z.string().min(1).describe("The send-as alias to be updated."),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SendAs JSON request body. Top-level fields: displayName, isDefault, isPrimary, replyToAddress, sendAsEmail, signature, smtpMsa, treatAsAlias, verificationStatus."),
@@ -601,7 +601,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The immutable ID for the SmimeInfo."),
       sendAsEmail: z.string().min(1).describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
@@ -616,7 +616,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The immutable ID for the SmimeInfo."),
       sendAsEmail: z.string().min(1).describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
@@ -632,7 +632,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"encryptedKeyPassword","api":"encryptedKeyPassword"},{"field":"expiration","api":"expiration"},{"field":"id","api":"id"},{"field":"isDefault","api":"isDefault"},{"field":"issuerCn","api":"issuerCn"},{"field":"pem","api":"pem"},{"field":"pkcs12","api":"pkcs12"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       sendAsEmail: z.string().min(1).describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       encryptedKeyPassword: z.string().describe("Encrypted key password, when key is encrypted.").optional(),
@@ -653,7 +653,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       sendAsEmail: z.string().min(1).describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -667,7 +667,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The immutable ID for the SmimeInfo."),
       sendAsEmail: z.string().min(1).describe("The email address that appears in the \"From:\" header for mail sent using this alias."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
@@ -682,7 +682,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       sendAsEmail: z.string().min(1).describe("The send-as alias to be updated."),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SendAs JSON request body. Top-level fields: displayName, isDefault, isPrimary, replyToAddress, sendAsEmail, signature, smtpMsa, treatAsAlias, verificationStatus."),
@@ -697,7 +697,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"sendAsEmail","api":"sendAsEmail","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       sendAsEmail: z.string().min(1).describe("The send-as alias to be verified."),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -712,7 +712,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"disposition","api":"disposition"},{"field":"emailAddress","api":"emailAddress"},{"field":"enabled","api":"enabled"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       disposition: z.enum(["dispositionUnspecified","leaveInInbox","archive","trash","markRead"]).describe("The state that a message should be left in after it has been forwarded.").optional(),
       emailAddress: z.string().describe("Email address to which all incoming messages are forwarded. This email address must be a verified member of the forwarding addresses.").optional(),
@@ -729,7 +729,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"autoExpunge","api":"autoExpunge"},{"field":"enabled","api":"enabled"},{"field":"expungeBehavior","api":"expungeBehavior"},{"field":"maxFolderSize","api":"maxFolderSize"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       autoExpunge: coerceBoolean.describe("If this value is true, Gmail will immediately expunge a message when it is marked as deleted in IMAP. Otherwise, Gmail will wait for an update from the client before expunging messages marked as delet").optional(),
       enabled: coerceBoolean.describe("Whether IMAP is enabled for the account.").optional(),
@@ -747,7 +747,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"displayLanguage","api":"displayLanguage"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       displayLanguage: z.string().describe("The language to display Gmail in, formatted as an RFC 3066 Language Tag (for example `en-GB`, `fr` or `ja` for British English, French, or Japanese respectively). The set of languages supported by Gma").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -762,7 +762,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"accessWindow","api":"accessWindow"},{"field":"disposition","api":"disposition"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("User's email address. The special value \"me\" can be used to indicate the authenticated user."),
       accessWindow: z.enum(["accessWindowUnspecified","disabled","fromNowOn","allMail"]).describe("The range of messages which are accessible via POP.").optional(),
       disposition: z.enum(["dispositionUnspecified","leaveInInbox","archive","trash","markRead"]).describe("The action that will be executed on a message after it has been fetched via POP.").optional(),
@@ -777,7 +777,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -790,7 +790,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("ID of the Thread to delete."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -804,7 +804,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"userId","api":"userId","location":"path"},{"field":"includeSpamTrash","api":"includeSpamTrash","location":"query"},{"field":"labelIds","api":"labelIds","location":"query"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"q","api":"q","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       includeSpamTrash: coerceBoolean.describe("Include threads from `SPAM` and `TRASH` in the results.").optional(),
       labelIds: coerceArray(z.string()).describe("Only return threads with labels that match all of the specified label IDs.").optional(),
@@ -823,7 +823,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"addLabelIds","api":"addLabelIds"},{"field":"removeLabelIds","api":"removeLabelIds"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The ID of the thread to modify."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       addLabelIds: coerceArray(z.string()).describe("A list of IDs of labels to add to this thread. You can add up to 100 labels with each update.").optional(),
@@ -839,7 +839,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The ID of the thread to Trash."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -853,7 +853,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"id","api":"id","location":"path"},{"field":"userId","api":"userId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       id: z.string().min(1).describe("The ID of the thread to remove from Trash."),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -868,7 +868,7 @@ export function registerGmailGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"labelFilterAction","api":"labelFilterAction"},{"field":"labelFilterBehavior","api":"labelFilterBehavior"},{"field":"labelIds","api":"labelIds"},{"field":"topicName","api":"topicName"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       userId: z.string().min(1).describe("The user's email address. The special value `me` can be used to indicate the authenticated user."),
       labelFilterAction: z.enum(["include","exclude"]).describe("Filtering behavior of `labelIds list` specified. This field is deprecated because it caused incorrect behavior in some cases; use `label_filter_behavior` instead.").optional(),
       labelFilterBehavior: z.enum(["include","exclude"]).describe("Filtering behavior of `labelIds list` specified. This field replaces `label_filter_action`; if set, `label_filter_action` is ignored.").optional(),

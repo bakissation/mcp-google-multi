@@ -10,7 +10,8 @@
 // suggests what the caller probably meant. Rewriting would risk sending a real
 // value to Google on a guess, which is strictly worse than refusing.
 
-import { editDistance } from './scope-catalog.js';
+import { editDistance, SUGGEST_MAX_INPUT } from './scope-catalog.js';
+import { sliceClean } from './trim.js';
 
 export type UnknownArgMode = 'reject' | 'warn' | 'off';
 
@@ -68,6 +69,23 @@ const GENERIC = new Set(['id', 'name', 'title', 'body', 'parent', 'text', 'conte
 
 const flatten = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+/** A call can carry thousands of unknown keys, or one of megabytes: only the
+ * first few earn a did-you-mean, and the log line and the envelope echo a
+ * bounded prefix of each name. The reject decision itself is never capped. */
+export const MAX_SUGGESTED_KEYS = 8;
+const MAX_ECHO_CHARS = 64;
+
+export function echoName(name: string): string {
+  return name.length > MAX_ECHO_CHARS ? `${sliceClean(name, MAX_ECHO_CHARS)}...` : name;
+}
+
+/** The first MAX_SUGGESTED_KEYS names, each capped, then "and N more". */
+export function echoNames(names: readonly string[], quote = false): string {
+  const shown = names.slice(0, MAX_SUGGESTED_KEYS).map((n) => (quote ? `"${echoName(n)}"` : echoName(n)));
+  const rest = names.length - shown.length;
+  return rest > 0 ? `${shown.join(', ')} and ${rest} more` : shown.join(', ');
+}
+
 function tokens(s: string): string[] {
   return s
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -86,6 +104,7 @@ function tokens(s: string): string[] {
  * distance 6, well past any sane threshold, which is why tier 1 exists.
  */
 export function suggestKeys(unknown: string, declared: readonly string[], limit = 2): string[] {
+  if (unknown.length > SUGGEST_MAX_INPUT) return [];
   const uFlat = flatten(unknown);
   const uTok = tokens(unknown);
   const tiers: Array<Array<{ key: string; rank: number }>> = [[], [], [], []];
@@ -105,8 +124,11 @@ export function suggestKeys(unknown: string, declared: readonly string[], limit 
       tiers[2].push({ key, rank: Math.abs(kFlat.length - uFlat.length) });
       continue;
     }
+    const maxDist = Math.max(1, Math.floor(uFlat.length / 4));
+    // The distance is at least the length gap: skip the DP when that alone fails.
+    if (Math.abs(uFlat.length - kFlat.length) > maxDist) continue;
     const d = editDistance(uFlat, kFlat);
-    if (d <= Math.max(1, Math.floor(uFlat.length / 4))) tiers[3].push({ key, rank: d });
+    if (d <= maxDist) tiers[3].push({ key, rank: d });
   }
 
   const tier = tiers.find((t) => t.length > 0);
@@ -140,9 +162,17 @@ export function screenArguments(tool: string, args: Record<string, unknown>, dec
   const out: ScreenResult = { unknown: [], redundant: [] };
   if (STRICT_EXEMPT_TOOLS.has(tool) || declared.length === 0) return out;
   const declaredSet = new Set(declared);
+  // Tier 0 (same key modulo case and separators) is a map lookup, so every key
+  // gets it and a redundant twin is recognised past the ranking budget too.
+  // A near-miss duplicate (a typo sent next to its declared key) is recognised
+  // only within the budget: a call needs 9 of them before one is refused.
+  const byFlat = new Map<string, string[]>();
+  for (const k of declared) byFlat.set(flatten(k), [...(byFlat.get(flatten(k)) ?? []), k]);
+  let ranked = 0;
   for (const key of Object.keys(args)) {
     if (declaredSet.has(key) || isExemptKey(key)) continue;
-    const suggestions = suggestKeys(key, declared);
+    const twins = key.length <= SUGGEST_MAX_INPUT ? byFlat.get(flatten(key)) : undefined;
+    const suggestions = twins ? twins.slice(0, 2) : ranked++ < MAX_SUGGESTED_KEYS ? suggestKeys(key, declared) : [];
     // The caller sent both spellings, so the declared one already won and the
     // outcome is what it has always been. Never fail a call that works today.
     if (suggestions.some((s) => s in args)) {
@@ -167,7 +197,7 @@ export function unknownArgEnvelope(
   account: string | undefined,
   siblings: SiblingSpelling[] = [],
 ): { error: string; message: string; hint: string; retriable: boolean; account?: string } {
-  const names = unknown.map((u) => `"${u.sent}"`).join(', ');
+  const names = echoNames(unknown.map((u) => u.sent), true);
   const accepts = `This tool accepts: ${declared.join(', ')}.`;
   const suggested = unknown.flatMap((u) => u.suggestions);
   let hint: string;

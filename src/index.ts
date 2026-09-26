@@ -279,6 +279,7 @@ async function main() {
     const { OAuth2Client } = await import('googleapis-common');
     const { writeToken } = await import('./token-store.js');
     const { resolveScopesForAccount } = await import('./auth.js');
+    const { ownerAuthUrlOptions } = await import('./oauth-consent.js');
     const { configDir } = await import('./config-file.js');
     const { getAccountSet } = await import('./accounts.js');
     const googleClient = () =>
@@ -295,20 +296,8 @@ async function main() {
         refreshStorePath: path.join(configDir(), 'mcp-tokens.enc'),
       },
       {
-        buildGoogleAuthUrl: ({ flow, alias, state }) => {
-          if (flow === 'alias_reauth' && alias) {
-            const cfg = getAccountSet().configs[alias];
-            // openid+email so /callback can bind the returned identity to the alias.
-            return googleClient().generateAuthUrl({
-              access_type: 'offline',
-              prompt: 'consent',
-              scope: [...new Set([...resolveScopesForAccount(alias), 'openid', 'email'])],
-              login_hint: cfg?.email,
-              state,
-            });
-          }
-          return googleClient().generateAuthUrl({ scope: ['openid', 'email'], prompt: 'select_account', state });
-        },
+        buildGoogleAuthUrl: ({ flow, alias, state }) =>
+          googleClient().generateAuthUrl(ownerAuthUrlOptions({ flow, alias, state }, (a) => resolveScopesForAccount(a))),
         exchangeCode: async (code, flow) => {
           const { tokens } = await googleClient().getToken(code);
           const email = verifiedEmailFromIdToken(tokens.id_token ?? undefined);

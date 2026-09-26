@@ -1,5 +1,7 @@
 import type { Transport, JSONRPCMessage, MessageExtraInfo } from "@modelcontextprotocol/server";
 import {
+  echoName,
+  echoNames,
   screenArguments,
   unknownArgEnvelope,
   type SiblingSpelling,
@@ -161,7 +163,7 @@ export function screenMessage(
 
   const all = [...screened.unknown.map((u) => u.sent), ...screened.redundant];
   // Key names only; argument VALUES never reach the log.
-  log(`[args] ${tool}: undeclared ${all.join(', ')}${opts.mode === 'warn' ? ' (dropped)' : ' (rejected)'}`);
+  log(`[args] ${tool}: undeclared ${echoNames(all)}${opts.mode === 'warn' ? ' (dropped)' : ' (rejected)'}`);
   try {
     // Only ever a DECLARED key or the literal placeholder, so the metrics
     // closed-vocabulary rule holds: the caller's key is never persisted.
@@ -180,7 +182,7 @@ export function screenMessage(
     tool,
     screened.unknown,
     declared,
-    typeof account === 'string' ? account : undefined,
+    typeof account === 'string' ? echoName(account) : undefined,
     siblings,
   );
   return {

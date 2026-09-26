@@ -18,7 +18,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AddMatterPermissionsRequest JSON request body. Top-level fields: ccMe, matterPermission, sendEmails."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -33,7 +33,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -46,7 +46,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CountArtifactsRequest JSON request body. Top-level fields: query, view."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -60,7 +60,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Matter JSON request body. Top-level fields: description, matterId, matterPermissions, matterRegion, name, state."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -73,7 +73,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -86,7 +86,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Export JSON request body. Top-level fields: cloudStorageSink, createTime, exportOptions, id, matterId, name, parentExportId, query, requester, stats, status."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -100,7 +100,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"exportId","api":"exportId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       exportId: z.string().min(1).describe("The export ID."),
       matterId: z.string().min(1).describe("The matter ID."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -114,7 +114,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"exportId","api":"exportId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       exportId: z.string().min(1).describe("The export ID."),
       matterId: z.string().min(1).describe("The matter ID."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -128,7 +128,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       pageSize: z.number().describe("The number of exports to return in the response.").optional(),
       pageToken: z.string().describe("The pagination token as returned in the response.").optional(),
@@ -143,7 +143,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       view: z.enum(["VIEW_UNSPECIFIED","BASIC","FULL"]).describe("Specifies how much information about the matter to return in the response.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -158,7 +158,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"accountId","api":"accountId"},{"field":"email","api":"email"},{"field":"firstName","api":"firstName"},{"field":"holdTime","api":"holdTime"},{"field":"lastName","api":"lastName"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       holdId: z.string().min(1).describe("The hold ID."),
       matterId: z.string().min(1).describe("The matter ID."),
       accountId: z.string().describe("The account ID, as provided by the [Admin SDK](https://developers.google.com/admin-sdk/).").optional(),
@@ -177,7 +177,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"accountId","api":"accountId","location":"path"},{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       accountId: z.string().min(1).describe("The ID of the account to remove from the hold."),
       holdId: z.string().min(1).describe("The hold ID."),
       matterId: z.string().min(1).describe("The matter ID."),
@@ -192,7 +192,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       holdId: z.string().min(1).describe("The hold ID."),
       matterId: z.string().min(1).describe("The matter ID."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -207,7 +207,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"accountIds","api":"accountIds"},{"field":"emails","api":"emails"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       holdId: z.string().min(1).describe("The hold ID."),
       matterId: z.string().min(1).describe("The matter ID."),
       accountIds: coerceArray(z.string()).describe("A comma-separated list of the account IDs of the accounts to add to the hold. Specify either **emails** or **account_ids**, but not both.").optional(),
@@ -223,7 +223,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Hold JSON request body. Top-level fields: accounts, corpus, holdId, name, orgUnit, query, updateTime."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -237,7 +237,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       holdId: z.string().min(1).describe("The hold ID."),
       matterId: z.string().min(1).describe("The matter ID."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -251,7 +251,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       holdId: z.string().min(1).describe("The hold ID."),
       matterId: z.string().min(1).describe("The matter ID."),
       view: z.enum(["HOLD_VIEW_UNSPECIFIED","BASIC_HOLD","FULL_HOLD"]).describe("The amount of detail to return for a hold.").optional(),
@@ -266,7 +266,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       pageSize: z.number().describe("The number of holds to return in the response, between 0 and 100 inclusive. Leaving this empty, or as 0, is the same as **page_size** = 100.").optional(),
       pageToken: z.string().describe("The pagination token as returned in the response. An empty token means start from the beginning.").optional(),
@@ -283,7 +283,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"accountIds","api":"accountIds"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       holdId: z.string().min(1).describe("The hold ID."),
       matterId: z.string().min(1).describe("The matter ID."),
       accountIds: coerceArray(z.string()).describe("The account IDs of the accounts to remove from the hold.").optional(),
@@ -298,7 +298,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"holdId","api":"holdId","location":"path"},{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       holdId: z.string().min(1).describe("The ID of the hold."),
       matterId: z.string().min(1).describe("The matter ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Hold JSON request body. Top-level fields: accounts, corpus, holdId, name, orgUnit, query, updateTime."),
@@ -313,7 +313,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"state","api":"state","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       pageSize: z.number().describe("The number of matters to return in the response. Default and maximum are 100.").optional(),
       pageToken: z.string().describe("The pagination token as returned in the response.").optional(),
       state: z.enum(["STATE_UNSPECIFIED","OPEN","CLOSED","DELETED"]).describe("If set, lists only matters with the specified state. The default lists matters of all states.").optional(),
@@ -330,7 +330,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [{"field":"accountId","api":"accountId"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       accountId: z.string().describe("The account ID.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -345,7 +345,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -358,7 +358,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The ID of the matter to create the saved query in."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("SavedQuery JSON request body. Top-level fields: createTime, displayName, matterId, query, savedQueryId."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -372,7 +372,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"savedQueryId","api":"savedQueryId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The ID of the matter to delete the saved query from."),
       savedQueryId: z.string().min(1).describe("ID of the saved query to delete."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -386,7 +386,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"savedQueryId","api":"savedQueryId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The ID of the matter to get the saved query from."),
       savedQueryId: z.string().min(1).describe("ID of the saved query to retrieve."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -400,7 +400,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The ID of the matter to get the saved queries for."),
       pageSize: z.number().describe("The maximum number of saved queries to return.").optional(),
       pageToken: z.string().describe("The pagination token as returned in the previous response. An empty token means start from the beginning.").optional(),
@@ -416,7 +416,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -429,7 +429,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"matterId","api":"matterId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       matterId: z.string().min(1).describe("The matter ID."),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("Matter JSON request body. Top-level fields: description, matterId, matterPermissions, matterRegion, name, state."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -444,7 +444,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("The name of the operation resource to be cancelled."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -457,7 +457,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("The name of the operation resource to be deleted."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -470,7 +470,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("The name of the operation resource."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -483,7 +483,7 @@ export function registerVaultGeneratedTools(registry: ToolRegistry, deps: Execut
     params: [{"field":"name","api":"name","location":"path"},{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"returnPartialSuccess","api":"returnPartialSuccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("The name of the operation's parent resource."),
       filter: z.string().describe("The standard list filter.").optional(),
       pageSize: z.number().describe("The standard list page size.").optional(),

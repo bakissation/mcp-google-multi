@@ -319,7 +319,7 @@ export function emitService(doc: DiscoveryDocJson, api: GenApi, alreadyEmitted: 
 
   for (const plan of plans) {
     const m = plan.method;
-    const shape: string[] = [emitShapeField('account', 'accountField(registry.accountAliases())')];
+    const shape: string[] = [emitShapeField('account', 'accountField(() => registry.accountAliases())')];
     for (const p of plan.params) {
       const raw = m.params[p.api];
       shape.push(emitShapeField(p.field, paramZod(p.api, raw, report.looseParams, m.id)));

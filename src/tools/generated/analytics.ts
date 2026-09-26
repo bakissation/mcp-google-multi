@@ -18,7 +18,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the Account to soft-delete. Format: accounts/{account} Example: \"accounts/100\""),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -31,7 +31,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the account to lookup. Format: accounts/{account} Example: \"accounts/100\""),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -44,7 +44,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the settings to lookup. Format: accounts/{account}/dataSharingSettings Example: `accounts/1000/dataSharingSettings`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -57,7 +57,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"showDeleted","api":"showDeleted","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       pageSize: z.number().describe("Optional. The maximum number of resources to return. The service may return fewer than this value, even if there are additional pages. If unspecified, at most 50 resources will be returned. The maximu").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListAccounts` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListAccounts` must match the call").optional(),
       showDeleted: coerceBoolean.describe("Whether to include soft-deleted (ie: \"trashed\") Accounts in the results. Accounts can be inspected to determine whether they are deleted or not.").optional(),
@@ -73,7 +73,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"createTime","api":"createTime"},{"field":"deleted","api":"deleted"},{"field":"displayName","api":"displayName"},{"field":"gmpOrganization","api":"gmpOrganization"},{"field":"name_","api":"name"},{"field":"regionCode","api":"regionCode"},{"field":"updateTime","api":"updateTime"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Identifier. Resource name of this account. Format: accounts/{account} Example: \"accounts/100\""),
       updateMask: z.string().describe("Required. The list of fields to be updated. Field names must be in snake case (for example, \"field_to_update\"). Omitted fields will not be updated. To replace the entire entity, use one path with the ").optional(),
       createTime: z.string().describe("Output only. Time when this account was originally created.").optional(),
@@ -94,7 +94,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAnalyticsAdminV1betaProvisionAccountTicketRequest JSON request body. Top-level fields: account, redirectUri."),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -107,7 +107,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"entity","api":"entity","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       entity: z.string().min(1).describe("The Data Access Report supports requesting at the property level or account level. If requested at the account level, Data Access Reports include all access for all properties under that account. To r"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAnalyticsAdminV1betaRunAccessReportRequest JSON request body. Top-level fields: dateRanges, dimensionFilter, dimensions, expandGroups, includeAllUsers, limit, metricFilter, metrics, offset, orderBys, returnEntityQuota, timeZone."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -122,7 +122,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"action","api":"action"},{"field":"actorEmail","api":"actorEmail"},{"field":"earliestChangeTime","api":"earliestChangeTime"},{"field":"latestChangeTime","api":"latestChangeTime"},{"field":"pageSize","api":"pageSize"},{"field":"pageToken","api":"pageToken"},{"field":"property","api":"property"},{"field":"resourceType","api":"resourceType"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       account_: z.string().min(1).describe("Required. The account resource for which to return change history resources. Format: accounts/{account} Example: `accounts/100`"),
       action: coerceArray(z.enum(["ACTION_TYPE_UNSPECIFIED","CREATED","UPDATED","DELETED"])).describe("Optional. If set, only return changes that match one or more of these types of actions.").optional(),
       actorEmail: coerceArray(z.string()).describe("Optional. If set, only return changes if they are made by a user in this list.").optional(),
@@ -144,7 +144,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"acknowledgement","api":"acknowledgement"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       property: z.string().min(1).describe("Required. The property for which to acknowledge user data collection."),
       acknowledgement: z.string().describe("Required. An acknowledgement that the caller of this method understands the terms of user data collection. This field must contain the exact value: \"I acknowledge that I have the necessary privacy dis").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -158,7 +158,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The resource name of the parent property where this conversion event will be created. Format: properties/123"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAnalyticsAdminV1betaConversionEvent JSON request body. Top-level fields: countingMethod, createTime, custom, defaultConversionValue, deletable, eventName, name."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -172,7 +172,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The resource name of the conversion event to delete. Format: properties/{property}/conversionEvents/{conversion_event} Example: \"properties/123/conversionEvents/456\""),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -185,7 +185,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The resource name of the conversion event to retrieve. Format: properties/{property}/conversionEvents/{conversion_event} Example: \"properties/123/conversionEvents/456\""),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -198,7 +198,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The resource name of the parent property. Example: 'properties/123'"),
       pageSize: z.number().describe("Optional. The maximum number of resources to return. If unspecified, at most 50 resources will be returned. The maximum value is 200; (higher values will be coerced to the maximum)").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListConversionEvents` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListConversionEvents` mus").optional(),
@@ -213,7 +213,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Identifier. Resource name of this conversion event. Format: properties/{property}/conversionEvents/{conversion_event}"),
       updateMask: z.string().describe("Required. The list of fields to be updated. Field names must be in snake case (e.g., \"field_to_update\"). Omitted fields will not be updated. To replace the entire entity, use one path with the string ").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAnalyticsAdminV1betaConversionEvent JSON request body. Top-level fields: countingMethod, createTime, custom, defaultConversionValue, deletable, eventName, name."),
@@ -229,7 +229,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"account_","api":"account"},{"field":"createTime","api":"createTime"},{"field":"currencyCode","api":"currencyCode"},{"field":"deleteTime","api":"deleteTime"},{"field":"displayName","api":"displayName"},{"field":"expireTime","api":"expireTime"},{"field":"industryCategory","api":"industryCategory"},{"field":"name","api":"name"},{"field":"parent","api":"parent"},{"field":"propertyType","api":"propertyType"},{"field":"serviceLevel","api":"serviceLevel"},{"field":"timeZone","api":"timeZone"},{"field":"updateTime","api":"updateTime"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       account_: z.string().describe("Immutable. The resource name of the parent account Format: accounts/{account_id} Example: \"accounts/123\"").optional(),
       createTime: z.string().describe("Output only. Time when the entity was originally created.").optional(),
       currencyCode: z.string().describe("The currency type used in reports involving monetary values. Format: https://en.wikipedia.org/wiki/ISO_4217 Examples: \"USD\", \"EUR\", \"JPY\"").optional(),
@@ -255,7 +255,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the CustomDimension to archive. Example format: properties/1234/customDimensions/5678"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -269,7 +269,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"description","api":"description"},{"field":"disallowAdsPersonalization","api":"disallowAdsPersonalization"},{"field":"displayName","api":"displayName"},{"field":"name","api":"name"},{"field":"parameterName","api":"parameterName"},{"field":"scope","api":"scope"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Example format: properties/1234"),
       description: z.string().describe("Optional. Description for this custom dimension. Max length of 150 characters.").optional(),
       disallowAdsPersonalization: coerceBoolean.describe("Optional. If set to true, sets this dimension as NPA and excludes it from ads personalization. This is currently only supported by user-scoped custom dimensions.").optional(),
@@ -288,7 +288,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the CustomDimension to get. Example format: properties/1234/customDimensions/5678"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -301,7 +301,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Example format: properties/1234"),
       pageSize: z.number().describe("Optional. The maximum number of resources to return. If unspecified, at most 50 resources will be returned. The maximum value is 200 (higher values will be coerced to the maximum).").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListCustomDimensions` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListCustomDimensions` mus").optional(),
@@ -317,7 +317,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"description","api":"description"},{"field":"disallowAdsPersonalization","api":"disallowAdsPersonalization"},{"field":"displayName","api":"displayName"},{"field":"name_","api":"name"},{"field":"parameterName","api":"parameterName"},{"field":"scope","api":"scope"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Identifier. Resource name for this CustomDimension resource. Format: properties/{property}/customDimensions/{customDimension}"),
       updateMask: z.string().describe("Required. The list of fields to be updated. Omitted fields will not be updated. To replace the entire entity, use one path with the string \"*\" to match all fields.").optional(),
       description: z.string().describe("Optional. Description for this custom dimension. Max length of 150 characters.").optional(),
@@ -338,7 +338,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the CustomMetric to archive. Example format: properties/1234/customMetrics/5678"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -352,7 +352,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"description","api":"description"},{"field":"displayName","api":"displayName"},{"field":"measurementUnit","api":"measurementUnit"},{"field":"name","api":"name"},{"field":"parameterName","api":"parameterName"},{"field":"restrictedMetricType","api":"restrictedMetricType"},{"field":"scope","api":"scope"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Example format: properties/1234"),
       description: z.string().describe("Optional. Description for this custom dimension. Max length of 150 characters.").optional(),
       displayName: z.string().describe("Required. Display name for this custom metric as shown in the Analytics UI. Max length of 82 characters, alphanumeric plus space and underscore starting with a letter. Legacy system-generated display ").optional(),
@@ -372,7 +372,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the CustomMetric to get. Example format: properties/1234/customMetrics/5678"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -385,7 +385,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Example format: properties/1234"),
       pageSize: z.number().describe("The maximum number of resources to return. If unspecified, at most 50 resources will be returned. The maximum value is 200 (higher values will be coerced to the maximum).").optional(),
       pageToken: z.string().describe("A page token, received from a previous `ListCustomMetrics` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListCustomMetrics` must match the call").optional(),
@@ -401,7 +401,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"description","api":"description"},{"field":"displayName","api":"displayName"},{"field":"measurementUnit","api":"measurementUnit"},{"field":"name_","api":"name"},{"field":"parameterName","api":"parameterName"},{"field":"restrictedMetricType","api":"restrictedMetricType"},{"field":"scope","api":"scope"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Identifier. Resource name for this CustomMetric resource. Format: properties/{property}/customMetrics/{customMetric}"),
       updateMask: z.string().describe("Required. The list of fields to be updated. Omitted fields will not be updated. To replace the entire entity, use one path with the string \"*\" to match all fields.").optional(),
       description: z.string().describe("Optional. Description for this custom dimension. Max length of 150 characters.").optional(),
@@ -422,7 +422,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Example format: properties/1234"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAnalyticsAdminV1betaDataStream JSON request body. Top-level fields: androidAppStreamData, createTime, displayName, iosAppStreamData, name, type, updateTime, webStreamData."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -436,7 +436,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the DataStream to delete. Example format: properties/1234/dataStreams/5678"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -449,7 +449,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the DataStream to get. Example format: properties/1234/dataStreams/5678"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -462,7 +462,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Example format: properties/1234"),
       pageSize: z.number().describe("The maximum number of resources to return. If unspecified, at most 50 resources will be returned. The maximum value is 200 (higher values will be coerced to the maximum).").optional(),
       pageToken: z.string().describe("A page token, received from a previous `ListDataStreams` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListDataStreams` must match the call tha").optional(),
@@ -478,7 +478,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"displayName","api":"displayName"},{"field":"name","api":"name"},{"field":"secretValue","api":"secretValue"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent resource where this secret will be created. Format: properties/{property}/dataStreams/{dataStream}"),
       displayName: z.string().describe("Required. Human-readable display name for this secret.").optional(),
       name: z.string().describe("Identifier. Resource name of this secret. This secret may be a child of any type of stream. Format: properties/{property}/dataStreams/{dataStream}/measurementProtocolSecrets/{measurementProtocolSecret").optional(),
@@ -494,7 +494,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the MeasurementProtocolSecret to delete. Format: properties/{property}/dataStreams/{dataStream}/measurementProtocolSecrets/{measurementProtocolSecret}"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -507,7 +507,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the measurement protocol secret to lookup. Format: properties/{property}/dataStreams/{dataStream}/measurementProtocolSecrets/{measurementProtocolSecret}"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -520,7 +520,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The resource name of the parent stream. Format: properties/{property}/dataStreams/{dataStream}/measurementProtocolSecrets"),
       pageSize: z.number().describe("Optional. The maximum number of resources to return. If unspecified, at most 10 resources will be returned. The maximum value is 10. Higher values will be coerced to the maximum.").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListMeasurementProtocolSecrets` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListMeasurement").optional(),
@@ -536,7 +536,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"displayName","api":"displayName"},{"field":"name_","api":"name"},{"field":"secretValue","api":"secretValue"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Identifier. Resource name of this secret. This secret may be a child of any type of stream. Format: properties/{property}/dataStreams/{dataStream}/measurementProtocolSecrets/{measurementProtocolSecret"),
       updateMask: z.string().describe("Required. The list of fields to be updated. Omitted fields will not be updated.").optional(),
       displayName: z.string().describe("Required. Human-readable display name for this secret.").optional(),
@@ -553,7 +553,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Identifier. Resource name of this Data Stream. Format: properties/{property_id}/dataStreams/{stream_id} Example: \"properties/1000/dataStreams/2000\""),
       updateMask: z.string().describe("Required. The list of fields to be updated. Omitted fields will not be updated. To replace the entire entity, use one path with the string \"*\" to match all fields.").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAnalyticsAdminV1betaDataStream JSON request body. Top-level fields: androidAppStreamData, createTime, displayName, iosAppStreamData, name, type, updateTime, webStreamData."),
@@ -568,7 +568,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the Property to soft-delete. Format: properties/{property_id} Example: \"properties/1000\""),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -582,7 +582,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"createTime","api":"createTime"},{"field":"name","api":"name"},{"field":"project","api":"project"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Format: properties/{property_id} Example: `properties/1234`"),
       createTime: z.string().describe("Output only. Time when this FirebaseLink was originally created.").optional(),
       name: z.string().describe("Identifier. Example format: properties/1234/firebaseLinks/5678").optional(),
@@ -598,7 +598,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. Format: properties/{property_id}/firebaseLinks/{firebase_link_id} Example: `properties/1234/firebaseLinks/5678`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -611,7 +611,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Format: properties/{property_id} Example: `properties/1234`"),
       pageSize: z.number().describe("Optional. The maximum number of resources to return. The service may return fewer than this value, even if there are additional pages. If unspecified, at most 50 resources will be returned. The maximu").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListFirebaseLinks` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListFirebaseLinks` must matc").optional(),
@@ -626,7 +626,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the property to lookup. Format: properties/{property_id} Example: \"properties/1000\""),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -639,7 +639,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the settings to lookup. Format: properties/{property}/dataRetentionSettings Example: \"properties/1000/dataRetentionSettings\""),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -653,7 +653,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"adsPersonalizationEnabled","api":"adsPersonalizationEnabled"},{"field":"canManageClients","api":"canManageClients"},{"field":"createTime","api":"createTime"},{"field":"creatorEmailAddress","api":"creatorEmailAddress"},{"field":"customerId","api":"customerId"},{"field":"name","api":"name"},{"field":"updateTime","api":"updateTime"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Example format: properties/1234"),
       adsPersonalizationEnabled: coerceBoolean.describe("Enable personalized advertising features with this integration. Automatically publish my Google Analytics audience lists and Google Analytics remarketing events/parameters to the linked Google Ads acc").optional(),
       canManageClients: coerceBoolean.describe("Output only. If true, this link is for a Google Ads manager account.").optional(),
@@ -673,7 +673,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. Example format: properties/1234/googleAdsLinks/5678"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -686,7 +686,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. Example format: properties/1234"),
       pageSize: z.number().describe("Optional. The maximum number of resources to return. If unspecified, at most 50 resources will be returned. The maximum value is 200 (higher values will be coerced to the maximum).").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListGoogleAdsLinks` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListGoogleAdsLinks` must ma").optional(),
@@ -702,7 +702,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"adsPersonalizationEnabled","api":"adsPersonalizationEnabled"},{"field":"canManageClients","api":"canManageClients"},{"field":"createTime","api":"createTime"},{"field":"creatorEmailAddress","api":"creatorEmailAddress"},{"field":"customerId","api":"customerId"},{"field":"name_","api":"name"},{"field":"updateTime","api":"updateTime"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Identifier. Format: properties/{propertyId}/googleAdsLinks/{googleAdsLinkId} Note: googleAdsLinkId is not the Google Ads customer ID."),
       updateMask: z.string().describe("Required. The list of fields to be updated. Field names must be in snake case (e.g., \"field_to_update\"). Omitted fields will not be updated. To replace the entire entity, use one path with the string ").optional(),
       adsPersonalizationEnabled: coerceBoolean.describe("Enable personalized advertising features with this integration. Automatically publish my Google Analytics audience lists and Google Analytics remarketing events/parameters to the linked Google Ads acc").optional(),
@@ -723,7 +723,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The resource name of the parent property where this Key Event will be created. Format: properties/123"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAnalyticsAdminV1betaKeyEvent JSON request body. Top-level fields: countingMethod, createTime, custom, defaultValue, deletable, eventName, name."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -737,7 +737,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The resource name of the Key Event to delete. Format: properties/{property}/keyEvents/{key_event} Example: \"properties/123/keyEvents/456\""),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -750,7 +750,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The resource name of the Key Event to retrieve. Format: properties/{property}/keyEvents/{key_event} Example: \"properties/123/keyEvents/456\""),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -763,7 +763,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The resource name of the parent property. Example: 'properties/123'"),
       pageSize: z.number().describe("Optional. The maximum number of resources to return. If unspecified, at most 50 resources will be returned. The maximum value is 200; (higher values will be coerced to the maximum)").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListKeyEvents` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListKeyEvents` must match the ca").optional(),
@@ -778,7 +778,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Output only. Resource name of this key event. Format: properties/{property}/keyEvents/{key_event}"),
       updateMask: z.string().describe("Required. The list of fields to be updated. Field names must be in snake case (e.g., \"field_to_update\"). Omitted fields will not be updated. To replace the entire entity, use one path with the string ").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAnalyticsAdminV1betaKeyEvent JSON request body. Top-level fields: countingMethod, createTime, custom, defaultValue, deletable, eventName, name."),
@@ -793,7 +793,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"showDeleted","api":"showDeleted","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       filter: z.string().describe("Required. An expression for filtering the results of the request. Fields eligible for filtering are: `parent:`(The resource name of the parent account/property) or `ancestor:`(The resource name of the").optional(),
       pageSize: z.number().describe("Optional. The maximum number of resources to return. The service may return fewer than this value, even if there are additional pages. If unspecified, at most 50 resources will be returned. The maximu").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListProperties` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListProperties` must match the ").optional(),
@@ -810,7 +810,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"account_","api":"account"},{"field":"createTime","api":"createTime"},{"field":"currencyCode","api":"currencyCode"},{"field":"deleteTime","api":"deleteTime"},{"field":"displayName","api":"displayName"},{"field":"expireTime","api":"expireTime"},{"field":"industryCategory","api":"industryCategory"},{"field":"name_","api":"name"},{"field":"parent","api":"parent"},{"field":"propertyType","api":"propertyType"},{"field":"serviceLevel","api":"serviceLevel"},{"field":"timeZone","api":"timeZone"},{"field":"updateTime","api":"updateTime"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Identifier. Resource name of this property. Format: properties/{property_id} Example: \"properties/1000\""),
       updateMask: z.string().describe("Required. The list of fields to be updated. Field names must be in snake case (e.g., \"field_to_update\"). Omitted fields will not be updated. To replace the entire entity, use one path with the string ").optional(),
       account_: z.string().describe("Immutable. The resource name of the parent account Format: accounts/{account_id} Example: \"accounts/123\"").optional(),
@@ -837,7 +837,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"entity","api":"entity","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       entity: z.string().min(1).describe("The Data Access Report supports requesting at the property level or account level. If requested at the account level, Data Access Reports include all access for all properties under that account. To r"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("GoogleAnalyticsAdminV1betaRunAccessReportRequest JSON request body. Top-level fields: dateRanges, dimensionFilter, dimensions, expandGroups, includeAllUsers, limit, metricFilter, metrics, offset, orderBys, returnEntityQuota, timeZone."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -852,7 +852,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"eventDataRetention","api":"eventDataRetention"},{"field":"name_","api":"name"},{"field":"resetUserDataOnNewActivity","api":"resetUserDataOnNewActivity"},{"field":"userDataRetention","api":"userDataRetention"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Identifier. Resource name for this DataRetentionSetting resource. Format: properties/{property}/dataRetentionSettings"),
       updateMask: z.string().describe("Required. The list of fields to be updated. Field names must be in snake case (e.g., \"field_to_update\"). Omitted fields will not be updated. To replace the entire entity, use one path with the string ").optional(),
       eventDataRetention: z.enum(["RETENTION_DURATION_UNSPECIFIED","TWO_MONTHS","FOURTEEN_MONTHS","TWENTY_SIX_MONTHS","THIRTY_EIGHT_MONTHS","FIFTY_MONTHS"]).describe("Required. The length of time that event-level data is retained.").optional(),
@@ -874,7 +874,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. The parent resource where this audience export will be created. Format: `properties/{property}`"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("AudienceExport JSON request body. Top-level fields: audience, audienceDisplayName, beginCreatingTime, creationQuotaTokensCharged, dimensions, errorMessage, name, percentageCompleted, rowCount, state."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -888,7 +888,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The audience export resource name. Format: `properties/{property}/audienceExports/{audience_export}`"),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -901,7 +901,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       parent: z.string().min(1).describe("Required. All audience exports for this property will be listed in the response. Format: `properties/{property}`"),
       pageSize: z.number().describe("Optional. The maximum number of audience exports to return. The service may return fewer than this value. If unspecified, at most 200 audience exports will be returned. The maximum value is 1000 (high").optional(),
       pageToken: z.string().describe("Optional. A page token, received from a previous `ListAudienceExports` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListAudienceExports` must ").optional(),
@@ -917,7 +917,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     hasBody: true,
     bodyParams: [{"field":"limit","api":"limit"},{"field":"offset","api":"offset"}],
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. The name of the audience export to retrieve users from. Format: `properties/{property}/audienceExports/{audience_export}`"),
       limit: z.string().describe("Optional. The number of rows to return. If unspecified, 10,000 rows are returned. The API returns a maximum of 250,000 rows per request, no matter how many you ask for. `limit` must be positive. The A").optional(),
       offset: z.string().describe("Optional. The row count of the start row. The first row is counted as row 0. When paging, the first request does not specify offset; or equivalently, sets offset to 0; the first request returns the fi").optional(),
@@ -932,7 +932,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"property","api":"property","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       property: z.string().min(1).describe("A Google Analytics property identifier whose events are tracked. Specified in the URL path and not the body. To learn more, see [where to find your Property ID](https://developers.google.com/analytics"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchRunPivotReportsRequest JSON request body. Top-level fields: requests."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -946,7 +946,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"property","api":"property","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       property: z.string().min(1).describe("A Google Analytics property identifier whose events are tracked. Specified in the URL path and not the body. To learn more, see [where to find your Property ID](https://developers.google.com/analytics"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchRunReportsRequest JSON request body. Top-level fields: requests."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -960,7 +960,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"property","api":"property","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       property: z.string().min(1).describe("A Google Analytics property identifier whose events are tracked. To learn more, see [where to find your Property ID](https://developers.google.com/analytics/devguides/reporting/data/v1/property-id). `"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("CheckCompatibilityRequest JSON request body. Top-level fields: compatibilityFilter, dimensionFilter, dimensions, metricFilter, metrics."),
       fields: z.string().optional().describe('Response field mask.'),
@@ -974,7 +974,7 @@ export function registerAnalyticsGeneratedTools(registry: ToolRegistry, deps: Ex
     params: [{"field":"property","api":"property","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
-      account: accountField(registry.accountAliases()),
+      account: accountField(() => registry.accountAliases()),
       property: z.string().min(1).describe("A Google Analytics property identifier whose events are tracked. Specified in the URL path and not the body. To learn more, see [where to find your Property ID](https://developers.google.com/analytics"),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("RunPivotReportRequest JSON request body. Top-level fields: cohortSpec, comparisons, currencyCode, dateRanges, dimensionFilter, dimensions, keepEmptyRows, metricFilter, metrics, pivots, property, returnPropertyQuota."),
       fields: z.string().optional().describe('Response field mask.'),

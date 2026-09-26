@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import http from 'node:http';
 import type { OAuth2Client } from 'googleapis-common';
 import {
+  ownerAuthUrlOptions,
   openLoopbackConsent,
   ConsentDeniedError,
   ConsentTimeoutError,
@@ -78,5 +79,27 @@ describe('openLoopbackConsent (ephemeral port)', () => {
     await expect(get(`${loop.redirect}?state=state-1&code=abc`)).rejects.toThrow();
     await new Promise((r) => setTimeout(r, 20));
     expect(settled).toBe(false);
+  });
+});
+
+describe('ownerAuthUrlOptions', () => {
+  const scopesFor = (alias: string) => [`https://www.googleapis.com/auth/${alias}`, 'email'];
+
+  // The alias_reauth link needs no authentication, so a login_hint would put
+  // the alias's Google address in a redirect anyone can trigger.
+  it('alias_reauth asks for the alias scopes plus identity, with no login_hint', () => {
+    const o = ownerAuthUrlOptions({ flow: 'alias_reauth', alias: 'work', state: 's1' }, scopesFor);
+    expect(o).toEqual({
+      access_type: 'offline',
+      prompt: 'select_account consent',
+      scope: ['https://www.googleapis.com/auth/work', 'email', 'openid'],
+      state: 's1',
+    });
+    expect(o).not.toHaveProperty('login_hint');
+  });
+
+  it('every other flow asks for identity only', () => {
+    expect(ownerAuthUrlOptions({ flow: 'owner_gate', state: 's2' }, scopesFor)).toEqual({ scope: ['openid', 'email'], prompt: 'select_account', state: 's2' });
+    expect(ownerAuthUrlOptions({ flow: 'alias_reauth', state: 's3' }, scopesFor).scope).toEqual(['openid', 'email']);
   });
 });

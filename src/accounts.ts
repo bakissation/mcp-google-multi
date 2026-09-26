@@ -383,6 +383,7 @@ export const ACCOUNTS = current.aliases;
  * enum actually accepts, and naming a runtime-added alias as valid while
  * rejecting it would be a lie. */
 export function unknownAliasMessage(aliases: readonly string[], selectors = false): string {
+  if (aliases.length === 0) return 'No Google account is configured yet. Add one with account_add.';
   const all = selectors ? '; "*" for all accounts' : '';
   const csv = selectors && aliases.length > 1 ? `; or a CSV subset like "${aliases.slice(0, 2).join(',')}"` : '';
   return `Unknown account alias. Valid: ${aliases.join(', ')}${all}${csv}. Run account_list if accounts changed since this server started.`;
@@ -411,12 +412,31 @@ export const accountAliasSchema: z.ZodType<string> = accountAliasSchemaFor(ACCOU
  * permissive (same empty-safe rule as above); dispatch still resolves the
  * alias against the live registry. */
 export function accountArgLive(aliases: () => readonly string[]): z.ZodType<string> {
-  return z.string().superRefine((value, ctx) => {
+  return z.string().check(liveAccountCheck(aliases, false));
+}
+
+// The check instance survives the clones .describe() and .optional() make,
+// so it is what marks a field as an account selector for the registry.
+const LIVE_ACCOUNT_CHECKS = new WeakSet<object>();
+
+/** The live membership check behind accountArgLive and the fan-out field;
+ * `selectors` also admits "*". An empty set stays permissive. */
+export function liveAccountCheck(aliases: () => readonly string[], selectors: boolean) {
+  const check = z.superRefine<string>((value, ctx) => {
     const current = aliases();
-    if (current.length > 0 && !current.includes(value)) {
-      ctx.addIssue({ code: 'custom', message: unknownAliasMessage(current) });
-    }
+    if (current.length === 0 || current.includes(value) || (selectors && value === '*')) return;
+    ctx.addIssue({ code: 'custom', message: unknownAliasMessage(current, selectors) });
   });
+  LIVE_ACCOUNT_CHECKS.add(check);
+  return check;
+}
+
+/** True for a field built on liveAccountCheck, optional or not. */
+export function isLiveAccountField(field: unknown): boolean {
+  type Def = { type?: string; innerType?: unknown; checks?: unknown[] };
+  let def = (field as { _zod?: { def?: Def } } | undefined)?._zod?.def;
+  if (def?.type === 'optional') def = (def.innerType as { _zod?: { def?: Def } } | undefined)?._zod?.def;
+  return def?.checks?.some((c) => LIVE_ACCOUNT_CHECKS.has(c as object)) ?? false;
 }
 
 /**
