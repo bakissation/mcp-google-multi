@@ -71,6 +71,10 @@ export interface HttpHostOptions {
 // serialize() lock forever. Generous by default so slow-but-valid calls (large
 // Drive exports, fan-out) still finish; the point is only to guarantee release.
 const DISPATCH_TIMEOUT_DEFAULT = 120_000;
+/** MCP 2025-06-18 dropped JSON-RPC batching, and the SDK screens every frame
+ * of a batch synchronously in one tick: without a cap one body multiplies the
+ * per-call work by however many frames fit in it. */
+const MAX_BATCH_FRAMES = 16;
 
 export function parseOwnerEmails(env: NodeJS.ProcessEnv = process.env): string[] {
   return (env.MCP_OWNER_EMAILS ?? '')
@@ -271,6 +275,9 @@ export class HttpTransportHost {
       body = await this.readJson(req);
     } catch (e) {
       return this.fail(res, 400, 'invalid_body', (e as Error).message);
+    }
+    if (Array.isArray(body) && body.length > MAX_BATCH_FRAMES) {
+      return this.fail(res, 400, 'batch_too_large', `a JSON-RPC batch may hold at most ${MAX_BATCH_FRAMES} messages`);
     }
 
     // Host/Origin are enforced by the front guard above (uniformly for /mcp and

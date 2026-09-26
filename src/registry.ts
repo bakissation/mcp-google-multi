@@ -7,7 +7,7 @@ import { fanoutAccountField, invalidAccountsResult, parseAccountSelector, runFan
 import { MAX_RESPONSE_CHARS } from './executor.js';
 import type { ArgKind, ArgShape } from './arg-normalize.js';
 import type { Metrics } from './usage-metrics.js';
-import { suggestKeys } from './arg-strict.js';
+import { MAX_SUGGESTED_KEYS, suggestKeys } from './arg-strict.js';
 import { classifyScope } from './scope-observability.js';
 
 /** Nothing granted, no profile: asks the BUNDLE CATALOG whether a scope is
@@ -374,7 +374,7 @@ export class ToolRegistry {
     // case (parentId against parentFolderId) fails containment and edit
     // distance alike, which is the whole reason that matcher exists.
     const keys = candidates.map(([key]) => key);
-    const hits = new Set(unknownKeys.flatMap((k) => suggestKeys(k, keys)));
+    const hits = new Set(unknownKeys.slice(0, MAX_SUGGESTED_KEYS).flatMap((k) => suggestKeys(k, keys)));
     return candidates
       .filter(([key]) => hits.has(key))
       .slice(0, 2)

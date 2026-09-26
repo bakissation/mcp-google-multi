@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { getAccountSet, unknownAliasMessage } from './accounts.js';
+import { echoName, echoNames, MAX_SUGGESTED_KEYS } from './arg-strict.js';
 
 export const CSV_RE = /^[a-zA-Z0-9_-]+(\s*,\s*[a-zA-Z0-9_-]+)+$/;
 
@@ -62,10 +63,11 @@ export function invalidAccountsResult(invalid: string[], accounts: readonly stri
         type: 'text' as const,
         text: JSON.stringify({
           error: 'validation_error',
-          message: `Unknown account alias(es): ${invalid.join(', ')}.`,
+          // The caller's CSV can hold any number of tokens: echo a prefix.
+          message: `Unknown account alias(es): ${echoNames(invalid)}.`,
           hint: unknownAliasMessage(accounts, true),
           retriable: false,
-          account: invalid.join(','),
+          account: invalid.slice(0, MAX_SUGGESTED_KEYS).map(echoName).join(','),
         }),
       },
     ],

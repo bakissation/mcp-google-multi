@@ -204,6 +204,14 @@ describe('screenMessage (unknown-argument screening)', () => {
     expect(env.retriable).toBe(false);
   });
 
+  it('echoes a bounded prefix of the caller account, like every other echo', () => {
+    const lines: string[] = [];
+    const out = screenMessage(call('drive_create_folder', { account: 'a'.repeat(3_000_000), bogus: 1 }), strict('reject'), (l) => lines.push(l));
+    const env = envelopeOf(out);
+    expect(env.account).toBe(`${'a'.repeat(64)}...`);
+    expect(lines.join('\n').length).toBeLessThan(300);
+  });
+
   it('answers as a tool result, not a JSON-RPC error, so the model can self-correct', () => {
     const out = screenMessage(call('drive_create_folder', { parentId: 'x' }, 42), strict('reject'), () => {});
     if (out.action !== 'reject') throw new Error('expected a reject');

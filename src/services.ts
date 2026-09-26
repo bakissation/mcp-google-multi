@@ -18,6 +18,7 @@ import { getOptionalBundles, getAdminAccounts } from './auth.js';
 import type { ToolRegistry } from './registry.js';
 import { GENERATED_SERVICES } from './tools/generated/index.js';
 import { suggestKeys } from './arg-strict.js';
+import { sliceClean } from './trim.js';
 
 export interface ServiceEntry {
   name: string;
@@ -75,8 +76,12 @@ export const GENERATED_GATES: Record<string, { enabled: (set?: AccountSet) => bo
  * never heard of. Those need different next steps, and the server knows which
  * is which: it composed the enabled-service list at boot.
  */
-export function unknownToolMessage(registry: ToolRegistry, name: string): string {
-  const near = suggestKeys(name, registry.toolNames(), 3);
+const MAX_TOOL_NAME_ECHO = 64;
+
+export function unknownToolMessage(registry: ToolRegistry, rawName: string): string {
+  // The name is the caller's, unvalidated: echo a bounded prefix only.
+  const name = rawName.length > MAX_TOOL_NAME_ECHO ? `${sliceClean(rawName, MAX_TOOL_NAME_ECHO)}...` : rawName;
+  const near = suggestKeys(rawName, registry.toolNames(), 3);
   if (near.length > 0) return `Tool ${name} not found. Did you mean: ${near.join(', ')}?`;
 
   // A service that EXISTS in the build but registered nothing is gated, not

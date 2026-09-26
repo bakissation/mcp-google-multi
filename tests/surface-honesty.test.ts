@@ -56,12 +56,29 @@ describe('unknown tool name', () => {
     expect(unknownToolMessage(registry, 'gmail_serach')).toMatch(/Did you mean: .*gmail_search/);
   });
 
+  it('ranks only the first few unknown keys against the service sibling keys', () => {
+    const reg = buildAll();
+    // near the length of real keys, so the length-gap skip does not spare the DP
+    const keys = Array.from({ length: 60_000 }, (_, i) => `${i}`.padStart(12, '9'));
+    const t0 = performance.now();
+    reg.siblingSpellings('drive_list', keys);
+    expect(performance.now() - t0).toBeLessThan(500);
+  });
+
   it('names the scope bundle when the service exists but is gated', () => {
     const gated = new ToolRegistry(stub() as never, POLICY, 'eager');
     SERVICES.find((s) => s.name === 'gmail')!.register(gated);
     const msg = unknownToolMessage(gated, 'keep_notes_zzz');
     expect(msg).toContain('"keep" service is not enabled');
     expect(msg).toContain('google_api_call');
+  });
+
+  it('answers an oversized name quickly and echoes only a prefix', () => {
+    const t0 = performance.now();
+    const msg = unknownToolMessage(registry, 'z'.repeat(1_000_000));
+    expect(performance.now() - t0).toBeLessThan(250);
+    expect(msg.length).toBeLessThan(300);
+    expect(msg).toContain(`Tool ${'z'.repeat(64)}... not found`);
   });
 
   it('points at discovery when the name resembles nothing at all', () => {
