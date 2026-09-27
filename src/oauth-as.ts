@@ -47,6 +47,12 @@ export interface AuthServerConfig {
   accessTtlSec?: number;
   masterKey: string;
   refreshStorePath: string;
+  /** `maxAgeSec` of the refresh store buildAuthServer creates: sessions end
+   * this long after their sign-in. Unset: unlimited. */
+  refreshMaxAgeSec?: number;
+  /** `idleSec` of that store: sessions end this long after their last
+   * refresh. Unset: unlimited. */
+  refreshIdleSec?: number;
   /** Default true. The clientless `flow=alias_reauth` link names an alias with
    * no tenant binding, so a multi-tenant deployment sets false: with several
    * tenants an alias name alone is ambiguous and the branch becomes a
@@ -303,10 +309,15 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   const accessTtl = config.accessTtlSec ?? ACCESS_TTL_DEFAULT;
   const cimd = deps.fetchCimd ?? ((clientId: string) => fetchCimdDocument(clientId));
   const replay = deps.replayGuard ?? new ReplayGuard();
-  const refresh = deps.refreshStore ?? new RefreshStore(config.refreshStorePath, config.masterKey);
   const registered = deps.registeredClients ?? new Map<string, { redirect_uris: string[] }>();
   const now = deps.now ?? (() => Date.now());
   const log = deps.log ?? (() => undefined);
+  // Silently dropping a lifetime the caller asked for would leave sessions unlimited.
+  if (deps.refreshStore && (config.refreshMaxAgeSec !== undefined || config.refreshIdleSec !== undefined)) {
+    throw new Error('E_REFRESH_OPTION_CONFLICT: refreshMaxAgeSec and refreshIdleSec configure the refresh store buildAuthServer creates; set them on the injected refreshStore instead');
+  }
+  const refresh =
+    deps.refreshStore ?? new RefreshStore(config.refreshStorePath, config.masterKey, { maxAgeSec: config.refreshMaxAgeSec, idleSec: config.refreshIdleSec, log });
   const nowSec = () => Math.floor(now() / 1000);
   const resolveSubject = deps.resolveSubject ?? ((email: string) => (config.ownerEmails.includes(email) ? { sub: 'owner' } : null));
   const issHeader = { 'Cache-Control': 'no-store' };

@@ -577,6 +577,15 @@ throws `E_REFRESH_STORE_UNREADABLE` for a file that does not decrypt).
 token to a short non-secret family tag (for rate limiting and log correlation)
 without touching the store.
 
+`/oauth-as`: `AuthServerConfig.refreshMaxAgeSec` and `refreshIdleSec` set
+`maxAgeSec` and `idleSec` on the refresh store `buildAuthServer` creates, and
+that store now logs revoked, dropped and expired families through
+`AuthServerDeps.log`. Setting either field while also passing
+`AuthServerDeps.refreshStore` throws `E_REFRESH_OPTION_CONFLICT`; set them on
+that store instead. The owner's server sets neither. With a lifetime set, keep
+the host clock synchronized: a clock that jumps forward ends every session
+(clients sign in again), and the log says so.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)
