@@ -101,3 +101,64 @@ describe('RefreshStore.purgeTenant (S1.21)', () => {
     }
   });
 });
+
+describe('RefreshStore.rotate accept (checked before the token is spent)', () => {
+  let dir: string;
+  afterEach(() => dir && fs.rmSync(dir, { recursive: true, force: true }));
+  const storeAt = () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'gm-accept-'));
+    const file = path.join(dir, 'mcp-tokens.enc');
+    return { s: new RefreshStore(file, 'mk'), file };
+  };
+
+  it('accept false drops every active record of that sub, returns null, and other subjects keep rotating', () => {
+    const { s } = storeAt();
+    const a1 = s.issue(1000, 'tenant-a');
+    const a2 = s.issue(1000, 'tenant-a');
+    const b1 = s.issue(1000, 'tenant-b');
+    const seen: string[] = [];
+    expect(
+      s.rotate(a1, 2000, (sub) => {
+        seen.push(sub);
+        return false;
+      }),
+    ).toBeNull();
+    expect(seen).toEqual(['tenant-a']);
+    expect(s.rotate(a1, 3000, () => true)).toBeNull();
+    expect(s.rotate(a2, 3000, () => true)).toBeNull();
+    expect(s.purgeTenant('tenant-a')).toBe(0);
+    const rb = s.rotate(b1, 3000, (sub) => sub === 'tenant-b');
+    expect(rb!.sub).toBe('tenant-b');
+  });
+
+  it('a throwing accept mutates nothing: the store bytes are unchanged and the same token rotates once accept recovers', () => {
+    const { s, file } = storeAt();
+    const a1 = s.issue(1000, 'tenant-a');
+    const before = fs.readFileSync(file);
+    expect(() =>
+      s.rotate(a1, 2000, () => {
+        throw new Error('registry unreadable');
+      }),
+    ).toThrow('registry unreadable');
+    expect(fs.readFileSync(file).equals(before)).toBe(true);
+    const r = s.rotate(a1, 3000, () => true);
+    expect(r!.sub).toBe('tenant-a');
+    expect(r!.token).not.toBe(a1);
+  });
+
+  it('a reuse of a rotated-away token never consults accept and still revokes the family', () => {
+    const { s } = storeAt();
+    const a1 = s.issue(1000, 'tenant-a');
+    const a2 = s.rotate(a1, 2000)!;
+    let calls = 0;
+    const accept = () => {
+      calls += 1;
+      return true;
+    };
+    expect(s.rotate(a1, 3000, accept)).toBeNull();
+    expect(calls).toBe(0);
+    expect(s.rotate(a2.token, 4000, accept)).toBeNull();
+    expect(s.rotate('never-issued', 4000, accept)).toBeNull();
+    expect(calls).toBe(0);
+  });
+});

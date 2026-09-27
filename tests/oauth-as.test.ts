@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import http from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
-import { rmSync, mkdtempSync } from 'node:fs';
+import { rmSync, mkdtempSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { McpServer } from "@modelcontextprotocol/server";
@@ -622,6 +622,85 @@ describe('alias_add flow + resolveSubject seam (S1.14)', () => {
     expect((await verifyAccessToken(tok.access_token, BASE, secret)).sub).toBe('tenant-9');
     const ref = JSON.parse((await req(port, 'POST', '/token', form({ grant_type: 'refresh_token', refresh_token: tok.refresh_token }))).text);
     expect((await verifyAccessToken(ref.access_token, BASE, secret)).sub).toBe('tenant-9');
+  });
+
+  describe('subjectActive: /token refuses a subject the host no longer serves', () => {
+    const subjects = (email: string) => (email === 'member@x.example' ? { sub: 'tenant-9' } : email === 'owner@x.example' ? { sub: 'tenant-8' } : null);
+    async function codeFor(port: number, googleCode = 'member-code'): Promise<string> {
+      const authz = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
+      const cb = await req(port, 'GET', `/callback?code=${googleCode}&state=${encodeURIComponent(stateFrom(authz.headers.location as string))}`);
+      expect(cb.status).toBe(302);
+      return new URL(cb.headers.location as string).searchParams.get('code')!;
+    }
+    const redeem = (port: number, code: string) =>
+      req(port, 'POST', '/token', form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, code_verifier: verifier, resource: `${BASE}/mcp` }));
+    const refreshWith = (port: number, refresh_token: string) => req(port, 'POST', '/token', form({ grant_type: 'refresh_token', refresh_token }));
+
+    it('a code whose subject became inactive before redemption is refused invalid_grant and issues no refresh token', async () => {
+      let active = true;
+      const asked: string[] = [];
+      const { port } = await startMt({}, { resolveSubject: subjects, subjectActive: (sub) => (asked.push(sub), active) });
+      const code = await codeFor(port);
+      active = false;
+      const r = await redeem(port, code);
+      expect(r.status).toBe(400);
+      expect(JSON.parse(r.text)).toEqual({ error: 'invalid_grant', message: 'the subject is no longer provisioned' });
+      expect(asked).toEqual(['tenant-9']);
+      expect(existsSync(path.join(tmp, 'mcp-tokens.enc'))).toBe(false);
+    });
+
+    it('a refresh token whose subject became inactive is refused invalid_grant, and the family is gone: once subjectActive answers true again, the rotated token is still refused', async () => {
+      let active = true;
+      const { port } = await startMt({}, { resolveSubject: subjects, subjectActive: (sub) => sub !== 'tenant-9' || active });
+      const first = JSON.parse((await redeem(port, await codeFor(port))).text);
+      const second = JSON.parse((await redeem(port, await codeFor(port))).text);
+      const other = JSON.parse((await redeem(port, await codeFor(port, 'owner-code'))).text);
+      const rotated = JSON.parse((await refreshWith(port, first.refresh_token)).text);
+      expect(rotated.refresh_token).toBeTruthy();
+      active = false;
+      const refused = await refreshWith(port, rotated.refresh_token);
+      expect(refused.status).toBe(400);
+      expect(JSON.parse(refused.text).error).toBe('invalid_grant');
+      active = true;
+      expect((await refreshWith(port, rotated.refresh_token)).status).toBe(400);
+      expect((await refreshWith(port, second.refresh_token)).status).toBe(400);
+      const kept = await refreshWith(port, other.refresh_token);
+      expect(kept.status).toBe(200);
+      expect((await verifyAccessToken(JSON.parse(kept.text).access_token, BASE, secret)).sub).toBe('tenant-8');
+    });
+
+    it('a throwing subjectActive answers 503 temporarily_unavailable on both grants, the message does not reach the body, and the presented refresh token still rotates on the next attempt', async () => {
+      let broken = false;
+      const lines: string[] = [];
+      const { port } = await startMt(
+        {},
+        {
+          resolveSubject: subjects,
+          log: (l) => lines.push(l),
+          subjectActive: () => {
+            if (broken) throw new Error('registry /srv/private/tenants.enc unreadable');
+            return true;
+          },
+        },
+      );
+      const tok = JSON.parse((await redeem(port, await codeFor(port))).text);
+      const pendingCode = await codeFor(port);
+      broken = true;
+      for (const r of [await redeem(port, pendingCode), await refreshWith(port, tok.refresh_token)]) {
+        expect(r.status).toBe(503);
+        expect(r.headers['retry-after']).toBe('5');
+        expect(JSON.parse(r.text).error).toBe('temporarily_unavailable');
+        expect(r.text).not.toContain('private');
+        expect(r.text).not.toContain('unreadable');
+      }
+      expect(lines.filter((l) => l.includes('unreadable'))).toHaveLength(2);
+      broken = false;
+      const ref = await refreshWith(port, tok.refresh_token);
+      expect(ref.status).toBe(200);
+      expect((await verifyAccessToken(JSON.parse(ref.text).access_token, BASE, secret)).sub).toBe('tenant-9');
+      // the code's jti was spent before the check; the client signs in again
+      expect(JSON.parse((await redeem(port, pendingCode)).text).message).toBe('authorization code already redeemed');
+    });
   });
 
   async function googleLegState(port: number, as: { mintFlowState: AuthServerDepsMint }, opts: Parameters<AuthServerDepsMint>[0]) {
