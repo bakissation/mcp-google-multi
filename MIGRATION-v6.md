@@ -561,10 +561,16 @@ tokens an earlier release still remembered keep revoking the session. Until
 then an earlier-release session is stored under its live token, so deleting
 `mcp-tokens.enc` is the way to retire them all at once (every client signs in
 once). `RefreshStore.issue(nowMs, sub)` no longer takes a family id.
-`new RefreshStore(path, masterKey, { log })` takes an optional server-side log
-for revoked and dropped families; its lines carry a short family tag, never a
-token or a subject. A store file written by a newer release (any `format`
-other than 2) is refused with `E_REFRESH_STORE_FORMAT` rather than read as empty;
+`new RefreshStore(path, masterKey, { maxAgeSec, idleSec, log })` optionally
+ends a session a fixed time after its sign-in, or after a time without a
+refresh. An expired session is refused (`invalid_grant`) and removed. Both
+are unset by default: sessions last until revoked, as before. A value that is
+not a positive whole number throws `E_REFRESH_OPTION_INVALID`. With a
+lifetime set, a stored time more than five minutes ahead of the clock is
+pulled back to it. The optional `log` receives a line for every revoked,
+dropped or expired family; its lines carry a short family tag, never a token
+or a subject. A store file written by a newer release (any `format` other
+than 2) is refused with `E_REFRESH_STORE_FORMAT` rather than read as empty;
 `assertRefreshStoreReadable(path, masterKey)` runs the same check at boot (and
 throws `E_REFRESH_STORE_UNREADABLE` for a file that does not decrypt).
 `refreshFamilyTagger(masterKey)` returns a function that maps a well-formed

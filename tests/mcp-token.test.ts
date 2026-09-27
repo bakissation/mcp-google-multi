@@ -19,6 +19,7 @@ import {
   RefreshStore,
   assertRefreshStoreReadable,
   refreshFamilyTagger,
+  type RefreshStoreOptions,
   type StatePayload,
 } from '../src/mcp-token.js';
 import { withFileLock } from '../src/fs-atomic.js';
@@ -583,6 +584,154 @@ describe('RefreshStore earlier-release records', () => {
     expect([rb.sub, rc.sub]).toEqual(['tenant-b', 'tenant-c']);
     expect(rb.token).toMatch(/^r1\./);
     expect(upgraded.rotate(rc.token, 4003)!.sub).toBe('tenant-c');
+  });
+});
+
+describe('RefreshStore lifetimes (ruling 10)', () => {
+  const KEY = 'master-key-for-test';
+  let dir: string;
+  afterEach(() => dir && rmSync(dir, { recursive: true, force: true }));
+  const storeAt = (options: RefreshStoreOptions = {}) => {
+    dir = mkdtempSync(path.join(tmpdir(), 'gm-life-'));
+    const file = path.join(dir, 'mcp-tokens.enc');
+    const logs: string[] = [];
+    return { s: new RefreshStore(file, KEY, { log: (l) => logs.push(l), ...options }), file, logs };
+  };
+  const subsOnDisk = (file: string) => Object.values(onDisk(file, KEY).families).map((f) => f.sub).sort();
+  const unknownFamily = () => specToken(KEY, randomBytes(16), 0).token;
+
+  it('L1 maxAgeSec ends a family that long after its sign-in, however often it rotates', () => {
+    const { s, file } = storeAt({ maxAgeSec: 100 });
+    let t = s.issue(0, 'owner');
+    t = s.rotate(t, 50_000)!.token;
+    t = s.rotate(t, 99_999)!.token;
+    expect(s.rotate(t, 100_000)).toBeNull();
+    expect(onDisk(file, KEY).families).toEqual({});
+  });
+
+  it('L2 idleSec ends a family that long after its last rotation', () => {
+    const { s, file } = storeAt({ idleSec: 10 });
+    let t = s.issue(0, 'owner');
+    t = s.rotate(t, 9_999)!.token;
+    t = s.rotate(t, 19_998)!.token;
+    expect(s.rotate(t, 29_998)).toBeNull();
+    expect(onDisk(file, KEY).families).toEqual({});
+  });
+
+  it('L3 without options a family never expires', () => {
+    const { s } = storeAt();
+    const t = s.issue(0, 'owner');
+    expect(s.rotate(t, 10 * 365 * 86_400_000)!.sub).toBe('owner');
+  });
+
+  it('L4 every issue and rotation drops the expired families of every subject', () => {
+    const { s, file } = storeAt({ idleSec: 10 });
+    s.issue(0, 'a');
+    const b = s.issue(0, 'b');
+    s.issue(0, 'c');
+    s.rotate(b, 5_000);
+    s.issue(12_000, 'd');
+    expect(subsOnDisk(file)).toEqual(['b', 'd']);
+  });
+
+  it('L5 a refused token writes only when the prune found work', () => {
+    const { s, file } = storeAt({ idleSec: 10 });
+    s.issue(0, 'a');
+    s.issue(0, 'b');
+    const before = readFileSync(file);
+    expect(s.rotate(unknownFamily(), 30_000)).toBeNull();
+    const pruned = readFileSync(file);
+    expect(pruned.equals(before)).toBe(false);
+    expect(onDisk(file, KEY).families).toEqual({});
+    expect(s.rotate(unknownFamily(), 30_001)).toBeNull();
+    expect(s.rotate('x'.repeat(60), 30_002)).toBeNull();
+    expect(readFileSync(file).equals(pruned)).toBe(true);
+  });
+
+  it('L6 an expired family is refused without consulting accept', () => {
+    const { s } = storeAt({ idleSec: 10 });
+    const t = s.issue(0, 'owner');
+    const accept = vi.fn(() => true);
+    expect(s.rotate(t, 10_000, accept)).toBeNull();
+    expect(accept).not.toHaveBeenCalled();
+  });
+
+  it('L7 a throwing accept writes and logs nothing, not even the prune; the retry logs the expiry once', () => {
+    const { s, file, logs } = storeAt({ idleSec: 10 });
+    s.issue(0, 'x');
+    const y = s.issue(8_000, 'y');
+    const before = readFileSync(file);
+    expect(() =>
+      s.rotate(y, 12_000, () => {
+        throw new Error('registry unreadable');
+      }),
+    ).toThrow('registry unreadable');
+    expect(readFileSync(file).equals(before)).toBe(true);
+    expect(logs).toEqual([]);
+    expect(s.rotate(y, 12_001, () => true)!.sub).toBe('y');
+    expect(logs).toEqual(['refresh families expired n=1']);
+  });
+
+  it('L8 a lifetime that is not a positive whole number throws', () => {
+    for (const name of ['maxAgeSec', 'idleSec'] as const) {
+      for (const bad of [0, -1, 1.5, NaN, Infinity, '10']) {
+        expect(() => new RefreshStore('/unused', KEY, { [name]: bad as number }), `${name}=${String(bad)}`).toThrow(`E_REFRESH_OPTION_INVALID: ${name} must be a positive whole number`);
+      }
+    }
+  });
+
+  it('L9 an idle limit longer than the absolute one is allowed and the absolute one still fires', () => {
+    const { s } = storeAt({ maxAgeSec: 100, idleSec: 1000 });
+    let t = s.issue(0, 'owner');
+    t = s.rotate(t, 50_000)!.token;
+    expect(s.rotate(t, 100_000)).toBeNull();
+  });
+
+  it('T1 the last-use time never moves backwards', () => {
+    const { s, file } = storeAt({ idleSec: 100 });
+    let t = s.issue(0, 'owner');
+    t = s.rotate(t, 10_000)!.token;
+    s.rotate(t, 5_000);
+    expect(Object.values(onDisk(file, KEY).families)[0].usedAt).toBe(10_000);
+  });
+
+  it('T2 a time written while the clock ran ahead is pulled back, so the limit counts from the clock', () => {
+    const { s, file, logs } = storeAt({ maxAgeSec: 100 });
+    const t0 = 1_000_000_000;
+    const ahead = specToken(KEY, randomBytes(16), 0);
+    seedFamilies(file, KEY, { [ahead.fid]: { sub: 'a', gen: 0, cur: ahead.cur, createdAt: t0 + 1e9, usedAt: t0 + 1e9 } });
+    expect(s.rotate(unknownFamily(), t0)).toBeNull();
+    expect(onDisk(file, KEY).families[ahead.fid]).toMatchObject({ createdAt: t0, usedAt: t0 });
+    expect(logs).toEqual(['refresh store clock: n=2 timestamps ahead of the clock were clamped']);
+    expect(s.rotate(ahead.token, t0 + 100_000)).toBeNull();
+  });
+
+  it('T3 a prune that empties the store says the clock may be wrong', () => {
+    let { s, logs } = storeAt({ idleSec: 10 });
+    s.issue(0, 'a');
+    s.issue(0, 'b');
+    s.rotate(unknownFamily(), 50_000);
+    expect(logs).toEqual(['refresh families expired n=2', 'refresh store: every session expired at once (check the host clock)']);
+    rmSync(dir, { recursive: true, force: true });
+    ({ s, logs } = storeAt({ idleSec: 10 }));
+    s.issue(40_000, 'a');
+    s.issue(45_000, 'b');
+    s.rotate(unknownFamily(), 50_000);
+    expect(logs).toEqual(['refresh families expired n=1']);
+  });
+
+  it('M4 earlier-release sessions expire too, and a migrated one keeps its original sign-in time', () => {
+    let { s, file } = storeAt({ idleSec: 10 });
+    const [L0, L1] = [legacyTok('L0'), legacyTok('L1')];
+    seedLegacy(file, KEY, { [L1]: { sub: 'owner', issuedAt: 1000, family: 'fam-a' } }, { [L0]: 'fam-a' });
+    expect(s.rotate(L1, 11_000)).toBeNull();
+    const d = onDisk(file, KEY);
+    expect([d.families, d.active, d.spent]).toEqual([{}, {}, {}]);
+    rmSync(dir, { recursive: true, force: true });
+    ({ s, file } = storeAt({ maxAgeSec: 100 }));
+    seedLegacy(file, KEY, { [L1]: { sub: 'owner', issuedAt: 1000, family: 'fam-a' } });
+    const r = s.rotate(L1, 50_000)!;
+    expect(s.rotate(r.token, 101_000)).toBeNull();
   });
 });
 

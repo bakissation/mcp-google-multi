@@ -222,6 +222,8 @@ const R1_MAC_DOMAIN = Buffer.from('mcp-google-multi refresh r1\n');
 const R1_KEY_INFO = 'mcp-google-multi:refresh-mac:v1';
 const GEN_MAX = 0xffffffff;
 const LEGACY_TOKEN = /^[A-Za-z0-9_-]{43}$/;
+/** With a lifetime set, a stored time further ahead than this is pulled back to the clock. */
+const CLOCK_SKEW_MS = 5 * 60_000;
 
 interface FamilyRecord {
   sub: string;
@@ -406,8 +408,18 @@ export function assertRefreshStoreReadable(file: string, masterKey: string): voi
 }
 
 export interface RefreshStoreOptions {
-  /** Server-side log for a revoked or dropped family. Never given a token or a subject. */
+  /** Absolute family lifetime in seconds, counted from the sign-in. Unset: unlimited. */
+  maxAgeSec?: number;
+  /** Idle lifetime in seconds, counted from the last issue or rotation. Unset: unlimited. */
+  idleSec?: number;
+  /** Server-side log for a revoked, dropped or expired family. Never given a token or a subject. */
   log?: (line: string) => void;
+}
+
+function lifetimeMs(name: string, v: unknown): number | undefined {
+  if (v === undefined) return undefined;
+  if (typeof v !== 'number' || !Number.isSafeInteger(v) || v <= 0) throw new Error(`E_REFRESH_OPTION_INVALID: ${name} must be a positive whole number`);
+  return v * 1000;
 }
 
 /**
@@ -421,6 +433,8 @@ export interface RefreshStoreOptions {
  */
 export class RefreshStore {
   private readonly log: (line: string) => void;
+  private readonly maxAgeMs: number | undefined;
+  private readonly idleMs: number | undefined;
   private macKey: Buffer | undefined;
   // Set once a load finds no earlier-release record. Nothing here adds one,
   // so from then on a legacy-shaped token is refused before the lock.
@@ -431,14 +445,69 @@ export class RefreshStore {
     private readonly masterKey: string,
     options: RefreshStoreOptions = {},
   ) {
+    this.maxAgeMs = lifetimeMs('maxAgeSec', options.maxAgeSec);
+    this.idleMs = lifetimeMs('idleSec', options.idleSec);
     this.log = options.log ?? (() => undefined);
+  }
+
+  private get timed(): boolean {
+    return this.maxAgeMs !== undefined || this.idleMs !== undefined;
+  }
+
+  // Positive form: a non-finite time can only make a session dead.
+  private live(createdAt: number, usedAt: number, nowMs: number): boolean {
+    return (this.maxAgeMs === undefined || nowMs < createdAt + this.maxAgeMs) && (this.idleMs === undefined || nowMs < usedAt + this.idleMs);
+  }
+
+  /** Drop expired sessions in both formats; the count of those dropped. */
+  private prune(data: RefreshData, nowMs: number, lines: string[]): number {
+    if (!this.timed) return 0;
+    let n = 0;
+    for (const [k, f] of Object.entries(data.families)) {
+      if (!this.live(f.createdAt, f.usedAt, nowMs)) {
+        delete data.families[k];
+        n += 1;
+      }
+    }
+    for (const [t, r] of Object.entries(data.active)) {
+      if (!this.live(r.issuedAt, r.issuedAt, nowMs)) {
+        delete data.active[t];
+        n += 1;
+      }
+    }
+    if (n > 0) {
+      lines.push(`refresh families expired n=${n}`);
+      if (Object.keys(data.families).length === 0 && Object.keys(data.active).length === 0) lines.push('refresh store: every session expired at once (check the host clock)');
+    }
+    return n;
+  }
+
+  /** A session written while the clock ran ahead would otherwise outlive its
+   * limit by the size of the jump. */
+  private clamp(data: RefreshData, nowMs: number, lines: string[]): boolean {
+    if (!this.timed) return false;
+    const limit = nowMs + CLOCK_SKEW_MS;
+    let n = 0;
+    const pull = (t: number): number => {
+      if (t <= limit) return t;
+      n += 1;
+      return nowMs;
+    };
+    for (const f of Object.values(data.families)) {
+      f.createdAt = pull(f.createdAt);
+      f.usedAt = pull(f.usedAt);
+    }
+    for (const r of Object.values(data.active)) r.issuedAt = pull(r.issuedAt);
+    if (n > 0) lines.push(`refresh store clock: n=${n} timestamps ahead of the clock were clamped`);
+    return n > 0;
   }
 
   private key(): Buffer {
     return (this.macKey ??= refreshMacKey(this.masterKey));
   }
 
-  private load(): { data: RefreshData; dirty: boolean } {
+  /** With `nowMs` (every issue and rotation), also clamps and prunes. */
+  private load(nowMs?: number, lines: string[] = []): { data: RefreshData; dirty: boolean } {
     let d: unknown;
     try {
       d = readPlain(this.path, this.masterKey);
@@ -447,6 +516,10 @@ export class RefreshStore {
     }
     checkFormat(this.path, d);
     const loaded = decodeData(d);
+    if (nowMs !== undefined) {
+      if (this.clamp(loaded.data, nowMs, lines)) loaded.dirty = true;
+      if (this.prune(loaded.data, nowMs, lines) > 0) loaded.dirty = true;
+    }
     if (Object.keys(loaded.data.active).length === 0 && Object.keys(loaded.data.spent).length === 0) this.legacyEmpty = true;
     return loaded;
   }
@@ -483,11 +556,13 @@ export class RefreshStore {
     if (typeof sub !== 'string' || sub === '') throw new Error('RefreshStore.issue: sub must be a non-empty string');
     const key = this.key();
     return withFileLock(this.path, () => {
-      const { data } = this.load();
+      const lines: string[] = [];
+      const { data } = this.load(nowMs, lines);
       const fid = this.newFamilyId(data);
       const { token, cur } = mintR1(key, fid, 0);
       data.families[fid.toString('base64url')] = { sub, gen: 0, cur, createdAt: nowMs, usedAt: nowMs };
       this.save(data);
+      this.emit(lines);
       return token;
     });
   }
@@ -506,8 +581,9 @@ export class RefreshStore {
     const r1 = parseR1(oldToken, key);
     if (!r1 && !(typeof oldToken === 'string' && LEGACY_TOKEN.test(oldToken) && !this.legacyEmpty)) return null;
     return withFileLock(this.path, () => {
-      const { data, dirty } = this.load();
       const lines: string[] = [];
+      // Expiry runs first: a dead session is refused without consulting accept.
+      const { data, dirty } = this.load(nowMs, lines);
       const done = <T>(result: T, write: boolean): T => {
         if (write) this.save(data);
         this.emit(lines);
@@ -537,7 +613,8 @@ export class RefreshStore {
         const next = mintR1(key, r1.fidBytes, f.gen + 1);
         f.gen += 1;
         f.cur = next.cur;
-        f.usedAt = nowMs;
+        // now() is read before the lock wait, so a later writer can hold an earlier time.
+        f.usedAt = Math.max(f.usedAt, nowMs);
         return done({ token: next.token, sub: f.sub }, true);
       }
 
@@ -558,7 +635,7 @@ export class RefreshStore {
       data.spent[oldToken] = rec.family;
       const fid = this.newFamilyId(data);
       const next = mintR1(key, fid, 0);
-      data.families[fid.toString('base64url')] = { sub: rec.sub, gen: 0, cur: next.cur, createdAt: rec.issuedAt, usedAt: nowMs, legacy: rec.family };
+      data.families[fid.toString('base64url')] = { sub: rec.sub, gen: 0, cur: next.cur, createdAt: rec.issuedAt, usedAt: Math.max(rec.issuedAt, nowMs), legacy: rec.family };
       return done({ token: next.token, sub: rec.sub }, true);
     });
   }
