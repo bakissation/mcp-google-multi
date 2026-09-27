@@ -486,6 +486,22 @@ threw inside the catch-all, and the unhandled rejection it produced
 terminates the process under Node's default `--unhandled-rejections=throw`.
 This applies with or without `graceMs`.
 
+`/mcp-token`: `RefreshStore` still keeps at most 2,000 rotated-away refresh
+tokens, but over that cap it now drops the oldest entry of the subject holding
+the most (ties: the subject whose oldest entry is oldest) instead of the oldest
+entry overall, so one subject's refreshes can no longer push out another's and
+disarm its theft detection. A subject is the `sub` of the family's active token
+and its families share one budget, so a subject that opens many families
+dilutes only itself. A subject's entry is dropped only while it holds at least
+as many as every other subject, so with S subjects holding spent tokens, each
+keeps at least its floor(2000 / S) most recent, and a subject evicts another's
+history only when that other holds at least as many. A single subject keeps
+exactly the last 2,000 rotations across all its families, oldest first, as
+before. A family with no active token left (revoked, refused by `accept`, or
+purged) keeps none. An older token is still refused (`invalid_grant`) without
+revoking. The store file keeps its shape and encryption: a file from an earlier
+release loads as is, and an earlier release reads a file this one wrote.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)
