@@ -16,6 +16,7 @@ import {
   REAUTH_LINK_TTL_SEC,
   ReplayGuard,
   RefreshStore,
+  assertRefreshStoreReadable,
   type StatePayload,
 } from '../src/mcp-token.js';
 import { decryptToken, encryptToken } from '../src/token-store.js';
@@ -206,6 +207,63 @@ describe('RefreshStore looks up own keys only', () => {
     writeFileSync(file, encryptToken({ active, spent: { [tok('bad-spent')]: 7 } }, 'master-key-for-test'), { mode: 0o600 });
     for (const t of ['no-sub', 'empty-sub', 'no-family', 'not-an-object', 'bad-spent']) expect(s.rotate(tok(t), 2000)).toBeNull();
     expect(s.rotate(tok('good'), 2000)!.sub).toBe('owner');
+  });
+});
+
+describe('RefreshStore file format', () => {
+  const KEY = 'master-key-for-test';
+  let dir: string;
+  afterEach(() => dir && rmSync(dir, { recursive: true, force: true }));
+  const storeAt = () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'gm-format-'));
+    const file = path.join(dir, 'mcp-tokens.enc');
+    return { s: new RefreshStore(file, KEY), file };
+  };
+  const plain = (file: string) => decryptToken(readFileSync(file, 'utf-8'), KEY) as unknown as Record<string, unknown>;
+  const isMap = (v: unknown) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+  it('writes format 2 and keeps object-typed active and spent maps an earlier release reads', () => {
+    const { s, file } = storeAt();
+    s.rotate(s.issue(1000, 'owner'), 2000);
+    const d = plain(file);
+    expect(d.format).toBe(2);
+    expect(isMap(d.families)).toBe(true);
+    expect(isMap(d.active)).toBe(true);
+    expect(isMap(d.spent)).toBe(true);
+  });
+
+  it('refuses a file a newer release wrote instead of reading it as empty', () => {
+    const { s, file } = storeAt();
+    const legacy = 'L'.repeat(43);
+    writeFileSync(file, encryptToken({ format: 3, families: {}, active: { [legacy]: { sub: 'owner', issuedAt: 1000, family: 'fam-a' } }, spent: {} }, KEY), { mode: 0o600 });
+    const before = readFileSync(file);
+    const calls: [string, () => unknown][] = [
+      ['rotate', () => s.rotate(legacy, 2000)],
+      ['issue', () => s.issue(2000, 'owner')],
+      ['purgeTenant', () => s.purgeTenant('owner')],
+      ['assertRefreshStoreReadable', () => assertRefreshStoreReadable(file, KEY)],
+    ];
+    for (const [name, call] of calls) {
+      let err: unknown;
+      try {
+        call();
+      } catch (e) {
+        err = e;
+      }
+      expect(err, name).toBeInstanceOf(Error);
+      const msg = (err as Error).message;
+      expect(msg, name).toMatch(/^E_REFRESH_STORE_FORMAT: mcp-tokens\.enc was written by a newer release \(format 3\)/);
+      expect(msg, name).not.toContain(dir);
+      expect(readFileSync(file).equals(before), name).toBe(true);
+    }
+  });
+
+  it('assertRefreshStoreReadable returns for an absent or current file and throws for another key', () => {
+    const { s, file } = storeAt();
+    expect(() => assertRefreshStoreReadable(file, KEY)).not.toThrow();
+    s.issue(1000, 'owner');
+    expect(() => assertRefreshStoreReadable(file, KEY)).not.toThrow();
+    expect(() => assertRefreshStoreReadable(file, 'another-master-key')).toThrow(/^E_REFRESH_STORE_UNREADABLE: mcp-tokens\.enc does not decrypt/);
   });
 });
 

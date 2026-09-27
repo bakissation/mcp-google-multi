@@ -6,6 +6,7 @@
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import { SignJWT, jwtVerify } from 'jose';
 import { deriveKey, encryptToken, decryptToken } from './token-store.js';
 import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
@@ -207,6 +208,32 @@ export interface RefreshRecord {
 }
 
 const SPENT_CAP = 2000;
+/** Store files this release writes; an absent `format` is an earlier release's. */
+const REFRESH_FORMAT = 2;
+
+interface FamilyRecord {
+  sub: string;
+  /** Generation of the current token (0 at issue). */
+  gen: number;
+  /** base64url sha256 of the current token's decoded bytes. */
+  cur: string;
+  /** ms: sign-in; copied forward on every rotation. */
+  createdAt: number;
+  /** ms: last issue or rotation. */
+  usedAt: number;
+  /** The earlier-release family this one continues. */
+  legacy?: string;
+}
+
+interface RefreshData {
+  families: Record<string, FamilyRecord>;
+  /** Earlier-release records: token -> record. */
+  active: Record<string, RefreshRecord>;
+  /** rotated-away token -> family, for reuse detection (OAuth 2.1 §4.14). */
+  spent: Record<string, string>;
+}
+
+const B64URL = /^[A-Za-z0-9_-]+$/;
 
 function ownEntries(o: unknown): [string, unknown][] {
   // An own `__proto__` key (JSON.parse makes one) would set the prototype when copied.
@@ -219,10 +246,78 @@ function isLegacyRecord(r: unknown): r is RefreshRecord {
   return typeof x.sub === 'string' && x.sub !== '' && typeof x.family === 'string' && typeof x.issuedAt === 'number' && Number.isFinite(x.issuedAt);
 }
 
-interface RefreshData {
-  active: Record<string, RefreshRecord>;
-  /** rotated-away token -> family, for reuse detection (OAuth 2.1 §4.14). */
-  spent: Record<string, string>;
+function isCanonicalB64(s: string, bytes: number): boolean {
+  return B64URL.test(s) && Buffer.from(s, 'base64url').length === bytes && Buffer.from(s, 'base64url').toString('base64url') === s;
+}
+
+function isFamilyRecord(key: string, r: unknown): r is FamilyRecord {
+  if (r === null || typeof r !== 'object') return false;
+  const x = r as Record<string, unknown>;
+  return (
+    isCanonicalB64(key, 16) &&
+    typeof x.sub === 'string' && x.sub !== '' &&
+    Number.isInteger(x.gen) && (x.gen as number) >= 0 && (x.gen as number) <= 0xffffffff &&
+    typeof x.cur === 'string' && x.cur.length === 43 && isCanonicalB64(x.cur, 32) &&
+    Number.isFinite(x.createdAt) && Number.isFinite(x.usedAt) &&
+    (x.legacy === undefined || typeof x.legacy === 'string')
+  );
+}
+
+function formatError(file: string, format: unknown): Error {
+  const name = basename(file);
+  return new Error(`E_REFRESH_STORE_FORMAT: ${name} was written by a newer release (format ${JSON.stringify(format)}): upgrade, or delete ${name} to sign every MCP client out`);
+}
+
+/** The decrypted plaintext, or null when the file is absent. Throws when it
+ * does not decrypt; the caller decides what that means. */
+function readPlain(file: string, masterKey: string): unknown {
+  if (!existsSync(file)) return null;
+  return decryptToken(readFileSync(file, 'utf-8'), masterKey);
+}
+
+// Outside any decrypt catch: a file from a newer release loaded as empty
+// would be erased by the next write.
+function checkFormat(file: string, d: unknown): void {
+  if (d !== null && typeof d === 'object' && Object.hasOwn(d, 'format') && (d as { format: unknown }).format !== REFRESH_FORMAT) {
+    throw formatError(file, (d as { format: unknown }).format);
+  }
+}
+
+/** Only well-formed own entries survive, so no lookup lands on an inherited
+ * key and no malformed record reaches a liveness test or the token codec.
+ * `dirty` says something was dropped. */
+function decodeData(d: unknown): { data: RefreshData; dirty: boolean } {
+  const data: RefreshData = { families: {}, active: {}, spent: {} };
+  const x = (d ?? {}) as Record<string, unknown>;
+  let dropped = 0;
+  for (const [k, f] of ownEntries(x.families)) {
+    if (isFamilyRecord(k, f)) {
+      data.families[k] = { sub: f.sub, gen: f.gen, cur: f.cur, createdAt: f.createdAt, usedAt: f.usedAt, ...(f.legacy === undefined ? {} : { legacy: f.legacy }) };
+    } else dropped += 1;
+  }
+  for (const [t, r] of ownEntries(x.active)) {
+    if (isLegacyRecord(r)) data.active[t] = { sub: r.sub, issuedAt: r.issuedAt, family: r.family };
+    else dropped += 1;
+  }
+  for (const [t, fam] of ownEntries(x.spent)) {
+    if (typeof fam === 'string') data.spent[t] = fam;
+    else dropped += 1;
+  }
+  return { data, dirty: dropped > 0 };
+}
+
+/** Boot check for a refresh store file: returns when it is absent or this
+ * release can read it; throws when it does not decrypt under `masterKey`
+ * (E_REFRESH_STORE_UNREADABLE) or a newer release wrote it
+ * (E_REFRESH_STORE_FORMAT). */
+export function assertRefreshStoreReadable(file: string, masterKey: string): void {
+  let d: unknown;
+  try {
+    d = readPlain(file, masterKey);
+  } catch (e) {
+    throw new Error(`E_REFRESH_STORE_UNREADABLE: ${basename(file)} does not decrypt with this MASTER_KEY`, { cause: e });
+  }
+  checkFormat(file, d);
 }
 
 /**
@@ -239,21 +334,14 @@ export class RefreshStore {
   ) {}
 
   private load(): RefreshData {
-    const data: RefreshData = { active: {}, spent: {} };
-    if (!existsSync(this.path)) return data;
-    let d: Partial<Record<keyof RefreshData, unknown>>;
+    let d: unknown;
     try {
-      d = decryptToken(readFileSync(this.path, 'utf-8'), this.masterKey) as unknown as typeof d;
+      d = readPlain(this.path, this.masterKey);
     } catch {
-      return data;
+      d = null;
     }
-    // Only well-formed own entries survive, so no lookup can land on an
-    // inherited key or a record without a subject.
-    for (const [t, r] of ownEntries(d?.active)) {
-      if (isLegacyRecord(r)) data.active[t] = { sub: r.sub, issuedAt: r.issuedAt, family: r.family };
-    }
-    for (const [t, fam] of ownEntries(d?.spent)) if (typeof fam === 'string') data.spent[t] = fam;
-    return data;
+    checkFormat(this.path, d);
+    return decodeData(d).data;
   }
 
   private save(data: RefreshData): void {
@@ -291,7 +379,7 @@ export class RefreshStore {
       delete data.spent[order[most.at[most.head++]]];
       total -= 1;
     }
-    atomicWriteFileSync(this.path, encryptToken(data, this.masterKey), 0o600);
+    atomicWriteFileSync(this.path, encryptToken({ format: REFRESH_FORMAT, families: data.families, active: data.active, spent: data.spent }, this.masterKey), 0o600);
   }
 
   issue(nowMs: number, sub: string, family?: string): string {

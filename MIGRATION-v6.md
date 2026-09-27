@@ -562,6 +562,12 @@ that was reachable from the internet:
    account's Google access, and review mail forwarding, filters and delegates,
    Drive sharing, and files written by the server's user.
 
+`/mcp-token`: the refresh store file (`mcp-tokens.enc`) now carries
+`format: 2`. A file whose `format` this release does not know is refused with
+`E_REFRESH_STORE_FORMAT` rather than read as empty and overwritten, and
+`assertRefreshStoreReadable(path, masterKey)` runs the same check at boot (it
+also throws `E_REFRESH_STORE_UNREADABLE` for a file that does not decrypt).
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)
@@ -636,10 +642,11 @@ This protects tokens **at rest**, not against same-user malware: exactly like a 
 
 ## 9. Rollback and downgrade traps
 
-v6 does not touch v5 tokens and does not overwrite v5 env, so rollback is clean: reinstall `mcp-google-multi@5`, keep `.env` where v5 expects it (working directory / package root), ignore `config.json`. No data is lost. Two traps to know before you downgrade:
+v6 does not touch v5 tokens and does not overwrite v5 env, so rollback is clean: reinstall `mcp-google-multi@5`, keep `.env` where v5 expects it (working directory / package root), ignore `config.json`. No data is lost. Traps to know before you downgrade:
 
 - **`MASTER_KEY` keychain-only.** If v6 auto-provisioned `MASTER_KEY` into the OS keychain with **no** env copy, an env-only v5 cannot find it and token decryption breaks. Before downgrading, export the key from the keychain into `.env` (or, during any period you might roll back, keep `MASTER_KEY` in env rather than keychain-only). v6 also mirrors an env key into the keychain on first successful decrypt to reduce this risk.
 - **`config.json` version.** A future `config.json` written by a newer v6 (`version: 2`) is rejected by an older reader with `E_CONFIG_VERSION_UNSUPPORTED` rather than crashing: but that also means a newer file won't load on an older binary. If you downgrade across a config-version bump, restore the older `config.json` from your backup (step 0).
+- **`E_REFRESH_STORE_FORMAT` on `/token`.** The refresh store file was written by a newer release. Upgrade, or delete `mcp-tokens.enc` to sign every MCP client out.
 
 Email and tool-visibility changes are code-level only: downgrading the package restores v5 behavior with no data implication.
 
