@@ -65,6 +65,11 @@ export interface HttpHostOptions {
   onArgRename?: (tool: string, renames: number) => void;
   /** Unknown-argument screening (arg-strict.ts); absent = off. */
   strictArgs?: StrictArgOptions;
+  /** Per-server cap on /mcp requests reading their body, queued or running;
+   * the next answers 429 lane_busy before its body is read. Unset = no cap. */
+  maxQueuedPerLane?: number;
+  /** Max JSON-RPC messages in one /mcp body (default 16). */
+  maxBatchFrames?: number;
 }
 
 // A hung handler that keeps the connection open would otherwise hold the global
@@ -118,6 +123,8 @@ export class HttpTransportHost {
   // core has one lane (the boot server); with resolveServer each resolved
   // server gets its own, however subjects map onto servers.
   private readonly locks = new Map<McpServer, Promise<unknown>>();
+  // Requests holding a lane slot, per server; used only with maxQueuedPerLane.
+  private readonly depth = new Map<McpServer, number>();
 
   constructor(private readonly opts: HttpHostOptions) {}
 
@@ -260,6 +267,28 @@ export class HttpTransportHost {
       }
     }
 
+    // Checked before the body read, so a refused request never buffers its body.
+    const cap = this.opts.maxQueuedPerLane;
+    if (cap === undefined) return this.admitted(req, res, target, sub);
+    const lane = target.server;
+    const held = this.depth.get(lane) ?? 0;
+    if (held >= cap) {
+      res.setHeader('Retry-After', '1');
+      this.fail(res, 429, 'lane_busy', 'too many requests are already queued for this server');
+      this.log('429 lane_busy path=/mcp');
+      return;
+    }
+    this.depth.set(lane, held + 1);
+    try {
+      await this.admitted(req, res, target, sub);
+    } finally {
+      const left = (this.depth.get(lane) ?? 1) - 1;
+      if (left > 0) this.depth.set(lane, left);
+      else this.depth.delete(lane);
+    }
+  }
+
+  private async admitted(req: IncomingMessage, res: ServerResponse, target: ServerTarget, sub: string): Promise<void> {
     // Thread the verified subject to tool handlers: the Node transport forwards
     // req.auth verbatim as ctx.http.authInfo. Token/clientId stay empty — the
     // bearer value must not re-enter the dispatch path via handler context.
@@ -276,8 +305,9 @@ export class HttpTransportHost {
     } catch (e) {
       return this.fail(res, 400, 'invalid_body', (e as Error).message);
     }
-    if (Array.isArray(body) && body.length > MAX_BATCH_FRAMES) {
-      return this.fail(res, 400, 'batch_too_large', `a JSON-RPC batch may hold at most ${MAX_BATCH_FRAMES} messages`);
+    const maxFrames = this.opts.maxBatchFrames ?? MAX_BATCH_FRAMES;
+    if (Array.isArray(body) && body.length > maxFrames) {
+      return this.fail(res, 400, 'batch_too_large', `a JSON-RPC batch may hold at most ${maxFrames} messages`);
     }
 
     // Host/Origin are enforced by the front guard above (uniformly for /mcp and
@@ -370,6 +400,9 @@ export class HttpTransportHost {
   private readJson(req: IncomingMessage): Promise<unknown> {
     const max = this.opts.maxBodyBytes ?? 4_000_000;
     return new Promise((resolve, reject) => {
+      // A client that left while the request was authenticated or resolved has
+      // already destroyed it, and no 'end' or 'error' would ever follow.
+      if (req.destroyed) return reject(new Error('request aborted'));
       let size = 0;
       const chunks: Buffer[] = [];
       req.on('data', (c: Buffer) => {

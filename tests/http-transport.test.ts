@@ -9,6 +9,7 @@ import {
   hostAllowed,
   jsonRpcMethod,
   type Authenticator,
+  type HttpHostOptions,
 } from '../src/http-transport.js';
 import { z } from "zod";
 
@@ -78,7 +79,7 @@ function makeServer(): McpServer {
 
 async function startHost(
   authenticate: Authenticator = () => ({ ok: true }),
-  extra: { dispatchTimeoutMs?: number; log?: (line: string) => void } = {},
+  extra: Partial<Omit<HttpHostOptions, 'server' | 'config' | 'authenticate'>> = {},
 ): Promise<number> {
   const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
   const host = new HttpTransportHost({ server: makeServer(), config, version: '9.9.9', ownerConfigured: true, authenticate, ...extra });
@@ -91,10 +92,11 @@ function request(
   port: number,
   method: string,
   path: string,
-  opts: { headers?: Record<string, string>; body?: unknown; signal?: AbortSignal } = {},
+  opts: { headers?: Record<string, string>; body?: unknown; raw?: string; signal?: AbortSignal } = {},
 ): Promise<{ status: number; headers: http.IncomingHttpHeaders; text: string }> {
   return new Promise((resolve, reject) => {
-    const data = opts.body !== undefined ? Buffer.from(JSON.stringify(opts.body)) : undefined;
+    const data =
+      opts.raw !== undefined ? Buffer.from(opts.raw) : opts.body !== undefined ? Buffer.from(JSON.stringify(opts.body)) : undefined;
     const req = http.request(
       {
         hostname: '127.0.0.1',
@@ -500,5 +502,153 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
     expect(logs).toContain('200 /mcp method=tools/list');
     // no params / arguments / secrets leak into the log
     expect(logs.join('\n')).not.toMatch(/params|arguments|protocolVersion/);
+  });
+});
+
+async function until(cond: () => boolean | Promise<boolean>, what: string, ms = 2000): Promise<void> {
+  const end = Date.now() + ms;
+  while (!(await cond())) {
+    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
+
+const tick = () => new Promise((r) => setImmediate(r));
+const callTool = (id: number, name: string) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: {} } });
+
+/** Two servers behind one host: sub `a` reaches A (whose `held` tool waits
+ * for the test to open its gate), sub `b` reaches B. */
+async function laneHost(extra: Partial<HttpHostOptions> = {}) {
+  let open!: () => void;
+  const gate = new Promise<void>((r) => (open = r));
+  const held = { calls: 0 };
+  const make = (name: string) => {
+    const s = new McpServer({ name, version: '0.0.0' });
+    s.registerTool('ping', { description: 'ping', inputSchema: z.object({}) }, async () => ({
+      content: [{ type: 'text' as const, text: 'pong' }],
+    }));
+    s.registerTool('held', { description: 'waits for the gate', inputSchema: z.object({}) }, async () => {
+      held.calls++;
+      await gate;
+      return { content: [{ type: 'text' as const, text: 'released' }] };
+    });
+    return s;
+  };
+  const servers: Record<string, McpServer> = { a: make('A'), b: make('B') };
+  const resolved: string[] = [];
+  const logs: string[] = [];
+  const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
+  const host = new HttpTransportHost({
+    server: makeServer(),
+    config,
+    version: '9.9.9',
+    ownerConfigured: true,
+    authenticate: (req) => ({ ok: true, sub: String(req.headers['x-test-sub'] ?? '') }),
+    resolveServer: ({ sub }) => {
+      resolved.push(sub);
+      return servers[sub] ? { server: servers[sub] } : null;
+    },
+    log: (l) => logs.push(l),
+    ...extra,
+  });
+  await host.start();
+  hosts.push(host);
+  const port = host.address()!.port;
+  const call = (sub: string, tool: string, signal?: AbortSignal) =>
+    request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT, 'x-test-sub': sub }, body: callTool(1, tool), signal });
+  const admitted = async (sub: string, n: number) => {
+    await until(() => resolved.filter((s) => s === sub).length >= n, `${n} resolutions of ${sub}`);
+    await tick();
+  };
+  return { host, port, open, held, logs, call, admitted };
+}
+
+describe('HttpTransportHost lane bounds', () => {
+  it('maxQueuedPerLane: a full lane answers 429 lane_busy while another server still completes', async () => {
+    const h = await laneHost({ maxQueuedPerLane: 2 });
+    const first = h.call('a', 'held');
+    const second = h.call('a', 'held');
+    await h.admitted('a', 2);
+    const third = await h.call('a', 'ping');
+    expect(third.status).toBe(429);
+    expect(third.headers['retry-after']).toBe('1');
+    expect(JSON.parse(third.text)).toEqual({ error: 'lane_busy', message: 'too many requests are already queued for this server' });
+    expect(h.logs).toContain('429 lane_busy path=/mcp');
+    const other = await h.call('b', 'ping');
+    expect(other.status).toBe(200);
+    expect(JSON.parse(other.text).result.content[0].text).toBe('pong');
+    h.open();
+    for (const r of await Promise.all([first, second])) expect(JSON.parse(r.text).result.content[0].text).toBe('released');
+  });
+
+  it('the lane slot is released on every exit', async () => {
+    const ping = (port: number) => request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(1, 'ping') });
+    const bodies = await startHost(undefined, { maxQueuedPerLane: 1, maxBodyBytes: 200 });
+    await request(bodies, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, raw: 'x'.repeat(400) }).catch(() => undefined);
+    expect((await ping(bodies)).status).toBe(200);
+    const bad = await request(bodies, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, raw: '{not json' });
+    expect(JSON.parse(bad.text).error).toBe('invalid_body');
+    expect((await ping(bodies)).status).toBe(200);
+    const batch = await request(bodies, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, raw: JSON.stringify(Array.from({ length: 17 }, () => ({}))) });
+    expect(JSON.parse(batch.text).error).toBe('batch_too_large');
+    expect((await ping(bodies)).status).toBe(200);
+
+    const runs = await startHost(undefined, { maxQueuedPerLane: 1, dispatchTimeoutMs: 80 });
+    const hung = await request(runs, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(2, 'hang') });
+    expect(hung.status).toBe(504);
+    expect((await ping(runs)).status).toBe(200);
+    const ac = new AbortController();
+    const left = request(runs, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(3, 'slow'), signal: ac.signal }).catch(() => undefined);
+    await new Promise((r) => setTimeout(r, 20));
+    ac.abort();
+    await left;
+    await until(async () => (await ping(runs)).status === 200, 'the slot of a client that left mid-dispatch');
+  });
+
+  it('a client that leaves before its body is read releases its slot', async () => {
+    let calls = 0;
+    const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
+    const server = makeServer();
+    const host = new HttpTransportHost({
+      server: makeServer(),
+      config,
+      version: '9.9.9',
+      ownerConfigured: true,
+      authenticate: () => ({ ok: true }),
+      maxQueuedPerLane: 1,
+      resolveServer: async () => {
+        if (calls++ === 0) await new Promise((r) => setTimeout(r, 100));
+        return { server };
+      },
+    });
+    await host.start();
+    hosts.push(host);
+    const port = host.address()!.port;
+    const ac = new AbortController();
+    const left = request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(1, 'ping'), signal: ac.signal }).catch(() => undefined);
+    await until(() => calls === 1, 'the first resolution');
+    ac.abort();
+    await left;
+    await new Promise((r) => setTimeout(r, 150));
+    const after = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(2, 'ping') });
+    expect(after.status).toBe(200);
+  });
+
+  it('without maxQueuedPerLane, 20 requests queued on one lane all complete', async () => {
+    const port = await startHost();
+    const results = await Promise.all(
+      Array.from({ length: 20 }, (_, i) => request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(i, 'ping') })),
+    );
+    for (const r of results) expect(JSON.parse(r.text).result.content[0].text).toBe('pong');
+  });
+
+  it('maxBatchFrames 1 refuses a 2-frame batch and still dispatches a 1-frame array', async () => {
+    const port = await startHost(undefined, { maxBatchFrames: 1 });
+    const two = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: [callTool(1, 'ping'), callTool(2, 'ping')] });
+    expect(two.status).toBe(400);
+    expect(JSON.parse(two.text)).toEqual({ error: 'batch_too_large', message: 'a JSON-RPC batch may hold at most 1 messages' });
+    const one = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: [callTool(3, 'ping')] });
+    expect(one.status).toBe(200);
+    expect(one.text).toContain('pong');
   });
 });

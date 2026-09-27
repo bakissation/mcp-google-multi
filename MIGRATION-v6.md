@@ -438,6 +438,16 @@ comparing, when either input is longer. `/http-transport`: `/mcp` answers
 2025-06-18 has no batching; one body could otherwise multiply per-call
 work).
 
+`/http-transport`: `HttpHostOptions.maxQueuedPerLane` caps the `/mcp`
+requests one resolved server holds at once, counting those reading their
+body, queued on its lane or running. The next request for that server is
+answered 429 `lane_busy` with `Retry-After: 1`, after authentication and
+`resolveServer` and before its body is read, so other servers' lanes are
+unaffected. `HttpHostOptions.maxBatchFrames` sets the batch cap (default
+16); `1` refuses any array body of more than one message with the same 400
+`batch_too_large`. Both are unset by default, which leaves the single-owner
+host unchanged.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)
