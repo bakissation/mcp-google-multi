@@ -516,6 +516,18 @@ process owns also loses its group and other bits when a document is written,
 keeping setuid, setgid and sticky. A `DISCOVERY_CACHE_PATH` override (or an
 injected `cacheDir`) keeps its mode.
 
+`/oauth-as`: the owner sign-in (`owner_gate`) must now finish in the browser
+that started it. The redirect to Google sets a per-flow cookie
+(`__Host-mgm-og-*` on an https base, `mgm-og-*` without `Secure` on an http
+base) and signs its hash into the state (`StatePayload.bind`); `/callback`
+answers 400 `E_BROWSER_MISMATCH`, with no redirect, no code exchange and no
+`resolveSubject` call, when the cookie is missing or different. A client that
+opens `/authorize` in the system browser completes as before. A Google URL
+copied to another browser or device no longer signs in, and a state signed by
+an earlier release (no `bind`) is refused, so a sign-in in flight across the
+upgrade has to start again. The DCR consent page is now sent with
+`frame-ancestors 'none'`. `alias_add` and `alias_reauth` are unchanged.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)

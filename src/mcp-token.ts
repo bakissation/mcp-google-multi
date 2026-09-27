@@ -78,6 +78,9 @@ export interface StatePayload {
   /** alias_add only: an opaque value the minting caller chose, signed like
    * tenantId and handed back to its binder (e.g. a server-side link record). */
   nonce?: string;
+  /** owner_gate only: base64url sha256 of the browser-binding cookie the
+   * Google redirect set; /callback refuses a browser that lacks it. */
+  bind?: string;
 }
 
 export interface CodePayload {
