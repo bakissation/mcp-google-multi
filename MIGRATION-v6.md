@@ -510,6 +510,12 @@ timeout names the lock file). The real message now goes to
 without the query string. The slug is unchanged; a caller that parsed the
 message must read the server log instead.
 
+Discovery cache: directory levels `loadMethodIndex` creates are now 0700. On
+the default path (`DISCOVERY_CACHE_PATH` unset) an existing directory this
+process owns also loses its group and other bits when a document is written,
+keeping setuid, setgid and sticky. A `DISCOVERY_CACHE_PATH` override (or an
+injected `cacheDir`) keeps its mode.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)
