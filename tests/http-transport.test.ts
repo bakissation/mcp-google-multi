@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import http from 'node:http';
+import net from 'node:net';
 import { McpServer } from "@modelcontextprotocol/server";
 import { resolveHttpConfig } from '../src/http-config.js';
 import {
@@ -516,6 +517,19 @@ async function until(cond: () => boolean | Promise<boolean>, what: string, ms = 
 const tick = () => new Promise((r) => setImmediate(r));
 const callTool = (id: number, name: string) => ({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: {} } });
 
+/** One /mcp POST as raw bytes, so a test can pipeline several on one socket. */
+function rawPost(frame: unknown, headers: Record<string, string> = {}): string {
+  const body = JSON.stringify(frame);
+  const head = { host: '127.0.0.1', accept: MCP_ACCEPT, 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body)), ...headers };
+  return `POST /mcp HTTP/1.1\r\n${Object.entries(head).map(([k, v]) => `${k}: ${v}\r\n`).join('')}\r\n${body}`;
+}
+
+function rawSocket(port: number): net.Socket {
+  const socket = net.connect(port, '127.0.0.1');
+  socket.on('error', () => undefined);
+  return socket;
+}
+
 /** Two servers behind one host: sub `a` reaches A (whose `held` tool waits
  * for the test to open its gate), sub `b` reaches B. */
 async function laneHost(extra: Partial<HttpHostOptions> = {}) {
@@ -632,6 +646,39 @@ describe('HttpTransportHost lane bounds', () => {
     await new Promise((r) => setTimeout(r, 150));
     const after = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(2, 'ping') });
     expect(after.status).toBe(200);
+  });
+
+  it.each([undefined, 2])('a request whose client left while queued is never dispatched (maxQueuedPerLane %s)', async (cap) => {
+    const h = await laneHost({ maxQueuedPerLane: cap });
+    const running = h.call('a', 'held');
+    await until(() => h.held.calls === 1, 'the running call');
+    const ac = new AbortController();
+    const queued = h.call('a', 'held', ac.signal).catch(() => undefined);
+    await h.admitted('a', 2);
+    ac.abort();
+    await queued;
+    await new Promise((r) => setTimeout(r, 50));
+    h.open();
+    expect(JSON.parse((await running).text).result.content[0].text).toBe('released');
+    await until(() => h.logs.includes('499 client_gone path=/mcp'), 'the client_gone line');
+    expect((await h.call('a', 'ping')).status).toBe(200);
+    expect(h.held.calls).toBe(1);
+    expect((h.host as unknown as { depth: Map<unknown, unknown> }).depth.size).toBe(0);
+  });
+
+  it('a request pipelined behind a held one is never dispatched once its connection is gone', async () => {
+    const h = await laneHost();
+    const socket = rawSocket(h.port);
+    socket.write(rawPost(callTool(1, 'held'), { 'x-test-sub': 'a' }) + rawPost(callTool(2, 'held'), { 'x-test-sub': 'a' }));
+    await until(() => h.held.calls === 1, 'the running call');
+    await h.admitted('a', 2);
+    await new Promise((r) => setTimeout(r, 50));
+    socket.destroy();
+    await new Promise((r) => setTimeout(r, 50));
+    h.open();
+    await until(() => h.logs.includes('499 client_gone path=/mcp'), 'the client_gone line');
+    expect((await h.call('a', 'ping')).status).toBe(200);
+    expect(h.held.calls).toBe(1);
   });
 
   it('without maxQueuedPerLane, 20 requests queued on one lane all complete', async () => {

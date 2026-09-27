@@ -448,6 +448,12 @@ unaffected. `HttpHostOptions.maxBatchFrames` sets the batch cap (default
 `batch_too_large`. Both are unset by default, which leaves the single-owner
 host unchanged.
 
+`/http-transport`: a `/mcp` request whose client disconnected while it
+waited on its server's lane is no longer dispatched when its turn comes; the
+host logs `499 client_gone path=/mcp` and the lane moves on. That includes a request pipelined behind another on a connection the client has dropped. Before, a
+queued write whose client had timed out still ran later, and the client's
+retry could run it twice. This applies with or without the new options.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)

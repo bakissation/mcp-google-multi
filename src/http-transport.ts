@@ -233,6 +233,14 @@ export class HttpTransportHost {
       return this.fail(res, 405, 'method_not_allowed', 'POST /mcp only (stateless mode; no GET SSE).');
     }
     if (!this.frontGuard(req, res)) return;
+    // Registered before anything awaits: a client that leaves while its request
+    // waits on the lane must not have it dispatched once its turn comes. A
+    // response queued behind another on its connection never emits 'close', so
+    // the socket is checked too.
+    let gone = false;
+    res.once('close', () => (gone = true));
+    const socket = req.socket;
+    const clientGone = () => gone || socket.destroyed;
 
     const auth = await this.opts.authenticate(req);
     if (!auth.ok) {
@@ -269,7 +277,7 @@ export class HttpTransportHost {
 
     // Checked before the body read, so a refused request never buffers its body.
     const cap = this.opts.maxQueuedPerLane;
-    if (cap === undefined) return this.admitted(req, res, target, sub);
+    if (cap === undefined) return this.admitted(req, res, target, sub, clientGone);
     const lane = target.server;
     const held = this.depth.get(lane) ?? 0;
     if (held >= cap) {
@@ -280,7 +288,7 @@ export class HttpTransportHost {
     }
     this.depth.set(lane, held + 1);
     try {
-      await this.admitted(req, res, target, sub);
+      await this.admitted(req, res, target, sub, clientGone);
     } finally {
       const left = (this.depth.get(lane) ?? 1) - 1;
       if (left > 0) this.depth.set(lane, left);
@@ -288,7 +296,13 @@ export class HttpTransportHost {
     }
   }
 
-  private async admitted(req: IncomingMessage, res: ServerResponse, target: ServerTarget, sub: string): Promise<void> {
+  private async admitted(
+    req: IncomingMessage,
+    res: ServerResponse,
+    target: ServerTarget,
+    sub: string,
+    clientGone: () => boolean,
+  ): Promise<void> {
     // Thread the verified subject to tool handlers: the Node transport forwards
     // req.auth verbatim as ctx.http.authInfo. Token/clientId stay empty — the
     // bearer value must not re-enter the dispatch path via handler context.
@@ -334,6 +348,10 @@ export class HttpTransportHost {
     // subjects to one) would otherwise race it through the connect gap.
     const { server: mcpServer, argShapeFor, strictArgs, validationEnvelope } = target;
     await this.serializeFor(mcpServer, async () => {
+      if (clientGone()) {
+        this.log('499 client_gone path=/mcp');
+        return;
+      }
       const disconnected = new Promise<'closed'>((resolve) => res.once('close', () => resolve('closed')));
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timedOut = new Promise<'timeout'>((resolve) => {
