@@ -7,7 +7,7 @@ import path from 'node:path';
 import { McpServer } from "@modelcontextprotocol/server";
 import { resolveHttpConfig } from '../src/http-config.js';
 import { HttpTransportHost } from '../src/http-transport.js';
-import { buildAuthServer, redirectAllowed, verifiedEmailFromIdToken, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServer, type AuthServerDeps } from '../src/oauth-as.js';
+import { buildAuthServer, redirectAllowed, verifiedEmailFromIdToken, verifiedIdentityFromIdToken, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServer, type AuthServerDeps } from '../src/oauth-as.js';
 import { jwtSecretFrom, signAccessToken, signPending, signReauthLink, verifyAccessToken } from '../src/mcp-token.js';
 import { SsrfBlockedError } from '../src/ssrf-guard.js';
 import { z } from "zod";
@@ -730,6 +730,49 @@ describe('alias_add flow + resolveSubject seam (S1.14)', () => {
     expect(cb.status).toBe(302);
     expect(new URL(cb.headers.location as string).searchParams.get('error')).toBe('access_denied');
   });
+
+  const ownerGateCallback = async (port: number) => {
+    const authz = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
+    return req(port, 'GET', `/callback?code=member-code&state=${encodeURIComponent(stateFrom(authz.headers.location as string))}`);
+  };
+
+  it('owner_gate hands resolveSubject the verified Google sub and hd', async () => {
+    const seen: unknown[][] = [];
+    const { port } = await startMt({}, {
+      exchangeCode: async () => ({ tokens: {}, email: 'member@x.example', sub: '1234', hd: 'x.example' }),
+      resolveSubject: (...args) => {
+        seen.push(args);
+        return { sub: 'tenant-a' };
+      },
+    });
+    const cb = await ownerGateCallback(port);
+    expect(cb.status).toBe(302);
+    expect(new URL(cb.headers.location as string).searchParams.get('code')).toBeTruthy();
+    expect(seen).toEqual([['member@x.example', { sub: '1234', hd: 'x.example' }]]);
+  });
+
+  it('an exchange without a sub still resolves by email', async () => {
+    const seen: unknown[][] = [];
+    const { port } = await startMt({}, {
+      resolveSubject: (...args) => {
+        seen.push(args);
+        return null;
+      },
+    });
+    const cb = await ownerGateCallback(port);
+    expect(new URL(cb.headers.location as string).searchParams.get('error')).toBe('access_denied');
+    expect(seen).toEqual([['member@x.example', { sub: undefined, hd: undefined }]]);
+  });
+
+  it('alias_add hands bindTenantAlias the verified sub', async () => {
+    const { port, as } = await startMt({}, {
+      exchangeCode: async () => ({ tokens: { refresh_token: 'g-rt' }, email: 'member@x.example', sub: '1234', hd: 'x.example' }),
+    });
+    const cb = await complete(port, await googleLegState(port, as, { flow: 'alias_add', alias: 'work', tenantId: 'tenant-a' }));
+    expect(cb.status).toBe(200);
+    expect(binds[0]).toMatchObject({ tenantId: 'tenant-a', alias: 'work', email: 'member@x.example', sub: '1234' });
+    expect(binds[0]).not.toHaveProperty('hd');
+  });
 });
 
 describe('verifiedEmailFromIdToken', () => {
@@ -743,5 +786,27 @@ describe('verifiedEmailFromIdToken', () => {
     expect(verifiedEmailFromIdToken('not-a-jwt')).toBeUndefined();
     expect(verifiedEmailFromIdToken(undefined)).toBeUndefined();
     expect(verifiedEmailFromIdToken(null)).toBeUndefined();
+  });
+
+  it('verifiedIdentityFromIdToken returns email, sub and hd only for a verified email', () => {
+    const claims = { email: 'a@x.example', sub: '1234', hd: 'x.example' };
+    expect(verifiedIdentityFromIdToken(idToken({ ...claims, email_verified: true }))).toEqual(claims);
+    expect(verifiedIdentityFromIdToken(idToken({ ...claims, email_verified: 'true' }))).toEqual(claims);
+    expect(verifiedIdentityFromIdToken(idToken({ ...claims, email_verified: false }))).toBeUndefined();
+    expect(verifiedIdentityFromIdToken(idToken(claims))).toBeUndefined();
+    expect(verifiedIdentityFromIdToken('not-a-jwt')).toBeUndefined();
+    expect(verifiedIdentityFromIdToken(undefined)).toBeUndefined();
+    expect(verifiedIdentityFromIdToken(idToken({ email: 'c@consumer.example', email_verified: true, sub: '99' }))).toEqual({ email: 'c@consumer.example', sub: '99' });
+  });
+
+  it('verifiedIdentityFromIdToken drops a sub that is not a 1-255 character printable string, and an hd that is not a domain', () => {
+    const identity = (extra: Record<string, unknown>) => verifiedIdentityFromIdToken(idToken({ email: 'a@x.example', email_verified: true, ...extra }));
+    for (const sub of [1234, '', 'x'.repeat(256), '12 34', '12\u00e934']) expect(identity({ sub })).toEqual({ email: 'a@x.example' });
+    expect(identity({ sub: 'x'.repeat(255) })?.sub).toBe('x'.repeat(255));
+    const longHd = `${'a'.repeat(63)}.${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(62)}`;
+    expect(longHd).toHaveLength(254);
+    for (const hd of ['x', 'a b.c', longHd, 7, '.x.example', 'x.example.', 'x..example']) expect(identity({ hd })).toEqual({ email: 'a@x.example' });
+    expect(identity({ hd: longHd.slice(1) })?.hd).toBe(longHd.slice(1));
+    expect(identity({ hd: 'Sub-1.X.example' })?.hd).toBe('Sub-1.X.example');
   });
 });

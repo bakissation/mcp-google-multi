@@ -387,6 +387,25 @@ next tool error hands out a fresh one. `mintFlowState` is typed for
 completion page name the scopes Google's consent left out; a narrower grant
 keeps a stored token instead of replacing it.
 
+`/oauth-as`: `resolveSubject` receives an optional second argument
+`{ sub, hd }`, Google's stable account id and Workspace hosted domain, when the
+code exchange returned them, so a tenant resolver can key on the account
+rather than an address that can be reassigned. `GoogleExchangeResult` gains
+optional `sub` and `hd`, and `TenantAliasBind` gains `sub`.
+`verifiedIdentityFromIdToken` returns `{ email, sub, hd }` under the same
+verified-email rule as `verifiedEmailFromIdToken`, dropping a malformed `sub`
+or `hd`. The default resolver and the owner's own exchange are unchanged.
+
+`/fs-atomic`: `withFileLock` keeps its owner file linked to the lock while it
+is held, and the owner file's name records the holder's pid, PID namespace id,
+process start time and boot. A lock whose recorded process is no longer
+running is broken at once, including one a crashed container left behind for
+its restarted successor, which usually reuses both the pid and the namespace
+id. A lock from another namespace or boot is broken only once it is 60 s old,
+and a lock written by an older release (no owner file) keeps the pid probe and
+gains the same lease. One waiter at a time breaks a dead lock. The lock body
+and the signature are unchanged; `__setLockIdentityForTest` is a test hook.
+
 `/accounts` exports `liveAccountCheck` and `isLiveAccountField`: an `account`
 field built on the live check (as `accountArgLive` builds it) validates
 against the registry's current aliases at parse time and counts as a
