@@ -558,7 +558,10 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     try {
       exchanged = deps.exchangeCode ? await deps.exchangeCode(code, st.flow) : { tokens: {} };
     } catch (e) {
-      return errorPage(res, 400, 'invalid_grant', `Google code exchange failed: ${(e as Error).message}`);
+      // The detail can name proxies and hosts; it goes to the log, not the browser.
+      const detail = e instanceof Error ? e.message : typeof e === 'string' ? e : 'non-Error rejection';
+      log(`callback exchange failed flow=${st.flow}: ${detail.replace(/[\r\n]+/g, ' ')}`);
+      return errorPage(res, 400, 'invalid_grant', 'Google could not complete the sign-in; start again from your app');
     }
 
     if (st.flow === 'alias_add') {

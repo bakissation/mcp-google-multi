@@ -677,6 +677,40 @@ describe('owner_gate Google leg is bound to the browser that started it (H4 F1)'
   });
 });
 
+describe('a failed Google code exchange answers a generic page (H4 F12)', () => {
+  const detail = 'request to https://oauth2.googleapis.com/token failed, reason: connect ECONNREFUSED 10.9.8.7:3128\nproxy-authorization: Basic c2VjcmV0';
+
+  it('owner_gate and alias_reauth show no exchange detail; the log gets it on one line', async () => {
+    const logs: string[] = [];
+    const port = await start({
+      exchangeCode: async () => {
+        throw new Error(detail);
+      },
+      log: (l) => logs.push(l),
+    });
+    const owner = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).headers.location as string);
+    const reauth = stateFrom((await req(port, 'GET', reauthPath('work'))).headers.location as string);
+    for (const [flow, state] of [['owner_gate', owner], ['alias_reauth', reauth]]) {
+      const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`);
+      expect(cb.status).toBe(400);
+      expect(cb.headers.location).toBeUndefined();
+      expect(cb.text).toBe('invalid_grant: Google could not complete the sign-in; start again from your app');
+      const line = logs.find((l) => l.startsWith(`callback exchange failed flow=${flow}:`));
+      expect(line).toContain('ECONNREFUSED 10.9.8.7:3128');
+      expect(line).not.toMatch(/[\r\n]/);
+    }
+    expect(written.work).toBeUndefined();
+  });
+
+  it('a non-Error rejection still answers the generic page', async () => {
+    const port = await start({ exchangeCode: () => Promise.reject(undefined) });
+    const state = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).headers.location as string);
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`);
+    expect(cb.status).toBe(400);
+    expect(cb.text).toBe('invalid_grant: Google could not complete the sign-in; start again from your app');
+  });
+});
+
 describe('DCR /register bounds (unbounded-store DoS guard)', () => {
   it('rejects too many redirect_uris', async () => {
     const port = await start();

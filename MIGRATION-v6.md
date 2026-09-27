@@ -528,6 +528,15 @@ an earlier release (no `bind`) is refused, so a sign-in in flight across the
 upgrade has to start again. The DCR consent page is now sent with
 `frame-ancestors 'none'`. `alias_add` and `alias_reauth` are unchanged.
 
+`/oauth-as`: when `exchangeCode` throws, `/callback` now answers 400
+`invalid_grant: Google could not complete the sign-in; start again from your
+app` for every flow. Before, the page carried `Google code exchange failed: `
+plus the thrown message, which on a network failure names hosts and proxies.
+The message now goes to `AuthServerDeps.log` as
+`callback exchange failed flow=<flow>: <message>`, on one line. The slug and
+status are unchanged, and a rejection that is not an `Error` gets the same
+page instead of an unhandled route error.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)
