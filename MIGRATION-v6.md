@@ -502,6 +502,14 @@ purged) keeps none. An older token is still refused (`invalid_grant`) without
 revoking. The store file keeps its shape and encryption: a file from an earlier
 release loads as is, and an earlier release reads a file this one wrote.
 
+`/http-transport`: a request whose handler throws before its response starts
+is answered 500 `{"error":"internal_error","message":"internal error"}`.
+Before, `message` was the thrown message, which can name server paths (a lock
+timeout names the lock file). The real message now goes to
+`HttpHostOptions.log` as `500 internal_error path=<pathname>: <message>`,
+without the query string. The slug is unchanged; a caller that parsed the
+message must read the server log instead.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)

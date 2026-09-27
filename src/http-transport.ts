@@ -139,6 +139,16 @@ function stopReading(socket: Socket): void {
   socket.resume = () => socket;
 }
 
+// For a log line: the pathname only (a query can carry a code or a state),
+// and never a throw, since the caller is the catch-all.
+function pathOf(req: IncomingMessage): string {
+  try {
+    return new URL(req.url ?? '/', 'http://localhost').pathname;
+  } catch {
+    return '?';
+  }
+}
+
 export class HttpTransportHost {
   private httpServer?: Server;
   // Serialize the connect→dispatch critical section PER SERVER: a McpServer
@@ -211,8 +221,21 @@ export class HttpTransportHost {
       res.once('close', settle);
       // Never rejects: close() waits on it, and a catch-all that itself threw
       // must neither reject close() nor surface as an unhandled rejection.
+      // The thrown message can name server paths (a lock timeout does), so it
+      // goes only to the host's log.
       const done = this.handle(req, res)
-        .catch((e) => this.fail(res, 500, 'internal_error', (e as Error).message))
+        .catch((e) => {
+          try {
+            this.fail(res, 500, 'internal_error', 'internal error');
+          } finally {
+            // A throwing log must not reach the destroy below: the answer is sent.
+            try {
+              this.log(`500 internal_error path=${pathOf(req)}: ${e instanceof Error ? e.message : 'non-Error throw'}`);
+            } catch {
+              // nowhere left to report it
+            }
+          }
+        })
         .catch(() => void res.destroy());
       this.handling.add(done);
       void done.finally(() => this.handling.delete(done));
