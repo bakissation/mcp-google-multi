@@ -8,6 +8,7 @@ import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 // loopback-owner authenticator so the local-HTTP model works before the AS lands.
 
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
+import type { Socket } from 'node:net';
 import type { HttpConfig } from './http-config.js';
 import { withArgNormalization, type ArgShape, type StrictArgOptions, withValidationEnvelope, type ValidationEnvelopeOptions } from './arg-normalize.js';
 export type AuthOutcome =
@@ -65,6 +66,11 @@ export interface HttpHostOptions {
   onArgRename?: (tool: string, renames: number) => void;
   /** Unknown-argument screening (arg-strict.ts); absent = off. */
   strictArgs?: StrictArgOptions;
+  /** Per-server cap on /mcp requests reading their body, queued or running;
+   * the next answers 429 lane_busy before its body is read. Unset = no cap. */
+  maxQueuedPerLane?: number;
+  /** Max JSON-RPC messages in one /mcp body (default 16). */
+  maxBatchFrames?: number;
 }
 
 // A hung handler that keeps the connection open would otherwise hold the global
@@ -109,6 +115,30 @@ export function jsonRpcMethod(body: unknown): string {
 }
 
 
+/** setTimeout fires at once for a delay above this, so a longer grace would
+ * cut every connection immediately. */
+const MAX_GRACE_MS = 2 ** 31 - 1;
+
+// A lingering close: a socket destroyed while its client is still sending (a
+// body pipelined after the close) is reset by the kernel, which drops whatever
+// of the last response is still unsent. So the socket only ends its side and
+// waits for the client's FIN, or for the grace to end.
+function endAfterFlush(socket: Socket): void {
+  if (socket.destroyed || socket.writableEnded) return;
+  socket.end();
+}
+
+// A request that arrives while closing is never answered, so Node keeps it
+// until the socket closes, and a flood pipelined behind a held response would
+// pile up without limit. Reading stops for good instead, which lets TCP flow
+// control stop the client. Node resumes a socket after every parsed request
+// and on drain, so resume becomes a no-op. Such a socket never sees the
+// client's FIN either: the grace ends it.
+function stopReading(socket: Socket): void {
+  socket.pause();
+  socket.resume = () => socket;
+}
+
 export class HttpTransportHost {
   private httpServer?: Server;
   // Serialize the connect→dispatch critical section PER SERVER: a McpServer
@@ -118,6 +148,16 @@ export class HttpTransportHost {
   // core has one lane (the boot server); with resolveServer each resolved
   // server gets its own, however subjects map onto servers.
   private readonly locks = new Map<McpServer, Promise<unknown>>();
+  // Requests holding a lane slot, per server; used only with maxQueuedPerLane.
+  private readonly depth = new Map<McpServer, number>();
+  // What a graceful close waits on: open sockets, per socket the requests it
+  // has accepted whose response has not settled and the last of them, and
+  // every handle() that has not settled.
+  private readonly sockets = new Set<Socket>();
+  private readonly pending = new Map<Socket, { count: number; last: ServerResponse }>();
+  private readonly handling = new Set<Promise<void>>();
+  private closing = false;
+  private graceful?: Promise<void>;
 
   constructor(private readonly opts: HttpHostOptions) {}
 
@@ -145,7 +185,44 @@ export class HttpTransportHost {
   async start(): Promise<void> {
     const { config } = this.opts;
     const server = createServer((req, res) => {
-      this.handle(req, res).catch((e) => this.fail(res, 500, 'internal_error', (e as Error).message));
+      const socket = req.socket;
+      // Once closing, a connection ends after the last request it accepted
+      // before the close, so one arriving now is never handled (RFC 9112 9.6).
+      // Its body is left unread: nothing reads the socket again.
+      if (this.closing) {
+        stopReading(socket);
+        return;
+      }
+      const entry = this.pending.get(socket);
+      if (entry) {
+        entry.count++;
+        entry.last = res;
+      } else this.pending.set(socket, { count: 1, last: res });
+      let settled = false;
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        const e = this.pending.get(socket);
+        if (!e || --e.count > 0) return;
+        this.pending.delete(socket);
+        if (this.closing) endAfterFlush(socket);
+      };
+      res.once('finish', settle);
+      res.once('close', settle);
+      // Never rejects: close() waits on it, and a catch-all that itself threw
+      // must neither reject close() nor surface as an unhandled rejection.
+      const done = this.handle(req, res)
+        .catch((e) => this.fail(res, 500, 'internal_error', (e as Error).message))
+        .catch(() => void res.destroy());
+      this.handling.add(done);
+      void done.finally(() => this.handling.delete(done));
+    });
+    server.on('connection', (socket: Socket) => {
+      this.sockets.add(socket);
+      socket.once('close', () => {
+        this.sockets.delete(socket);
+        this.pending.delete(socket);
+      });
     });
     // Slow-loris mitigation behind the tunnel.
     server.headersTimeout = 15_000;
@@ -162,14 +239,70 @@ export class HttpTransportHost {
     this.log(`listening on ${config.host}:${config.port} (public ${config.publicUrl}, transport ${config.transport})`);
   }
 
-  async close(): Promise<void> {
+  /** Without graceMs, every connection is cut at once, even during a graceful
+   * close. With it, the host stops accepting, lets in-flight requests finish
+   * and their responses finish writing, then resolves once each client has
+   * closed its side; whatever is still open after graceMs is cut. A repeat
+   * call with graceMs during a graceful close joins it, keeping the first
+   * grace. graceMs must be a number from 0 to 2^31-1 ms (about 24.8 days, the
+   * longest delay a timer holds); anything else, Infinity included, rejects
+   * with a TypeError and leaves the host as it was. */
+  async close(opts: { graceMs?: number } = {}): Promise<void> {
+    const { graceMs } = opts;
+    if (graceMs !== undefined && !(typeof graceMs === 'number' && graceMs >= 0 && graceMs <= MAX_GRACE_MS)) {
+      throw new TypeError(`graceMs must be a number from 0 to ${MAX_GRACE_MS}`);
+    }
     const s = this.httpServer;
     if (!s) return;
-    await new Promise<void>((resolve) => {
-      s.close(() => resolve());
-      s.closeAllConnections?.();
+    if (graceMs === undefined) {
+      await new Promise<void>((resolve) => {
+        s.close(() => resolve());
+        s.closeAllConnections?.();
+      });
+      this.httpServer = undefined;
+      return;
+    }
+    // Starting over would destroy every socket in its lingering close.
+    this.graceful ??= this.closeGracefully(s, graceMs).finally(() => (this.graceful = undefined));
+    return this.graceful;
+  }
+
+  private async closeGracefully(s: Server, graceMs: number): Promise<void> {
+    this.closing = true;
+    // Node's close() also destroys every connection it deems idle, and that
+    // includes one whose response has ended but is still flushing: a large
+    // body would be cut short. Idle sockets are closed below instead.
+    const nodeIdleCloser = s.closeIdleConnections;
+    s.closeIdleConnections = () => undefined;
+    const closed = new Promise<void>((resolve) => s.close(() => resolve()));
+    s.closeIdleConnections = nodeIdleCloser;
+    // Every request accepted before now is answered, and a connection ends
+    // after the last of them: that one says so if it has not started, and the
+    // settle hook in start() ends the socket once it finishes. Node itself
+    // destroys a socket once a Connection: close response is flushed, which
+    // resets it just as endAfterFlush explains, so that end lingers too.
+    for (const socket of this.sockets) {
+      const entry = this.pending.get(socket);
+      if (!entry) {
+        socket.destroy();
+        continue;
+      }
+      socket.destroySoon = () => endAfterFlush(socket);
+      if (!entry.last.headersSent) entry.last.setHeader('Connection', 'close');
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, graceMs);
     });
-    this.httpServer = undefined;
+    try {
+      await Promise.race([closed.then(() => Promise.all(this.handling)), expired]);
+    } finally {
+      clearTimeout(timer);
+      s.closeAllConnections();
+      await closed;
+      this.httpServer = undefined;
+      this.closing = false;
+    }
   }
 
   /** The bound port (useful when listening on port 0 in tests). */
@@ -226,6 +359,14 @@ export class HttpTransportHost {
       return this.fail(res, 405, 'method_not_allowed', 'POST /mcp only (stateless mode; no GET SSE).');
     }
     if (!this.frontGuard(req, res)) return;
+    // Registered before anything awaits: a client that leaves while its request
+    // waits on the lane must not have it dispatched once its turn comes. A
+    // response queued behind another on its connection never emits 'close', so
+    // the socket is checked too.
+    let gone = false;
+    res.once('close', () => (gone = true));
+    const socket = req.socket;
+    const clientGone = () => gone || socket.destroyed;
 
     const auth = await this.opts.authenticate(req);
     if (!auth.ok) {
@@ -260,6 +401,34 @@ export class HttpTransportHost {
       }
     }
 
+    // Checked before the body read, so a refused request never buffers its body.
+    const cap = this.opts.maxQueuedPerLane;
+    if (cap === undefined) return this.admitted(req, res, target, sub, clientGone);
+    const lane = target.server;
+    const held = this.depth.get(lane) ?? 0;
+    if (held >= cap) {
+      res.setHeader('Retry-After', '1');
+      this.fail(res, 429, 'lane_busy', 'too many requests are already queued for this server');
+      this.log('429 lane_busy path=/mcp');
+      return;
+    }
+    this.depth.set(lane, held + 1);
+    try {
+      await this.admitted(req, res, target, sub, clientGone);
+    } finally {
+      const left = (this.depth.get(lane) ?? 1) - 1;
+      if (left > 0) this.depth.set(lane, left);
+      else this.depth.delete(lane);
+    }
+  }
+
+  private async admitted(
+    req: IncomingMessage,
+    res: ServerResponse,
+    target: ServerTarget,
+    sub: string,
+    clientGone: () => boolean,
+  ): Promise<void> {
     // Thread the verified subject to tool handlers: the Node transport forwards
     // req.auth verbatim as ctx.http.authInfo. Token/clientId stay empty — the
     // bearer value must not re-enter the dispatch path via handler context.
@@ -276,8 +445,9 @@ export class HttpTransportHost {
     } catch (e) {
       return this.fail(res, 400, 'invalid_body', (e as Error).message);
     }
-    if (Array.isArray(body) && body.length > MAX_BATCH_FRAMES) {
-      return this.fail(res, 400, 'batch_too_large', `a JSON-RPC batch may hold at most ${MAX_BATCH_FRAMES} messages`);
+    const maxFrames = this.opts.maxBatchFrames ?? MAX_BATCH_FRAMES;
+    if (Array.isArray(body) && body.length > maxFrames) {
+      return this.fail(res, 400, 'batch_too_large', `a JSON-RPC batch may hold at most ${maxFrames} messages`);
     }
 
     // Host/Origin are enforced by the front guard above (uniformly for /mcp and
@@ -304,6 +474,10 @@ export class HttpTransportHost {
     // subjects to one) would otherwise race it through the connect gap.
     const { server: mcpServer, argShapeFor, strictArgs, validationEnvelope } = target;
     await this.serializeFor(mcpServer, async () => {
+      if (clientGone()) {
+        this.log('499 client_gone path=/mcp');
+        return;
+      }
       const disconnected = new Promise<'closed'>((resolve) => res.once('close', () => resolve('closed')));
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timedOut = new Promise<'timeout'>((resolve) => {
@@ -370,6 +544,9 @@ export class HttpTransportHost {
   private readJson(req: IncomingMessage): Promise<unknown> {
     const max = this.opts.maxBodyBytes ?? 4_000_000;
     return new Promise((resolve, reject) => {
+      // A client that left while the request was authenticated or resolved has
+      // already destroyed it, and no 'end' or 'error' would ever follow.
+      if (req.destroyed) return reject(new Error('request aborted'));
       let size = 0;
       const chunks: Buffer[] = [];
       req.on('data', (c: Buffer) => {
@@ -396,6 +573,12 @@ export class HttpTransportHost {
 
   private fail(res: ServerResponse, status: number, error: string, message: string): void {
     if (res.writableEnded) return;
+    // A response already started cannot become an error one; cutting it tells
+    // the client it is incomplete.
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
     res.writeHead(status, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error, message }));
   }

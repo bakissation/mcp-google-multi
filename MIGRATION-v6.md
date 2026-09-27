@@ -438,6 +438,54 @@ comparing, when either input is longer. `/http-transport`: `/mcp` answers
 2025-06-18 has no batching; one body could otherwise multiply per-call
 work).
 
+`/http-transport`: `HttpHostOptions.maxQueuedPerLane` caps the `/mcp`
+requests one resolved server holds at once, counting those reading their
+body, queued on its lane or running. The next request for that server is
+answered 429 `lane_busy` with `Retry-After: 1`, after authentication and
+`resolveServer` and before its body is read, so other servers' lanes are
+unaffected. `HttpHostOptions.maxBatchFrames` sets the batch cap (default
+16); `1` refuses any array body of more than one message with the same 400
+`batch_too_large`. Both are unset by default, which leaves the single-owner
+host unchanged.
+
+`/http-transport`: a `/mcp` request whose client disconnected while it
+waited on its server's lane is no longer dispatched when its turn comes; the
+host logs `499 client_gone path=/mcp` and the lane moves on. That includes a request pipelined behind another on a connection the client has dropped. Before, a
+queued write whose client had timed out still ran later, and the client's
+retry could run it twice. This applies with or without the new options.
+
+`/http-transport`: `HttpTransportHost.close({ graceMs })` closes gracefully.
+It stops accepting connections and closes idle keep-alive ones, including
+one whose request headers are still arriving. A request that arrives after
+`close()` begins never runs; every request accepted before it is answered:
+it runs to completion and its response is delivered, whether it was still
+reading its body, waiting on its server's lane, or pipelined behind another
+response on the same connection. A connection ends after the last response
+it owes, which carries `Connection: close` when its headers were not yet
+sent. The call resolves once nothing is left; whatever is still open after
+`graceMs` is cut, as `close()` does. `close()` with no argument keeps its
+old behavior and cuts every connection at once, also when called during a
+graceful close. A repeat `close({ graceMs })` during a graceful close joins
+the one under way and keeps its grace. The host ends a connection with a
+lingering close: it ends its side after the last response and waits for the
+client to close its side, so a slow reader never gets the connection reset
+under the tail of that response, and a client that never closes its side
+holds `close()` until `graceMs`. A connection on which the client sends a
+request after the close began is no longer read at all, so a flood of
+pipelined requests cannot pile up in memory: TCP flow control stops the
+client, the responses owed on it are still delivered, and since its client's
+close can no longer be seen it is cut when `graceMs` ends. `graceMs` must be
+a number from 0 to 2^31-1 (the longest delay a timer holds, about 24.8 days);
+any other value, `Infinity` included, rejects with a `TypeError` and the host
+keeps serving.
+
+`/http-transport`: a request whose handler throws after its response has
+started now has its connection cut, so the client sees an incomplete response.
+Before, the host tried to write a 500 on top of the started response; that
+threw inside the catch-all, and the unhandled rejection it produced
+terminates the process under Node's default `--unhandled-rejections=throw`.
+This applies with or without `graceMs`.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)
