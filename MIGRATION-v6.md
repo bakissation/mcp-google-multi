@@ -545,6 +545,23 @@ refresh token, without any sign-in. `signAccessToken` throws unless `sub` is a
 non-empty string, and `verifyAccessToken` refuses a token without one, so an
 access token with no `sub` claim no longer authenticates.
 
+**Operator action (HTTP mode, 6.0.0-alpha.1 through alpha.62).** Every
+prerelease that served `/token` over HTTP was open to that mint. stdio installs
+and the 5.x line never served `/token` and are not affected. On an HTTP host
+that was reachable from the internet:
+1. Before upgrading, keep a copy of `mcp-tokens.enc` for forensics: the upgrade
+   drops sub-less records on its next save. In the copy, an active record with
+   no `sub` is a minted chain; in the logs, a `token issued grant=refresh_token`
+   with no earlier `callback ok flow=owner_gate` is a hint.
+2. Upgrade, then rotate `MCP_JWT_KEY` and delete `mcp-tokens.enc`; every client
+   signs in again. Tokens minted this way stop working on the upgrade alone, but
+   a signing key read off the host would keep working until it is rotated.
+3. If exploitation cannot be ruled out: the owner's context can read and write
+   local files, so treat `.env`, the master key and the token store as exposed.
+   Rotate the master key and the Google OAuth client secret, re-grant each
+   account's Google access, and review mail forwarding, filters and delegates,
+   Drive sharing, and files written by the server's user.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)
