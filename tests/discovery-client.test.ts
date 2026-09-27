@@ -225,6 +225,57 @@ describe('loadMethodIndex caching', () => {
     expect(fs.existsSync(path.join(dir, 'gmail.json'))).toBe(true);
   });
 
+  const withEnv = async (vars: Record<string, string | undefined>, fn: () => Promise<void>) => {
+    const prev = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]));
+    const set = (v: Record<string, string | undefined>) => {
+      for (const [k, x] of Object.entries(v)) {
+        if (x === undefined) delete process.env[k];
+        else process.env[k] = x;
+      }
+    };
+    set(vars);
+    try {
+      await fn();
+    } finally {
+      set(prev);
+    }
+  };
+
+  it.skipIf(process.platform === 'win32')('creates missing cache levels owner-only and tightens the default cache directory, keeping special bits', async () => {
+    const fresh = path.join(dir, 'made', 'cache');
+    await loadMethodIndex('gmail', { fetchFn: okFetch([]), cacheDir: fresh });
+    expect(fs.statSync(path.join(dir, 'made')).mode & 0o777).toBe(0o700);
+    expect(fs.statSync(fresh).mode & 0o777).toBe(0o700);
+
+    clearDiscoveryMemoryCache();
+    const def = path.join(dir, 'xdg', 'mcp-google-multi', 'discovery');
+    fs.mkdirSync(def, { recursive: true });
+    fs.chmodSync(def, 0o2775);
+    await withEnv({ XDG_CONFIG_HOME: path.join(dir, 'xdg'), DISCOVERY_CACHE_PATH: undefined }, async () => {
+      await loadMethodIndex('gmail', { fetchFn: okFetch([]) });
+    });
+    expect(fs.statSync(def).mode & 0o7777).toBe(0o2700);
+    expect(fs.existsSync(path.join(def, 'gmail.json'))).toBe(true);
+  });
+
+  it.skipIf(process.platform === 'win32')('leaves the mode of an explicit cache directory alone', async () => {
+    const shared = path.join(dir, 'shared');
+    fs.mkdirSync(shared);
+    fs.chmodSync(shared, 0o2775);
+    await withEnv({ DISCOVERY_CACHE_PATH: shared }, async () => {
+      await loadMethodIndex('gmail', { fetchFn: okFetch([]) });
+    });
+    expect(fs.statSync(shared).mode & 0o7777).toBe(0o2775);
+    expect(fs.existsSync(path.join(shared, 'gmail.json'))).toBe(true);
+
+    clearDiscoveryMemoryCache();
+    const loose = path.join(dir, 'loose');
+    fs.mkdirSync(loose);
+    fs.chmodSync(loose, 0o755);
+    await loadMethodIndex('gmail', { fetchFn: okFetch([]), cacheDir: loose });
+    expect(fs.statSync(loose).mode & 0o7777).toBe(0o755);
+  });
+
   it('falls back to the per-service $discovery endpoint when the central directory 404s (newer APIs)', async () => {
     const calls: string[] = [];
     const fetchFn = async (url: string) => {

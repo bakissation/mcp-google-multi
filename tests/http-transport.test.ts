@@ -505,6 +505,61 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
     // no params / arguments / secrets leak into the log
     expect(logs.join('\n')).not.toMatch(/params|arguments|protocolVersion/);
   });
+
+  it('a route that throws answers a generic 500 and logs the real message with the path, never the query', async () => {
+    const logs: string[] = [];
+    const port = await startHost(() => ({ ok: true }), {
+      log: (l) => logs.push(l),
+      routes: {
+        '/token': async () => {
+          throw new Error('Timed out waiting for lock /srv/state/mcp-tokens.enc.lock');
+        },
+        '/odd': async () => {
+          throw 'not an Error';
+        },
+      },
+    });
+    const res = await request(port, 'POST', '/token?code=query-secret');
+    expect(res.status).toBe(500);
+    expect(JSON.parse(res.text)).toEqual({ error: 'internal_error', message: 'internal error' });
+    expect(res.text).not.toMatch(/srv|lock/);
+    const odd = await request(port, 'GET', '/odd');
+    expect(JSON.parse(odd.text)).toEqual({ error: 'internal_error', message: 'internal error' });
+    const bad = await request(port, 'GET', '//');
+    expect(bad.status).toBe(500);
+    expect(JSON.parse(bad.text)).toEqual({ error: 'internal_error', message: 'internal error' });
+    expect(logs).toEqual([
+      expect.stringMatching(/^listening on /),
+      '500 internal_error path=/token: Timed out waiting for lock /srv/state/mcp-tokens.enc.lock',
+      '500 internal_error path=/odd: non-Error throw',
+      '500 internal_error path=?: Invalid URL',
+    ]);
+  });
+
+  it('a host log that throws on the 500 line leaves the answered connection open', async () => {
+    const port = await startHost(() => ({ ok: true }), {
+      log: (l) => {
+        if (l.startsWith('500')) throw new Error('log sink down');
+      },
+      routes: {
+        '/boom': async () => {
+          throw new Error('route failed');
+        },
+      },
+    });
+    const conn = wire(port);
+    const ask = 'GET /boom HTTP/1.1\r\nhost: 127.0.0.1\r\n\r\n';
+    conn.socket.write(ask);
+    await until(() => responsesOf(conn.received()).length === 1, 'the first answer');
+    conn.socket.write(ask);
+    await until(() => responsesOf(conn.received()).length === 2, 'the second answer on the same connection');
+    for (const r of responsesOf(conn.received())) {
+      expect(r.head).toMatch(/^HTTP\/1\.1 500 /);
+      expect(JSON.parse(r.body)).toEqual({ error: 'internal_error', message: 'internal error' });
+    }
+    expect(conn.socket.destroyed).toBe(false);
+    conn.socket.destroy();
+  });
 });
 
 async function until(cond: () => boolean | Promise<boolean>, what: string, ms = 2000): Promise<void> {
@@ -1268,7 +1323,9 @@ describe('HttpTransportHost graceful close', () => {
   });
 
   it('close({ graceMs }) resolves even when answering a failed request itself throws', async () => {
+    const logs: string[] = [];
     const h = await closeHost({
+      log: (l) => logs.push(l),
       routes: {
         '/broken': async () => {
           throw new Error('route failed');
@@ -1285,6 +1342,7 @@ describe('HttpTransportHost graceful close', () => {
       const conn = wire(h.port);
       conn.socket.write('GET /broken HTTP/1.1\r\nhost: 127.0.0.1\r\n\r\n');
       await until(() => failSpy.mock.calls.length === 1, 'the failed answer');
+      await until(() => logs.includes('500 internal_error path=/broken: route failed'), 'the logged cause');
       await h.host.close({ graceMs: 20_000 });
       await conn.ended;
       await new Promise((r) => setTimeout(r, 50));

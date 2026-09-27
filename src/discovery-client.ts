@@ -113,6 +113,19 @@ export function discoveryCacheDir(env: NodeJS.ProcessEnv = process.env): string 
   );
 }
 
+// Default cache path only (an operator's DISCOVERY_CACHE_PATH may be shared,
+// even /tmp, and keeps its mode), only when this process owns it, and best
+// effort. Clears group/other bits and keeps setuid/setgid/sticky.
+function tightenOwnDir(dir: string): void {
+  if (process.platform === 'win32') return;
+  try {
+    const st = fs.statSync(dir);
+    if (st.uid === process.getuid?.() && (st.mode & 0o077) !== 0) fs.chmodSync(dir, st.mode & ~0o077 & 0o7777);
+  } catch {
+    // the cache still works with the directory's own mode
+  }
+}
+
 // A poisoned cache file could repoint baseUrl off-Google; refuse to send the
 // user's Bearer token anywhere but a googleapis.com host.
 export function isGoogleApiUrl(url: string): boolean {
@@ -184,6 +197,7 @@ export async function loadMethodIndex(api: string, deps: DiscoveryDeps = {}): Pr
     throw new Error(`Unknown api "${api}". Known: ${Object.keys(SUPPORTED_APIS).join(', ')}`);
   }
   const fetchFn = deps.fetchFn ?? ((url: string) => fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }));
+  const defaultDir = deps.cacheDir === undefined && process.env.DISCOVERY_CACHE_PATH === undefined;
   const cacheDir = deps.cacheDir ?? discoveryCacheDir();
   const cacheFile = path.join(cacheDir, `${api}.json`);
 
@@ -219,7 +233,8 @@ export async function loadMethodIndex(api: string, deps: DiscoveryDeps = {}): Pr
         const res = await fetchFn(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         doc = (await res.json()) as DiscoveryDoc;
-        fs.mkdirSync(cacheDir, { recursive: true });
+        fs.mkdirSync(cacheDir, { recursive: true, mode: 0o700 });
+        if (defaultDir) tightenOwnDir(cacheDir);
         fs.writeFileSync(cacheFile, JSON.stringify(doc), { mode: 0o600 });
         break;
       } catch (err) {

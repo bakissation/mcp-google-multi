@@ -233,10 +233,39 @@ export class RefreshStore {
   }
 
   private save(data: RefreshData): void {
-    // bound the spent set (drop oldest-inserted) so it can't grow forever.
-    const keys = Object.keys(data.spent);
-    if (keys.length > SPENT_CAP) {
-      for (const k of keys.slice(0, keys.length - SPENT_CAP)) delete data.spent[k];
+    // A family with no active token has nothing left to revoke. Over the cap,
+    // the subject holding the most spent tokens loses its oldest (ties: the
+    // oldest entry), so a subject's rotations, across all its families, only
+    // push out its own history (docs/internals.md). Insertion order = rotation
+    // order.
+    const owner = new Map<string, string>();
+    for (const r of Object.values(data.active)) owner.set(r.family, r.sub);
+    const order = Object.keys(data.spent);
+    const held = new Map<string, { at: number[]; head: number }>();
+    let total = 0;
+    order.forEach((t, i) => {
+      const sub = owner.get(data.spent[t]);
+      if (sub === undefined) {
+        delete data.spent[t];
+        return;
+      }
+      const h = held.get(sub);
+      if (h) h.at.push(i);
+      else held.set(sub, { at: [i], head: 0 });
+      total += 1;
+    });
+    while (total > SPENT_CAP) {
+      let most = { at: [] as number[], head: 0 };
+      let mostN = 0;
+      for (const h of held.values()) {
+        const n = h.at.length - h.head;
+        if (n > mostN || (n === mostN && n > 0 && h.at[h.head] < most.at[most.head])) {
+          most = h;
+          mostN = n;
+        }
+      }
+      delete data.spent[order[most.at[most.head++]]];
+      total -= 1;
     }
     atomicWriteFileSync(this.path, encryptToken(data, this.masterKey), 0o600);
   }
@@ -288,9 +317,8 @@ export class RefreshStore {
   }
 
   /** Drop every ACTIVE record minted under `sub` (linear scan under the store
-   * lock). Spent entries carry no sub and stay: with their families gone, a
-   * reuse finds nothing to revoke — inert by construction. Returns the number
-   * of active tokens dropped. */
+   * lock); the save then drops the spent entries of every family left with no
+   * active token. Returns the number of active tokens dropped. */
   purgeTenant(sub: string): number {
     return withFileLock(this.path, () => {
       const data = this.load();
