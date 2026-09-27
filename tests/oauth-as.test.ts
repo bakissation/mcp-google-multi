@@ -24,8 +24,13 @@ let tmp: string;
 const hosts: HttpTransportHost[] = [];
 const written: Record<string, unknown> = {};
 
+/** A browser's cookies, keyed by name. Requests use `browser` unless given another jar. */
+type Jar = Map<string, string>;
+let browser: Jar = new Map();
+
 beforeEach(() => {
   tmp = mkdtempSync(path.join(tmpdir(), 'gm-as-'));
+  browser = new Map();
 });
 afterEach(async () => {
   await Promise.all(hosts.splice(0).map((h) => h.close()));
@@ -40,8 +45,8 @@ const reauthPath = (alias: string) => {
   return `${u.pathname}${u.search}`;
 };
 
-async function start(depOverrides: Partial<AuthServerDeps> = {}): Promise<number> {
-  const cfg = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http', MCP_PUBLIC_URL: BASE }), port: 0 };
+async function start(depOverrides: Partial<AuthServerDeps> = {}, base = BASE): Promise<number> {
+  const cfg = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http', MCP_PUBLIC_URL: base }), port: 0 };
   const deps: AuthServerDeps = {
     fetchCimd: async (cid) => {
       if (cid === CLIENT_ID) return { client_id: cid, redirect_uris: [REDIRECT] };
@@ -60,7 +65,7 @@ async function start(depOverrides: Partial<AuthServerDeps> = {}): Promise<number
     ...depOverrides,
   };
   const as = buildAuthServer(
-    { base: BASE, resourceUri: `${BASE}/mcp`, secret, ownerEmails: ['owner@x.example'], cimdIssuers: ['claude.ai'], masterKey: 'mk', refreshStorePath: path.join(tmp, 'mcp-tokens.enc') },
+    { base, resourceUri: `${base}/mcp`, secret, ownerEmails: ['owner@x.example'], cimdIssuers: ['claude.ai'], masterKey: 'mk', refreshStorePath: path.join(tmp, 'mcp-tokens.enc') },
     deps,
   );
   currentAs = as;
@@ -77,12 +82,24 @@ interface Res {
   headers: http.IncomingHttpHeaders;
   text: string;
 }
-function req(port: number, method: string, urlPath: string, opts: { headers?: Record<string, string>; body?: string } = {}): Promise<Res> {
+function storeCookies(jar: Jar, lines: string[] | undefined): void {
+  for (const line of lines ?? []) {
+    const [pair, ...attrs] = line.split(';');
+    const i = pair.indexOf('=');
+    const name = pair.slice(0, i).trim();
+    if (attrs.some((a) => /^\s*max-age=0\s*$/i.test(a))) jar.delete(name);
+    else jar.set(name, pair.slice(i + 1).trim());
+  }
+}
+function req(port: number, method: string, urlPath: string, opts: { headers?: Record<string, string>; body?: string; jar?: Jar } = {}): Promise<Res> {
   return new Promise((resolve, reject) => {
     const data = opts.body !== undefined ? Buffer.from(opts.body) : undefined;
+    const jar = opts.jar ?? browser;
+    const cookie = [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
     const r = http.request(
-      { hostname: '127.0.0.1', port, method, path: urlPath, headers: { host: 'mcp.test', ...(data ? { 'content-length': String(data.length) } : {}), ...opts.headers } },
+      { hostname: '127.0.0.1', port, method, path: urlPath, headers: { host: 'mcp.test', ...(cookie ? { cookie } : {}), ...(data ? { 'content-length': String(data.length) } : {}), ...opts.headers } },
       (res) => {
+        storeCookies(jar, res.headers['set-cookie']);
         let text = '';
         res.on('data', (c) => (text += c));
         res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, text }));
@@ -318,6 +335,18 @@ describe('negative paths (one per §5.12 MUST)', () => {
     expect(JSON.parse(reuse.text).error).toBe('invalid_grant');
   });
 
+  it('a refresh token naming an inherited object key -> invalid_grant, no token minted', async () => {
+    const port = await start();
+    for (const refresh_token of ['constructor', '__proto__', 'toString']) {
+      const r = await req(port, 'POST', '/token', form({ grant_type: 'refresh_token', refresh_token }));
+      expect(r.status).toBe(400);
+      const body = JSON.parse(r.text);
+      expect(body.error).toBe('invalid_grant');
+      expect(body.access_token).toBeUndefined();
+    }
+    expect(existsSync(path.join(tmp, 'mcp-tokens.enc'))).toBe(false);
+  });
+
   it('/mcp without a bearer -> 401 + WWW-Authenticate', async () => {
     const port = await start();
     const r = await req(port, 'POST', '/mcp', { headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: '{}' });
@@ -491,6 +520,206 @@ describe('negative paths (one per §5.12 MUST)', () => {
     const port = await start();
     const r = await req(port, 'GET', '/.well-known/oauth-authorization-server', { headers: { origin: 'https://evil.example' } });
     expect(r.status).toBe(403);
+  });
+});
+
+describe('owner_gate Google leg is bound to the browser that started it (H4 F1)', () => {
+  const ATTACKER_CB = 'https://attacker.example/cb';
+  const bindCookies = (jar: Jar) => [...jar.keys()].filter((k) => k.includes('mgm-og-'));
+
+  /** Deps whose exchange and subject resolution record every call. */
+  function spied(extra: Partial<AuthServerDeps> = {}) {
+    const calls = { exchange: 0, resolve: 0 };
+    const logs: string[] = [];
+    const deps: Partial<AuthServerDeps> = {
+      exchangeCode: async () => {
+        calls.exchange++;
+        return { tokens: {}, email: 'owner@x.example' };
+      },
+      resolveSubject: () => {
+        calls.resolve++;
+        return { sub: 'owner' };
+      },
+      log: (l) => logs.push(l),
+      ...extra,
+    };
+    return { calls, logs, deps };
+  }
+
+  /** A DCR client registered and approved from `jar`; returns the Google state. */
+  async function dcrGoogleState(port: number, jar: Jar): Promise<{ state: string; approved: Res; interstitial: Res }> {
+    const reg = JSON.parse((await req(port, 'POST', '/register', { jar, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ redirect_uris: [ATTACKER_CB] }) })).text);
+    const interstitial = await req(port, 'GET', `/authorize?${authorizeQuery({ client_id: reg.client_id, redirect_uri: ATTACKER_CB })}`, { jar });
+    const pending = interstitial.text.match(/name="pending" value="([^"]+)"/)![1];
+    const approved = await req(port, 'POST', '/authorize', { jar, ...form({ pending }) });
+    expect(approved.status).toBe(302);
+    return { state: stateFrom(approved.headers.location as string), approved, interstitial };
+  }
+
+  it('a forwarded Google URL completed in another browser is refused 400: no code, no exchange, no subject lookup', async () => {
+    const { calls, logs, deps } = spied();
+    const port = await start(deps);
+    const attacker: Jar = new Map();
+    const victim: Jar = new Map();
+    const { state } = await dcrGoogleState(port, attacker);
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: victim });
+    expect(cb.status).toBe(400);
+    expect(cb.headers.location).toBeUndefined();
+    expect(cb.text).not.toContain('attacker.example');
+    expect(cb.text).not.toContain('code=');
+    expect(cb.text).toContain('E_BROWSER_MISMATCH');
+    expect(calls).toEqual({ exchange: 0, resolve: 0 });
+    const refused = logs.filter((l) => l.startsWith('callback refused'));
+    expect(refused).toEqual(['callback refused flow=owner_gate: browser binding missing']);
+    const cookieValue = attacker.get(bindCookies(attacker)[0])!;
+    expect(logs.join('\n')).not.toContain(cookieValue);
+    expect(logs.join('\n')).not.toContain(state);
+    // the refused state is spent: the starting browser cannot replay the victim's callback
+    const replay = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: attacker });
+    expect(replay.status).toBe(400);
+    expect(replay.headers.location).toBeUndefined();
+    expect(calls).toEqual({ exchange: 0, resolve: 0 });
+  });
+
+  it('the same browser completes the DCR flow and the binding cookie is cleared', async () => {
+    const { calls, deps } = spied();
+    const port = await start(deps);
+    const jar: Jar = new Map();
+    const { state } = await dcrGoogleState(port, jar);
+    expect(bindCookies(jar)).toHaveLength(1);
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar });
+    expect(cb.status).toBe(302);
+    const back = new URL(cb.headers.location as string);
+    expect(back.origin + back.pathname).toBe(ATTACKER_CB);
+    expect(back.searchParams.get('code')).toBeTruthy();
+    expect(calls).toEqual({ exchange: 1, resolve: 1 });
+    expect(bindCookies(jar)).toHaveLength(0);
+  });
+
+  it('a tampered binding cookie is refused before the exchange', async () => {
+    const { calls, logs, deps } = spied();
+    const port = await start(deps);
+    const jar: Jar = new Map();
+    const { state } = await dcrGoogleState(port, jar);
+    const [name] = bindCookies(jar);
+    const value = jar.get(name)!;
+    jar.set(name, (value[0] === 'A' ? 'B' : 'A') + value.slice(1));
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar });
+    expect(cb.status).toBe(400);
+    expect(cb.headers.location).toBeUndefined();
+    expect(cb.text).toContain('E_BROWSER_MISMATCH');
+    expect(calls).toEqual({ exchange: 0, resolve: 0 });
+    expect(logs).toContain('callback refused flow=owner_gate: browser binding mismatch');
+  });
+
+  it("another browser's own binding cookie does not unlock the forwarded state", async () => {
+    const { calls, deps } = spied();
+    const port = await start(deps);
+    const attacker: Jar = new Map();
+    const victim: Jar = new Map();
+    const { state } = await dcrGoogleState(port, attacker);
+    await req(port, 'GET', `/authorize?${authorizeQuery()}`, { jar: victim });
+    expect(bindCookies(victim)).toHaveLength(1);
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: victim });
+    expect(cb.status).toBe(400);
+    expect(calls.exchange).toBe(0);
+  });
+
+  it('two sign-ins started in one browser both complete (one cookie per flow)', async () => {
+    const { deps } = spied();
+    const port = await start(deps);
+    const first = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).headers.location as string);
+    const second = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).headers.location as string);
+    expect(bindCookies(browser)).toHaveLength(2);
+    expect((await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(first)}`)).status).toBe(302);
+    expect((await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(second)}`)).status).toBe(302);
+    expect(bindCookies(browser)).toHaveLength(0);
+  });
+
+  it('an https base sets a __Host- cookie (Secure, HttpOnly, Lax, Path=/, the state TTL, no Domain) on both client legs', async () => {
+    const port = await start();
+    const cimd = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
+    const { approved } = await dcrGoogleState(port, new Map());
+    for (const r of [cimd, approved]) {
+      const lines = r.headers['set-cookie'] ?? [];
+      expect(lines).toHaveLength(1);
+      const [pair, ...attrs] = lines[0].split(';').map((a) => a.trim());
+      expect(pair).toMatch(/^__Host-mgm-og-[A-Za-z0-9_-]+=[A-Za-z0-9_-]{43}$/);
+      expect(attrs.map((a) => a.toLowerCase()).sort()).toEqual(['httponly', 'max-age=600', 'path=/', 'samesite=lax', 'secure']);
+    }
+  });
+
+  it('an http loopback base (the single owner) uses a cookie without Secure and the sign-in completes', async () => {
+    const LOOP = 'http://127.0.0.1:3118';
+    const port = await start({}, LOOP);
+    const host = { host: '127.0.0.1:3118' };
+    const q = authorizeQuery({ resource: `${LOOP}/mcp` });
+    const authz = await req(port, 'GET', `/authorize?${q}`, { headers: host });
+    expect(authz.status).toBe(302);
+    const [line] = authz.headers['set-cookie'] ?? [];
+    expect(line).toMatch(/^mgm-og-[A-Za-z0-9_-]+=/);
+    expect(line.toLowerCase()).not.toContain('secure');
+    expect(line.toLowerCase()).toContain('httponly');
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(stateFrom(authz.headers.location as string))}`, { headers: host });
+    expect(cb.status).toBe(302);
+    const code = new URL(cb.headers.location as string).searchParams.get('code')!;
+    const tok = JSON.parse((await req(port, 'POST', '/token', { headers: { ...host, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, code_verifier: verifier, resource: `${LOOP}/mcp` }).toString() })).text);
+    expect((await verifyAccessToken(tok.access_token, LOOP, secret)).sub).toBe('owner');
+    expect(bindCookies(browser)).toHaveLength(0);
+  });
+
+  it('alias_reauth and alias_add set no binding cookie and complete from a fresh browser', async () => {
+    const port = await start({ bindTenantAlias: () => undefined });
+    const reauth = await req(port, 'GET', reauthPath('work'));
+    expect(reauth.headers['set-cookie']).toBeUndefined();
+    const r1 = await req(port, 'GET', `/callback?code=work-code&state=${encodeURIComponent(stateFrom(reauth.headers.location as string))}`, { jar: new Map() });
+    expect(r1.status).toBe(200);
+    const url = new URL(await currentAs!.mintFlowState({ flow: 'alias_add', alias: 'side', tenantId: 'tenant-a' }));
+    const add = await req(port, 'GET', `${url.pathname}${url.search}`);
+    expect(add.headers['set-cookie']).toBeUndefined();
+    const r2 = await req(port, 'GET', `/callback?code=work-code&state=${encodeURIComponent(stateFrom(add.headers.location as string))}`, { jar: new Map() });
+    expect(r2.status).toBe(200);
+  });
+
+  it('the DCR consent interstitial refuses to be framed', async () => {
+    const port = await start();
+    const { interstitial } = await dcrGoogleState(port, new Map());
+    expect(interstitial.headers['content-security-policy']).toBe("frame-ancestors 'none'");
+    expect(interstitial.headers['x-frame-options']).toBe('DENY');
+  });
+});
+
+describe('a failed Google code exchange answers a generic page (H4 F12)', () => {
+  const detail = 'request to https://oauth2.googleapis.com/token failed, reason: connect ECONNREFUSED 10.9.8.7:3128\nproxy-authorization: Basic c2VjcmV0';
+
+  it('owner_gate and alias_reauth show no exchange detail; the log gets it on one line', async () => {
+    const logs: string[] = [];
+    const port = await start({
+      exchangeCode: async () => {
+        throw new Error(detail);
+      },
+      log: (l) => logs.push(l),
+    });
+    const owner = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).headers.location as string);
+    const reauth = stateFrom((await req(port, 'GET', reauthPath('work'))).headers.location as string);
+    for (const [flow, state] of [['owner_gate', owner], ['alias_reauth', reauth]]) {
+      const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`);
+      expect(cb.status).toBe(400);
+      expect(cb.headers.location).toBeUndefined();
+      expect(cb.text).toBe('invalid_grant: Google could not complete the sign-in; start again from your app');
+      const line = logs.find((l) => l.startsWith(`callback exchange failed flow=${flow}:`));
+      expect(line).toContain('ECONNREFUSED 10.9.8.7:3128');
+      expect(line).not.toMatch(/[\r\n]/);
+    }
+    expect(written.work).toBeUndefined();
+  });
+
+  it('a non-Error rejection still answers the generic page', async () => {
+    const port = await start({ exchangeCode: () => Promise.reject(undefined) });
+    const state = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).headers.location as string);
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`);
+    expect(cb.status).toBe(400);
+    expect(cb.text).toBe('invalid_grant: Google could not complete the sign-in; start again from your app');
   });
 });
 

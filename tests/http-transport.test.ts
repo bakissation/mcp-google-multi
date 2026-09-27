@@ -1190,6 +1190,8 @@ describe('HttpTransportHost graceful close', () => {
   };
   /** Reads one chunk every few milliseconds, so the host's last writes wait in
    * its socket buffer when it ends the connection. */
+  // Windows ticks timers at about 15.6 ms and reads smaller chunks, so a slow
+  // reader there can need several seconds for 8 MB: the graces below leave room.
   const readSlowly = (socket: net.Socket) => {
     socket.pause();
     const every = setInterval(() => {
@@ -1206,7 +1208,7 @@ describe('HttpTransportHost graceful close', () => {
     await until(() => conn.received().length > 0, 'the start of the big response');
     const stop = readSlowly(conn.socket);
     try {
-      const closing = h.host.close({ graceMs: 3000 });
+      const closing = h.host.close({ graceMs: 15_000 });
       await new Promise((r) => setTimeout(r, 50));
       conn.socket.write(lateBody());
       await conn.ended;
@@ -1218,7 +1220,7 @@ describe('HttpTransportHost graceful close', () => {
     expect(answers).toHaveLength(1);
     expect(JSON.parse(answers[0].body).result.content[0].text.length).toBe(BIG_CHARS);
     expect(h.writes.calls).toBe(0);
-  }, 15_000);
+  }, 40_000);
 
   it('close({ graceMs }) delivers a big response not yet started whole to a slow reader that pipelines a large body after the close began', async () => {
     const h = await closeHost();
@@ -1227,7 +1229,7 @@ describe('HttpTransportHost graceful close', () => {
     await until(() => h.held.calls === 1, 'the running call');
     const stop = readSlowly(conn.socket);
     try {
-      const closing = h.host.close({ graceMs: 3000 });
+      const closing = h.host.close({ graceMs: 15_000 });
       await new Promise((r) => setTimeout(r, 50));
       h.open();
       await until(() => conn.received().length > 0, 'the start of the big response');
@@ -1241,7 +1243,7 @@ describe('HttpTransportHost graceful close', () => {
     expect(answers).toHaveLength(1);
     expect(answers[0].head).toMatch(/connection: close/i);
     expect(JSON.parse(answers[0].body).result.content[0].text.length).toBe(BIG_CHARS);
-  }, 15_000);
+  }, 40_000);
 
   it('a second close({ graceMs }) after the last response finished writing still delivers it whole to a slow reader', async () => {
     const h = await closeHost();
@@ -1253,12 +1255,12 @@ describe('HttpTransportHost graceful close', () => {
     (h.host as unknown as { httpServer: http.Server }).httpServer.on('request', () => late++);
     const stop = readSlowly(conn.socket);
     try {
-      const first = h.host.close({ graceMs: 3000 });
+      const first = h.host.close({ graceMs: 15_000 });
       conn.socket.write(lateBody());
       await until(() => late === 1, 'the request after the close');
       h.open();
       await until(() => pending.size === 0, 'the last response to finish writing');
-      void h.host.close({ graceMs: 3000 });
+      void h.host.close({ graceMs: 15_000 });
       await conn.ended;
       await first;
     } finally {
@@ -1267,7 +1269,7 @@ describe('HttpTransportHost graceful close', () => {
     const answers = responsesOf(conn.received());
     expect(answers).toHaveLength(1);
     expect(JSON.parse(answers[0].body).result.content[0].text.length).toBe(BIG_CHARS);
-  }, 15_000);
+  }, 40_000);
 
   it('close({ graceMs }) resolves and fully closes when a route that started its response throws', async () => {
     let fire!: () => void;

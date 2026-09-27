@@ -35,6 +35,7 @@ export interface AccessTokenParams {
 }
 
 export async function signAccessToken(p: AccessTokenParams): Promise<string> {
+  if (typeof p.sub !== 'string' || p.sub === '') throw new Error('signAccessToken: sub must be a non-empty string');
   const ttl = p.ttlSec ?? ACCESS_TTL_DEFAULT;
   return new SignJWT({ scope: 'mcp:use', purpose: 'mcp_access' })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
@@ -57,7 +58,8 @@ export interface AccessClaims {
 export async function verifyAccessToken(token: string, base: string, secret: Uint8Array): Promise<AccessClaims> {
   const { payload } = await jwtVerify(token, secret, { issuer: base, audience: `${base}/mcp` });
   if (payload.purpose !== 'mcp_access') throw new Error('wrong token purpose');
-  return { sub: String(payload.sub), scope: String(payload.scope ?? ''), jti: String(payload.jti ?? '') };
+  if (typeof payload.sub !== 'string' || payload.sub === '') throw new Error('access token has no subject');
+  return { sub: payload.sub, scope: String(payload.scope ?? ''), jti: String(payload.jti ?? '') };
 }
 
 // --- Signed state + authorization code (self-contained artifacts) -----------
@@ -78,6 +80,9 @@ export interface StatePayload {
   /** alias_add only: an opaque value the minting caller chose, signed like
    * tenantId and handed back to its binder (e.g. a server-side link record). */
   nonce?: string;
+  /** owner_gate only: base64url sha256 of the browser-binding cookie the
+   * Google redirect set; /callback refuses a browser that lacks it. */
+  bind?: string;
 }
 
 export interface CodePayload {
@@ -203,6 +208,17 @@ export interface RefreshRecord {
 
 const SPENT_CAP = 2000;
 
+function ownEntries(o: unknown): [string, unknown][] {
+  // An own `__proto__` key (JSON.parse makes one) would set the prototype when copied.
+  return o !== null && typeof o === 'object' && !Array.isArray(o) ? Object.entries(o).filter(([k]) => k !== '__proto__') : [];
+}
+
+function isLegacyRecord(r: unknown): r is RefreshRecord {
+  if (r === null || typeof r !== 'object') return false;
+  const x = r as Record<string, unknown>;
+  return typeof x.sub === 'string' && x.sub !== '' && typeof x.family === 'string' && typeof x.issuedAt === 'number' && Number.isFinite(x.issuedAt);
+}
+
 interface RefreshData {
   active: Record<string, RefreshRecord>;
   /** rotated-away token -> family, for reuse detection (OAuth 2.1 §4.14). */
@@ -223,13 +239,21 @@ export class RefreshStore {
   ) {}
 
   private load(): RefreshData {
-    if (!existsSync(this.path)) return { active: {}, spent: {} };
+    const data: RefreshData = { active: {}, spent: {} };
+    if (!existsSync(this.path)) return data;
+    let d: Partial<Record<keyof RefreshData, unknown>>;
     try {
-      const d = decryptToken(readFileSync(this.path, 'utf-8'), this.masterKey) as unknown as Partial<RefreshData>;
-      return { active: d.active ?? {}, spent: d.spent ?? {} };
+      d = decryptToken(readFileSync(this.path, 'utf-8'), this.masterKey) as unknown as typeof d;
     } catch {
-      return { active: {}, spent: {} };
+      return data;
     }
+    // Only well-formed own entries survive, so no lookup can land on an
+    // inherited key or a record without a subject.
+    for (const [t, r] of ownEntries(d?.active)) {
+      if (isLegacyRecord(r)) data.active[t] = { sub: r.sub, issuedAt: r.issuedAt, family: r.family };
+    }
+    for (const [t, fam] of ownEntries(d?.spent)) if (typeof fam === 'string') data.spent[t] = fam;
+    return data;
   }
 
   private save(data: RefreshData): void {
@@ -292,10 +316,10 @@ export class RefreshStore {
   rotate(oldToken: string, nowMs: number, accept?: (sub: string) => boolean): { token: string; sub: string } | null {
     return withFileLock(this.path, () => {
       const data = this.load();
-      const rec = data.active[oldToken];
+      const rec = Object.hasOwn(data.active, oldToken) ? data.active[oldToken] : undefined;
       if (!rec) {
         // Reuse of a rotated-away token signals theft: revoke the whole family.
-        const fam = data.spent[oldToken];
+        const fam = Object.hasOwn(data.spent, oldToken) ? data.spent[oldToken] : undefined;
         if (fam) {
           for (const [t, r] of Object.entries(data.active)) if (r.family === fam) delete data.active[t];
           this.save(data);

@@ -516,6 +516,52 @@ process owns also loses its group and other bits when a document is written,
 keeping setuid, setgid and sticky. A `DISCOVERY_CACHE_PATH` override (or an
 injected `cacheDir`) keeps its mode.
 
+`/oauth-as`: the owner sign-in (`owner_gate`) must now finish in the browser
+that started it. The redirect to Google sets a per-flow cookie
+(`__Host-mgm-og-*` on an https base, `mgm-og-*` without `Secure` on an http
+base) and signs its hash into the state (`StatePayload.bind`); `/callback`
+answers 400 `E_BROWSER_MISMATCH`, with no redirect, no code exchange and no
+`resolveSubject` call, when the cookie is missing or different. A client that
+opens `/authorize` in the system browser completes as before. A Google URL
+copied to another browser or device no longer signs in, and a state signed by
+an earlier release (no `bind`) is refused, so a sign-in in flight across the
+upgrade has to start again. The DCR consent page is now sent with
+`frame-ancestors 'none'`. `alias_add` and `alias_reauth` are unchanged.
+
+`/oauth-as`: when `exchangeCode` throws, `/callback` now answers 400
+`invalid_grant: Google could not complete the sign-in; start again from your
+app` for every flow. Before, the page carried `Google code exchange failed: `
+plus the thrown message, which on a network failure names hosts and proxies.
+The message now goes to `AuthServerDeps.log` as
+`callback exchange failed flow=<flow>: <message>`, on one line. The slug and
+status are unchanged, and a rejection that is not an `Error` gets the same
+page instead of an unhandled route error.
+
+`/mcp-token`: `RefreshStore` now looks a presented refresh token up among the
+store's own entries only, and drops on load any record without a string
+subject and family. Before, a value such as `constructor` matched an inherited
+object property, and `/token` answered it with a working access token and a
+refresh token, without any sign-in. `signAccessToken` throws unless `sub` is a
+non-empty string, and `verifyAccessToken` refuses a token without one, so an
+access token with no `sub` claim no longer authenticates.
+
+**Operator action (HTTP mode, 6.0.0-alpha.1 through alpha.62).** Every
+prerelease that served `/token` over HTTP was open to that mint. stdio installs
+and the 5.x line never served `/token` and are not affected. On an HTTP host
+that was reachable from the internet:
+1. Before upgrading, keep a copy of `mcp-tokens.enc` for forensics: the upgrade
+   drops sub-less records on its next save. In the copy, an active record with
+   no `sub` is a minted chain; in the logs, a `token issued grant=refresh_token`
+   with no earlier `callback ok flow=owner_gate` is a hint.
+2. Upgrade, then rotate `MCP_JWT_KEY` and delete `mcp-tokens.enc`; every client
+   signs in again. Tokens minted this way stop working on the upgrade alone, but
+   a signing key read off the host would keep working until it is rotated.
+3. If exploitation cannot be ruled out: the owner's context can read and write
+   local files, so treat `.env`, the master key and the token store as exposed.
+   Rotate the master key and the Google OAuth client secret, re-grant each
+   account's Google access, and review mail forwarding, filters and delegates,
+   Drive sharing, and files written by the server's user.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)

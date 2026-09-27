@@ -6,7 +6,7 @@
 // an `authenticate` for POST /mcp. All Google/CIMD I/O is injectable so the
 // whole surface is exercised by an offline harness.
 
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { isIPv4 } from 'node:net';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AuthOutcome, RouteHandler } from './http-transport.js';
@@ -183,8 +183,8 @@ function subjectUnavailable(res: ServerResponse): true {
   return json(res, 503, { error: 'temporarily_unavailable', message: 'the sign-in could not be checked right now; retry shortly' }, { 'Retry-After': '5' });
 }
 
-function redirect(res: ServerResponse, location: string): true {
-  res.writeHead(302, { Location: location });
+function redirect(res: ServerResponse, location: string, extraHeaders: Record<string, string> = {}): true {
+  res.writeHead(302, { Location: location, ...extraHeaders });
   res.end();
   return true;
 }
@@ -219,6 +219,41 @@ export function redirectAllowed(redirectUri: string, docRedirectUris: string[]):
     // any loopback host + any port + same scheme + same path
     return isLoopbackHostname(du.hostname) && du.protocol === r.protocol && du.pathname === r.pathname;
   });
+}
+
+// The owner_gate browser binding (docs/internals.md). One cookie per flow, so
+// two sign-ins started in one browser do not overwrite each other. __Host-
+// requires Secure, which an http base (the loopback owner) cannot rely on in
+// every browser, so an http base gets a plain host-only name instead.
+const BIND_HASH = /^[A-Za-z0-9_-]{43}$/;
+
+function bindCookieName(base: string, bind: string): string {
+  return `${base.startsWith('https:') ? '__Host-' : ''}mgm-og-${bind.slice(0, 16)}`;
+}
+
+function bindCookieAttrs(base: string, maxAge: number): string {
+  return `Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${base.startsWith('https:') ? '; Secure' : ''}`;
+}
+
+function readCookie(req: IncomingMessage, name: string): string | undefined {
+  for (const part of (req.headers.cookie ?? '').split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim();
+  }
+  return undefined;
+}
+
+function sha256Url(value: string): string {
+  return createHash('sha256').update(value).digest('base64url');
+}
+
+function browserBinding(req: IncomingMessage, base: string, bind: unknown): 'ok' | 'missing' | 'mismatch' {
+  if (typeof bind !== 'string' || !BIND_HASH.test(bind)) return 'missing';
+  const value = readCookie(req, bindCookieName(base, bind));
+  if (!value) return 'missing';
+  const got = createHash('sha256').update(value).digest();
+  const want = Buffer.from(bind, 'base64url');
+  return got.length === want.length && timingSafeEqual(got, want) ? 'ok' : 'mismatch';
 }
 
 function pkceS256(verifier: string): string {
@@ -348,11 +383,20 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   }
 
   async function toGoogle(res: ServerResponse, sp: StatePayload): Promise<true> {
+    // H4 F1: without this, a Google URL minted here and forwarded to someone
+    // else signs THEM in and hands their subject to the starting client.
+    const headers: Record<string, string> = {};
+    if (sp.flow === 'owner_gate') {
+      const value = randomBytes(32).toString('base64url');
+      const bind = sha256Url(value);
+      sp = { ...sp, bind };
+      headers['Set-Cookie'] = `${bindCookieName(base, bind)}=${value}; ${bindCookieAttrs(base, STATE_TTL_DEFAULT)}`;
+    }
     const state = await signState(sp, base, secret, nowSec());
     const authUrl = deps.buildGoogleAuthUrl
       ? deps.buildGoogleAuthUrl({ flow: sp.flow, alias: sp.alias, state, bundles: sp.bundles })
       : `https://accounts.google.com/o/oauth2/v2/auth?state=${encodeURIComponent(state)}`;
-    return redirect(res, authUrl);
+    return redirect(res, authUrl, headers);
   }
 
   // GET /authorize (validate + interstitial for DCR clients); POST /authorize
@@ -469,7 +513,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     // cannot forge, so there is nothing to spoof.
     if (client.dcr) {
       const pendingToken = await signPending(statePayload, base, secret, nowSec());
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': "frame-ancestors 'none'", 'X-Frame-Options': 'DENY' });
       res.end(
         `<!doctype html><meta charset=utf-8><title>Authorize access</title>` +
           `<body style="font-family:system-ui,sans-serif;max-width:36em;margin:3em auto;line-height:1.5">` +
@@ -498,13 +542,26 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     if (!replay.consume(st.jti, STATE_TTL_DEFAULT * 1000, now())) {
       return errorPage(res, 400, 'E_STATE_INVALID', 'state has already been used (replay)');
     }
+    // After the spend, so a refused callback URL cannot be replayed from the
+    // browser that holds the cookie; before the exchange and resolveSubject.
+    if (st.flow === 'owner_gate') {
+      const binding = browserBinding(req, base, st.bind);
+      if (binding !== 'ok') {
+        log(`callback refused flow=owner_gate: browser binding ${binding}`);
+        return errorPage(res, 400, 'E_BROWSER_MISMATCH', 'finish the sign-in in the browser that started it; start again from your app');
+      }
+      res.setHeader('Set-Cookie', `${bindCookieName(base, st.bind ?? '')}=; ${bindCookieAttrs(base, 0)}`);
+    }
     if (!code) return errorPage(res, 400, 'invalid_request', 'missing code');
 
     let exchanged: GoogleExchangeResult;
     try {
       exchanged = deps.exchangeCode ? await deps.exchangeCode(code, st.flow) : { tokens: {} };
     } catch (e) {
-      return errorPage(res, 400, 'invalid_grant', `Google code exchange failed: ${(e as Error).message}`);
+      // The detail can name proxies and hosts; it goes to the log, not the browser.
+      const detail = e instanceof Error ? e.message : typeof e === 'string' ? e : 'non-Error rejection';
+      log(`callback exchange failed flow=${st.flow}: ${detail.replace(/[\r\n]+/g, ' ')}`);
+      return errorPage(res, 400, 'invalid_grant', 'Google could not complete the sign-in; start again from your app');
     }
 
     if (st.flow === 'alias_add') {
