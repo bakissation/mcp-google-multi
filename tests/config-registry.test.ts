@@ -367,6 +367,33 @@ describe('fs-atomic', () => {
       }
     });
 
+    it('a holder that recorded no start time is judged by the probe and the lease', () => {
+      const p = path.join(base, 'a.json');
+      expectKept(p, plantLock(p, { pid: process.ppid, id: { ...SELF_ID, start: '0' }, mtimeMs: Date.now() - 30_000 }), process.ppid);
+      vi.restoreAllMocks();
+      clearLock(p);
+      plantLock(p, { pid: process.ppid, id: { ...SELF_ID, start: '0' }, mtimeMs: Date.now() - 61_000 });
+      expectBroken(p);
+    });
+
+    for (const [part, unknown] of [['start time', { start: '0' }], ['boot id', { boot: '0' }], ['namespace', { ns: 'host' }]] as const) {
+      it(`a waiter that cannot read its own ${part} uses the probe, the own-pid rule and the lease`, () => {
+        const self = { ...SELF_ID, ...unknown };
+        __setLockIdentityForTest(self);
+        try {
+          const p = path.join(base, 'a.json');
+          // Would read as alive by start time: this pid, this very start tick.
+          plantLock(p, { pid: process.pid, id: { ...self, start: SELF_ID.start }, mtimeMs: performance.timeOrigin - 10_000 });
+          fastClock();
+          expectBroken(p);
+          vi.restoreAllMocks();
+          expectKept(p, plantLock(p, { pid: process.ppid, id: { ...self, start: procStart(process.ppid) }, mtimeMs: Date.now() - 30_000 }), process.ppid);
+        } finally {
+          __setLockIdentityForTest();
+        }
+      });
+    }
+
     it('keeps a lock another live process holds, however old; breaks one whose pid is gone', () => {
       const p = path.join(base, 'a.json');
       expectKept(p, plantLock(p, { pid: process.ppid, id: { ...SELF_ID, start: procStart(process.ppid) }, mtimeMs: Date.now() - 120_000 }), process.ppid);
@@ -457,6 +484,28 @@ describe('fs-atomic', () => {
     let ran = false;
     withFileLock(p, () => void (ran = true));
     expect(ran).toBe(true);
+  });
+
+  it('a lock without an owner file is broken only if its mtime is unchanged under the breaker', () => {
+    const p = path.join(base, 'a.json');
+    const lock = plantLock(p, { pid: process.ppid, mtimeMs: Date.now() - 61_000 });
+    const realWrite = fs.writeFileSync.bind(fs);
+    let swapped = false;
+    vi.spyOn(fs, 'writeFileSync').mockImplementation(((target: string, ...rest: unknown[]) => {
+      // Between the judgement and the break, a new holder (same pid body,
+      // same freed inode) took the lock.
+      if (String(target).endsWith('.break') && !swapped) {
+        swapped = true;
+        utimesSync(lock, new Date(), new Date());
+      }
+      return (realWrite as (...a: unknown[]) => void)(target, ...rest);
+    }) as unknown as typeof fs.writeFileSync);
+    fastClock();
+    let ran = false;
+    expect(() => withFileLock(p, () => void (ran = true))).toThrow(/Timed out waiting/);
+    expect(swapped).toBe(true);
+    expect(ran).toBe(false);
+    expect(existsSync(lock)).toBe(true);
   });
 
   it('a holder whose lock was broken does not remove its successor\'s lock on release', () => {

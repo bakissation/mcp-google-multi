@@ -144,7 +144,9 @@ function holderDead(holder: LockHolder, now: number): boolean {
   // No owner file: an older writer, whose namespace is unknown.
   if (!owner) return probeDead(pid) || leaseOver;
   if (owner.ns !== SELF.ns || owner.boot !== SELF.boot) return leaseOver;
-  if (SELF.start !== '0' && owner.start !== '0') {
+  // Two unreadable parts compare equal without naming the same namespace or
+  // boot, so only a fully known identity is looked up by start time.
+  if (SELF.ns !== 'host' && SELF.boot !== '0' && SELF.start !== '0' && owner.start !== '0') {
     // A live namespace id is never shared, so the recorded pid is ours to
     // look up: a restarted container reuses both the id and the pid, but not
     // the start time.
