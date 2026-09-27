@@ -93,7 +93,7 @@ function request(
   port: number,
   method: string,
   path: string,
-  opts: { headers?: Record<string, string>; body?: unknown; raw?: string; signal?: AbortSignal } = {},
+  opts: { headers?: Record<string, string>; body?: unknown; raw?: string; signal?: AbortSignal; agent?: http.Agent } = {},
 ): Promise<{ status: number; headers: http.IncomingHttpHeaders; text: string }> {
   return new Promise((resolve, reject) => {
     const data =
@@ -105,6 +105,7 @@ function request(
         method,
         path,
         signal: opts.signal,
+        agent: opts.agent,
         headers: {
           host: '127.0.0.1', // an allowlisted bare host
           ...(data ? { 'content-type': 'application/json', 'content-length': String(data.length) } : {}),
@@ -679,6 +680,9 @@ describe('HttpTransportHost lane bounds', () => {
     await until(() => h.logs.includes('499 client_gone path=/mcp'), 'the client_gone line');
     expect((await h.call('a', 'ping')).status).toBe(200);
     expect(h.held.calls).toBe(1);
+    const books = h.host as unknown as { pending: Map<unknown, unknown>; handling: Set<unknown> };
+    await until(() => books.handling.size === 0, 'every handle() to settle');
+    expect(books.pending.size).toBe(0);
   });
 
   it('without maxQueuedPerLane, 20 requests queued on one lane all complete', async () => {
@@ -697,5 +701,616 @@ describe('HttpTransportHost lane bounds', () => {
     const one = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: [callTool(3, 'ping')] });
     expect(one.status).toBe(200);
     expect(one.text).toContain('pong');
+  });
+});
+
+const BIG_CHARS = 8_000_000;
+
+/** One server whose `big` tool answers ~8 MB, well above the loopback socket
+ * buffers, and whose `held` tool waits for the test to open its gate. */
+async function closeHost(extra: Partial<HttpHostOptions> = {}) {
+  let open!: () => void;
+  const gate = new Promise<void>((r) => (open = r));
+  const held = { calls: 0 };
+  const writes = { calls: 0 };
+  const server = new McpServer({ name: 'close', version: '0.0.0' });
+  server.registerTool('write', { description: 'a call with a side effect', inputSchema: z.object({}) }, async () => {
+    writes.calls++;
+    return { content: [{ type: 'text' as const, text: 'written' }] };
+  });
+  server.registerTool('ping', { description: 'ping', inputSchema: z.object({}) }, async () => ({
+    content: [{ type: 'text' as const, text: 'pong' }],
+  }));
+  server.registerTool('big', { description: 'a large answer', inputSchema: z.object({}) }, async () => ({
+    content: [{ type: 'text' as const, text: 'a'.repeat(BIG_CHARS) }],
+  }));
+  server.registerTool('held', { description: 'waits for the gate', inputSchema: z.object({}) }, async () => {
+    held.calls++;
+    await gate;
+    return { content: [{ type: 'text' as const, text: 'released' }] };
+  });
+  server.registerTool('heldBig', { description: 'waits for the gate, then answers large', inputSchema: z.object({}) }, async () => {
+    held.calls++;
+    await gate;
+    return { content: [{ type: 'text' as const, text: 'a'.repeat(BIG_CHARS) }] };
+  });
+  const config = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http' }), port: 0 };
+  const host = new HttpTransportHost({ server, config, version: '9.9.9', ownerConfigured: true, authenticate: () => ({ ok: true }), ...extra });
+  await host.start();
+  hosts.push(host);
+  return { host, port: host.address()!.port, open, held, writes };
+}
+
+function post(port: number, agent?: http.Agent): { req: http.ClientRequest; response: Promise<http.IncomingMessage> } {
+  const req = http.request({
+    hostname: '127.0.0.1',
+    port,
+    method: 'POST',
+    path: '/mcp',
+    agent,
+    headers: { host: '127.0.0.1', accept: MCP_ACCEPT, 'content-type': 'application/json' },
+  });
+  const response = new Promise<http.IncomingMessage>((resolve, reject) => {
+    req.on('response', resolve);
+    req.on('error', reject);
+  });
+  return { req, response };
+}
+
+function drain(res: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    res.on('data', (c: Buffer) => chunks.push(c));
+    res.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+    res.on('error', reject);
+    res.resume();
+  });
+}
+
+/** A raw connection that keeps everything the host sends on it. */
+function wire(port: number) {
+  const socket = rawSocket(port);
+  let text = '';
+  socket.on('data', (c: Buffer) => (text += c.toString('utf-8')));
+  const ended = new Promise<void>((r) => socket.once('close', () => r()));
+  return { socket, ended, received: () => text };
+}
+
+/** Splits what one connection received into its HTTP/1.1 responses. */
+function responsesOf(raw: string): { head: string; body: string }[] {
+  const out: { head: string; body: string }[] = [];
+  let rest = raw;
+  for (;;) {
+    const split = rest.indexOf('\r\n\r\n');
+    if (split < 0) return out;
+    const head = rest.slice(0, split);
+    rest = rest.slice(split + 4);
+    const length = /^content-length: *(\d+)/im.exec(head);
+    let body = '';
+    if (length) {
+      body = rest.slice(0, Number(length[1]));
+      rest = rest.slice(body.length);
+    } else {
+      for (;;) {
+        const line = rest.indexOf('\r\n');
+        if (line < 0) break;
+        const size = parseInt(rest.slice(0, line), 16);
+        rest = rest.slice(line + 2);
+        if (!(size > 0)) break;
+        body += rest.slice(0, size);
+        rest = rest.slice(size + 2);
+      }
+      rest = rest.slice(2);
+    }
+    out.push({ head, body });
+  }
+}
+
+describe('HttpTransportHost graceful close', () => {
+  it('close({ graceMs }) stops accepting but lets a multi-megabyte response in flight arrive whole', async () => {
+    const h = await closeHost();
+    const idle = new http.Agent({ keepAlive: true });
+    const busy = new http.Agent({ keepAlive: true });
+    try {
+      expect((await request(h.port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(1, 'ping'), agent: idle })).status).toBe(200);
+      const { req, response } = post(h.port, busy);
+      req.end(JSON.stringify(callTool(2, 'big')));
+      const res = await response;
+      res.pause();
+      // Where loopback buffers absorb the whole body (Windows), the response has
+      // already finished on the server side and there is nothing left to wait for.
+      const inFlight = (h.host as unknown as { pending: Map<unknown, unknown> }).pending.size > 0;
+      let closed = false;
+      const closing = h.host.close({ graceMs: 10_000 }).then(() => (closed = true));
+      await new Promise((r) => setTimeout(r, 150));
+      if (inFlight) expect(closed).toBe(false);
+      await expect(request(h.port, 'GET', '/health')).rejects.toThrow();
+      const started = Date.now();
+      const text = await drain(res);
+      expect(res.complete).toBe(true);
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(text).result.content[0].text.length).toBe(BIG_CHARS);
+      await closing;
+      expect(Date.now() - started).toBeLessThan(3000);
+    } finally {
+      idle.destroy();
+      busy.destroy();
+    }
+  });
+
+  it('close({ graceMs }) lets a request still reading its body finish, and tells its client the connection closes', async () => {
+    const h = await closeHost();
+    const agent = new http.Agent({ keepAlive: true });
+    try {
+      const body = Buffer.from(JSON.stringify(callTool(1, 'ping')));
+      const { req, response } = post(h.port, agent);
+      req.setHeader('content-length', String(body.length));
+      req.write(body.subarray(0, 10));
+      await new Promise((r) => setTimeout(r, 50));
+      const closing = h.host.close({ graceMs: 10_000 });
+      await new Promise((r) => setTimeout(r, 50));
+      req.end(body.subarray(10));
+      const res = await response;
+      const text = await drain(res);
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(text).result.content[0].text).toBe('pong');
+      expect(res.headers.connection).toBe('close');
+      const started = Date.now();
+      await closing;
+      expect(Date.now() - started).toBeLessThan(3000);
+    } finally {
+      agent.destroy();
+    }
+  });
+
+  it('close({ graceMs }) resolves at once when only idle keep-alive connections remain', async () => {
+    const h = await closeHost();
+    const agent = new http.Agent({ keepAlive: true });
+    try {
+      await request(h.port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(1, 'ping'), agent });
+      const started = Date.now();
+      await h.host.close({ graceMs: 10_000 });
+      expect(Date.now() - started).toBeLessThan(1000);
+    } finally {
+      agent.destroy();
+    }
+  });
+
+  it('close({ graceMs }) waits for a request still being authenticated after its client left', async () => {
+    let release!: () => void;
+    const authGate = new Promise<void>((r) => (release = r));
+    let authCalls = 0;
+    const h = await closeHost({
+      authenticate: async () => {
+        authCalls++;
+        await authGate;
+        return { ok: true };
+      },
+    });
+    const ac = new AbortController();
+    const left = request(h.port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(1, 'ping'), signal: ac.signal }).catch(() => undefined);
+    await until(() => authCalls === 1, 'the authentication');
+    ac.abort();
+    await left;
+    let closed = false;
+    const closing = h.host.close({ graceMs: 10_000 }).then(() => (closed = true));
+    await new Promise((r) => setTimeout(r, 150));
+    expect(closed).toBe(false);
+    release();
+    await closing;
+  });
+
+  it('close({ graceMs }) cuts a request still running when the grace ends', async () => {
+    const h = await closeHost();
+    const hung = request(h.port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(1, 'held') }).then(
+      () => 'answered',
+      () => 'cut',
+    );
+    await until(() => h.held.calls === 1, 'the running call');
+    const started = Date.now();
+    await h.host.close({ graceMs: 150 });
+    const took = Date.now() - started;
+    expect(took).toBeGreaterThanOrEqual(140);
+    expect(took).toBeLessThan(2000);
+    expect(await hung).toBe('cut');
+    h.open();
+  });
+
+  it('close({ graceMs }) answers a call pipelined behind a streaming route response, and ends the connection after it', async () => {
+    let openStream!: () => void;
+    const streamGate = new Promise<void>((r) => (openStream = r));
+    const h = await closeHost({
+      routes: {
+        '/stream': async (_req, res) => {
+          res.writeHead(200, { 'content-type': 'text/plain' });
+          res.write('first ');
+          await streamGate;
+          res.end('last');
+          return true;
+        },
+      },
+    });
+    const conn = wire(h.port);
+    conn.socket.write('GET /stream HTTP/1.1\r\nhost: 127.0.0.1\r\n\r\n' + rawPost(callTool(2, 'held')));
+    await until(() => conn.received().includes('first') && h.held.calls === 1, 'the started response and the running call');
+    const closing = h.host.close({ graceMs: 10_000 });
+    openStream();
+    await until(() => conn.received().includes('last'), 'the end of the started response');
+    await new Promise((r) => setTimeout(r, 50));
+    const started = Date.now();
+    h.open();
+    await closing;
+    await conn.ended;
+    expect(Date.now() - started).toBeLessThan(3000);
+    const answers = responsesOf(conn.received());
+    expect(answers).toHaveLength(2);
+    expect(answers[0].body).toBe('first last');
+    expect(answers[0].head).not.toMatch(/connection: close/i);
+    expect(answers[1].head).toMatch(/connection: close/i);
+    expect(JSON.parse(answers[1].body).result.content[0].text).toBe('released');
+    expect(h.held.calls).toBe(1);
+  });
+
+  it('close({ graceMs }) answers a route pipelined behind an /mcp response that has not started', async () => {
+    const h = await closeHost({
+      routes: {
+        '/small': async (_req, res) => {
+          res.end('small');
+          return true;
+        },
+      },
+    });
+    const conn = wire(h.port);
+    conn.socket.write(rawPost(callTool(1, 'held')) + 'GET /small HTTP/1.1\r\nhost: 127.0.0.1\r\n\r\n');
+    await until(() => h.held.calls === 1, 'the running call');
+    await new Promise((r) => setTimeout(r, 50));
+    const closing = h.host.close({ graceMs: 10_000 });
+    await new Promise((r) => setTimeout(r, 50));
+    const started = Date.now();
+    h.open();
+    await closing;
+    await conn.ended;
+    expect(Date.now() - started).toBeLessThan(3000);
+    const answers = responsesOf(conn.received());
+    expect(answers).toHaveLength(2);
+    expect(JSON.parse(answers[0].body).result.content[0].text).toBe('released');
+    expect(answers[1].body).toBe('small');
+  });
+
+  it('close({ graceMs }) begun as a small response finishes still delivers a big one pipelined behind it whole', async () => {
+    const ref: { host?: HttpTransportHost } = {};
+    let closing: Promise<void> | undefined;
+    const h = await closeHost({
+      routes: {
+        '/small': async (_req, res) => {
+          res.once('finish', () => (closing = ref.host!.close({ graceMs: 10_000 })));
+          res.end('small');
+          return true;
+        },
+      },
+    });
+    ref.host = h.host;
+    const conn = wire(h.port);
+    conn.socket.write('GET /small HTTP/1.1\r\nhost: 127.0.0.1\r\n\r\n' + rawPost(callTool(2, 'big')));
+    await conn.ended;
+    await closing;
+    const answers = responsesOf(conn.received());
+    expect(answers).toHaveLength(2);
+    expect(answers[0].body).toBe('small');
+    expect(JSON.parse(answers[1].body).result.content[0].text.length).toBe(BIG_CHARS);
+  });
+
+  it('close({ graceMs }) still runs a request that was waiting on its lane when the close began', async () => {
+    let auths = 0;
+    const h = await closeHost({
+      authenticate: () => {
+        auths++;
+        return { ok: true };
+      },
+    });
+    const conn = wire(h.port);
+    conn.socket.write(rawPost(callTool(1, 'held')) + rawPost(callTool(2, 'write')));
+    await until(() => h.held.calls === 1 && auths === 2, 'the running call and the queued one');
+    const closing = h.host.close({ graceMs: 10_000 });
+    await new Promise((r) => setTimeout(r, 50));
+    const started = Date.now();
+    h.open();
+    await closing;
+    await conn.ended;
+    expect(Date.now() - started).toBeLessThan(3000);
+    const answers = responsesOf(conn.received());
+    expect(answers).toHaveLength(2);
+    expect(JSON.parse(answers[0].body).result.content[0].text).toBe('released');
+    expect(answers[0].head).not.toMatch(/connection: close/i);
+    expect(answers[1].head).toMatch(/connection: close/i);
+    expect(JSON.parse(answers[1].body).result.content[0].text).toBe('written');
+    expect(h.writes.calls).toBe(1);
+  });
+
+  it('close({ graceMs }) never handles a request pipelined after the close began, ends its side after the last one before it, and cuts the connection when the grace ends', async () => {
+    let auths = 0;
+    const h = await closeHost({
+      authenticate: () => {
+        auths++;
+        return { ok: true };
+      },
+    });
+    const conn = wire(h.port);
+    conn.socket.write(rawPost(callTool(1, 'held')));
+    await until(() => h.held.calls === 1, 'the running call');
+    const closing = h.host.close({ graceMs: 1000 });
+    await new Promise((r) => setTimeout(r, 50));
+    conn.socket.write(rawPost(callTool(2, 'write')));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(auths).toBe(1);
+    const finned = new Promise<number>((r) => conn.socket.once('end', () => r(Date.now())));
+    const started = Date.now();
+    h.open();
+    expect((await finned) - started).toBeLessThan(500);
+    await closing;
+    await conn.ended;
+    expect(Date.now() - started).toBeGreaterThanOrEqual(700);
+    expect(h.writes.calls).toBe(0);
+    const answers = responsesOf(conn.received());
+    expect(answers).toHaveLength(1);
+    expect(answers[0].head).toMatch(/connection: close/i);
+    expect(JSON.parse(answers[0].body).result.content[0].text).toBe('released');
+  });
+
+  it('close({ graceMs }) stops reading a connection once a request arrives after the close, so a pipelined flood never piles up', async () => {
+    const h = await closeHost();
+    const conn = wire(h.port);
+    conn.socket.write(rawPost(callTool(1, 'heldBig')));
+    await until(() => h.held.calls === 1, 'the running call');
+    let late = 0;
+    (h.host as unknown as { httpServer: http.Server }).httpServer.on('request', () => late++);
+    const closing = h.host.close({ graceMs: 1500 });
+    conn.socket.write('GET /health HTTP/1.1\r\nhost: 127.0.0.1\r\n\r\n');
+    await until(() => late === 1, 'the first request after the close');
+    conn.socket.write('GET /health HTTP/1.1\r\nhost: 127.0.0.1\r\n\r\n'.repeat(20_000));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(late).toBeLessThanOrEqual(2);
+    h.open();
+    await until(() => {
+      try {
+        return JSON.parse(responsesOf(conn.received())[0]?.body ?? '') !== undefined;
+      } catch {
+        return false;
+      }
+    }, 'the whole answer owed');
+    expect(late).toBeLessThanOrEqual(2);
+    const answers = responsesOf(conn.received());
+    expect(answers[0].head).toMatch(/connection: close/i);
+    expect(JSON.parse(answers[0].body).result.content[0].text.length).toBe(BIG_CHARS);
+    await closing;
+    await conn.ended;
+  });
+
+  it('close({ graceMs }) destroys at once a connection whose request headers are still arriving', async () => {
+    const h = await closeHost();
+    const socket = rawSocket(h.port);
+    const ended = new Promise<void>((r) => socket.once('close', () => r()));
+    socket.write('POST /mcp HTTP/1.1\r\nhost: 127.0.0.1\r\n');
+    await until(() => (h.host as unknown as { sockets: Set<unknown> }).sockets.size === 1, 'the connection');
+    const started = Date.now();
+    await h.host.close({ graceMs: 10_000 });
+    await ended;
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it('close() without graceMs during a graceful close still cuts at once', async () => {
+    const h = await closeHost();
+    const hung = request(h.port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(1, 'held') }).then(
+      () => 'answered',
+      () => 'cut',
+    );
+    await until(() => h.held.calls === 1, 'the running call');
+    const graceful = h.host.close({ graceMs: 10_000 });
+    const started = Date.now();
+    await h.host.close();
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(await hung).toBe('cut');
+    expect(h.host.address()).toBeUndefined();
+    h.open();
+    await graceful;
+  });
+
+  it('close() without graceMs still cuts an in-flight request at once', async () => {
+    const h = await closeHost();
+    const hung = request(h.port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(1, 'held') }).then(
+      () => 'answered',
+      () => 'cut',
+    );
+    await until(() => h.held.calls === 1, 'the running call');
+    const started = Date.now();
+    await h.host.close();
+    expect(Date.now() - started).toBeLessThan(100);
+    expect(await hung).toBe('cut');
+    h.open();
+  });
+  /** A post-close request whose body is far larger than the socket buffers. */
+  const lateBody = () => {
+    const body = 'x'.repeat(6_000_000);
+    return `POST /mcp HTTP/1.1\r\nhost: 127.0.0.1\r\naccept: ${MCP_ACCEPT}\r\ncontent-type: application/json\r\ncontent-length: ${body.length}\r\n\r\n${body}`;
+  };
+  /** Reads one chunk every few milliseconds, so the host's last writes wait in
+   * its socket buffer when it ends the connection. */
+  const readSlowly = (socket: net.Socket) => {
+    socket.pause();
+    const every = setInterval(() => {
+      socket.once('data', () => socket.pause());
+      socket.resume();
+    }, 5);
+    return () => clearInterval(every);
+  };
+
+  it('close({ graceMs }) delivers a started big response whole to a slow reader that pipelines a large body after the close began', async () => {
+    const h = await closeHost();
+    const conn = wire(h.port);
+    conn.socket.write(rawPost(callTool(1, 'big')));
+    await until(() => conn.received().length > 0, 'the start of the big response');
+    const stop = readSlowly(conn.socket);
+    try {
+      const closing = h.host.close({ graceMs: 3000 });
+      await new Promise((r) => setTimeout(r, 50));
+      conn.socket.write(lateBody());
+      await conn.ended;
+      await closing;
+    } finally {
+      stop();
+    }
+    const answers = responsesOf(conn.received());
+    expect(answers).toHaveLength(1);
+    expect(JSON.parse(answers[0].body).result.content[0].text.length).toBe(BIG_CHARS);
+    expect(h.writes.calls).toBe(0);
+  }, 15_000);
+
+  it('close({ graceMs }) delivers a big response not yet started whole to a slow reader that pipelines a large body after the close began', async () => {
+    const h = await closeHost();
+    const conn = wire(h.port);
+    conn.socket.write(rawPost(callTool(1, 'heldBig')));
+    await until(() => h.held.calls === 1, 'the running call');
+    const stop = readSlowly(conn.socket);
+    try {
+      const closing = h.host.close({ graceMs: 3000 });
+      await new Promise((r) => setTimeout(r, 50));
+      h.open();
+      await until(() => conn.received().length > 0, 'the start of the big response');
+      conn.socket.write(lateBody());
+      await conn.ended;
+      await closing;
+    } finally {
+      stop();
+    }
+    const answers = responsesOf(conn.received());
+    expect(answers).toHaveLength(1);
+    expect(answers[0].head).toMatch(/connection: close/i);
+    expect(JSON.parse(answers[0].body).result.content[0].text.length).toBe(BIG_CHARS);
+  }, 15_000);
+
+  it('a second close({ graceMs }) after the last response finished writing still delivers it whole to a slow reader', async () => {
+    const h = await closeHost();
+    const conn = wire(h.port);
+    conn.socket.write(rawPost(callTool(1, 'heldBig')));
+    await until(() => h.held.calls === 1, 'the running call');
+    const pending = (h.host as unknown as { pending: Map<unknown, unknown> }).pending;
+    let late = 0;
+    (h.host as unknown as { httpServer: http.Server }).httpServer.on('request', () => late++);
+    const stop = readSlowly(conn.socket);
+    try {
+      const first = h.host.close({ graceMs: 3000 });
+      conn.socket.write(lateBody());
+      await until(() => late === 1, 'the request after the close');
+      h.open();
+      await until(() => pending.size === 0, 'the last response to finish writing');
+      void h.host.close({ graceMs: 3000 });
+      await conn.ended;
+      await first;
+    } finally {
+      stop();
+    }
+    const answers = responsesOf(conn.received());
+    expect(answers).toHaveLength(1);
+    expect(JSON.parse(answers[0].body).result.content[0].text.length).toBe(BIG_CHARS);
+  }, 15_000);
+
+  it('close({ graceMs }) resolves and fully closes when a route that started its response throws', async () => {
+    let fire!: () => void;
+    const thrown = new Promise<void>((r) => (fire = r));
+    const h = await closeHost({
+      routes: {
+        '/broken': async (_req, res) => {
+          res.writeHead(200, { 'content-type': 'text/plain' });
+          res.write('partial');
+          await thrown;
+          throw new Error('route failed mid-response');
+        },
+      },
+    });
+    const conn = wire(h.port);
+    conn.socket.write('GET /broken HTTP/1.1\r\nhost: 127.0.0.1\r\n\r\n');
+    await until(() => conn.received().includes('partial'), 'the started response');
+    const closing = h.host.close({ graceMs: 20_000 });
+    await new Promise((r) => setTimeout(r, 50));
+    fire();
+    await expect(closing).resolves.toBeUndefined();
+    await conn.ended;
+    expect(h.host.address()).toBeUndefined();
+    expect((h.host as unknown as { closing: boolean }).closing).toBe(false);
+  });
+
+  it('a route that throws after starting its response has its connection cut, without an unhandled rejection', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (e: unknown) => unhandled.push(e);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const h = await closeHost({
+        routes: {
+          '/broken': async (_req, res) => {
+            res.writeHead(200, { 'content-type': 'text/plain' });
+            res.write('partial');
+            await tick();
+            throw new Error('route failed mid-response');
+          },
+        },
+      });
+      const failSpy = vi.spyOn(h.host as unknown as { fail: () => void }, 'fail');
+      const conn = wire(h.port);
+      conn.socket.write('GET /broken HTTP/1.1\r\nhost: 127.0.0.1\r\n\r\n');
+      await conn.ended;
+      await new Promise((r) => setTimeout(r, 50));
+      expect(conn.received()).toContain('partial');
+      expect(failSpy.mock.results.map((r) => r.type)).toEqual(['return']);
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+  });
+
+  it('close({ graceMs }) resolves even when answering a failed request itself throws', async () => {
+    const h = await closeHost({
+      routes: {
+        '/broken': async () => {
+          throw new Error('route failed');
+        },
+      },
+    });
+    const unhandled: unknown[] = [];
+    const onUnhandled = (e: unknown) => unhandled.push(e);
+    process.on('unhandledRejection', onUnhandled);
+    const failSpy = vi.spyOn(h.host as unknown as { fail: () => void }, 'fail').mockImplementation(() => {
+      throw new Error('answer failed');
+    });
+    try {
+      const conn = wire(h.port);
+      conn.socket.write('GET /broken HTTP/1.1\r\nhost: 127.0.0.1\r\n\r\n');
+      await until(() => failSpy.mock.calls.length === 1, 'the failed answer');
+      await h.host.close({ graceMs: 20_000 });
+      await conn.ended;
+      await new Promise((r) => setTimeout(r, 50));
+      expect(h.host.address()).toBeUndefined();
+      expect(unhandled).toEqual([]);
+    } finally {
+      failSpy.mockRestore();
+      process.off('unhandledRejection', onUnhandled);
+    }
+  });
+
+  it('close({ graceMs }) refuses a grace a timer cannot hold, and leaves the host serving', async () => {
+    const h = await closeHost();
+    const running = request(h.port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: callTool(1, 'held') });
+    await until(() => h.held.calls === 1, 'the running call');
+    for (const graceMs of [Infinity, 2 ** 31, -1, Number.NaN, '100' as unknown as number]) {
+      await expect(h.host.close({ graceMs })).rejects.toThrow(TypeError);
+    }
+    expect((await request(h.port, 'GET', '/health')).status).toBe(200);
+    let closed = false;
+    const closing = h.host.close({ graceMs: 2 ** 31 - 1 }).then(() => (closed = true));
+    await new Promise((r) => setTimeout(r, 150));
+    expect(closed).toBe(false);
+    h.open();
+    const answer = await running;
+    expect(JSON.parse(answer.text).result.content[0].text).toBe('released');
+    await closing;
   });
 });
