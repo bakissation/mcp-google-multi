@@ -140,6 +140,12 @@ export interface AuthServerDeps {
    * A returned refusal answers 403 with its slug; a throw or rejection answers
    * 500 E_ALIAS_ADD_FAILED. */
   bindTenantAlias?: (bind: TenantAliasBind) => void | AliasBindRefusal | Promise<void | AliasBindRefusal>;
+  /** False for a subject this host no longer serves (a multi-tenant host that
+   * removed or suspended it): /token then issues and rotates nothing for it
+   * (400 invalid_grant; a rotated sub's refresh tokens are dropped). A throw
+   * means the answer is unknown right now: 503 temporarily_unavailable, and
+   * the presented refresh token is not spent. Absent: every subject is active. */
+  subjectActive?: (sub: string) => boolean;
 }
 
 export interface AuthServer {
@@ -169,6 +175,12 @@ function errorPage(res: ServerResponse, status: number, slug: string, message: s
   res.writeHead(status, { 'Content-Type': 'text/plain' });
   res.end(`${slug}: ${message}`);
   return true;
+}
+
+class SubjectCheckUnavailable extends Error {}
+
+function subjectUnavailable(res: ServerResponse): true {
+  return json(res, 503, { error: 'temporarily_unavailable', message: 'the sign-in could not be checked right now; retry shortly' }, { 'Retry-After': '5' });
 }
 
 function redirect(res: ServerResponse, location: string): true {
@@ -618,12 +630,45 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
         return json(res, 400, { error: 'invalid_grant', message: 'PKCE verification failed' });
       }
       const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl, sub: code.sub });
+      if (deps.subjectActive) {
+        let active: boolean;
+        try {
+          active = deps.subjectActive(code.sub);
+        } catch (e) {
+          log(`token deferred grant=authorization_code: subject check failed: ${e instanceof Error ? e.message : 'non-Error throw'}`);
+          return subjectUnavailable(res);
+        }
+        if (!active) {
+          log('token refused grant=authorization_code: subject inactive');
+          return json(res, 400, { error: 'invalid_grant', message: 'the subject is no longer provisioned' });
+        }
+      }
       const refreshToken = refresh.issue(now(), code.sub);
       log('token issued grant=authorization_code');
       return json(res, 200, { access_token: access, token_type: 'Bearer', expires_in: accessTtl, refresh_token: refreshToken, scope: 'mcp:use' });
     }
     if (grant === 'refresh_token') {
-      const next = refresh.rotate(form.refresh_token ?? '', now());
+      const subjectActive = deps.subjectActive;
+      const accept = subjectActive
+        ? (sub: string): boolean => {
+            let active: boolean;
+            try {
+              active = subjectActive(sub);
+            } catch (e) {
+              throw new SubjectCheckUnavailable('subject check failed', { cause: e });
+            }
+            if (!active) log('token refused grant=refresh_token: subject inactive');
+            return active;
+          }
+        : undefined;
+      let next: ReturnType<RefreshStore['rotate']>;
+      try {
+        next = refresh.rotate(form.refresh_token ?? '', now(), accept);
+      } catch (e) {
+        if (!(e instanceof SubjectCheckUnavailable)) throw e;
+        log(`token deferred grant=refresh_token: subject check failed: ${e.cause instanceof Error ? e.cause.message : 'non-Error throw'}`);
+        return subjectUnavailable(res);
+      }
       if (!next) return json(res, 400, { error: 'invalid_grant', message: 'unknown or rotated refresh token' });
       const access = await signAccessToken({ base, secret, iat: nowSec(), ttlSec: accessTtl, sub: next.sub });
       log('token issued grant=refresh_token');

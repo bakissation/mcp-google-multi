@@ -414,6 +414,19 @@ propagates, so the presented token still rotates on a later attempt. A reuse
 of a rotated-away token never calls it. Without `accept`, rotation is
 unchanged.
 
+`/oauth-as`: `AuthServerDeps.subjectActive(sub)` (optional) lets a host
+refuse MCP tokens for a subject it no longer serves. At `/token`, a
+`refresh_token` grant checks it through `rotate`'s `accept`, and an
+`authorization_code` grant checks it just before the refresh token is issued.
+`false` answers 400 `invalid_grant` and issues nothing (a refused refresh also
+drops that subject's other refresh tokens). A throw answers 503
+`temporarily_unavailable` with `Retry-After: 5`; the thrown message goes only
+to the server log, and a presented refresh token is not spent. An
+authorization code is single-use, so a client refused with 503 at code
+redemption signs in again. Without `subjectActive` both grants are unchanged,
+and the owner's server never sets it. `temporarily_unavailable` is a new
+error slug.
+
 `/accounts` exports `liveAccountCheck` and `isLiveAccountField`: an `account`
 field built on the live check (as `accountArgLive` builds it) validates
 against the registry's current aliases at parse time and counts as a

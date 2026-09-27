@@ -23,6 +23,8 @@ One waiter at a time breaks a dead lock, under a `.break` file created with `O_E
 
 `rotate` spends the presented token (moves it to the spent set) in the same critical section that mints its successor. A caller that asked "is this subject still served?" only after `rotate` returned could not fail safe: on a transient error the old token is already spent and the client is signed out. The optional `accept(sub)` therefore runs inside the lock, after the record is found and before any mutation. A `false` drops every active record of that sub (the `purgeTenant` loop), so a later `true` does not revive the family; a throw leaves the file untouched. The spent-token branch never calls it, so theft detection is unchanged.
 
+`/token` wires `AuthServerDeps.subjectActive` into `accept` and converts a throw from it into a module-private error class inside the callback, so the route answers 503 `temporarily_unavailable` only for that failure; any other throw from the store still propagates. The route never puts the thrown message in the body, because the transport's catch-all 500 would echo it. The authorization-code grant checks the subject after its last `await` and immediately before `issue`, so within one process nothing can interleave between the check and the write.
+
 ## Admin SDK
 
 ### Why admin tools are per-account opt-in (`ADMIN_SCOPES`, `src/auth.ts`)
