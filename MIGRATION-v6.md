@@ -537,6 +537,14 @@ The message now goes to `AuthServerDeps.log` as
 status are unchanged, and a rejection that is not an `Error` gets the same
 page instead of an unhandled route error.
 
+`/mcp-token`: `RefreshStore` now looks a presented refresh token up among the
+store's own entries only, and drops on load any record without a string
+subject and family. Before, a value such as `constructor` matched an inherited
+object property, and `/token` answered it with a working access token and a
+refresh token, without any sign-in. `signAccessToken` throws unless `sub` is a
+non-empty string, and `verifyAccessToken` refuses a token without one, so an
+access token with no `sub` claim no longer authenticates.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)

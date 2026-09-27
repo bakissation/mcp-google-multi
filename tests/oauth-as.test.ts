@@ -335,6 +335,18 @@ describe('negative paths (one per §5.12 MUST)', () => {
     expect(JSON.parse(reuse.text).error).toBe('invalid_grant');
   });
 
+  it('a refresh token naming an inherited object key -> invalid_grant, no token minted', async () => {
+    const port = await start();
+    for (const refresh_token of ['constructor', '__proto__', 'toString']) {
+      const r = await req(port, 'POST', '/token', form({ grant_type: 'refresh_token', refresh_token }));
+      expect(r.status).toBe(400);
+      const body = JSON.parse(r.text);
+      expect(body.error).toBe('invalid_grant');
+      expect(body.access_token).toBeUndefined();
+    }
+    expect(existsSync(path.join(tmp, 'mcp-tokens.enc'))).toBe(false);
+  });
+
   it('/mcp without a bearer -> 401 + WWW-Authenticate', async () => {
     const port = await start();
     const r = await req(port, 'POST', '/mcp', { headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: '{}' });

@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { rmSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { rmSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { SignJWT } from 'jose';
 import {
   jwtSecretFrom,
   signAccessToken,
@@ -47,6 +48,18 @@ describe('MCP access token (HS256)', () => {
     const t = await signAccessToken({ base: BASE, secret, iat, sub: 'tenant-a' });
     const claims = await verifyAccessToken(t, BASE, secret);
     expect(claims.sub).toBe('tenant-a');
+  });
+  it('refuses a token with no string subject, and never signs one', async () => {
+    const noSub = await new SignJWT({ scope: 'mcp:use', purpose: 'mcp_access' })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setIssuer(BASE)
+      .setAudience(`${BASE}/mcp`)
+      .setIssuedAt(iat)
+      .setExpirationTime(iat + 600)
+      .sign(secret);
+    await expect(verifyAccessToken(noSub, BASE, secret)).rejects.toThrow('access token has no subject');
+    await expect(signAccessToken({ base: BASE, secret, iat, sub: undefined as unknown as string })).rejects.toThrow('sub must be a non-empty string');
+    await expect(signAccessToken({ base: BASE, secret, iat, sub: '' })).rejects.toThrow('sub must be a non-empty string');
   });
   it('a state token cannot be used as an access token (purpose separation)', async () => {
     const st = await signState({ flow: 'owner_gate', client_id: 'c', redirect_uri: 'r', code_challenge: 'x', resource: `${BASE}/mcp` }, BASE, secret, iat);
@@ -152,6 +165,47 @@ describe('RefreshStore (C14 rotation)', () => {
     // ...while tenant-b's chain still rotates, sub intact
     const rB = s.rotate(tB, 5000);
     expect(rB!.sub).toBe('tenant-b');
+  });
+});
+
+describe('RefreshStore looks up own keys only', () => {
+  const INHERITED = ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'];
+  let dir: string;
+  afterEach(() => dir && rmSync(dir, { recursive: true, force: true }));
+  const storeAt = () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'gm-ownkey-'));
+    const file = path.join(dir, 'mcp-tokens.enc');
+    return { s: new RefreshStore(file, 'master-key-for-test'), file };
+  };
+
+  it('an inherited object key is not a refresh token: nothing is minted and no file is written', () => {
+    const { s, file } = storeAt();
+    for (const k of INHERITED) expect(s.rotate(k, 1000)).toBeNull();
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it('an inherited object key leaves an existing store untouched', () => {
+    const { s, file } = storeAt();
+    const t = s.issue(1000, 'owner');
+    const before = readFileSync(file);
+    for (const k of INHERITED) expect(s.rotate(k, 2000)).toBeNull();
+    expect(readFileSync(file).equals(before)).toBe(true);
+    expect(s.rotate(t, 3000)!.sub).toBe('owner');
+  });
+
+  it('a record without a string subject or family loads as absent', () => {
+    const { s, file } = storeAt();
+    const tok = (label: string) => label.padEnd(43, '0');
+    const active = {
+      [tok('no-sub')]: { issuedAt: 1000, family: 'fam-a' },
+      [tok('empty-sub')]: { sub: '', issuedAt: 1000, family: 'fam-a' },
+      [tok('no-family')]: { sub: 'owner', issuedAt: 1000 },
+      [tok('not-an-object')]: 'owner',
+      [tok('good')]: { sub: 'owner', issuedAt: 1000, family: 'fam-b' },
+    };
+    writeFileSync(file, encryptToken({ active, spent: { [tok('bad-spent')]: 7 } }, 'master-key-for-test'), { mode: 0o600 });
+    for (const t of ['no-sub', 'empty-sub', 'no-family', 'not-an-object', 'bad-spent']) expect(s.rotate(tok(t), 2000)).toBeNull();
+    expect(s.rotate(tok('good'), 2000)!.sub).toBe('owner');
   });
 });
 
