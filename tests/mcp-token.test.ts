@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { rmSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { createHash, randomBytes } from 'node:crypto';
+import { rmSync, mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { SignJWT } from 'jose';
@@ -17,9 +18,13 @@ import {
   ReplayGuard,
   RefreshStore,
   assertRefreshStoreReadable,
+  refreshFamilyTagger,
   type StatePayload,
 } from '../src/mcp-token.js';
+import { withFileLock } from '../src/fs-atomic.js';
 import { decryptToken, encryptToken } from '../src/token-store.js';
+import { RefreshStore as PrevRefreshStore } from './fixtures/refresh-store-prev.js';
+import { legacyTok, onDisk, r1Bytes, seedFamilies, seedLegacy, specKey, specMac, specTag, specToken } from './_refresh-spec.js';
 
 const BASE = 'https://mcp.example.com';
 const secret = jwtSecretFrom('dGVzdC1qd3Qta2V5LXRoYXQtaXMtMzItYnl0ZXMh'); // any string key
@@ -267,152 +272,384 @@ describe('RefreshStore file format', () => {
   });
 });
 
-describe('RefreshStore spent cap evicts from the subject holding the most (C3)', () => {
+describe('RefreshStore generations (F2)', () => {
+  const KEY = 'master-key-for-test';
+  let dir: string;
+  afterEach(() => dir && rmSync(dir, { recursive: true, force: true }));
+  const storeAt = (mk = KEY) => {
+    dir = mkdtempSync(path.join(tmpdir(), 'gm-gen-'));
+    const file = path.join(dir, 'mcp-tokens.enc');
+    const logs: string[] = [];
+    return { s: new RefreshStore(file, mk, { log: (l) => logs.push(l) }), file, logs };
+  };
+  const fam = (sub: string, gen: number, cur: string, extra: Record<string, unknown> = {}) => ({ sub, gen, cur, createdAt: 1000, usedAt: 1000, ...extra });
+  const chain = (s: RefreshStore, first: string, n: number): string[] => {
+    const out = [first];
+    for (let i = 0; i < n; i++) out.push(s.rotate(out[out.length - 1], 2000 + i)!.token);
+    return out;
+  };
+  const fidOf = (token: string) => r1Bytes(token).subarray(0, 16);
+
+  it('G0 known answer: key derivation, byte order and MAC input are pinned', () => {
+    const MK = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=';
+    const TOKEN = 'r1.EBESExQVFhcYGRobHB0eHwECAwSgoaKjpKWmp6ipqqusra6vae0HPY7R1kpwyrnP9flryVjpAG54fFMHUKGK8Sgywi0';
+    expect(specKey(MK).toString('hex')).toBe('055e29c4600133162eabbd2f74bd5b34623da9509bcfb5cbbe7446f3ffd21891');
+    const fid = Buffer.from(Array.from({ length: 16 }, (_, i) => 0x10 + i));
+    const rand = Buffer.from(Array.from({ length: 16 }, (_, i) => 0xa0 + i));
+    const spec = specToken(MK, fid, 0x01020304, { rand });
+    expect(spec.token).toBe(TOKEN);
+    const { s, file } = storeAt(MK);
+    seedFamilies(file, MK, { [spec.fid]: fam('owner', 0x01020304, spec.cur) });
+    const r = s.rotate(TOKEN, 2000);
+    expect(r!.sub).toBe('owner');
+    const next = r1Bytes(r!.token);
+    expect(next.subarray(0, 16).equals(fid)).toBe(true);
+    expect(next.readUInt32BE(16)).toBe(0x01020305);
+    expect(next.subarray(36).equals(specMac(MK, next.subarray(0, 36)))).toBe(true);
+    expect(onDisk(file, MK).families[spec.fid]).toMatchObject({ gen: 0x01020305, cur: createHash('sha256').update(next).digest('base64url') });
+  });
+
+  it('G1 fifty rotations leave one family record and no rotated-away tokens', () => {
+    const { s, file } = storeAt();
+    const t = chain(s, s.issue(1000, 'owner'), 1);
+    const afterOne = readFileSync(file, 'utf-8').length;
+    chain(s, t[1], 49);
+    const d = onDisk(file, KEY);
+    expect(Object.values(d.families)).toEqual([expect.objectContaining({ sub: 'owner', gen: 50 })]);
+    expect(d.active).toEqual({});
+    expect(d.spent).toEqual({});
+    expect(Math.abs(readFileSync(file, 'utf-8').length - afterOne)).toBeLessThanOrEqual(4);
+  });
+
+  it('G2 any rotated-away generation revokes the family, not just the previous one', () => {
+    let { s, file } = storeAt();
+    let t = chain(s, s.issue(1000, 'owner'), 5);
+    expect(s.rotate(t[2], 9000)).toBeNull();
+    expect(s.rotate(t[5], 9001)).toBeNull();
+    expect(onDisk(file, KEY).families).toEqual({});
+    rmSync(dir, { recursive: true, force: true });
+    ({ s, file } = storeAt());
+    t = chain(s, s.issue(1000, 'owner'), 5);
+    expect(s.rotate(t[0], 9000)).toBeNull();
+    expect(s.rotate(t[5], 9001)).toBeNull();
+    expect(onDisk(file, KEY).families).toEqual({});
+  });
+
+  it('G3 a token 4,997 generations old still revokes; the current one at 5,000 rotates', () => {
+    const { s, file, logs } = storeAt();
+    const fid = randomBytes(16);
+    const cur = specToken(KEY, fid, 5000);
+    seedFamilies(file, KEY, { [cur.fid]: fam('owner', 5000, cur.cur) });
+    expect(s.rotate(specToken(KEY, fid, 3).token, 2000)).toBeNull();
+    expect(s.rotate(cur.token, 2001)).toBeNull();
+    expect(onDisk(file, KEY).families).toEqual({});
+    expect(logs).toEqual([`refresh family revoked: reuse tag=${specTag(fid)}`]);
+    seedFamilies(file, KEY, { [cur.fid]: fam('owner', 5000, cur.cur) });
+    const r = s.rotate(cur.token, 3000);
+    expect(r!.sub).toBe('owner');
+    expect(r1Bytes(r!.token).readUInt32BE(16)).toBe(5001);
+  });
+
+  it('G4 a flipped MAC byte is refused and the real token still rotates', () => {
+    const { s } = storeAt();
+    const t = s.issue(1000, 'owner');
+    const b = r1Bytes(t);
+    b[40] ^= 0x01;
+    expect(s.rotate(`r1.${b.toString('base64url')}`, 2000)).toBeNull();
+    expect(s.rotate(t, 2001)!.sub).toBe('owner');
+  });
+
+  it('G5 a forged older generation (random MAC) revokes nothing', () => {
+    const { s, file } = storeAt();
+    const t = chain(s, s.issue(1000, 'owner'), 1);
+    const forged = specToken(KEY, fidOf(t[1]), 0, { mac: randomBytes(32) });
+    const before = onDisk(file, KEY).families;
+    expect(s.rotate(forged.token, 3000)).toBeNull();
+    expect(onDisk(file, KEY).families).toEqual(before);
+    expect(s.rotate(t[1], 3001)!.sub).toBe('owner');
+  });
+
+  it('G6 the current token with its random part altered and the original MAC is refused', () => {
+    const { s } = storeAt();
+    const t = s.issue(1000, 'owner');
+    const b = r1Bytes(t);
+    b[25] ^= 0x80;
+    expect(s.rotate(`r1.${b.toString('base64url')}`, 2000)).toBeNull();
+    expect(s.rotate(t, 2001)!.sub).toBe('owner');
+  });
+
+  it('G7 a token minted under another master key names nothing', () => {
+    const { s } = storeAt();
+    const t = chain(s, s.issue(1000, 'owner'), 1);
+    expect(s.rotate(specToken('another-master-key', fidOf(t[1]), 0).token, 3000)).toBeNull();
+    expect(s.rotate(specToken('another-master-key', fidOf(t[1]), 1).token, 3001)).toBeNull();
+    expect(s.rotate(t[1], 3002)!.sub).toBe('owner');
+  });
+
+  it('G8 an issued token is r1 and the file holds neither it nor its body', () => {
+    const { s, file } = storeAt();
+    const t = s.issue(1000, 'owner');
+    expect(t).toMatch(/^r1\.[A-Za-z0-9_-]{91}$/);
+    const json = JSON.stringify(onDisk(file, KEY));
+    expect(json).not.toContain(t);
+    expect(json).not.toContain(t.slice(3));
+    expect(json).not.toContain(r1Bytes(t).subarray(20, 36).toString('base64url'));
+  });
+
+  it('G9 one spelling per token: a re-spelled, shortened, lengthened or junk token is refused', () => {
+    const { s } = storeAt();
+    const t = s.issue(1000, 'owner');
+    const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const respelled = t.slice(0, -1) + ABC[ABC.indexOf(t[t.length - 1]) ^ 1];
+    expect(r1Bytes(respelled).equals(r1Bytes(t))).toBe(true);
+    for (const x of [respelled, t.slice(0, -1), `${t}A`, `r1.${'*'.repeat(91)}`]) expect(s.rotate(x, 2000)).toBeNull();
+    expect(s.rotate(t, 2001)!.sub).toBe('owner');
+  });
+
+  it('G10 a family at the last generation is dropped instead of throwing', () => {
+    const { s, file, logs } = storeAt();
+    const fid = randomBytes(16);
+    const cur = specToken(KEY, fid, 0xffffffff);
+    seedFamilies(file, KEY, { [cur.fid]: fam('owner', 0xffffffff, cur.cur) });
+    expect(s.rotate(cur.token, 2000)).toBeNull();
+    expect(onDisk(file, KEY).families).toEqual({});
+    expect(logs).toEqual([`refresh family dropped: overflow tag=${specTag(fid)}`]);
+  });
+
+  it('G11 a reuse revokes its own family only: same-subject and other-subject families keep rotating', () => {
+    const { s } = storeAt();
+    const a = chain(s, s.issue(1000, 'tenant-a'), 1);
+    const b = s.issue(1000, 'tenant-a');
+    const c = s.issue(1000, 'tenant-b');
+    expect(s.rotate(a[0], 3000)).toBeNull();
+    expect(s.rotate(a[1], 3001)).toBeNull();
+    expect(s.rotate(b, 3002)!.sub).toBe('tenant-a');
+    expect(s.rotate(c, 3003)!.sub).toBe('tenant-b');
+  });
+
+  it('G12 a newer generation or a same-generation twin drops the family and says so, not theft', () => {
+    const { s, file, logs } = storeAt();
+    const fid = randomBytes(16);
+    const cur = specToken(KEY, fid, 5);
+    seedFamilies(file, KEY, { [cur.fid]: fam('owner', 5, cur.cur) });
+    expect(s.rotate(specToken(KEY, fid, 6).token, 2000)).toBeNull();
+    expect(onDisk(file, KEY).families).toEqual({});
+    expect(s.rotate(cur.token, 2001)).toBeNull();
+    seedFamilies(file, KEY, { [cur.fid]: fam('owner', 5, cur.cur) });
+    expect(s.rotate(specToken(KEY, fid, 5).token, 3000)).toBeNull();
+    expect(onDisk(file, KEY).families).toEqual({});
+    expect(s.rotate(cur.token, 3001)).toBeNull();
+    expect(logs).toEqual([`refresh family dropped: ahead tag=${specTag(fid)}`, `refresh family dropped: mismatch tag=${specTag(fid)}`]);
+  });
+
+  it('G13 a token that does not decode to exactly 68 bytes is refused without throwing', () => {
+    const { s } = storeAt();
+    const t = s.issue(1000, 'owner');
+    const body = t.slice(3);
+    const variants = [`r1.${body.slice(0, 90)}*`, `r1.${body.slice(0, 89)}**`, `r1.${body}AA`, `r1.${body.slice(0, 88)}`];
+    for (const x of variants) expect(() => s.rotate(x, 2000)).not.toThrow();
+    for (const x of variants) expect(s.rotate(x, 2000)).toBeNull();
+    expect(s.rotate(t, 2001)!.sub).toBe('owner');
+  });
+
+  it('V1 a malformed family record is dropped on load and a good one keeps rotating', () => {
+    const { s, file } = storeAt();
+    const good = specToken(KEY, randomBytes(16), 0);
+    const any = () => specToken(KEY, randomBytes(16), 0);
+    const ABC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const k = any();
+    const nonCanonical = k.fid.slice(0, -1) + ABC[ABC.indexOf(k.fid[21]) ^ 1];
+    const bad: Record<string, unknown> = {
+      [nonCanonical]: fam('owner', 0, k.cur),
+      [any().fid]: fam('', 0, any().cur),
+      [any().fid]: fam('owner', 1.5, any().cur),
+      [any().fid]: fam('owner', -1, any().cur),
+      [any().fid]: fam('owner', 2 ** 32, any().cur),
+      [any().fid]: fam('owner', 0, any().cur.slice(0, 42)),
+      [any().fid]: fam('owner', 0, any().cur, { createdAt: null }),
+      [any().fid]: fam('owner', 0, any().cur, { usedAt: '1000' }),
+      [any().fid]: fam('owner', 0, any().cur, { legacy: 5 }),
+    };
+    expect(Object.keys(bad)).toHaveLength(9);
+    seedFamilies(file, KEY, { ...bad, [good.fid]: fam('owner', 0, good.cur) });
+    const r = s.rotate(good.token, 2000);
+    expect(r!.sub).toBe('owner');
+    expect(Object.keys(onDisk(file, KEY).families)).toEqual([good.fid]);
+  });
+});
+
+describe('RefreshStore earlier-release records', () => {
   const KEY = 'master-key-for-test';
   let dir: string;
   afterEach(() => dir && rmSync(dir, { recursive: true, force: true }));
   const storeAt = () => {
-    dir = mkdtempSync(path.join(tmpdir(), 'gm-spent-'));
+    dir = mkdtempSync(path.join(tmpdir(), 'gm-legacy-'));
+    const file = path.join(dir, 'mcp-tokens.enc');
+    const logs: string[] = [];
+    return { s: new RefreshStore(file, KEY, { log: (l) => logs.push(l) }), file, logs };
+  };
+  const [L0, L1] = [legacyTok('L0'), legacyTok('L1')];
+
+  it('M1 a live earlier-release token rotates once into a new family that keeps its evidence', () => {
+    const { s, file } = storeAt();
+    seedLegacy(file, KEY, { [L1]: { sub: 'owner', issuedAt: 1000, family: 'fam-a' } }, { [L0]: 'fam-a' });
+    const r = s.rotate(L1, 2000);
+    expect(r!.sub).toBe('owner');
+    expect(r!.token).toMatch(/^r1\./);
+    const d = onDisk(file, KEY);
+    expect(d.format).toBe(2);
+    expect(d.active).toEqual({});
+    expect(d.spent).toEqual({ [L0]: 'fam-a', [L1]: 'fam-a' });
+    expect(Object.values(d.families)).toEqual([expect.objectContaining({ sub: 'owner', gen: 0, createdAt: 1000, usedAt: 2000, legacy: 'fam-a' })]);
+    expect(s.rotate(r!.token, 3000)!.sub).toBe('owner');
+    expect(onDisk(file, KEY).spent).toEqual({ [L0]: 'fam-a', [L1]: 'fam-a' });
+  });
+
+  it('M2 an earlier-release rotated-away token revokes the family it migrated into', () => {
+    for (const reused of [L0, L1]) {
+      const { s, file, logs } = storeAt();
+      seedLegacy(file, KEY, { [L1]: { sub: 'owner', issuedAt: 1000, family: 'fam-a' } }, { [L0]: 'fam-a' });
+      const r = s.rotate(L1, 2000)!;
+      expect(s.rotate(reused, 3000)).toBeNull();
+      expect(s.rotate(r.token, 3001)).toBeNull();
+      const d = onDisk(file, KEY);
+      expect([d.families, d.active, d.spent]).toEqual([{}, {}, {}]);
+      expect(logs).toEqual([`refresh family revoked: reuse tag=${specTag('fam-a')}`]);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('M3 nothing is evicted: the oldest of 2,001 earlier-release tokens still revokes after 20 new rotations', () => {
+    const { s, file } = storeAt();
+    const spent: Record<string, string> = {};
+    for (let i = 0; i < 2000; i++) spent[legacyTok(`s${i}`)] = 'fam-a';
+    seedLegacy(file, KEY, { [L1]: { sub: 'owner', issuedAt: 1000, family: 'fam-a' } }, spent);
+    let t = s.rotate(L1, 2000)!.token;
+    for (let i = 0; i < 20; i++) t = s.rotate(t, 3000 + i)!.token;
+    expect(Object.keys(onDisk(file, KEY).spent)).toHaveLength(2001);
+    expect(s.rotate(legacyTok('s0'), 9000)).toBeNull();
+    expect(s.rotate(t, 9001)).toBeNull();
+  });
+
+  it('M5 accept false on an earlier-release token drops every session of that subject in both formats', () => {
+    const { s, file } = storeAt();
+    const [La, Lb] = [legacyTok('La'), legacyTok('Lb')];
+    seedLegacy(file, KEY, { [La]: { sub: 'tenant-a', issuedAt: 1000, family: 'fam-a' }, [Lb]: { sub: 'tenant-b', issuedAt: 1000, family: 'fam-b' } }, { [L0]: 'fam-a' });
+    const r1a = s.issue(1500, 'tenant-a');
+    expect(s.rotate(La, 2000, (sub) => sub !== 'tenant-a')).toBeNull();
+    const d = onDisk(file, KEY);
+    expect(d.families).toEqual({});
+    expect(Object.keys(d.active)).toEqual([Lb]);
+    expect(d.spent).toEqual({});
+    expect(s.rotate(r1a, 3000)).toBeNull();
+    expect(s.rotate(Lb, 3001, () => true)!.sub).toBe('tenant-b');
+  });
+
+  it('M6 purgeTenant counts and drops sessions in both formats and their evidence', () => {
+    const { s, file } = storeAt();
+    seedLegacy(file, KEY, { [L1]: { sub: 'tenant-a', issuedAt: 1000, family: 'fam-a' } }, { [L0]: 'fam-a' });
+    s.issue(1500, 'tenant-a');
+    s.issue(1500, 'tenant-a');
+    const b = s.issue(1500, 'tenant-b');
+    expect(s.purgeTenant('tenant-a')).toBe(3);
+    const d = onDisk(file, KEY);
+    expect(d.active).toEqual({});
+    expect(d.spent).toEqual({});
+    expect(Object.values(d.families).map((f) => f.sub)).toEqual(['tenant-b']);
+    expect(s.rotate(b, 2000)!.sub).toBe('tenant-b');
+  });
+
+  it('M9 round trip with the previous release: it refuses new tokens, and its file loads back', () => {
+    const { file } = storeAt();
+    const next = new RefreshStore(file, KEY);
+    const a = next.rotate(next.issue(1000, 'tenant-a'), 2000)!.token;
+    const d = onDisk(file, KEY);
+    const Lb = legacyTok('Lb');
+    writeFileSync(file, encryptToken({ ...d, active: { [Lb]: { sub: 'tenant-b', issuedAt: 1000, family: 'fam-b' } } }, KEY), { mode: 0o600 });
+
+    const prev = new PrevRefreshStore(file, KEY);
+    const before = readFileSync(file);
+    expect(prev.rotate(a, 3000)).toBeNull();
+    expect(readFileSync(file).equals(before)).toBe(true);
+    const c = prev.issue(3000, 'tenant-c');
+    const written = onDisk(file, KEY);
+    expect('families' in written || 'format' in written).toBe(false);
+    expect(Object.keys(written.active).sort()).toEqual([Lb, c].sort());
+
+    const upgraded = new RefreshStore(file, KEY);
+    expect(upgraded.rotate(a, 4000)).toBeNull();
+    const rb = upgraded.rotate(Lb, 4001)!;
+    const rc = upgraded.rotate(c, 4002)!;
+    expect([rb.sub, rc.sub]).toEqual(['tenant-b', 'tenant-c']);
+    expect(rb.token).toMatch(/^r1\./);
+    expect(upgraded.rotate(rc.token, 4003)!.sub).toBe('tenant-c');
+  });
+});
+
+describe('RefreshStore pre-auth cost', () => {
+  const KEY = 'master-key-for-test';
+  let dir: string;
+  let clock = 0;
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+  const storeAt = () => {
+    dir = mkdtempSync(path.join(tmpdir(), 'gm-prelock-'));
     const file = path.join(dir, 'mcp-tokens.enc');
     return { s: new RefreshStore(file, KEY), file };
   };
-  const onDisk = (file: string) => decryptToken(readFileSync(file, 'utf-8'), KEY) as unknown as {
-    active: Record<string, { sub: string; family: string }>;
-    spent: Record<string, string>;
+  // The lock is not re-entrant, so a call that takes it while this test holds
+  // it waits out LOCK_TIMEOUT_MS; the fast clock makes that quick.
+  const fastClock = () => {
+    clock = Date.now();
+    vi.spyOn(Date, 'now').mockImplementation(() => (clock += 500));
   };
-  const chain = (s: RefreshStore, token: string, n: number): string[] => {
-    const out = [token];
-    for (let i = 0; i < n; i++) out.push(s.rotate(out[out.length - 1], 2000 + i)!.token);
-    return out;
-  };
-  // Each rotation is an fsynced write under the lock (minutes on NTFS for
-  // thousands), so the history is written in the store's file shape, as a
-  // chain of rotations leaves it, and only the rotations that cross the cap run.
-  const seed = (file: string, families: [sub: string, spent: number][]): string[][] => {
-    const active: Record<string, { sub: string; issuedAt: number; family: string }> = {};
-    const spent: Record<string, string> = {};
-    const chains = families.map(([sub, n], f) => {
-      const family = `fam-${f}`;
-      const t = Array.from({ length: n + 1 }, (_, i) => `tok-${f}-${i}`);
-      for (const x of t.slice(0, n)) spent[x] = family;
-      active[t[n]] = { sub, issuedAt: 1000, family };
-      return t;
+
+  it('P1 a malformed or forged token is refused without taking the lock or touching the directory', () => {
+    const { s, file } = storeAt();
+    const t = s.issue(1000, 'owner');
+    const forged = specToken(KEY, r1Bytes(t).subarray(0, 16), 0, { mac: randomBytes(32) }).token;
+    fastClock();
+    withFileLock(file, () => {
+      const bytes = readFileSync(file);
+      const listing = readdirSync(dir).sort();
+      for (const x of [forged, 'x'.repeat(60), `r1.${'*'.repeat(91)}`, 'constructor']) {
+        expect(() => s.rotate(x, 2000)).not.toThrow();
+        expect(s.rotate(x, 2000)).toBeNull();
+      }
+      expect(readFileSync(file).equals(bytes)).toBe(true);
+      expect(readdirSync(dir).sort()).toEqual(listing);
     });
-    writeFileSync(file, encryptToken({ active, spent }, KEY), { mode: 0o600 });
-    return chains;
-  };
-  const extend = (s: RefreshStore, t: string[], n: number): string[] => [...t, ...chain(s, t[t.length - 1], n).slice(1)];
-
-  it('a subject opening many families dilutes only itself: another subject keeps its oldest stolen token armed', () => {
-    const { s, file } = storeAt();
-    const [v, ...att] = seed(file, [['victim', 600], ...Array.from({ length: 14 }, (): [string, number] => ['attacker', 100])]);
-    const fresh = chain(s, s.issue(1000, 'attacker'), 20);
-    // 2020 spent: the victim's are the oldest, yet the attacker holds the most and loses its 20 oldest.
-    expect(Object.keys(onDisk(file).spent)).toEqual([
-      ...v.slice(0, 600),
-      ...att[0].slice(20, 100),
-      ...att.slice(1).flatMap((t) => t.slice(0, 100)),
-      ...fresh.slice(0, 20),
-    ]);
-
-    expect(s.rotate(v[0], 9000)).toBeNull();
-    expect(s.rotate(v[600], 9001)).toBeNull();
-    expect(s.rotate(att[0][19], 9002)).toBeNull();
-    expect(s.rotate(att[0][100], 9003)!.sub).toBe('attacker');
   });
 
-  it('a single subject keeps the last 2000 rotated-away tokens across its families, oldest first', () => {
+  it('P2 an earlier-release-shaped token skips the lock once the store holds no earlier-release record', () => {
     const { s, file } = storeAt();
-    const [a, b0] = seed(file, [['owner', 800], ['owner', 1190]]);
-    const b = extend(s, b0, 15);
-    expect(Object.keys(onDisk(file).spent)).toEqual([...a.slice(5, 800), ...b.slice(0, 1205)]);
+    s.issue(1000, 'owner');
+    fastClock();
+    withFileLock(file, () => expect(s.rotate(legacyTok('junk'), 2000)).toBeNull());
+    vi.restoreAllMocks();
 
-    expect(s.rotate(a[4], 9000)).toBeNull();
-    expect(Object.keys(onDisk(file).active)).toEqual([a[800], b[1205]]);
-    expect(s.rotate(a[5], 9001)).toBeNull();
-    expect(Object.keys(onDisk(file).active)).toEqual([b[1205]]);
-    expect(s.rotate(b[1205], 9002)!.sub).toBe('owner');
+    const other = storeAt();
+    seedLegacy(other.file, KEY, { [legacyTok('L1')]: { sub: 'owner', issuedAt: 1000, family: 'fam-a' } });
+    other.s.issue(1000, 'owner');
+    fastClock();
+    expect(() => withFileLock(other.file, () => other.s.rotate(legacyTok('junk'), 2000))).toThrow(/Timed out/);
   });
 
-  it('a single family keeps its last 2000 rotated-away tokens: an older one is refused without revoking', () => {
-    const { s, file } = storeAt();
-    const [t0] = seed(file, [['owner', 1999]]);
-    const t = extend(s, t0, 2);
-    expect(Object.keys(onDisk(file).spent)).toEqual(t.slice(1, 2001));
-    expect(s.rotate(t[0], 9000)).toBeNull();
-    expect(Object.keys(onDisk(file).active)).toEqual([t[2001]]);
-    expect(s.rotate(t[1], 9001)).toBeNull();
-    expect(s.rotate(t[2001], 9002)).toBeNull();
-  });
-
-  it('three subjects over the cap: the largest loses its oldest across its families, ties to the oldest entry', () => {
-    const { s, file } = storeAt();
-    const [a1, a2, b, c0] = seed(file, [['tenant-a', 700], ['tenant-a', 500], ['tenant-b', 800], ['tenant-c', 596]]);
-    const c = extend(s, c0, 5);
-    // 400 from a (1200 -> 800), then a and b alternately, a first as its oldest
-    // entry is older; c never holds the most. Each keeps at least floor(2000 / 3).
-    expect(Object.keys(onDisk(file).spent)).toEqual([
-      ...a1.slice(501, 700),
-      ...a2.slice(0, 500),
-      ...b.slice(100, 800),
-      ...c.slice(0, 601),
-    ]);
-
-    expect(s.rotate(a1[500], 9000)).toBeNull();
-    expect(s.rotate(b[99], 9001)).toBeNull();
-    expect(Object.keys(onDisk(file).active)).toEqual([a1[700], a2[500], b[800], c[601]]);
-    expect(s.rotate(a1[501], 9002)).toBeNull();
-    expect(s.rotate(c[0], 9003)).toBeNull();
-    expect(s.rotate(a1[700], 9004)).toBeNull();
-    expect(s.rotate(c[601], 9005)).toBeNull();
-    expect(s.rotate(a2[500], 9006)!.sub).toBe('tenant-a');
-    expect(s.rotate(b[800], 9007)!.sub).toBe('tenant-b');
-  });
-
-  it('a family with no active token left keeps no spent tokens: revoked, refused by accept, or purged', () => {
-    const { s, file } = storeAt();
-    const familyOf = (token: string) => onDisk(file).active[token].family;
-    const a = chain(s, s.issue(1000, 'tenant-a'), 2);
-    const a2 = chain(s, s.issue(1000, 'tenant-a'), 2);
-    const b = chain(s, s.issue(1000, 'tenant-b'), 2);
-    const c = chain(s, s.issue(1000, 'tenant-c'), 2);
-    const d = chain(s, s.issue(1000, 'tenant-d'), 2);
-    const families = () => new Set(Object.values(onDisk(file).spent));
-    const [fa, fa2, fb, fc, fd] = [a, a2, b, c, d].map((t) => familyOf(t[2]));
-    expect(families()).toEqual(new Set([fa, fa2, fb, fc, fd]));
-
-    expect(s.rotate(a[0], 9000)).toBeNull();
-    expect(families()).toEqual(new Set([fa2, fb, fc, fd]));
-    expect(s.rotate(b[2], 9001, () => false)).toBeNull();
-    expect(families()).toEqual(new Set([fa2, fc, fd]));
-    expect(s.purgeTenant('tenant-c')).toBe(1);
-    expect(families()).toEqual(new Set([fa2, fd]));
-
-    expect(s.rotate(a[1], 9002)).toBeNull();
-    expect(s.rotate(c[1], 9003)).toBeNull();
-    expect(s.rotate(a2[0], 9004)).toBeNull();
-    expect(s.rotate(a2[2], 9005)).toBeNull();
-    expect(s.rotate(d[2], 9006)!.sub).toBe('tenant-d');
-  });
-
-  it('loads a store written by an earlier release: the file shape is unchanged', () => {
-    const { s, file } = storeAt();
-    const active = {
-      'a-live': { sub: 'tenant-a', issuedAt: 1000, family: 'fam-a' },
-      'b-live': { sub: 'tenant-b', issuedAt: 1000, family: 'fam-b' },
-    };
-    const spent: Record<string, string> = { 'a-old': 'fam-a' };
-    for (let i = 0; i < 100; i++) spent[`b-old-${i}`] = 'fam-b';
-    spent['gone-old'] = 'fam-gone';
-    writeFileSync(file, encryptToken({ active, spent }, KEY), { mode: 0o600 });
-
-    expect(s.rotate('a-old', 9000)).toBeNull();
-    expect(s.rotate('a-live', 9001)).toBeNull();
-    const after = onDisk(file);
-    expect(Object.keys(after.active)).toEqual(['b-live']);
-    expect(after.spent).toEqual(Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`b-old-${i}`, 'fam-b'])));
-    expect(s.rotate('b-old-0', 9002)).toBeNull();
-    expect(s.rotate('b-live', 9003)).toBeNull();
+  it('P3 refreshFamilyTagger tags a family the same at every generation and nothing else', () => {
+    const { s } = storeAt();
+    const tag = refreshFamilyTagger(KEY);
+    const a0 = s.issue(1000, 'owner');
+    const a1 = s.rotate(a0, 2000)!.token;
+    const b = s.issue(1000, 'owner');
+    expect(tag(a0)).toBe(specTag(r1Bytes(a0).subarray(0, 16)));
+    expect(tag(a1)).toBe(tag(a0));
+    expect(tag(b)).not.toBe(tag(a0));
+    expect(tag(b)).toMatch(/^[0-9a-f]{8}$/);
+    const badMac = specToken(KEY, r1Bytes(a0).subarray(0, 16), 0, { mac: randomBytes(32) }).token;
+    for (const x of [badMac, legacyTok('L1'), 'garbage', '']) expect(tag(x)).toBeNull();
+    expect(refreshFamilyTagger('another-master-key')(a0)).toBeNull();
   });
 });
 

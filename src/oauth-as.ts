@@ -22,8 +22,8 @@ import { fetchCimdDocument, SsrfBlockedError } from './ssrf-guard.js';
 const CLAUDE_AI_FIXED_CALLBACK = 'https://claude.ai/api/mcp/auth_callback';
 
 // DCR (/register) is public + unauthenticated, so its in-memory store must be
-// bounded like every sibling store (ReplayGuard cap, RefreshStore SPENT_CAP) or
-// a request loop OOMs the process. Cap client count (FIFO-evict the oldest) and
+// bounded like every sibling store (the ReplayGuard cap) or a request loop
+// OOMs the process. Cap client count (FIFO-evict the oldest) and
 // the per-request redirect_uris shape so one entry can't be arbitrarily large.
 export const DCR_MAX_CLIENTS = 1000;
 export const DCR_MAX_REDIRECT_URIS = 10;

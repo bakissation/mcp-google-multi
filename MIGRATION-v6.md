@@ -486,22 +486,6 @@ threw inside the catch-all, and the unhandled rejection it produced
 terminates the process under Node's default `--unhandled-rejections=throw`.
 This applies with or without `graceMs`.
 
-`/mcp-token`: `RefreshStore` still keeps at most 2,000 rotated-away refresh
-tokens, but over that cap it now drops the oldest entry of the subject holding
-the most (ties: the subject whose oldest entry is oldest) instead of the oldest
-entry overall, so one subject's refreshes can no longer push out another's and
-disarm its theft detection. A subject is the `sub` of the family's active token
-and its families share one budget, so a subject that opens many families
-dilutes only itself. A subject's entry is dropped only while it holds at least
-as many as every other subject, so with S subjects holding spent tokens, each
-keeps at least its floor(2000 / S) most recent, and a subject evicts another's
-history only when that other holds at least as many. A single subject keeps
-exactly the last 2,000 rotations across all its families, oldest first, as
-before. A family with no active token left (revoked, refused by `accept`, or
-purged) keeps none. An older token is still refused (`invalid_grant`) without
-revoking. The store file keeps its shape and encryption: a file from an earlier
-release loads as is, and an earlier release reads a file this one wrote.
-
 `/http-transport`: a request whose handler throws before its response starts
 is answered 500 `{"error":"internal_error","message":"internal error"}`.
 Before, `message` was the thrown message, which can name server paths (a lock
@@ -562,11 +546,30 @@ that was reachable from the internet:
    account's Google access, and review mail forwarding, filters and delegates,
    Drive sharing, and files written by the server's user.
 
-`/mcp-token`: the refresh store file (`mcp-tokens.enc`) now carries
-`format: 2`. A file whose `format` this release does not know is refused with
-`E_REFRESH_STORE_FORMAT` rather than read as empty and overwritten, and
-`assertRefreshStoreReadable(path, masterKey)` runs the same check at boot (it
-also throws `E_REFRESH_STORE_UNREADABLE` for a file that does not decrypt).
+`/mcp-token`: refresh tokens have a new format. A token is `r1.` followed by
+91 base64url characters. It carries its family id and a generation number,
+authenticated with a key derived from `MASTER_KEY`, and the store keeps only
+each family's current generation (hashed). Presenting any token a family has
+rotated away, however long ago, now revokes the family for the rest of its
+life. Before, the store remembered at most 2,000 rotated-away tokens, and an
+older one was only refused. The store no longer keeps a list of rotated-away
+tokens, so its size follows the number of sessions, not the number of
+refreshes. A token that is not well formed is refused without touching the
+store file. Tokens issued by an earlier release keep working: each one is
+exchanged for a new-format token on its next refresh, and the rotated-away
+tokens an earlier release still remembered keep revoking the session. Until
+then an earlier-release session is stored under its live token, so deleting
+`mcp-tokens.enc` is the way to retire them all at once (every client signs in
+once). `RefreshStore.issue(nowMs, sub)` no longer takes a family id.
+`new RefreshStore(path, masterKey, { log })` takes an optional server-side log
+for revoked and dropped families; its lines carry a short family tag, never a
+token or a subject. A store file written by a newer release (any `format`
+other than 2) is refused with `E_REFRESH_STORE_FORMAT` rather than read as empty;
+`assertRefreshStoreReadable(path, masterKey)` runs the same check at boot (and
+throws `E_REFRESH_STORE_UNREADABLE` for a file that does not decrypt).
+`refreshFamilyTagger(masterKey)` returns a function that maps a well-formed
+token to a short non-secret family tag (for rate limiting and log correlation)
+without touching the store.
 
 ## 5. Auth changes
 
@@ -646,6 +649,8 @@ v6 does not touch v5 tokens and does not overwrite v5 env, so rollback is clean:
 
 - **`MASTER_KEY` keychain-only.** If v6 auto-provisioned `MASTER_KEY` into the OS keychain with **no** env copy, an env-only v5 cannot find it and token decryption breaks. Before downgrading, export the key from the keychain into `.env` (or, during any period you might roll back, keep `MASTER_KEY` in env rather than keychain-only). v6 also mirrors an env key into the keychain on first successful decrypt to reduce this risk.
 - **`config.json` version.** A future `config.json` written by a newer v6 (`version: 2`) is rejected by an older reader with `E_CONFIG_VERSION_UNSUPPORTED` rather than crashing: but that also means a newer file won't load on an older binary. If you downgrade across a config-version bump, restore the older `config.json` from your backup (step 0).
+- **MCP refresh tokens after a downgrade across the refresh-format change.** An older release does not recognise the new refresh tokens. Every MCP client therefore signs in again once, and the older release's first write to `mcp-tokens.enc` discards the new-format sessions. Nothing is exposed, and after upgrading again those sessions sign in once more. Do not run two versions against one `mcp-tokens.enc` at the same time: each write by the older one signs out every new-format session.
+- **Do not restore `mcp-tokens.enc` from a backup.** A restored file is behind the clients (they are signed out anyway) and brings back sessions that were revoked for theft since the backup. Delete the file instead; every client signs in once.
 - **`E_REFRESH_STORE_FORMAT` on `/token`.** The refresh store file was written by a newer release. Upgrade, or delete `mcp-tokens.enc` to sign every MCP client out.
 
 Email and tool-visibility changes are code-level only: downgrading the package restores v5 behavior with no data implication.
