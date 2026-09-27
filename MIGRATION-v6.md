@@ -406,6 +406,14 @@ and a lock written by an older release (no owner file) keeps the pid probe and
 gains the same lease. One waiter at a time breaks a dead lock. The lock body
 and the signature are unchanged; `__setLockIdentityForTest` is a test hook.
 
+`/mcp-token`: `RefreshStore.rotate(oldToken, nowMs, accept?)` takes an
+optional `accept(sub)`, called inside the store lock after the presented
+token is found and before anything is spent. `false` drops every active
+refresh token of that sub and returns `null`; a throw changes nothing and
+propagates, so the presented token still rotates on a later attempt. A reuse
+of a rotated-away token never calls it. Without `accept`, rotation is
+unchanged.
+
 `/accounts` exports `liveAccountCheck` and `isLiveAccountField`: an `account`
 field built on the live check (as `accountArgLive` builds it) validates
 against the registry's current aliases at parse time and counts as a

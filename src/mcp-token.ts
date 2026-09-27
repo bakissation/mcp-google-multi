@@ -254,8 +254,13 @@ export class RefreshStore {
   /** Rotate a presented refresh token; null if unknown OR if the presented
    * token was already rotated away (reuse => the family is revoked). The
    * record's sub is copied forward and returned so the caller can mint the
-   * matching access token without trusting anything client-supplied. */
-  rotate(oldToken: string, nowMs: number): { token: string; sub: string } | null {
+   * matching access token without trusting anything client-supplied.
+   *
+   * `accept` (optional) is called inside the store lock, before any mutation,
+   * with the record's sub. false: every active record of that sub is dropped
+   * and null returned. A throw: nothing is mutated and the error propagates,
+   * so the presented token stays valid. Absent: unchanged. */
+  rotate(oldToken: string, nowMs: number, accept?: (sub: string) => boolean): { token: string; sub: string } | null {
     return withFileLock(this.path, () => {
       const data = this.load();
       const rec = data.active[oldToken];
@@ -266,6 +271,11 @@ export class RefreshStore {
           for (const [t, r] of Object.entries(data.active)) if (r.family === fam) delete data.active[t];
           this.save(data);
         }
+        return null;
+      }
+      if (accept && !accept(rec.sub)) {
+        for (const [t, r] of Object.entries(data.active)) if (r.sub === rec.sub) delete data.active[t];
+        this.save(data);
         return null;
       }
       delete data.active[oldToken];
