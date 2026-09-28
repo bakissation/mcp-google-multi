@@ -8,7 +8,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { resolveHttpConfig } from '../src/http-config.js';
 import { HttpTransportHost } from '../src/http-transport.js';
 import { buildAuthServer, redirectAllowed, verifiedEmailFromIdToken, verifiedIdentityFromIdToken, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServer, type AuthServerDeps } from '../src/oauth-as.js';
-import { jwtSecretFrom, signAccessToken, signPending, signReauthLink, verifyAccessToken } from '../src/mcp-token.js';
+import { jwtSecretFrom, signAccessToken, signPending, signReauthLink, verifyAccessToken, refreshFamilyTagger, RefreshStore } from '../src/mcp-token.js';
 import { SsrfBlockedError } from '../src/ssrf-guard.js';
 import { z } from "zod";
 
@@ -45,7 +45,7 @@ const reauthPath = (alias: string) => {
   return `${u.pathname}${u.search}`;
 };
 
-async function start(depOverrides: Partial<AuthServerDeps> = {}, base = BASE): Promise<number> {
+async function start(depOverrides: Partial<AuthServerDeps> = {}, base = BASE, configOver: Record<string, unknown> = {}): Promise<number> {
   const cfg = { ...resolveHttpConfig({ MCP_TRANSPORT: 'http', MCP_PUBLIC_URL: base }), port: 0 };
   const deps: AuthServerDeps = {
     fetchCimd: async (cid) => {
@@ -65,7 +65,7 @@ async function start(depOverrides: Partial<AuthServerDeps> = {}, base = BASE): P
     ...depOverrides,
   };
   const as = buildAuthServer(
-    { base, resourceUri: `${base}/mcp`, secret, ownerEmails: ['owner@x.example'], cimdIssuers: ['claude.ai'], masterKey: 'mk', refreshStorePath: path.join(tmp, 'mcp-tokens.enc') },
+    { base, resourceUri: `${base}/mcp`, secret, ownerEmails: ['owner@x.example'], cimdIssuers: ['claude.ai'], masterKey: 'mk', refreshStorePath: path.join(tmp, 'mcp-tokens.enc'), ...configOver },
     deps,
   );
   currentAs = as;
@@ -752,6 +752,89 @@ describe('DCR /register bounds (unbounded-store DoS guard)', () => {
 });
 
 type AuthServerDepsMint = ReturnType<typeof buildAuthServer>['mintFlowState'];
+
+describe('refresh lifetimes on AuthServerConfig (ruling 10)', () => {
+  // deps.now also dates the state and the code, which jose checks against the
+  // real clock, so the code is redeemed at off = 0 and only refreshes move on.
+  let off = 0;
+  beforeEach(() => {
+    off = 0;
+  });
+  const startWith = (configOver: Record<string, unknown>, depOverrides: Partial<AuthServerDeps> = {}) =>
+    start({ now: () => Date.now() + off, ...depOverrides }, BASE, configOver);
+  async function signIn(port: number): Promise<string> {
+    const authz = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(stateFrom(authz.headers.location as string))}`);
+    const code = new URL(cb.headers.location as string).searchParams.get('code')!;
+    const tok = await req(port, 'POST', '/token', form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, code_verifier: verifier, resource: `${BASE}/mcp` }));
+    expect(tok.status).toBe(200);
+    return JSON.parse(tok.text).refresh_token;
+  }
+  const refreshAt = async (port: number, atMs: number, refresh_token: string) => {
+    off = atMs;
+    const r = await req(port, 'POST', '/token', form({ grant_type: 'refresh_token', refresh_token }));
+    return { status: r.status, body: JSON.parse(r.text) as Record<string, string> };
+  };
+  const expectInvalidGrant = (r: { status: number; body: Record<string, string> }) => {
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe('invalid_grant');
+    expect(r.body.access_token).toBeUndefined();
+  };
+
+  it('O1 refreshIdleSec ends a session that long after its last refresh', async () => {
+    const port = await startWith({ refreshIdleSec: 60 });
+    const first = await signIn(port);
+    const r1 = await refreshAt(port, 59_000, first);
+    expect(r1.status).toBe(200);
+    expectInvalidGrant(await refreshAt(port, 119_000, r1.body.refresh_token));
+  });
+
+  it('O2 refreshMaxAgeSec ends a session that long after its sign-in, however often it refreshes', async () => {
+    const port = await startWith({ refreshMaxAgeSec: 120 });
+    let t = await signIn(port);
+    for (const at of [60_000, 119_000]) {
+      const r = await refreshAt(port, at, t);
+      expect(r.status).toBe(200);
+      t = r.body.refresh_token;
+    }
+    expectInvalidGrant(await refreshAt(port, 121_000, t));
+  });
+
+  it('O3 a lifetime together with an injected refreshStore throws; an injected store alone works', () => {
+    const cfg = { base: BASE, resourceUri: `${BASE}/mcp`, secret, ownerEmails: ['owner@x.example'], cimdIssuers: ['claude.ai'], masterKey: 'mk', refreshStorePath: path.join(tmp, 'mcp-tokens.enc') };
+    const refreshStore = new RefreshStore(path.join(tmp, 'injected.enc'), 'mk');
+    for (const over of [{ refreshMaxAgeSec: 60 }, { refreshIdleSec: 60 }]) {
+      expect(() => buildAuthServer({ ...cfg, ...over }, { refreshStore })).toThrow(/^E_REFRESH_OPTION_CONFLICT: /);
+    }
+    expect(() => buildAuthServer(cfg, { refreshStore })).not.toThrow();
+    expect(() => buildAuthServer({ ...cfg, refreshIdleSec: 60 })).not.toThrow();
+  });
+
+  it('O5 revoked and expired families reach the log with a tag, never the token, subject or email', async () => {
+    const logs: string[] = [];
+    const port = await startWith({ refreshIdleSec: 60 }, { log: (l) => logs.push(l) });
+    const stolen = await signIn(port);
+    const rotated = await refreshAt(port, 1_000, stolen);
+    expect(rotated.status).toBe(200);
+    expectInvalidGrant(await refreshAt(port, 2_000, stolen));
+    off = 0;
+    const idle = await signIn(port);
+    expectInvalidGrant(await refreshAt(port, 61_000, idle));
+
+    const tag = refreshFamilyTagger('mk');
+    const lines = logs.filter((l) => l.startsWith('refresh '));
+    expect(lines).toEqual([
+      `refresh family revoked: reuse tag=${tag(stolen)}`,
+      'refresh families expired n=1',
+      'refresh store: every session expired at once (check the host clock)',
+    ]);
+    expect(tag(stolen)).toMatch(/^[0-9a-f]{8}$/);
+    for (const t of [stolen, rotated.body.refresh_token, idle]) {
+      expect(logs.join('\n')).not.toContain(t.slice(3));
+    }
+    expect(lines.join('\n')).not.toMatch(/owner|@x\.example/);
+  });
+});
 
 describe('alias_add flow + resolveSubject seam (S1.14)', () => {
   const binds: Record<string, unknown>[] = [];
