@@ -133,6 +133,50 @@ describe('token-store crypto', () => {
     expect(fs.readFileSync(lock, 'utf8')).toBe('12345');
   });
 
+  it.each(['EACCES', 'EPERM'])('locks without a hard link when link() fails with %s', (code) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+    const link = vi.spyOn(fs, 'linkSync').mockImplementation(() => {
+      const err = new Error(`${code}: operation not permitted, link`) as NodeJS.ErrnoException;
+      err.code = code;
+      throw err;
+    });
+
+    writeToken('test', sample);
+    updateToken('test', { access_token: 'b' });
+
+    expect(link).toHaveBeenCalled();
+    expect(readToken('test')).toEqual({ ...sample, access_token: 'b' });
+    expect(fs.readdirSync(dir)).toEqual(['test.enc']);
+  });
+
+  it('waits on a lock still being written without a hard link, then recovers it once stale', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
+    cleanupDirs.push(dir);
+    ACCOUNT_CONFIG.test.encPath = path.join(dir, 'test.enc');
+    process.env.MASTER_KEY = KEY;
+    const lock = path.join(dir, '.test.enc.lock');
+    fs.writeFileSync(lock, '', { mode: 0o600 });
+    const createdAt = Date.now();
+    fs.utimesSync(lock, createdAt / 1000, createdAt / 1000);
+
+    let now = createdAt;
+    vi.spyOn(Date, 'now').mockImplementation(() => (now += 100));
+    let brokenAt: number | undefined;
+    const rm = fs.rmSync;
+    vi.spyOn(fs, 'rmSync').mockImplementation((target, options) => {
+      if (target === lock && brokenAt === undefined) brokenAt = now;
+      return rm(target, options);
+    });
+
+    writeToken('test', sample);
+
+    expect(brokenAt).toBeGreaterThanOrEqual(createdAt + 2_000);
+    expect(readToken('test')).toEqual(sample);
+  });
+
   it('retries the token rename through transient sharing violations', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'token-store-'));
     cleanupDirs.push(dir);

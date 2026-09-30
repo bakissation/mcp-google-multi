@@ -8,6 +8,10 @@ Contributor-facing rationale for non-obvious implementation choices — why the 
 
 `renameWithRetry` exists because Windows uses classic rename semantics (`MoveFileExW` without POSIX semantics): replacing a token file that another process momentarily holds open — a concurrent `readToken`, an antivirus scanner, or a search indexer — fails with a transient `EPERM`, `EACCES`, or `EBUSY`. Reads deliberately take no lock, so the token write lock cannot prevent this collision; a short bounded retry (`RENAME_ATTEMPTS` with linear backoff) absorbs it instead. POSIX rename never fails this way, so the retry loop is effectively inert on Linux and macOS.
 
+### Token lock without hard links (`acquireLockFile`, `src/token-store.ts`)
+
+The token write lock is normally taken by writing the pid to a private owner file and hard-linking it to the lock name, so the lock appears with its pid already in it. Android denies `link()` in an app's private storage (Termux, [#274](https://github.com/bakissation/mcp-google-multi/issues/274)) with `EACCES`, and some filesystems without hard links return `EPERM`. On either error the lock is created directly with `O_EXCL` (`flag: 'wx'`) and the pid written into it. That leaves a short window where the lock exists but is still empty, and an empty lock would otherwise read as a dead holder and be broken by a waiter, letting two writers in. A waiter therefore treats an empty lock younger than 2 s (`LOCK_WRITE_GRACE_MS`) as held; an older one is a crash between create and write, and is recovered like any dead holder.
+
 ## Admin SDK
 
 ### Why admin tools are per-account opt-in (`ADMIN_SCOPES`, `src/auth.ts`)
