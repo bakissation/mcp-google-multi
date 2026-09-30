@@ -8,6 +8,7 @@ const ENC_VERSION = 1;
 const ALGO = 'aes-256-gcm';
 const LOCK_TIMEOUT_MS = 5_000;
 const LOCK_RETRY_MS = 10;
+const LOCK_WRITE_GRACE_MS = 2_000;
 const RENAME_ATTEMPTS = 5;
 const RENAME_RETRY_MS = 20;
 
@@ -79,6 +80,18 @@ function sleep(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
+// Android denies link() in app-private storage (Termux), and some filesystems
+// lack hard links; there the lock is created directly with O_EXCL instead.
+function acquireLockFile(ownerFile: string, lock: string): void {
+  try {
+    fs.linkSync(ownerFile, lock);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== 'EACCES' && code !== 'EPERM') throw error;
+    fs.writeFileSync(lock, String(process.pid), { mode: 0o600, flag: 'wx' });
+  }
+}
+
 function withTokenLock<T>(alias: string, fn: () => T): T {
   const p = ACCOUNT_CONFIG[alias].encPath;
   const dir = path.dirname(p);
@@ -91,7 +104,7 @@ function withTokenLock<T>(alias: string, fn: () => T): T {
   try {
     while (true) {
       try {
-        fs.linkSync(ownerFile, lock);
+        acquireLockFile(ownerFile, lock);
         break;
       } catch (error) {
         const err = error as NodeJS.ErrnoException;
@@ -99,10 +112,13 @@ function withTokenLock<T>(alias: string, fn: () => T): T {
         try {
           const observedOwner = fs.readFileSync(lock, 'utf8');
           const owner = Number(observedOwner);
+          // The no-hardlink path creates the lock before writing its pid; see docs/internals.md.
+          const beingWritten =
+            observedOwner === '' && Math.abs(Date.now() - fs.statSync(lock).mtimeMs) < LOCK_WRITE_GRACE_MS;
           // Non-PID content can only come from a corrupt or interrupted lock
           // write — recover it like a dead owner instead of spinning to timeout.
-          let ownerDead = !(Number.isSafeInteger(owner) && owner > 0);
-          if (!ownerDead) {
+          let ownerDead = !beingWritten && !(Number.isSafeInteger(owner) && owner > 0);
+          if (!ownerDead && !beingWritten) {
             try {
               process.kill(owner, 0);
             } catch (ownerError) {
