@@ -139,6 +139,10 @@ const MAX_GRACE_MS = 2 ** 31 - 1;
 // waits for the client's FIN, or for the grace to end.
 function endAfterFlush(socket: Socket): void {
   if (socket.destroyed || socket.writableEnded) return;
+  // Node arms a keep-alive timer when a response finishes and destroys the
+  // socket when it fires, which would cut a slow reader's unread tail just as
+  // an early destroy does. Only the client's FIN or the grace ends it now.
+  socket.setTimeout(0);
   socket.end();
 }
 

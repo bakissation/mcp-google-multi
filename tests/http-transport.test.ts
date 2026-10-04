@@ -1311,6 +1311,29 @@ describe('HttpTransportHost graceful close', () => {
     expect(h.writes.calls).toBe(0);
   }, 40_000);
 
+  it("close({ graceMs }) delivers a finished big response whole to a client that stops reading longer than Node's keep-alive timeout", async () => {
+    const h = await closeHost();
+    const pending = (h.host as unknown as { pending: Map<unknown, unknown> }).pending;
+    const conn = wire(h.port);
+    const stop = readSlowly(conn.socket);
+    conn.socket.write(rawPost(callTool(1, 'big')));
+    await until(() => conn.received().length > 0, 'the start of the big response');
+    await until(() => pending.size === 0, 'the big response to finish writing', 15_000);
+    stop();
+    conn.socket.pause();
+    const closing = h.host.close({ graceMs: 15_000 });
+    // Past the 5 s keep-alive timeout plus Node's 1 s buffer, with the tail still unread.
+    await new Promise((r) => setTimeout(r, 7_000));
+    conn.socket.write(lateBody());
+    conn.socket.resume();
+    await conn.ended;
+    await closing;
+    const answers = responsesOf(conn.received());
+    expect(answers).toHaveLength(1);
+    expect(JSON.parse(answers[0].body).result.content[0].text.length).toBe(BIG_CHARS);
+    expect(h.writes.calls).toBe(0);
+  }, 40_000);
+
   it('close({ graceMs }) delivers a big response that finished writing before the close began whole to a slow reader that pipelines a large body after it', async () => {
     const h = await closeHost();
     const pending = (h.host as unknown as { pending: Map<unknown, unknown> }).pending;
