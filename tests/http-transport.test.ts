@@ -48,6 +48,20 @@ describe('http-transport pure helpers', () => {
     expect(jsonRpcMethod('nonsense')).toBe('unknown');
   });
 
+  it('jsonRpcMethod: a method not shaped like a name is <invalid>, a batch lists four then a count', () => {
+    for (const method of [5, null, 'a\nb', '', 'x'.repeat(65), 'tools call', { toString: 1 }, ['tools/list']]) {
+      expect(jsonRpcMethod({ jsonrpc: '2.0', id: 1, method }), JSON.stringify(method) ?? 'object').toBe('<invalid>');
+    }
+    expect(jsonRpcMethod({ method: 'x'.repeat(64) })).toBe('x'.repeat(64));
+    expect(jsonRpcMethod({ method: 'notifications/initialized' })).toBe('notifications/initialized');
+    expect(jsonRpcMethod({ method: 'rpc.discover' })).toBe('rpc.discover');
+    expect(jsonRpcMethod({ jsonrpc: '2.0', id: 1, result: {} })).toBe('unknown');
+    expect(jsonRpcMethod(['a', 'b', 'c', 'd', 'e'].map((method) => ({ method })))).toBe('a,b,c,d,+1');
+    expect(jsonRpcMethod(['a', 'b', 'c', 'd'].map((method) => ({ method })))).toBe('a,b,c,d');
+    expect(jsonRpcMethod([{ method: 'a' }, { method: 'a\nb' }, { id: 1, result: {} }])).toBe('a,<invalid>');
+    expect(jsonRpcMethod([{ id: 1, result: {} }, { id: 2, error: {} }])).toBe('batch');
+  });
+
   it('re-exports logSafe for a host that imports only this module', () => {
     expect(logSafe).toBe(trimLogSafe);
   });
@@ -576,6 +590,18 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
     expect(lines[1]).toBe(`403 origin_rejected origin=${'o'.repeat(64)}...(len=12000)`);
     expect(lines[2]).toMatch(/^403 origin_rejected origin=https:\/\/o0\.example, https:\/\/o1\.example, .{24}\.\.\.\(len=\d{4,}\)$/);
     for (const l of logs) expect(l).not.toMatch(UNSAFE);
+  });
+
+  // A method whose String() throws made the success line throw after the
+  // answer was sent: a tenant-triggered 500 line and a cut connection.
+  it('a method that is not a name logs <invalid> on the success line, never a 500', async () => {
+    const logs: string[] = [];
+    const port = await startHost(() => ({ ok: true }), { log: (l) => logs.push(l) });
+    for (const method of ['{"toString":1}', JSON.stringify(`tools/list\n200 /mcp method=forged`), JSON.stringify('m'.repeat(100_000))]) {
+      const res = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, raw: `{"jsonrpc":"2.0","id":1,"method":${method}}` });
+      expect(res.status).not.toBe(500);
+    }
+    expect(logs.filter((l) => !l.startsWith('listening on '))).toEqual(Array(3).fill('200 /mcp method=<invalid>'));
   });
 
   it('a thrown message with line breaks, or a long one, stays one bounded 500 line', async () => {

@@ -109,12 +109,23 @@ export function hostAllowed(host: string | undefined, allowed: string[]): boolea
   return allowed.includes(host) || allowed.includes(bare);
 }
 
-/** JSON-RPC method name(s) for an observability log line — no params, no PII. */
+const METHOD_NAME = /^[A-Za-z0-9_./$-]{1,64}$/;
+const BATCH_METHODS_SHOWN = 4;
+
+/** JSON-RPC method name(s) for an observability log line: no params, no PII.
+ * The method is the caller's: anything not shaped like a method name, which
+ * includes a value whose String() throws, is logged as `<invalid>`. */
 export function jsonRpcMethod(body: unknown): string {
-  const one = (b: unknown): string | undefined =>
-    b && typeof b === 'object' && 'method' in b ? String((b as { method: unknown }).method) : undefined;
-  if (Array.isArray(body)) return body.map(one).filter(Boolean).join(',') || 'batch';
-  return one(body) ?? 'unknown';
+  const one = (b: unknown): string | undefined => {
+    if (!b || typeof b !== 'object' || !('method' in b)) return undefined;
+    const m = (b as { method: unknown }).method;
+    return typeof m === 'string' && METHOD_NAME.test(m) ? m : '<invalid>';
+  };
+  if (!Array.isArray(body)) return one(body) ?? 'unknown';
+  const names = body.map(one).filter((n): n is string => n !== undefined);
+  if (names.length === 0) return 'batch';
+  const rest = names.length - BATCH_METHODS_SHOWN;
+  return rest > 0 ? `${names.slice(0, BATCH_METHODS_SHOWN).join(',')},+${rest}` : names.join(',');
 }
 
 
