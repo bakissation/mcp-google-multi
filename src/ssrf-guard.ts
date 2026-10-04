@@ -15,6 +15,17 @@ export class SsrfBlockedError extends Error {
   }
 }
 
+/** A non-2xx answer, kept apart so the cache can tell an issuer that is
+ * overloaded for now from one that says the document is gone. */
+export class CimdHttpError extends SsrfBlockedError {
+  readonly status: number;
+  constructor(status: number) {
+    super(`CIMD fetch failed: HTTP ${status}`);
+    this.name = 'CimdHttpError';
+    this.status = status;
+  }
+}
+
 /** True if an IPv4 literal is in a blocked (private/link-local/loopback/etc) range. */
 export function isBlockedIPv4(ip: string): boolean {
   const parts = ip.split('.').map(Number);
@@ -212,7 +223,7 @@ export async function fetchCimdDocument(rawUrl: string, opts: CimdFetchOptions =
       // CIMD section 5: a redirect is never followed. Only this URL passed the
       // issuer allowlist, and a document behind a redirect could claim its client_id.
       if (res.status >= 300 && res.status < 400) throw new SsrfBlockedError('CIMD redirect refused');
-      if (!res.ok) throw new SsrfBlockedError(`CIMD fetch failed: HTTP ${res.status}`);
+      if (!res.ok) throw new CimdHttpError(res.status);
       const text = await readCapped(res, maxBytes, controller);
       let parsed: unknown;
       try {

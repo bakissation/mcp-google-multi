@@ -5,11 +5,11 @@
 // kept. Errors are never cached (CIMD section 5.2), and a negative cache would
 // not help anyway: the attack varies the path, so its key never repeats.
 
-import { isTransientFetchError, SsrfBlockedError } from './ssrf-guard.js';
+import { CimdHttpError, isTransientFetchError, SsrfBlockedError } from './ssrf-guard.js';
 import { logSafe } from './trim.js';
 
 export const CIMD_TTL_MS = 5 * 60_000;
-/** The oldest validated document still served while the cap is full. */
+/** The oldest validated document still served while the cap is full or the issuer cannot answer. */
 export const CIMD_MAX_STALE_MS = 24 * 60 * 60_000;
 /** Fetches at once. Their lookups are capped apart (ssrf-guard), as a lookup outlives a fetch that gave up on it. */
 export const CIMD_MAX_IN_FLIGHT = 4;
@@ -18,7 +18,7 @@ const BUSY_LOG_EVERY_MS = 60_000;
 
 export type CimdDocument = Record<string, unknown>;
 type CimdError = { error: 'E_CIMD_SSRF_BLOCKED' | 'E_CIMD_INVALID' };
-type Fetched = { doc: CimdDocument } | CimdError;
+type Fetched = { doc: CimdDocument; fresh: boolean } | CimdError;
 
 /** `fresh` is true only for the request whose fetch produced the document. */
 export type CimdResolution = { doc: CimdDocument; fresh: boolean } | { busy: true } | CimdError;
@@ -75,23 +75,26 @@ export class CimdClientCache {
       const doc = await this.deps.fetch(clientId);
       if (validate(doc)) {
         this.store(clientId, doc);
-        out = { doc };
+        out = { doc, fresh: true };
       } else {
         this.entries.delete(clientId);
       }
     } catch (e) {
-      // A document that went bad is never served stale; a timeout or a reset
-      // says nothing about the document, so the last good one stays for a
-      // later busy period.
-      if (!isTransientFetchError(e)) this.entries.delete(clientId);
       out = { error: e instanceof SsrfBlockedError ? 'E_CIMD_SSRF_BLOCKED' : 'E_CIMD_INVALID' };
+      // A document that went bad is never served stale. An issuer that is down
+      // or overloaded says nothing about the document, so the last good one
+      // stays and answers this fetch's requests too (stale-if-error; the error
+      // itself is never stored).
+      const stale = this.entries.get(clientId);
+      if (!saysNothingAboutDocument(e)) this.entries.delete(clientId);
+      else if (stale && this.deps.now() - stale.at < CIMD_MAX_STALE_MS) out = { doc: stale.doc, fresh: false };
       // #13: the detail goes to the log only; the caller gets a generic answer.
       this.deps.log(`CIMD fetch failed for ${logSafe(clientId, 128)}: ${logSafe(e instanceof Error ? e.message : 'non-Error rejection', 200)}`);
     } finally {
       this.inFlight.delete(clientId);
       settle(out);
     }
-    return 'doc' in out ? { doc: out.doc, fresh: true } : out;
+    return out;
   }
 
   private store(clientId: string, doc: CimdDocument): void {
@@ -116,4 +119,9 @@ export class CimdClientCache {
     this.busySuppressed = 0;
     this.deps.log(`CIMD busy: in-flight cap reached${suppressed > 0 ? ` (n=${suppressed} suppressed)` : ''}`);
   }
+}
+
+function saysNothingAboutDocument(e: unknown): boolean {
+  if (isTransientFetchError(e)) return true;
+  return e instanceof CimdHttpError && (e.status === 408 || e.status === 429 || e.status >= 500);
 }

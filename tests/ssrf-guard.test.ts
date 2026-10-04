@@ -4,6 +4,7 @@ import {
   isBlockedIPv6,
   isBlockedIp,
   assertPublicHttpsUrl,
+  CimdHttpError,
   fetchCimdDocument,
   isTransientFetchError,
   MAX_UNSETTLED_LOOKUPS,
@@ -170,6 +171,22 @@ describe('fetchCimdDocument', () => {
       }),
     ).rejects.toThrow(/fetch failed/);
     expect(calls).toBe(2);
+  });
+
+  it('rejects a non-2xx status with CimdHttpError carrying the status, after one fetch', async () => {
+    for (const status of [503, 429, 404]) {
+      let calls = 0;
+      const err = await fetchCimdDocument('https://claude.ai/x', {
+        ssrf,
+        retryBackoffMs: 0,
+        sleepImpl: async () => {},
+        fetchImpl: async () => (calls++, okResp('busy', status)),
+      }).catch((e: unknown) => e);
+      expect(err, String(status)).toBeInstanceOf(CimdHttpError);
+      expect(err, String(status)).toBeInstanceOf(SsrfBlockedError);
+      expect(err).toMatchObject({ status, message: `CIMD fetch failed: HTTP ${status}` });
+      expect(calls, String(status)).toBe(1);
+    }
   });
 
   it('does NOT retry a deterministic HTTP error', async () => {

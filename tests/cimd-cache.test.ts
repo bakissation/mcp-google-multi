@@ -8,7 +8,7 @@ import {
   type CimdDocument,
   type CimdResolution,
 } from '../src/cimd-cache.js';
-import { SsrfBlockedError } from '../src/ssrf-guard.js';
+import { CimdHttpError, SsrfBlockedError } from '../src/ssrf-guard.js';
 
 const docFor = (id: string): CimdDocument => ({ client_id: id, redirect_uris: ['https://claude.ai/api/mcp/auth_callback'] });
 const validFor = (id: string) => (doc: CimdDocument) => doc.client_id === id && Array.isArray(doc.redirect_uris) && doc.redirect_uris.length > 0;
@@ -124,21 +124,36 @@ describe('CimdClientCache', () => {
     expect(h.cache.size).toBe(0);
   });
 
-  it('K7 a deterministic refetch failure drops the entry; a transient one keeps it for a later busy period', async () => {
-    for (const [failure, kept, slug] of [
-      [() => Promise.reject(new SsrfBlockedError('CIMD fetch failed: HTTP 404')), false, 'E_CIMD_SSRF_BLOCKED'],
-      [() => Promise.resolve({ client_id: 'https://claude.ai/someone-else', redirect_uris: ['https://x.example/cb'] }), false, 'E_CIMD_INVALID'],
-      [() => Promise.resolve({ client_id: A, redirect_uris: [] }), false, 'E_CIMD_INVALID'],
-      [() => Promise.reject(transient()), true, 'E_CIMD_INVALID'],
-      [() => Promise.reject(new DOMException('This operation was aborted', 'AbortError')), true, 'E_CIMD_INVALID'],
-    ] as const) {
+  it('K7 a refetch failure that says the document went bad drops the entry; one that says nothing about it keeps it and serves it stale', async () => {
+    const stale: CimdResolution = { doc: docFor(A), fresh: false };
+    const blocked: CimdResolution = { error: 'E_CIMD_SSRF_BLOCKED' };
+    const invalid: CimdResolution = { error: 'E_CIMD_INVALID' };
+    const rejects = (e: unknown) => () => Promise.reject(e);
+    const cases: Array<[string, () => Promise<CimdDocument>, CimdResolution]> = [
+      ['404', rejects(new CimdHttpError(404)), blocked],
+      ['410', rejects(new CimdHttpError(410)), blocked],
+      ['403', rejects(new CimdHttpError(403)), blocked],
+      ['redirect', rejects(new SsrfBlockedError('CIMD redirect refused')), blocked],
+      ['oversized', rejects(new SsrfBlockedError('CIMD document exceeds 5120 bytes')), blocked],
+      ['ENOTFOUND', rejects(new SsrfBlockedError('DNS resolution failed for claude.ai: getaddrinfo ENOTFOUND claude.ai')), blocked],
+      ['mismatch', () => Promise.resolve({ client_id: 'https://claude.ai/someone-else', redirect_uris: ['https://x.example/cb'] }), invalid],
+      ['no redirect_uris', () => Promise.resolve({ client_id: A, redirect_uris: [] }), invalid],
+      ['503', rejects(new CimdHttpError(503)), stale],
+      ['500', rejects(new CimdHttpError(500)), stale],
+      ['429', rejects(new CimdHttpError(429)), stale],
+      ['408', rejects(new CimdHttpError(408)), stale],
+      ['reset', rejects(transient()), stale],
+      ['EAI_AGAIN', rejects(Object.assign(new Error('getaddrinfo EAI_AGAIN claude.ai'), { code: 'EAI_AGAIN' })), stale],
+      ['timeout', rejects(new DOMException('This operation was aborted', 'AbortError')), stale],
+    ];
+    for (const [label, failure, first] of cases) {
       const h = harness();
       await h.resolve(A);
       h.advance(CIMD_TTL_MS);
-      h.answer = failure as () => Promise<CimdDocument>;
-      expect(await h.resolve(A)).toEqual({ error: slug });
+      h.answer = failure;
+      expect(await h.resolve(A), label).toEqual(first);
       h.fillCap();
-      expect(await h.resolve(A)).toEqual(kept ? { doc: docFor(A), fresh: false } : { busy: true });
+      expect(await h.resolve(A), label).toEqual(first === stale ? stale : { busy: true });
     }
   });
 
@@ -197,5 +212,46 @@ describe('CimdClientCache', () => {
     h.advance(1);
     await h.resolve('https://claude.ai/flood-last');
     expect(h.logs[2]).toBe('CIMD busy: in-flight cap reached (n=1 suppressed)');
+  });
+
+  it('K12 every request waiting on a refetch gets the stored document when the issuer cannot answer, and the error when it says the document is gone', async () => {
+    const waitOnRefetch = async (failure: unknown, stored: boolean) => {
+      const h = harness();
+      if (stored) {
+        await h.resolve(A);
+        h.advance(CIMD_TTL_MS);
+      }
+      h.hold();
+      const five = Array.from({ length: 5 }, () => h.resolve(A));
+      expect(h.held).toHaveLength(1);
+      h.held[0].reject(failure);
+      return { answers: await Promise.all(five), size: h.cache.size };
+    };
+    for (const failure of [new CimdHttpError(503), new CimdHttpError(429), transient()]) {
+      expect(await waitOnRefetch(failure, true)).toEqual({ answers: Array(5).fill({ doc: docFor(A), fresh: false }), size: 1 });
+    }
+    for (const failure of [new CimdHttpError(404), new CimdHttpError(410)]) {
+      expect(await waitOnRefetch(failure, true)).toEqual({ answers: Array(5).fill({ error: 'E_CIMD_SSRF_BLOCKED' }), size: 0 });
+    }
+    expect(await waitOnRefetch(transient(), false)).toEqual({ answers: Array(5).fill({ error: 'E_CIMD_INVALID' }), size: 0 });
+    expect(await waitOnRefetch(new CimdHttpError(503), false)).toEqual({ answers: Array(5).fill({ error: 'E_CIMD_SSRF_BLOCKED' }), size: 0 });
+  });
+
+  it('K13 a stale answer keeps the document\'s age: the next request asks the issuer again, and one past the stale limit is not served', async () => {
+    const h = harness();
+    await h.resolve(A);
+    h.advance(CIMD_TTL_MS);
+    h.answer = () => Promise.reject(new CimdHttpError(503));
+    expect(await h.resolve(A)).toEqual({ doc: docFor(A), fresh: false });
+    h.answer = (id) => Promise.resolve(docFor(id));
+    expect(await h.resolve(A)).toEqual({ doc: docFor(A), fresh: true });
+    expect(h.fetches).toEqual([A, A, A]);
+
+    h.advance(CIMD_MAX_STALE_MS - 1);
+    h.hold();
+    const late = h.resolve(A);
+    h.advance(1);
+    h.held[0].reject(new CimdHttpError(503));
+    expect(await late).toEqual({ error: 'E_CIMD_SSRF_BLOCKED' });
   });
 });
