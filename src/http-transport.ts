@@ -179,6 +179,9 @@ export class HttpTransportHost {
   // every handle() that has not settled.
   private readonly sockets = new Set<Socket>();
   private readonly pending = new Map<Socket, { count: number; last: ServerResponse }>();
+  // Sockets that have accepted a request: nothing pending means the last
+  // response finished writing, but its tail can still sit in kernel buffers.
+  private readonly served = new WeakSet<Socket>();
   private readonly handling = new Set<Promise<void>>();
   private closing = false;
   private graceful?: Promise<void>;
@@ -217,6 +220,7 @@ export class HttpTransportHost {
         stopReading(socket);
         return;
       }
+      this.served.add(socket);
       const entry = this.pending.get(socket);
       if (entry) {
         entry.count++;
@@ -299,7 +303,8 @@ export class HttpTransportHost {
       this.httpServer = undefined;
       return;
     }
-    // Starting over would destroy every socket in its lingering close.
+    // Starting over would arm a second grace, and a shorter one would cut
+    // what the first still lets finish.
     this.graceful ??= this.closeGracefully(s, graceMs).finally(() => (this.graceful = undefined));
     return this.graceful;
   }
@@ -317,15 +322,18 @@ export class HttpTransportHost {
     // after the last of them: that one says so if it has not started, and the
     // settle hook in start() ends the socket once it finishes. Node itself
     // destroys a socket once a Connection: close response is flushed, which
-    // resets it just as endAfterFlush explains, so that end lingers too.
+    // resets it just as endAfterFlush explains, so that end lingers too. A
+    // socket with nothing pending may still be delivering the tail of its
+    // last response, so only one that never accepted a request is destroyed.
     for (const socket of this.sockets) {
       const entry = this.pending.get(socket);
-      if (!entry) {
+      if (!entry && !this.served.has(socket)) {
         socket.destroy();
         continue;
       }
       socket.destroySoon = () => endAfterFlush(socket);
-      if (!entry.last.headersSent) entry.last.setHeader('Connection', 'close');
+      if (!entry) endAfterFlush(socket);
+      else if (!entry.last.headersSent) entry.last.setHeader('Connection', 'close');
     }
     let timer: ReturnType<typeof setTimeout> | undefined;
     const expired = new Promise<void>((resolve) => {
