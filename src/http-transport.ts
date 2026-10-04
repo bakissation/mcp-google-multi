@@ -11,6 +11,8 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import type { Socket } from 'node:net';
 import type { HttpConfig } from './http-config.js';
 import { withArgNormalization, type ArgShape, type StrictArgOptions, withValidationEnvelope, type ValidationEnvelopeOptions } from './arg-normalize.js';
+// A host wrapping the log callbacks it hands core needs this, and trim has no package export.
+export { logSafe } from './trim.js';
 export type AuthOutcome =
   | { ok: true; sub?: string }
   | { ok: false; status: number; body: string; headers?: Record<string, string> };

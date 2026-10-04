@@ -20,6 +20,27 @@ export function sliceClean(text: string, max: number): string {
   return /[\uD800-\uDBFF]$/.test(sliced) ? sliced.slice(0, -1) : sliced;
 }
 
+// C0, DEL and C1 (NEL, 8-bit CSI and OSC) can end a line or drive a terminal;
+// the line and paragraph separators end a line for many readers; the bidi and
+// invisible format controls make a line read differently from its bytes.
+const LOG_UNSAFE = /[\p{Cc}\u061c\u200e\u200f\u202a-\u202e\u2028\u2029\u2066-\u2069]/gu;
+
+/** An untrusted value made fit for one log line: never throws, at most `max`
+ * characters of it (then `...(len=N)`), each unsafe character as a literal
+ * `\uXXXX`. Backslash stays as is, so a value already through here comes back
+ * unchanged and a clean short value keeps its exact text. */
+export function logSafe(value: unknown, max: number): string {
+  let text: string;
+  try {
+    text = String(value);
+  } catch {
+    return '<unprintable>';
+  }
+  const cut = text.length > max ? sliceClean(text, max) : text;
+  const escaped = cut.replace(LOG_UNSAFE, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+  return cut === text ? escaped : `${escaped}...(len=${text.length})`;
+}
+
 /** Largest prefix whose JSON encoding (the wrapping quotes included) fits
  * `maxEncoded`. Slicing raw characters overshoots whenever the text contains
  * quotes or backslashes, which JSON.stringify doubles: the escape hatch's

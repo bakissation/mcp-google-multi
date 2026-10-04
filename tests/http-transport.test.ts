@@ -9,9 +9,11 @@ import {
   originAllowed,
   hostAllowed,
   jsonRpcMethod,
+  logSafe,
   type Authenticator,
   type HttpHostOptions,
 } from '../src/http-transport.js';
+import { logSafe as trimLogSafe } from '../src/trim.js';
 import { z } from "zod";
 
 // ---- pure helpers -----------------------------------------------------------
@@ -46,6 +48,9 @@ describe('http-transport pure helpers', () => {
     expect(jsonRpcMethod('nonsense')).toBe('unknown');
   });
 
+  it('re-exports logSafe for a host that imports only this module', () => {
+    expect(logSafe).toBe(trimLogSafe);
+  });
 });
 
 // ---- integration: real McpServer over the host (BV-3) ------------------------
