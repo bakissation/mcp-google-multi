@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   isBlockedIPv4,
   isBlockedIPv6,
@@ -62,23 +62,37 @@ describe('fetchCimdDocument', () => {
     expect(doc.client_id).toBe('https://claude.ai/x');
   });
 
-  it('blocks a redirect to a private address', async () => {
-    let call = 0;
-    await expect(
-      fetchCimdDocument('https://claude.ai/x', {
-        ssrf: { resolveAll: async (h) => (h === 'claude.ai' ? ['93.184.216.34'] : ['169.254.169.254']) },
+  // CIMD section 5. Only the first URL passes the issuer allowlist, so a
+  // followed hop could fetch an attacker's document claiming the client_id.
+  it('refuses any redirect, even to the same host, without a second fetch', async () => {
+    for (const [status, location] of [[301, 'https://claude.ai/y'], [302, 'https://metadata.internal/'], [303, '/y'], [304, undefined], [307, 'https://claude.ai/y'], [308, 'https://claude.ai/y']] as const) {
+      let calls = 0;
+      const resolved: string[] = [];
+      const err = await fetchCimdDocument('https://claude.ai/x', {
+        ssrf: { resolveAll: async (h) => (resolved.push(h), ['93.184.216.34']) },
         fetchImpl: async () => {
-          call++;
-          return call === 1 ? okResp('', 302, { location: 'https://metadata.internal/' }) : okResp('{}');
+          calls++;
+          return new Response(null, { status, headers: location ? { location } : {} });
         },
-      }),
-    ).rejects.toThrow(SsrfBlockedError);
+      }).catch((e: unknown) => e);
+      expect(err, String(status)).toBeInstanceOf(SsrfBlockedError);
+      expect((err as Error).message).toBe('CIMD redirect refused');
+      expect(calls).toBe(1);
+      expect(resolved).toEqual(['claude.ai']);
+    }
   });
 
   it('rejects an oversized document', async () => {
     await expect(
       fetchCimdDocument('https://claude.ai/x', { ssrf, maxBytes: 10, fetchImpl: async () => okResp('x'.repeat(100)) }),
     ).rejects.toThrow(/exceeds/);
+  });
+
+  it('accepts 5120 bytes and refuses 5121 by default (CIMD section 8.7)', async () => {
+    const body = (n: number) => `{"a":"${'x'.repeat(n - 8)}"}`;
+    expect(body(5120)).toHaveLength(5120);
+    await expect(fetchCimdDocument('https://claude.ai/x', { ssrf, fetchImpl: async () => okResp(body(5120)) })).resolves.toHaveProperty('a');
+    await expect(fetchCimdDocument('https://claude.ai/x', { ssrf, fetchImpl: async () => okResp(body(5121)) })).rejects.toThrow('CIMD document exceeds 5120 bytes');
   });
 
   it('rejects a non-JSON body', async () => {
@@ -91,6 +105,7 @@ describe('fetchCimdDocument', () => {
     let calls = 0;
     const doc = await fetchCimdDocument('https://claude.ai/x', {
       ssrf,
+      retries: 2,
       retryBackoffMs: 0,
       sleepImpl: async () => {},
       fetchImpl: async () => {
@@ -118,6 +133,22 @@ describe('fetchCimdDocument', () => {
       }),
     ).rejects.toThrow(/fetch failed/);
     expect(calls).toBe(3); // 1 + 2 retries
+  });
+
+  it('retries a transient error once by default', async () => {
+    let calls = 0;
+    await expect(
+      fetchCimdDocument('https://claude.ai/x', {
+        ssrf,
+        retryBackoffMs: 0,
+        sleepImpl: async () => {},
+        fetchImpl: async () => {
+          calls++;
+          throw transient();
+        },
+      }),
+    ).rejects.toThrow(/fetch failed/);
+    expect(calls).toBe(2);
   });
 
   it('does NOT retry a deterministic HTTP error', async () => {
@@ -150,5 +181,78 @@ describe('fetchCimdDocument', () => {
       }),
     ).rejects.toThrow(SsrfBlockedError);
     expect(calls).toBe(0); // blocked before any fetch, and not retried
+  });
+
+  describe('one deadline for the whole fetch', () => {
+    /** A body that sends a first chunk, then stalls until the fetch is aborted, as undici's does. */
+    const stalledBody = (signal: AbortSignal) =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(c) {
+            c.enqueue(new TextEncoder().encode('{"client_id":'));
+            signal.addEventListener('abort', () => c.error(signal.reason));
+          },
+        }),
+      );
+    async function settleAt(p: Promise<unknown>, ms: number): Promise<unknown> {
+      let settled: unknown = 'pending';
+      p.then(
+        () => (settled = 'resolved'),
+        (e: unknown) => (settled = e),
+      );
+      await vi.advanceTimersByTimeAsync(ms - 1);
+      expect(settled).toBe('pending');
+      await vi.advanceTimersByTimeAsync(1);
+      return settled;
+    }
+
+    it('a slow lookup, a stalled body and the retry all end at 8 s', async () => {
+      vi.useFakeTimers();
+      try {
+        let lookups = 0;
+        let fetches = 0;
+        const p = fetchCimdDocument('https://claude.ai/x', {
+          ssrf: {
+            resolveAll: (h) => {
+              lookups++;
+              return new Promise((r) => setTimeout(() => r(h === 'claude.ai' ? ['93.184.216.34'] : []), 3000));
+            },
+          },
+          fetchImpl: async (_u, init) => {
+            fetches++;
+            return stalledBody(init!.signal!);
+          },
+        });
+        const settled = await settleAt(p, 8000);
+        expect((settled as Error).name).toBe('AbortError');
+        // the first attempt timed out in its body at 5 s, the retry in its lookup
+        expect({ lookups, fetches }).toEqual({ lookups: 2, fetches: 1 });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a lookup that never answers is abandoned at the deadline, and the per-attempt cap never outlives it', async () => {
+      vi.useFakeTimers();
+      try {
+        let lookups = 0;
+        const p = fetchCimdDocument('https://claude.ai/x', {
+          deadlineMs: 1500,
+          timeoutMs: 60_000,
+          ssrf: {
+            resolveAll: () => {
+              lookups++;
+              return new Promise<string[]>(() => {});
+            },
+          },
+          fetchImpl: async () => okResp('{}'),
+        });
+        const settled = await settleAt(p, 1500);
+        expect((settled as Error).name).toBe('AbortError');
+        expect(lookups).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
