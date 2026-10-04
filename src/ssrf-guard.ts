@@ -98,6 +98,10 @@ export async function assertPublicHttpsUrl(rawUrl: string, deps: SsrfDeps = {}):
   try {
     addresses = await resolveAll(url.hostname);
   } catch (e) {
+    // A resolver that could not answer this time says nothing about the host,
+    // so the fetch may retry it; a name that does not exist stays a block.
+    const code = (e as { code?: unknown } | null)?.code;
+    if (typeof code === 'string' && TRANSIENT_CODES.has(code)) throw e;
     throw new SsrfBlockedError(`DNS resolution failed for ${url.hostname}: ${(e as Error).message}`);
   }
   if (addresses.length === 0) throw new SsrfBlockedError(`no addresses resolved for ${url.hostname}`);

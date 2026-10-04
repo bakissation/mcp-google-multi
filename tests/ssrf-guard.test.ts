@@ -5,6 +5,7 @@ import {
   isBlockedIp,
   assertPublicHttpsUrl,
   fetchCimdDocument,
+  isTransientFetchError,
   SsrfBlockedError,
 } from '../src/ssrf-guard.js';
 
@@ -165,6 +166,40 @@ describe('fetchCimdDocument', () => {
       }),
     ).rejects.toThrow(SsrfBlockedError);
     expect(calls).toBe(1);
+  });
+
+  describe('a DNS failure', () => {
+    const dnsError = (code: string) => Object.assign(new Error(`getaddrinfo ${code} claude.ai`), { code });
+    const counting = (answer: (n: number) => Promise<string[]>) => {
+      const seen = { lookups: 0, fetches: 0 };
+      const opts = {
+        retryBackoffMs: 0,
+        sleepImpl: async () => {},
+        ssrf: { resolveAll: () => answer(++seen.lookups) },
+        fetchImpl: async () => (seen.fetches++, okResp(JSON.stringify({ client_id: 'https://claude.ai/x' }))),
+      };
+      return { seen, opts };
+    };
+
+    it('that is transient is retried, and the retry can succeed', async () => {
+      const { seen, opts } = counting((n) => (n === 1 ? Promise.reject(dnsError('EAI_AGAIN')) : Promise.resolve(['93.184.216.34'])));
+      await expect(fetchCimdDocument('https://claude.ai/x', opts)).resolves.toEqual({ client_id: 'https://claude.ai/x' });
+      expect(seen).toEqual({ lookups: 2, fetches: 1 });
+    });
+
+    it('that stays transient fails as transient, not as a block', async () => {
+      const { seen, opts } = counting(() => Promise.reject(dnsError('EAI_AGAIN')));
+      const err = await fetchCimdDocument('https://claude.ai/x', opts).catch((e: unknown) => e);
+      expect(err).not.toBeInstanceOf(SsrfBlockedError);
+      expect(isTransientFetchError(err)).toBe(true);
+      expect(seen).toEqual({ lookups: 2, fetches: 0 });
+    });
+
+    it('for a name that does not exist is a block, not retried', async () => {
+      const { seen, opts } = counting(() => Promise.reject(dnsError('ENOTFOUND')));
+      await expect(fetchCimdDocument('https://claude.ai/x', opts)).rejects.toThrow(SsrfBlockedError);
+      expect(seen).toEqual({ lookups: 1, fetches: 0 });
+    });
   });
 
   it('does NOT retry an SSRF block (private-IP rebind)', async () => {
