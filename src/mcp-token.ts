@@ -188,7 +188,6 @@ export class ReplayGuard {
    * never meet a full guard. The flood then lands where the artifact is
    * minted, and refusing there loses nothing. */
   reserve(jti: string, ttlMs: number, nowMs: number): 'ok' | 'full' {
-    this.evictExpiredHead(nowMs);
     if (!this.room(nowMs)) return 'full';
     this.record(jti, nowMs + ttlMs, false);
     return 'ok';
@@ -200,7 +199,6 @@ export class ReplayGuard {
    * keeps the record alive as long as the artifact itself, even when the clock
    * stepped back between its signing and this spend. */
   spend(jti: string, ttlMs: number, nowMs: number, artifactExpMs = 0): ReplaySpend {
-    this.evictExpiredHead(nowMs);
     const exp = Math.max(nowMs + ttlMs, artifactExpMs);
     const held = this.seen.get(jti);
     if (held && held.exp > nowMs) {
@@ -213,6 +211,13 @@ export class ReplayGuard {
     if (!this.room(nowMs)) return 'full';
     this.record(jti, exp, true);
     return 'ok';
+  }
+
+  /** Undo a spend whose next step could not go ahead. The slot stays held, so
+   * nothing is forgotten, and the artifact can be spent once more. */
+  unspend(jti: string): void {
+    const held = this.seen.get(jti);
+    if (held) held.spent = false;
   }
 
   /** `spend` as a boolean: false for a replay and for a full guard alike. */
@@ -229,9 +234,10 @@ export class ReplayGuard {
     if (exp < this.earliest) this.earliest = exp;
   }
 
-  // While full, a refusal costs O(1): a sweep runs only once something can
-  // have expired, and at most once a second, so a flood cannot make every
-  // request walk the whole map.
+  // Expired entries are dropped only here, when the map is at the cap: a refusal
+  // costs O(1), and a sweep runs only once something can have expired, at most
+  // once a second. Walking the map from its head on every call is not cheap: a
+  // Map iterator steps over every deleted slot until the table is rebuilt.
   private room(nowMs: number): boolean {
     if (this.seen.size < this.cap) return true;
     if (nowMs < this.earliest) return false;
@@ -244,15 +250,6 @@ export class ReplayGuard {
     }
     this.earliest = earliest;
     return this.seen.size < this.cap;
-  }
-
-  // Insertion order is mint or spend order, so with one TTL the head holds the
-  // earliest expiries; a short TTL behind a longer one waits for the sweep.
-  private evictExpiredHead(nowMs: number): void {
-    for (const [jti, e] of this.seen) {
-      if (e.exp > nowMs) return;
-      this.seen.delete(jti);
-    }
   }
 }
 
