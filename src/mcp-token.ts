@@ -509,10 +509,12 @@ export class RefreshStore {
   /** With `nowMs` (every issue and rotation), also clamps and prunes. */
   private load(nowMs?: number, lines: string[] = []): { data: RefreshData; dirty: boolean } {
     let d: unknown;
+    let readOk = true;
     try {
       d = readPlain(this.path, this.masterKey);
     } catch {
       d = null;
+      readOk = false;
     }
     checkFormat(this.path, d);
     const loaded = decodeData(d);
@@ -520,7 +522,8 @@ export class RefreshStore {
       if (this.clamp(loaded.data, nowMs, lines)) loaded.dirty = true;
       if (this.prune(loaded.data, nowMs, lines) > 0) loaded.dirty = true;
     }
-    if (Object.keys(loaded.data.active).length === 0 && Object.keys(loaded.data.spent).length === 0) this.legacyEmpty = true;
+    // A failed read is not evidence that the file holds no legacy record.
+    if (readOk && Object.keys(loaded.data.active).length === 0 && Object.keys(loaded.data.spent).length === 0) this.legacyEmpty = true;
     return loaded;
   }
 

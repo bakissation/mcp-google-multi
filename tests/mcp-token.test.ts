@@ -786,6 +786,17 @@ describe('RefreshStore pre-auth cost', () => {
     expect(() => withFileLock(other.file, () => other.s.rotate(legacyTok('junk'), 2000))).toThrow(/Timed out/);
   });
 
+  it('P4 a failed read does not turn on the pre-lock refusal', () => {
+    const { s, file } = storeAt();
+    const L1 = legacyTok('L1');
+    seedLegacy(file, KEY, { [L1]: { sub: 'owner', issuedAt: 1000, family: 'fam-a' } });
+    const bytes = readFileSync(file);
+    writeFileSync(file, 'not a store');
+    expect(s.purgeTenant('nobody')).toBe(0);
+    writeFileSync(file, bytes);
+    expect(s.rotate(L1, 2000)?.sub).toBe('owner');
+  });
+
   it('P3 refreshFamilyTagger tags a family the same at every generation and nothing else', () => {
     const { s } = storeAt();
     const tag = refreshFamilyTagger(KEY);
