@@ -653,6 +653,21 @@ that store instead. The owner's server sets neither. With a lifetime set, keep
 the host clock synchronized: a clock that jumps forward ends every session
 (clients sign in again), and the log says so.
 
+`/mcp-token`: `ReplayGuard` no longer forgets a spent state, approval or
+authorization code that is still live to make room. Before, a full guard
+dropped its oldest entry, so a flood of cheap sign-in steps could make a
+spent artifact usable again, among them a callback the owner_gate browser
+binding had refused, which could then be finished from the browser that
+started it. `ReplayGuard.spend(jti, ttlMs, nowMs)` returns `ok`, `replay` or
+`full`; `consume` keeps its boolean and answers false for both refusals. The
+default cap is 100,000 (was 10,000). On a full guard the browser steps of the
+sign-in answer 503 `E_SIGNIN_BUSY` with `Retry-After: 60`, and `/token`
+answers 503 `temporarily_unavailable` with `Retry-After: 5`, instead of
+reading as a replay; `AuthServerDeps.log` gets `replay guard full: sign-in
+refused` at most once a minute. A public deployment still needs a rate limit
+on `/authorize`, `/callback` and `/token` in front of it, since a flood now
+delays sign-ins instead of reopening them.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)

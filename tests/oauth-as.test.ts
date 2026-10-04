@@ -8,7 +8,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { resolveHttpConfig } from '../src/http-config.js';
 import { HttpTransportHost } from '../src/http-transport.js';
 import { buildAuthServer, redirectAllowed, verifiedEmailFromIdToken, verifiedIdentityFromIdToken, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServer, type AuthServerDeps } from '../src/oauth-as.js';
-import { jwtSecretFrom, signAccessToken, signPending, signReauthLink, verifyAccessToken, refreshFamilyTagger, RefreshStore } from '../src/mcp-token.js';
+import { jwtSecretFrom, signAccessToken, signPending, signReauthLink, verifyAccessToken, refreshFamilyTagger, RefreshStore, ReplayGuard } from '../src/mcp-token.js';
 import { SsrfBlockedError } from '../src/ssrf-guard.js';
 import { CIMD_MAX_IN_FLIGHT } from '../src/cimd-cache.js';
 import { z } from "zod";
@@ -580,6 +580,39 @@ describe('owner_gate Google leg is bound to the browser that started it (H4 F1)'
     expect(replay.status).toBe(400);
     expect(replay.headers.location).toBeUndefined();
     expect(calls).toEqual({ exchange: 0, resolve: 0 });
+  });
+
+  it('a flood of spends cannot make a refused callback usable again: a full replay guard answers 503', async () => {
+    const { calls, logs, deps } = spied({ replayGuard: new ReplayGuard(4) });
+    const port = await start(deps);
+    const attacker: Jar = new Map();
+    const { state } = await dcrGoogleState(port, attacker);
+    const refused = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: new Map() });
+    expect(refused.status).toBe(400);
+    const flood: Res[] = [];
+    for (let i = 0; i < 4; i++) {
+      const fresh = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`, { jar: new Map() })).headers.location as string);
+      flood.push(await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(fresh)}`, { jar: new Map() }));
+    }
+    expect(flood.map((r) => r.status)).toEqual([400, 400, 503, 503]);
+    expect(flood[2].text).toContain('E_SIGNIN_BUSY');
+    expect(flood[2].headers['retry-after']).toBe('60');
+    const replay = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: attacker });
+    expect(replay.status).toBe(400);
+    expect(replay.headers.location).toBeUndefined();
+    expect(calls).toEqual({ exchange: 0, resolve: 0 });
+    expect(logs.filter((l) => l.startsWith('replay guard full'))).toEqual(['replay guard full: sign-in refused']);
+  });
+
+  it('a full replay guard answers 503 at /token, not invalid_grant', async () => {
+    const port = await start({ replayGuard: new ReplayGuard(1) });
+    const authz = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(stateFrom(authz.headers.location as string))}`);
+    const code = new URL(cb.headers.location as string).searchParams.get('code')!;
+    const tok = await req(port, 'POST', '/token', form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, code_verifier: verifier, resource: `${BASE}/mcp` }));
+    expect(tok.status).toBe(503);
+    expect(JSON.parse(tok.text).error).toBe('temporarily_unavailable');
+    expect(tok.headers['retry-after']).toBe('5');
   });
 
   it('the same browser completes the DCR flow and the binding cookie is cleared', async () => {

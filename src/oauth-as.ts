@@ -14,7 +14,7 @@ import {
   signAccessToken, verifyAccessToken, signState, verifyState, signAuthzCode, verifyAuthzCode,
   signReauthLink, verifyReauthLink,
   signPending, verifyPending,
-  ReplayGuard, RefreshStore, STATE_TTL_DEFAULT, CODE_TTL_DEFAULT, ACCESS_TTL_DEFAULT,
+  ReplayGuard, type ReplaySpend, RefreshStore, STATE_TTL_DEFAULT, CODE_TTL_DEFAULT, ACCESS_TTL_DEFAULT,
   type StatePayload,
 } from './mcp-token.js';
 import { fetchCimdDocument } from './ssrf-guard.js';
@@ -179,8 +179,8 @@ function json(res: ServerResponse, status: number, body: unknown, extraHeaders: 
   return true;
 }
 
-function errorPage(res: ServerResponse, status: number, slug: string, message: string): true {
-  res.writeHead(status, { 'Content-Type': 'text/plain' });
+function errorPage(res: ServerResponse, status: number, slug: string, message: string, extraHeaders: Record<string, string> = {}): true {
+  res.writeHead(status, { 'Content-Type': 'text/plain', ...extraHeaders });
   res.end(`${slug}: ${message}`);
   return true;
 }
@@ -194,6 +194,11 @@ function subjectUnavailable(res: ServerResponse): true {
 // Not invalid_client: clients and people read that as a permanent misconfiguration.
 function clientUnavailable(res: ServerResponse): true {
   return json(res, 503, { error: 'temporarily_unavailable', message: 'the client could not be checked right now; retry shortly' }, { 'Retry-After': '5' });
+}
+
+// The replay guard is full: every slot holds a jti that is still live.
+function signInBusy(res: ServerResponse): true {
+  return errorPage(res, 503, 'E_SIGNIN_BUSY', 'sign-in is busy right now; retry in a minute', { 'Retry-After': '60' });
 }
 
 function redirect(res: ServerResponse, location: string, extraHeaders: Record<string, string> = {}): true {
@@ -326,6 +331,23 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   const refresh =
     deps.refreshStore ?? new RefreshStore(config.refreshStorePath, config.masterKey, { maxAgeSec: config.refreshMaxAgeSec, idleSec: config.refreshIdleSec, log });
   const nowSec = () => Math.floor(now() / 1000);
+  // A full guard is refused at whatever rate the caller likes, so its line is
+  // written at most once a minute.
+  let fullLoggedAt = -Infinity;
+  let fullSuppressed = 0;
+  const spend = (jti: string, ttlSec: number): ReplaySpend => {
+    const at = now();
+    const r = replay.spend(jti, ttlSec * 1000, at);
+    if (r === 'full') {
+      if (at - fullLoggedAt < 60_000) fullSuppressed++;
+      else {
+        log(`replay guard full: sign-in refused${fullSuppressed > 0 ? ` (n=${fullSuppressed} suppressed)` : ''}`);
+        fullLoggedAt = at;
+        fullSuppressed = 0;
+      }
+    }
+    return r;
+  };
   const resolveSubject = deps.resolveSubject ?? ((email: string) => (config.ownerEmails.includes(email) ? { sub: 'owner' } : null));
   const issHeader = { 'Cache-Control': 'no-store' };
 
@@ -429,9 +451,9 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       if (pending.flow !== 'owner_gate') {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the approval is invalid or expired');
       }
-      if (!replay.consume(pending.jti, STATE_TTL_DEFAULT * 1000, now())) {
-        return errorPage(res, 400, 'E_STATE_INVALID', 'this approval was already used');
-      }
+      const spent = spend(pending.jti, STATE_TTL_DEFAULT);
+      if (spent === 'full') return signInBusy(res);
+      if (spent === 'replay') return errorPage(res, 400, 'E_STATE_INVALID', 'this approval was already used');
       const { jti: _drop, ...sp } = pending;
       void _drop;
       return toGoogle(res, sp as StatePayload);
@@ -459,9 +481,9 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       if (minted.flow !== 'alias_add' || !minted.alias || !minted.tenantId) {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the add-account link is malformed');
       }
-      if (!replay.consume(minted.jti, STATE_TTL_DEFAULT * 1000, now())) {
-        return errorPage(res, 400, 'E_STATE_INVALID', 'this add-account link was already used');
-      }
+      const spent = spend(minted.jti, STATE_TTL_DEFAULT);
+      if (spent === 'full') return signInBusy(res);
+      if (spent === 'replay') return errorPage(res, 400, 'E_STATE_INVALID', 'this add-account link was already used');
       const { jti: _spent, ...sp } = minted;
       void _spent;
       return toGoogle(res, sp as StatePayload);
@@ -549,9 +571,9 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     } catch {
       return errorPage(res, 400, 'E_STATE_INVALID', 'state is invalid, expired, or tampered');
     }
-    if (!replay.consume(st.jti, STATE_TTL_DEFAULT * 1000, now())) {
-      return errorPage(res, 400, 'E_STATE_INVALID', 'state has already been used (replay)');
-    }
+    const spent = spend(st.jti, STATE_TTL_DEFAULT);
+    if (spent === 'full') return signInBusy(res);
+    if (spent === 'replay') return errorPage(res, 400, 'E_STATE_INVALID', 'state has already been used (replay)');
     // After the spend, so a refused callback URL cannot be replayed from the
     // browser that holds the cookie; before the exchange and resolveSubject.
     if (st.flow === 'owner_gate') {
@@ -684,9 +706,9 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       } catch {
         return json(res, 400, { error: 'invalid_grant', message: 'authorization code invalid or expired' });
       }
-      if (!replay.consume(code.jti, CODE_TTL_DEFAULT * 1000, now())) {
-        return json(res, 400, { error: 'invalid_grant', message: 'authorization code already redeemed' });
-      }
+      const spent = spend(code.jti, CODE_TTL_DEFAULT);
+      if (spent === 'full') return subjectUnavailable(res);
+      if (spent === 'replay') return json(res, 400, { error: 'invalid_grant', message: 'authorization code already redeemed' });
       if (form.redirect_uri !== code.redirect_uri) {
         return json(res, 400, { error: 'invalid_grant', message: 'redirect_uri mismatch' });
       }
