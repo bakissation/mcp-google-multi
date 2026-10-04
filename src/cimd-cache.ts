@@ -110,7 +110,7 @@ export class CimdClientCache {
   // Over-cap requests arrive at whatever rate the caller likes.
   private noteBusy(): void {
     const now = this.deps.now();
-    if (now - this.busyLoggedAt < BUSY_LOG_EVERY_MS) {
+    if (now >= this.busyLoggedAt && now - this.busyLoggedAt < BUSY_LOG_EVERY_MS) {
       this.busySuppressed++;
       return;
     }

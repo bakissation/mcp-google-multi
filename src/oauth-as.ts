@@ -8,13 +8,14 @@
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { isIPv4 } from 'node:net';
+import { decodeJwt } from 'jose';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AuthOutcome, RouteHandler } from './http-transport.js';
 import {
   signAccessToken, verifyAccessToken, signState, verifyState, signAuthzCode, verifyAuthzCode,
   signReauthLink, verifyReauthLink,
   signPending, verifyPending,
-  ReplayGuard, RefreshStore, STATE_TTL_DEFAULT, CODE_TTL_DEFAULT, ACCESS_TTL_DEFAULT,
+  ReplayGuard, type ReplaySpend, RefreshStore, STATE_TTL_DEFAULT, CODE_TTL_DEFAULT, ACCESS_TTL_DEFAULT,
   type StatePayload,
 } from './mcp-token.js';
 import { fetchCimdDocument } from './ssrf-guard.js';
@@ -162,7 +163,9 @@ export interface AuthServer {
   /** Mint a signed, single-use, TTL-bound clientless flow URL
    * (`${base}/authorize?flow=...&state=<signed>`). The tenantId/bundles ride
    * INSIDE the signed state, so nothing at /authorize or /callback trusts a
-   * caller-supplied identity. Inert unless something calls it. */
+   * caller-supplied identity. The URL works only on this AuthServer, and only
+   * until its process restarts: sign-in artifacts are signed with a key each
+   * buildAuthServer call generates. Inert unless something calls it. */
   mintFlowState: (opts: { flow: 'alias_add'; alias: string; tenantId?: string; bundles?: string[]; nonce?: string }) => Promise<string>;
   /** The owner's re-auth link for `alias`: HMAC-signed, expiring, not single
    * use (a chat client may prefetch it). /authorize refuses any alias_reauth
@@ -179,8 +182,8 @@ function json(res: ServerResponse, status: number, body: unknown, extraHeaders: 
   return true;
 }
 
-function errorPage(res: ServerResponse, status: number, slug: string, message: string): true {
-  res.writeHead(status, { 'Content-Type': 'text/plain' });
+function errorPage(res: ServerResponse, status: number, slug: string, message: string, extraHeaders: Record<string, string> = {}): true {
+  res.writeHead(status, { 'Content-Type': 'text/plain', ...extraHeaders });
   res.end(`${slug}: ${message}`);
   return true;
 }
@@ -194,6 +197,11 @@ function subjectUnavailable(res: ServerResponse): true {
 // Not invalid_client: clients and people read that as a permanent misconfiguration.
 function clientUnavailable(res: ServerResponse): true {
   return json(res, 503, { error: 'temporarily_unavailable', message: 'the client could not be checked right now; retry shortly' }, { 'Retry-After': '5' });
+}
+
+// The replay guard is full: every slot holds a jti that is still live.
+function signInBusy(res: ServerResponse): true {
+  return errorPage(res, 503, 'E_SIGNIN_BUSY', 'sign-in is busy right now; retry in a minute', { 'Retry-After': '60' });
 }
 
 function redirect(res: ServerResponse, location: string, extraHeaders: Record<string, string> = {}): true {
@@ -313,6 +321,11 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   const base = config.base;
   const resource = config.resourceUri;
   const secret = config.secret;
+  // States, approvals and codes live minutes, and their single use rests on an
+  // in-memory replay guard that a restart empties. So they are signed with a
+  // key only this AuthServer holds: a restart invalidates every one in flight,
+  // instead of letting a spent or unreserved one pass the new, empty guard.
+  const flowSecret = new Uint8Array(randomBytes(32));
   const accessTtl = config.accessTtlSec ?? ACCESS_TTL_DEFAULT;
   const cimd = deps.fetchCimd ?? ((clientId: string) => fetchCimdDocument(clientId));
   const replay = deps.replayGuard ?? new ReplayGuard();
@@ -326,6 +339,25 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   const refresh =
     deps.refreshStore ?? new RefreshStore(config.refreshStorePath, config.masterKey, { maxAgeSec: config.refreshMaxAgeSec, idleSec: config.refreshIdleSec, log });
   const nowSec = () => Math.floor(now() / 1000);
+  // A full guard is refused at whatever rate the caller likes, so its line is
+  // written at most once a minute (or at once after the clock stepped back).
+  let fullLoggedAt = -Infinity;
+  let fullSuppressed = 0;
+  const noteFull = (at: number): void => {
+    if (at >= fullLoggedAt && at - fullLoggedAt < 60_000) {
+      fullSuppressed++;
+      return;
+    }
+    log(`replay guard full: sign-in refused${fullSuppressed > 0 ? ` (n=${fullSuppressed} suppressed)` : ''}`);
+    fullLoggedAt = at;
+    fullSuppressed = 0;
+  };
+  const spend = (artifact: { jti: string; exp: number }, ttlSec: number): ReplaySpend => {
+    const at = now();
+    const r = replay.spend(artifact.jti, ttlSec * 1000, at, artifact.exp * 1000);
+    if (r === 'full') noteFull(at);
+    return r;
+  };
   const resolveSubject = deps.resolveSubject ?? ((email: string) => (config.ownerEmails.includes(email) ? { sub: 'owner' } : null));
   const issHeader = { 'Cache-Control': 'no-store' };
 
@@ -391,7 +423,9 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
   }
 
-  async function toGoogle(res: ServerResponse, sp: StatePayload): Promise<true> {
+  /** `incoming`: the artifact spent to get here. If no slot is left for the
+   * new state it is unspent, so retrying it works once a slot frees. */
+  async function toGoogle(res: ServerResponse, sp: StatePayload, incoming?: string): Promise<true> {
     // H4 F1: without this, a Google URL minted here and forwarded to someone
     // else signs THEM in and hands their subject to the starting client.
     const headers: Record<string, string> = {};
@@ -401,7 +435,15 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       sp = { ...sp, bind };
       headers['Set-Cookie'] = `${bindCookieName(base, bind)}=${value}; ${bindCookieAttrs(base, STATE_TTL_DEFAULT)}`;
     }
-    const state = await signState(sp, base, secret, nowSec());
+    const state = await signState(sp, base, flowSecret, nowSec());
+    // Its /callback must find a slot even while a flood fills the guard, or a
+    // refusal there (the browser binding) could not be recorded.
+    const at = now();
+    if (replay.reserve(String(decodeJwt(state).jti), STATE_TTL_DEFAULT * 1000, at) === 'full') {
+      if (incoming) replay.unspend(incoming);
+      noteFull(at);
+      return signInBusy(res);
+    }
     const authUrl = deps.buildGoogleAuthUrl
       ? deps.buildGoogleAuthUrl({ flow: sp.flow, alias: sp.alias, state, bundles: sp.bundles })
       : `https://accounts.google.com/o/oauth2/v2/auth?state=${encodeURIComponent(state)}`;
@@ -418,23 +460,24 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       } catch {
         return errorPage(res, 400, 'invalid_request', 'bad form');
       }
-      let pending: StatePayload & { jti: string };
+      let pending: StatePayload & { jti: string; exp: number };
       try {
-        pending = await verifyPending(form.pending ?? '', base, secret);
+        pending = await verifyPending(form.pending ?? '', base, flowSecret, nowSec());
       } catch {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the approval is invalid or expired');
       }
-      // Only the client leg signs pendings, and it is always the owner sign-in;
-      // a pending signed before that rule (flow=alias_reauth) is refused here.
+      // Only the client leg signs pendings, and it is always the owner sign-in.
+      // Defence in depth: a pending from an earlier release, which could carry
+      // flow=alias_reauth, was signed with MCP_JWT_KEY and no longer verifies.
       if (pending.flow !== 'owner_gate') {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the approval is invalid or expired');
       }
-      if (!replay.consume(pending.jti, STATE_TTL_DEFAULT * 1000, now())) {
-        return errorPage(res, 400, 'E_STATE_INVALID', 'this approval was already used');
-      }
+      const spent = spend(pending, STATE_TTL_DEFAULT);
+      if (spent === 'full') return signInBusy(res);
+      if (spent === 'replay') return errorPage(res, 400, 'E_STATE_INVALID', 'this approval was already used');
       const { jti: _drop, ...sp } = pending;
       void _drop;
-      return toGoogle(res, sp as StatePayload);
+      return toGoogle(res, sp as StatePayload, pending.jti);
     }
     const q = url.searchParams;
     const clientId = q.get('client_id') ?? '';
@@ -450,21 +493,21 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     // then re-sign fresh for the Google leg. A tampered tenantId breaks the
     // signature; a caller cannot supply one at all.
     if (q.get('flow') === 'alias_add' && !clientId) {
-      let minted: StatePayload & { jti: string };
+      let minted: StatePayload & { jti: string; exp: number };
       try {
-        minted = await verifyState(q.get('state') ?? '', base, secret);
+        minted = await verifyState(q.get('state') ?? '', base, flowSecret, nowSec());
       } catch {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the add-account link is invalid, expired, or tampered');
       }
       if (minted.flow !== 'alias_add' || !minted.alias || !minted.tenantId) {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the add-account link is malformed');
       }
-      if (!replay.consume(minted.jti, STATE_TTL_DEFAULT * 1000, now())) {
-        return errorPage(res, 400, 'E_STATE_INVALID', 'this add-account link was already used');
-      }
+      const spent = spend(minted, STATE_TTL_DEFAULT);
+      if (spent === 'full') return signInBusy(res);
+      if (spent === 'replay') return errorPage(res, 400, 'E_STATE_INVALID', 'this add-account link was already used');
       const { jti: _spent, ...sp } = minted;
       void _spent;
-      return toGoogle(res, sp as StatePayload);
+      return toGoogle(res, sp as StatePayload, minted.jti);
     }
 
     // In-call re-auth (BV-1): a user-clicked `flow=alias_reauth` link has NO
@@ -522,7 +565,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     // it — their redirect_uris come from an issuer-allowlisted document a rogue
     // cannot forge, so there is nothing to spoof.
     if (client.dcr) {
-      const pendingToken = await signPending(statePayload, base, secret, nowSec());
+      const pendingToken = await signPending(statePayload, base, flowSecret, nowSec());
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': "frame-ancestors 'none'", 'X-Frame-Options': 'DENY' });
       res.end(
         `<!doctype html><meta charset=utf-8><title>Authorize access</title>` +
@@ -543,15 +586,15 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   const callback: RouteHandler = async (req, res, url) => {
     const code = url.searchParams.get('code') ?? '';
     const stateToken = url.searchParams.get('state') ?? '';
-    let st: StatePayload & { jti: string };
+    let st: StatePayload & { jti: string; exp: number };
     try {
-      st = await verifyState(stateToken, base, secret);
+      st = await verifyState(stateToken, base, flowSecret, nowSec());
     } catch {
       return errorPage(res, 400, 'E_STATE_INVALID', 'state is invalid, expired, or tampered');
     }
-    if (!replay.consume(st.jti, STATE_TTL_DEFAULT * 1000, now())) {
-      return errorPage(res, 400, 'E_STATE_INVALID', 'state has already been used (replay)');
-    }
+    const spent = spend(st, STATE_TTL_DEFAULT);
+    if (spent === 'full') return signInBusy(res);
+    if (spent === 'replay') return errorPage(res, 400, 'E_STATE_INVALID', 'state has already been used (replay)');
     // After the spend, so a refused callback URL cannot be replayed from the
     // browser that holds the cookie; before the exchange and resolveSubject.
     if (st.flow === 'owner_gate') {
@@ -659,7 +702,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     const authzCode = await signAuthzCode(
       { redirect_uri: st.redirect_uri, code_challenge: st.code_challenge, resource: st.resource, sub: subject.sub },
       base,
-      secret,
+      flowSecret,
       nowSec(),
     );
     log('callback ok flow=owner_gate');
@@ -680,13 +723,13 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     if (grant === 'authorization_code') {
       let code: Awaited<ReturnType<typeof verifyAuthzCode>>;
       try {
-        code = await verifyAuthzCode(form.code ?? '', base, secret);
+        code = await verifyAuthzCode(form.code ?? '', base, flowSecret, nowSec());
       } catch {
         return json(res, 400, { error: 'invalid_grant', message: 'authorization code invalid or expired' });
       }
-      if (!replay.consume(code.jti, CODE_TTL_DEFAULT * 1000, now())) {
-        return json(res, 400, { error: 'invalid_grant', message: 'authorization code already redeemed' });
-      }
+      const spent = spend(code, CODE_TTL_DEFAULT);
+      if (spent === 'full') return subjectUnavailable(res);
+      if (spent === 'replay') return json(res, 400, { error: 'invalid_grant', message: 'authorization code already redeemed' });
       if (form.redirect_uri !== code.redirect_uri) {
         return json(res, 400, { error: 'invalid_grant', message: 'redirect_uri mismatch' });
       }
@@ -703,6 +746,8 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
           active = deps.subjectActive(code.sub);
         } catch (e) {
           log(`token deferred grant=authorization_code: subject check failed: ${e instanceof Error ? logSafe(e.message, 200) : 'non-Error throw'}`);
+          // Nothing was issued and PKCE passed, so the retry the 503 asks for may redeem it.
+          replay.unspend(code.jti);
           return subjectUnavailable(res);
         }
         if (!active) {
@@ -813,7 +858,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     const state = await signState(
       { flow, client_id: '', redirect_uri: '', code_challenge: '', resource, alias, tenantId, bundles, nonce },
       base,
-      secret,
+      flowSecret,
       nowSec(),
     );
     return `${base}/authorize?flow=${flow}&state=${encodeURIComponent(state)}`;

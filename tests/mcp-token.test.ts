@@ -27,6 +27,14 @@ import { decryptToken, encryptToken } from '../src/token-store.js';
 import { RefreshStore as PrevRefreshStore } from './fixtures/refresh-store-prev.js';
 import { legacyTok, onDisk, r1Bytes, seedFamilies, seedLegacy, specKey, specMac, specTag, specToken } from './_refresh-spec.js';
 
+/** Change one character in the middle of a JWT's signature. Changing the last
+ * ones can leave it intact: base64url decoding ignores the final character's
+ * low bits, so about one run in a thousand would not tamper at all. */
+const tamperSig = (jwt: string): string => {
+  const i = jwt.lastIndexOf('.') + 10;
+  return jwt.slice(0, i) + (jwt[i] === 'A' ? 'B' : 'A') + jwt.slice(i + 1);
+};
+
 const BASE = 'https://mcp.example.com';
 const secret = jwtSecretFrom('dGVzdC1qd3Qta2V5LXRoYXQtaXMtMzItYnl0ZXMh'); // any string key
 const other = jwtSecretFrom('a-different-key');
@@ -85,7 +93,7 @@ describe('signed state + authz code', () => {
   });
   it('rejects a tampered state', async () => {
     const st = await signState(payload, BASE, secret, iat);
-    await expect(verifyState(st.slice(0, -2) + 'xy', BASE, secret)).rejects.toBeTruthy();
+    await expect(verifyState(tamperSig(st), BASE, secret)).rejects.toBeTruthy();
   });
   it('rejects an expired state and an expired code', async () => {
     const st = await signState(payload, BASE, secret, iat - 10_000, 600);
@@ -117,6 +125,48 @@ describe('ReplayGuard (C10/C17)', () => {
     const g = new ReplayGuard(3);
     for (let i = 0; i < 10; i++) g.consume(`j${i}`, 100_000, 0);
     expect(g.size).toBeLessThanOrEqual(3);
+  });
+  it('refuses rather than forgets a live jti when full (H4 F1)', () => {
+    const g = new ReplayGuard(2);
+    expect(g.spend('a', 1000, 0)).toBe('ok');
+    expect(g.spend('b', 1000, 0)).toBe('ok');
+    expect(g.spend('c', 1000, 10)).toBe('full');
+    expect(g.consume('c', 1000, 10)).toBe(false);
+    expect(g.spend('a', 1000, 20)).toBe('replay');
+    expect(g.size).toBe(2);
+    expect(g.spend('c', 1000, 1000)).toBe('ok');
+  });
+  it('a reserved jti is spent once, even while the guard is full', () => {
+    const g = new ReplayGuard(2);
+    expect(g.reserve('r', 1000, 0)).toBe('ok');
+    expect(g.spend('x', 1000, 0)).toBe('ok');
+    expect(g.reserve('r2', 1000, 10)).toBe('full');
+    expect(g.spend('y', 1000, 10)).toBe('full');
+    expect(g.spend('r', 1000, 20)).toBe('ok');
+    expect(g.spend('r', 1000, 30)).toBe('replay');
+    expect(g.size).toBe(2);
+  });
+  it('a full guard sweeps at most once a second', () => {
+    const g = new ReplayGuard(2);
+    g.spend('long', 10_000, 0);
+    g.spend('s1', 100, 0);
+    expect(g.spend('x', 100, 200)).toBe('ok'); // sweeps s1 out
+    expect(g.spend('y', 100, 400)).toBe('full'); // x expired at 300, but the last sweep was 200 ms ago
+    expect(g.spend('y', 100, 1200)).toBe('ok');
+  });
+  it("a spend lasts as long as the artifact's own expiry, if that is later", () => {
+    const g = new ReplayGuard();
+    expect(g.spend('j', 100, 0, 5000)).toBe('ok');
+    expect(g.spend('j', 100, 1000)).toBe('replay');
+    expect(g.spend('j', 100, 5000)).toBe('ok');
+  });
+  it('an expired jti behind a longer-lived one is accepted again, and makes room when full', () => {
+    const g = new ReplayGuard(2);
+    expect(g.spend('long', 10_000, 0)).toBe('ok');
+    expect(g.spend('short', 100, 0)).toBe('ok');
+    expect(g.spend('short', 100, 200)).toBe('ok');
+    expect(g.spend('long', 10_000, 200)).toBe('replay');
+    expect(g.spend('other', 100, 400)).toBe('ok');
   });
 });
 

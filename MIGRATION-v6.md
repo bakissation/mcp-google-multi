@@ -653,6 +653,47 @@ that store instead. The owner's server sets neither. With a lifetime set, keep
 the host clock synchronized: a clock that jumps forward ends every session
 (clients sign in again), and the log says so.
 
+`/mcp-token`: `ReplayGuard` no longer forgets a spent state, approval or
+authorization code that is still live to make room. Before, a full guard
+dropped its oldest entry, so a flood of cheap sign-in steps could make a
+spent artifact usable again, among them a callback the owner_gate browser
+binding had refused, which could then be finished from the browser that
+started it. `ReplayGuard.spend(jti, ttlMs, nowMs, artifactExpMs?)` returns
+`ok`, `replay` or `full`, and keeps the record at least until the artifact's
+own expiry; `consume` keeps its boolean and answers false for both refusals.
+`ReplayGuard.reserve(jti, ttlMs, nowMs)` holds a slot for an artifact about
+to be handed out: every state sent to Google is reserved when it is minted,
+so its `/callback` always finds room and a refusal there is always recorded,
+and a flood is refused at `/authorize` instead. `ReplayGuard.unspend(jti)`
+gives back a spend whose next step could not go ahead, so an approval or
+add-account link refused for a full guard works on retry. Expired entries are
+dropped only when the guard is at its cap, in one sweep at most once a
+second, and a refusal in between costs O(1). The default cap is 100,000 (was
+10,000; about 13 MB when full). On a full guard the browser steps answer 503
+`E_SIGNIN_BUSY` with `Retry-After: 60`, and `/token` answers 503
+`temporarily_unavailable` with `Retry-After: 5`, instead of reading as a
+replay; `AuthServerDeps.log` gets `replay guard full: sign-in refused` at
+most once a minute. Authorization codes are not reserved, so during a flood
+`/token` can refuse a sign-in that already passed `/callback`; the client may
+retry within the code's 60 s. A `/token` that answers 503 because
+`subjectActive` threw now gives the code back, so that retry redeems it
+(before, it answered `already redeemed`). States, approvals and authorization
+codes are signed with a key each AuthServer (each `buildAuthServer` call)
+generates, and verified against the AuthServer's clock
+(`AuthServerDeps.now`); `MCP_JWT_KEY` still signs access tokens and re-auth
+links. So a restart invalidates every sign-in in flight and the user starts
+it again, instead of a spent or unreserved one passing the new, empty guard;
+a `mintFlowState` URL works only on the AuthServer that minted it, two
+replicas behind one base do not accept each other's sign-in steps, and
+artifacts made with the exported `signState`, `signPending` or
+`signAuthzCode` under `AuthServerConfig.secret` are no longer accepted by the
+routes. `verifyState`, `verifyPending` and `verifyAuthzCode` take an optional
+`nowSec`. A flood now blocks sign-ins instead of reopening them: 100,000
+requests in any 10-minute window fill the guard, about 170 a second keep it
+full, and sign-ins recover within a second of a sustained flood stopping, or
+up to 10 minutes after a burst; a public deployment still needs a per-IP rate
+limit on `/authorize`, `/callback` and `/token` in front of it.
+
 ## 5. Auth changes
 
 ### 5.1 New: HTTP transport + `/mcp` OAuth (opt-in, additive)

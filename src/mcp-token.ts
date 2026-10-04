@@ -14,7 +14,7 @@ import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 export const ACCESS_TTL_DEFAULT = 600; // seconds
 export const STATE_TTL_DEFAULT = 600;
 export const CODE_TTL_DEFAULT = 60;
-export const REPLAY_CAP_DEFAULT = 10_000;
+export const REPLAY_CAP_DEFAULT = 100_000;
 
 /** Derive the HS256 secret (32 bytes) from the provisioned MCP_JWT_KEY string. */
 export function jwtSecretFrom(jwtKey: string): Uint8Array {
@@ -103,18 +103,20 @@ async function signArtifact(claims: Record<string, unknown>, purpose: string, ba
     .sign(secret);
 }
 
-async function verifyArtifact(token: string, purpose: string, base: string, secret: Uint8Array): Promise<Record<string, unknown> & { jti: string }> {
-  const { payload } = await jwtVerify(token, secret, { issuer: base });
+// `nowSec`: the caller's clock, so expiry is judged by the same clock as the
+// replay guard that records the artifact's spend.
+async function verifyArtifact(token: string, purpose: string, base: string, secret: Uint8Array, nowSec?: number): Promise<Record<string, unknown> & { jti: string; exp: number }> {
+  const { payload } = await jwtVerify(token, secret, { issuer: base, ...(nowSec !== undefined ? { currentDate: new Date(nowSec * 1000) } : {}) });
   if (payload.purpose !== purpose) throw new Error(`wrong artifact purpose (${String(payload.purpose)})`);
-  return { ...payload, jti: String(payload.jti ?? '') } as Record<string, unknown> & { jti: string };
+  return { ...payload, jti: String(payload.jti ?? ''), exp: Number(payload.exp ?? 0) } as Record<string, unknown> & { jti: string; exp: number };
 }
 
 export function signState(payload: StatePayload, base: string, secret: Uint8Array, iat: number, ttlSec = STATE_TTL_DEFAULT): Promise<string> {
   return signArtifact(payload as unknown as Record<string, unknown>, 'mcp_state', base, secret, iat, ttlSec);
 }
 
-export async function verifyState(token: string, base: string, secret: Uint8Array): Promise<StatePayload & { jti: string }> {
-  return (await verifyArtifact(token, 'mcp_state', base, secret)) as unknown as StatePayload & { jti: string };
+export async function verifyState(token: string, base: string, secret: Uint8Array, nowSec?: number): Promise<StatePayload & { jti: string; exp: number }> {
+  return (await verifyArtifact(token, 'mcp_state', base, secret, nowSec)) as unknown as StatePayload & { jti: string; exp: number };
 }
 
 // --- alias_reauth link -------------------------------------------------------
@@ -156,46 +158,100 @@ export function signPending(payload: StatePayload, base: string, secret: Uint8Ar
   return signArtifact(payload as unknown as Record<string, unknown>, 'mcp_pending', base, secret, iat, ttlSec);
 }
 
-export async function verifyPending(token: string, base: string, secret: Uint8Array): Promise<StatePayload & { jti: string }> {
-  return (await verifyArtifact(token, 'mcp_pending', base, secret)) as unknown as StatePayload & { jti: string };
+export async function verifyPending(token: string, base: string, secret: Uint8Array, nowSec?: number): Promise<StatePayload & { jti: string; exp: number }> {
+  return (await verifyArtifact(token, 'mcp_pending', base, secret, nowSec)) as unknown as StatePayload & { jti: string; exp: number };
 }
 
 export function signAuthzCode(payload: CodePayload, base: string, secret: Uint8Array, iat: number, ttlSec = CODE_TTL_DEFAULT): Promise<string> {
   return signArtifact(payload as unknown as Record<string, unknown>, 'mcp_code', base, secret, iat, ttlSec);
 }
 
-export async function verifyAuthzCode(token: string, base: string, secret: Uint8Array): Promise<CodePayload & { jti: string }> {
-  return (await verifyArtifact(token, 'mcp_code', base, secret)) as unknown as CodePayload & { jti: string };
+export async function verifyAuthzCode(token: string, base: string, secret: Uint8Array, nowSec?: number): Promise<CodePayload & { jti: string; exp: number }> {
+  return (await verifyArtifact(token, 'mcp_code', base, secret, nowSec)) as unknown as CodePayload & { jti: string; exp: number };
 }
 
 // --- Replay guard (C10/C17: single-use, capped, TTL-evicted) ----------------
 
+/** `full`: there is no room without forgetting a jti that is still live. */
+export type ReplaySpend = 'ok' | 'replay' | 'full';
+
+/** A full guard refuses rather than sweeping again sooner than this. */
+const FULL_SWEEP_EVERY_MS = 1000;
+
 export class ReplayGuard {
-  private readonly seen = new Map<string, number>(); // jti -> expiry (ms)
+  private readonly seen = new Map<string, { exp: number; spent: boolean }>();
+  // A lower bound on every entry's expiry: below it nothing can have expired.
+  private earliest = Infinity;
+  private sweptAt = -Infinity;
 
   constructor(private readonly cap = REPLAY_CAP_DEFAULT) {}
 
-  /** Record a jti as spent. Returns false if it was already spent (replay). */
-  consume(jti: string, ttlMs: number, nowMs: number): boolean {
-    this.evictExpired(nowMs);
-    if (this.seen.has(jti)) return false;
-    if (this.seen.size >= this.cap) {
-      // drop the oldest-inserted entry to bound memory (C17)
-      const oldest = this.seen.keys().next().value;
-      if (oldest !== undefined) this.seen.delete(oldest);
+  /** Hold a slot for an artifact about to be handed out, so its spend can
+   * never meet a full guard. The flood then lands where the artifact is
+   * minted, and refusing there loses nothing. */
+  reserve(jti: string, ttlMs: number, nowMs: number): 'ok' | 'full' {
+    if (!this.room(nowMs)) return 'full';
+    this.record(jti, nowMs + ttlMs, false);
+    return 'ok';
+  }
+
+  /** Record a jti as spent. A full guard refuses instead of evicting a live
+   * jti: a flood of spends would otherwise make a spent artifact usable again,
+   * such as a callback the browser binding refused (H4 F1). `artifactExpMs`
+   * keeps the record alive as long as the artifact itself, even when the clock
+   * stepped back between its signing and this spend. */
+  spend(jti: string, ttlMs: number, nowMs: number, artifactExpMs = 0): ReplaySpend {
+    const exp = Math.max(nowMs + ttlMs, artifactExpMs);
+    const held = this.seen.get(jti);
+    if (held && held.exp > nowMs) {
+      if (held.spent) return 'replay';
+      held.spent = true;
+      held.exp = Math.max(held.exp, exp);
+      return 'ok';
     }
-    this.seen.set(jti, nowMs + ttlMs);
-    return true;
+    if (held) this.seen.delete(jti);
+    if (!this.room(nowMs)) return 'full';
+    this.record(jti, exp, true);
+    return 'ok';
+  }
+
+  /** Undo a spend whose next step could not go ahead. The slot stays held, so
+   * nothing is forgotten, and the artifact can be spent once more. */
+  unspend(jti: string): void {
+    const held = this.seen.get(jti);
+    if (held) held.spent = false;
+  }
+
+  /** `spend` as a boolean: false for a replay and for a full guard alike. */
+  consume(jti: string, ttlMs: number, nowMs: number): boolean {
+    return this.spend(jti, ttlMs, nowMs) === 'ok';
   }
 
   get size(): number {
     return this.seen.size;
   }
 
-  private evictExpired(nowMs: number): void {
-    for (const [jti, exp] of this.seen) {
-      if (exp <= nowMs) this.seen.delete(jti);
+  private record(jti: string, exp: number, spent: boolean): void {
+    this.seen.set(jti, { exp, spent });
+    if (exp < this.earliest) this.earliest = exp;
+  }
+
+  // Expired entries are dropped only here, when the map is at the cap: a refusal
+  // costs O(1), and a sweep runs only once something can have expired, at most
+  // once a second. Walking the map from its head on every call is not cheap: a
+  // Map iterator steps over every deleted slot until the table is rebuilt.
+  private room(nowMs: number): boolean {
+    if (this.seen.size < this.cap) return true;
+    if (nowMs < this.earliest) return false;
+    if (nowMs >= this.sweptAt && nowMs - this.sweptAt < FULL_SWEEP_EVERY_MS) return false;
+    this.sweptAt = nowMs;
+    let earliest = Infinity;
+    for (const [jti, e] of this.seen) {
+      if (e.exp <= nowMs) this.seen.delete(jti);
+      else if (e.exp < earliest) earliest = e.exp;
     }
+    this.earliest = earliest;
+    return this.seen.size < this.cap;
   }
 }
 

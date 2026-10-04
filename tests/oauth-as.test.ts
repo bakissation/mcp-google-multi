@@ -8,10 +8,18 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { resolveHttpConfig } from '../src/http-config.js';
 import { HttpTransportHost } from '../src/http-transport.js';
 import { buildAuthServer, redirectAllowed, verifiedEmailFromIdToken, verifiedIdentityFromIdToken, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServer, type AuthServerDeps } from '../src/oauth-as.js';
-import { jwtSecretFrom, signAccessToken, signPending, signReauthLink, verifyAccessToken, refreshFamilyTagger, RefreshStore } from '../src/mcp-token.js';
+import { jwtSecretFrom, signAccessToken, signPending, signReauthLink, verifyAccessToken, refreshFamilyTagger, RefreshStore, ReplayGuard } from '../src/mcp-token.js';
 import { SsrfBlockedError } from '../src/ssrf-guard.js';
 import { CIMD_MAX_IN_FLIGHT } from '../src/cimd-cache.js';
 import { z } from "zod";
+
+/** Change one character in the middle of a JWT's signature. Changing the last
+ * ones can leave it intact: base64url decoding ignores the final character's
+ * low bits, so about one run in a thousand would not tamper at all. */
+const tamperSig = (jwt: string): string => {
+  const i = jwt.lastIndexOf('.') + 10;
+  return jwt.slice(0, i) + (jwt[i] === 'A' ? 'B' : 'A') + jwt.slice(i + 1);
+};
 
 const BASE = 'https://mcp.test';
 const CLIENT_ID = 'https://claude.ai/oauth/mcp-client';
@@ -275,7 +283,7 @@ describe('negative paths (one per §5.12 MUST)', () => {
     const port = await start();
     const authz = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
     const state = stateFrom(authz.headers.location as string);
-    const r = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state.slice(0, -2) + 'xx')}`);
+    const r = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(tamperSig(state))}`);
     expect(r.status).toBe(400);
     expect(r.text).toContain('E_STATE_INVALID');
   });
@@ -440,7 +448,7 @@ describe('negative paths (one per §5.12 MUST)', () => {
 
   // alpha.57 signed a DCR pending with flow=alias_reauth; one still inside its
   // TTL at upgrade must not start the old unauthenticated re-auth.
-  it('POST /authorize refuses a pending that is not an owner sign-in', async () => {
+  it('POST /authorize refuses a pending signed with MCP_JWT_KEY, as an earlier release signed its alias_reauth ones', async () => {
     const asked: string[] = [];
     const port = await start({
       buildGoogleAuthUrl: ({ flow, state }) => {
@@ -580,6 +588,118 @@ describe('owner_gate Google leg is bound to the browser that started it (H4 F1)'
     expect(replay.status).toBe(400);
     expect(replay.headers.location).toBeUndefined();
     expect(calls).toEqual({ exchange: 0, resolve: 0 });
+  });
+
+  /** Mint states with fresh browsers until /authorize answers 503 (the guard is full). */
+  async function floodToFull(port: number): Promise<Res> {
+    for (let i = 0; i < 20; i++) {
+      const r = await req(port, 'GET', `/authorize?${authorizeQuery()}`, { jar: new Map() });
+      if (r.status !== 302) return r;
+    }
+    throw new Error('the replay guard never filled');
+  }
+
+  it('a flood after the refusal cannot make the refused callback usable again', async () => {
+    const { calls, logs, deps } = spied({ replayGuard: new ReplayGuard(4) });
+    const port = await start(deps);
+    const attacker: Jar = new Map();
+    const { state } = await dcrGoogleState(port, attacker);
+    expect((await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: new Map() })).status).toBe(400);
+    const busy = await floodToFull(port);
+    expect(busy.status).toBe(503);
+    expect(busy.text).toContain('E_SIGNIN_BUSY');
+    expect(busy.headers['retry-after']).toBe('60');
+    expect(busy.headers['set-cookie']).toBeUndefined();
+    const replay = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: attacker });
+    expect(replay.status).toBe(400);
+    expect(replay.headers.location).toBeUndefined();
+    expect(calls).toEqual({ exchange: 0, resolve: 0 });
+    expect(logs.filter((l) => l.startsWith('replay guard full'))).toEqual(['replay guard full: sign-in refused']);
+  });
+
+  it('a flood before the callback cannot leave it unspent: its slot was reserved when the state was minted', async () => {
+    const { calls, deps } = spied({ replayGuard: new ReplayGuard(4) });
+    const port = await start(deps);
+    const attacker: Jar = new Map();
+    const { state } = await dcrGoogleState(port, attacker);
+    expect((await floodToFull(port)).status).toBe(503);
+    const victim = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: new Map() });
+    expect(victim.status).toBe(400);
+    expect(victim.text).toContain('E_BROWSER_MISMATCH');
+    const replay = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: attacker });
+    expect(replay.status).toBe(400);
+    expect(replay.headers.location).toBeUndefined();
+    expect(calls).toEqual({ exchange: 0, resolve: 0 });
+  });
+
+  it('a restart invalidates every sign-in in flight, so a callback refused before it cannot be finished after it', async () => {
+    const first = spied();
+    const port1 = await start(first.deps);
+    const attacker: Jar = new Map();
+    const { state } = await dcrGoogleState(port1, attacker);
+    expect((await req(port1, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: new Map() })).status).toBe(400);
+    const second = spied();
+    const port2 = await start(second.deps);
+    const replay = await req(port2, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: attacker });
+    expect(replay.status).toBe(400);
+    expect(replay.text).toContain('E_STATE_INVALID');
+    expect(replay.headers.location).toBeUndefined();
+    expect(second.calls).toEqual({ exchange: 0, resolve: 0 });
+  });
+
+  it("sign-in artifacts expire by the AuthServer's clock, the one the replay guard uses", async () => {
+    let clock = Date.now() + 700_000;
+    const { calls, deps } = spied({ now: () => clock });
+    const port = await start(deps);
+    const attacker: Jar = new Map();
+    const { state } = await dcrGoogleState(port, attacker);
+    expect((await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: new Map() })).status).toBe(400);
+    clock += 601_000;
+    const replay = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: attacker });
+    expect(replay.status).toBe(400);
+    expect(replay.headers.location).toBeUndefined();
+    expect(calls).toEqual({ exchange: 0, resolve: 0 });
+  });
+
+  it('an approval refused for a full guard works on retry once a slot frees', async () => {
+    let clock = Date.now();
+    const port = await start({ replayGuard: new ReplayGuard(4), now: () => clock });
+    // two 600 s state slots and one 60 s code slot; the approval's spend takes the last
+    await req(port, 'GET', `/authorize?${authorizeQuery()}`, { jar: new Map() });
+    const jar: Jar = new Map();
+    const owner = await req(port, 'GET', `/authorize?${authorizeQuery()}`, { jar });
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(stateFrom(owner.headers.location as string))}`, { jar });
+    const code = new URL(cb.headers.location as string).searchParams.get('code')!;
+    expect((await req(port, 'POST', '/token', form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, code_verifier: verifier, resource: `${BASE}/mcp` }))).status).toBe(200);
+    const dcr: Jar = new Map();
+    const reg = JSON.parse((await req(port, 'POST', '/register', { jar: dcr, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ redirect_uris: [ATTACKER_CB] }) })).text);
+    const page = await req(port, 'GET', `/authorize?${authorizeQuery({ client_id: reg.client_id, redirect_uri: ATTACKER_CB })}`, { jar: dcr });
+    const pending = page.text.match(/name="pending" value="([^"]+)"/)![1];
+    expect((await req(port, 'POST', '/authorize', { jar: dcr, ...form({ pending }) })).status).toBe(503);
+    clock += 61_000;
+    expect((await req(port, 'POST', '/authorize', { jar: dcr, ...form({ pending }) })).status).toBe(302);
+    expect((await req(port, 'POST', '/authorize', { jar: dcr, ...form({ pending }) })).status).toBe(400);
+  });
+
+  it('after the clock steps back, the next full-guard line is written at once', async () => {
+    let clock = Date.now();
+    const { logs, deps } = spied({ replayGuard: new ReplayGuard(1), now: () => clock });
+    const port = await start(deps);
+    expect((await floodToFull(port)).status).toBe(503);
+    clock -= 3_600_000;
+    expect((await req(port, 'GET', `/authorize?${authorizeQuery()}`, { jar: new Map() })).status).toBe(503);
+    expect(logs.filter((l) => l.startsWith('replay guard full'))).toEqual(['replay guard full: sign-in refused', 'replay guard full: sign-in refused']);
+  });
+
+  it('a full replay guard answers 503 at /token, not invalid_grant', async () => {
+    const port = await start({ replayGuard: new ReplayGuard(1) });
+    const authz = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(stateFrom(authz.headers.location as string))}`);
+    const code = new URL(cb.headers.location as string).searchParams.get('code')!;
+    const tok = await req(port, 'POST', '/token', form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, code_verifier: verifier, resource: `${BASE}/mcp` }));
+    expect(tok.status).toBe(503);
+    expect(JSON.parse(tok.text).error).toBe('temporarily_unavailable');
+    expect(tok.headers['retry-after']).toBe('5');
   });
 
   it('the same browser completes the DCR flow and the binding cookie is cleared', async () => {
@@ -1248,7 +1368,8 @@ describe('alias_add flow + resolveSubject seam (S1.14)', () => {
       const ref = await refreshWith(port, tok.refresh_token);
       expect(ref.status).toBe(200);
       expect((await verifyAccessToken(JSON.parse(ref.text).access_token, BASE, secret)).sub).toBe('tenant-9');
-      // the code's jti was spent before the check; the client signs in again
+      // the code was given back, so the retry the 503 asked for redeems it, once
+      expect((await redeem(port, pendingCode)).status).toBe(200);
       expect(JSON.parse((await redeem(port, pendingCode)).text).message).toBe('authorization code already redeemed');
     });
   });

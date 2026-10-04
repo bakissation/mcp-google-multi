@@ -214,6 +214,15 @@ describe('CimdClientCache', () => {
     expect(h.logs[2]).toBe('CIMD busy: in-flight cap reached (n=1 suppressed)');
   });
 
+  it('K14 after the clock steps back, the next busy line is written at once', async () => {
+    const h = harness();
+    h.fillCap();
+    await h.resolve('https://claude.ai/flood-a');
+    h.advance(-3_600_000);
+    await h.resolve('https://claude.ai/flood-b');
+    expect(h.logs).toEqual(['CIMD busy: in-flight cap reached', 'CIMD busy: in-flight cap reached']);
+  });
+
   it('K12 every request waiting on a refetch gets the stored document when the issuer cannot answer, and the error when it says the document is gone', async () => {
     const waitOnRefetch = async (failure: unknown, stored: boolean) => {
       const h = harness();
