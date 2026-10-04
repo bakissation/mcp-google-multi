@@ -225,6 +225,9 @@ export async function fetchCimdDocument(rawUrl: string, opts: CimdFetchOptions =
       }
       return parsed as Record<string, unknown>;
     } catch (e) {
+      // A refused status throws with the body unread, and only an abort hands
+      // that connection back; the controller is this attempt's alone.
+      controller.abort();
       const wait = backoffMs * (attempt + 1);
       // A retry would start a second lookup beside the one this attempt gave up on.
       if (!lookupPending && attempt < retries && isTransientFetchError(e) && deadline - Date.now() > wait) {

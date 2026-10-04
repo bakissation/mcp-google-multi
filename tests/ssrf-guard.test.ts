@@ -88,6 +88,21 @@ describe('fetchCimdDocument', () => {
     }
   });
 
+  it('releases the body of a refused answer', async () => {
+    for (const status of [404, 302]) {
+      let kept: AbortSignal | undefined;
+      const err = await fetchCimdDocument('https://claude.ai/x', {
+        ssrf,
+        fetchImpl: async (_u, init) => {
+          kept = init!.signal!;
+          return new Response(new ReadableStream<Uint8Array>({ pull: () => new Promise(() => {}) }), { status });
+        },
+      }).catch((e: unknown) => e);
+      expect(err, String(status)).toBeInstanceOf(SsrfBlockedError);
+      expect(kept?.aborted, String(status)).toBe(true);
+    }
+  });
+
   it('rejects an oversized document', async () => {
     await expect(
       fetchCimdDocument('https://claude.ai/x', { ssrf, maxBytes: 10, fetchImpl: async () => okResp('x'.repeat(100)) }),
