@@ -142,7 +142,7 @@ const TRANSIENT_CODES = new Set([
   'UND_ERR_SOCKET',
 ]);
 
-function isTransientFetchError(e: unknown): boolean {
+export function isTransientFetchError(e: unknown): boolean {
   if (e instanceof SsrfBlockedError) return false; // deterministic security/shape reject
   const name = (e as { name?: string } | null)?.name;
   if (name === 'AbortError' || name === 'TimeoutError') return true; // our per-attempt timeout: dead/slow peer

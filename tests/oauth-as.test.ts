@@ -10,6 +10,7 @@ import { HttpTransportHost } from '../src/http-transport.js';
 import { buildAuthServer, redirectAllowed, verifiedEmailFromIdToken, verifiedIdentityFromIdToken, DCR_MAX_CLIENTS, DCR_MAX_REDIRECT_URIS, type AuthServer, type AuthServerDeps } from '../src/oauth-as.js';
 import { jwtSecretFrom, signAccessToken, signPending, signReauthLink, verifyAccessToken, refreshFamilyTagger, RefreshStore } from '../src/mcp-token.js';
 import { SsrfBlockedError } from '../src/ssrf-guard.js';
+import { CIMD_MAX_IN_FLIGHT } from '../src/cimd-cache.js';
 import { z } from "zod";
 
 const BASE = 'https://mcp.test';
@@ -862,6 +863,77 @@ describe('a hostile value reaches the log as one escaped, bounded line (H4 F7)',
       'token deferred grant=authorization_code: subject check failed: registry\\u000alocked',
       'token deferred grant=refresh_token: subject check failed: registry\\u000alocked',
     ]);
+  });
+});
+
+describe('CIMD fetches at /authorize are capped, and cached only once valid (H4 F6)', () => {
+  /** A fetchCimd whose `/held-` documents wait for release(); every call is recorded. */
+  function heldCimd() {
+    const gates: (() => void)[] = [];
+    const calls: string[] = [];
+    const fetchCimd = async (cid: string): Promise<Record<string, unknown>> => {
+      calls.push(cid);
+      if (cid.includes('/held-')) await new Promise<void>((r) => gates.push(r));
+      if (cid.includes('/mismatch')) return { client_id: 'https://claude.ai/someone-else', redirect_uris: [REDIRECT] };
+      return { client_id: cid, redirect_uris: [REDIRECT] };
+    };
+    return { gates, calls, fetchCimd, release: () => gates.splice(0).forEach((g) => g()) };
+  }
+  async function fillCap(port: number, h: ReturnType<typeof heldCimd>): Promise<Promise<Res>[]> {
+    const parked = Array.from({ length: CIMD_MAX_IN_FLIGHT }, (_, i) => req(port, 'GET', `/authorize?${authorizeQuery({ client_id: `https://claude.ai/held-${i}` })}`));
+    for (let waited = 0; h.gates.length < CIMD_MAX_IN_FLIGHT; waited += 5) {
+      if (waited > 2000) throw new Error('the parked fetches never started');
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    return parked;
+  }
+
+  it('over the cap /authorize answers 503 with Retry-After, a body that names nothing, and no fetch', async () => {
+    const h = heldCimd();
+    const logs: string[] = [];
+    const port = await start({ fetchCimd: h.fetchCimd, log: (l) => logs.push(l) });
+    const parked = await fillCap(port, h);
+    const r = await req(port, 'GET', `/authorize?${authorizeQuery({ client_id: 'https://claude.ai/random-path-1' })}`);
+    expect(r.status).toBe(503);
+    expect(r.headers['retry-after']).toBe('5');
+    expect(JSON.parse(r.text)).toEqual({ error: 'temporarily_unavailable', message: 'the client could not be checked right now; retry shortly' });
+    expect(h.calls).toHaveLength(CIMD_MAX_IN_FLIGHT);
+    expect(logs.filter((l) => l.startsWith('CIMD busy'))).toEqual(['CIMD busy: in-flight cap reached']);
+    h.release();
+    for (const p of await Promise.all(parked)) expect(p.status).toBe(302);
+  });
+
+  it('a client validated before still signs in while the cap is full, within the TTL and past it', async () => {
+    const h = heldCimd();
+    let off = 0;
+    const port = await start({ fetchCimd: h.fetchCimd, now: () => Date.now() + off });
+    expect((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).status).toBe(302);
+    const parked = await fillCap(port, h);
+    expect((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).status).toBe(302);
+    off = 6 * 60_000;
+    expect((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).status).toBe(302);
+    expect(h.calls.filter((c) => c === CLIENT_ID)).toHaveLength(1);
+    h.release();
+    await Promise.all(parked);
+  });
+
+  it('a document whose client_id does not match is refused and fetched again next time', async () => {
+    const h = heldCimd();
+    const port = await start({ fetchCimd: h.fetchCimd });
+    const id = 'https://claude.ai/mismatch';
+    for (let i = 0; i < 2; i++) {
+      const r = await req(port, 'GET', `/authorize?${authorizeQuery({ client_id: id })}`);
+      expect(r.status).toBe(400);
+      expect(JSON.parse(r.text).error).toBe('invalid_client');
+    }
+    expect(h.calls).toEqual([id, id]);
+  });
+
+  it('the loopback-only warning is logged once per fetch, not on every cached sign-in', async () => {
+    const logs: string[] = [];
+    const port = await start({ log: (l) => logs.push(l), fetchCimd: async (cid) => ({ client_id: cid, redirect_uris: ['http://localhost/cb'] }) });
+    for (let i = 0; i < 3; i++) await req(port, 'GET', `/authorize?${authorizeQuery()}`);
+    expect(logs.filter((l) => l.includes('advertises only loopback'))).toEqual([`client ${CLIENT_ID} advertises only loopback redirect_uris`]);
   });
 });
 

@@ -17,7 +17,8 @@ import {
   ReplayGuard, RefreshStore, STATE_TTL_DEFAULT, CODE_TTL_DEFAULT, ACCESS_TTL_DEFAULT,
   type StatePayload,
 } from './mcp-token.js';
-import { fetchCimdDocument, SsrfBlockedError } from './ssrf-guard.js';
+import { fetchCimdDocument } from './ssrf-guard.js';
+import { CimdClientCache } from './cimd-cache.js';
 import { logSafe } from './trim.js';
 
 const CLAUDE_AI_FIXED_CALLBACK = 'https://claude.ai/api/mcp/auth_callback';
@@ -190,6 +191,11 @@ function subjectUnavailable(res: ServerResponse): true {
   return json(res, 503, { error: 'temporarily_unavailable', message: 'the sign-in could not be checked right now; retry shortly' }, { 'Retry-After': '5' });
 }
 
+// Not invalid_client: clients and people read that as a permanent misconfiguration.
+function clientUnavailable(res: ServerResponse): true {
+  return json(res, 503, { error: 'temporarily_unavailable', message: 'the client could not be checked right now; retry shortly' }, { 'Retry-After': '5' });
+}
+
 function redirect(res: ServerResponse, location: string, extraHeaders: Record<string, string> = {}): true {
   res.writeHead(302, { Location: location, ...extraHeaders });
   res.end();
@@ -343,10 +349,9 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     scopes_supported: ['mcp:use'],
   };
 
-  const cimdCache = new Map<string, { doc: Record<string, unknown>; exp: number }>();
-  const CIMD_CACHE_TTL_MS = 5 * 60_000;
+  const cimdClients = new CimdClientCache({ fetch: cimd, now, log });
 
-  async function validateClient(clientId: string): Promise<{ redirect_uris: string[]; dcr: boolean } | { error: string; message: string }> {
+  async function validateClient(clientId: string): Promise<{ redirect_uris: string[]; dcr: boolean } | { error: string; message: string } | { busy: true }> {
     const reg = registered.get(clientId);
     if (reg) return { redirect_uris: reg.redirect_uris, dcr: true };
     // C7/#5: validate the issuer host + scheme BEFORE any outbound fetch, so we
@@ -365,27 +370,18 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       log(`CIMD rejected: issuer=${logSafe(`${scheme}//${issuerHost}`, 80)} not allowlisted client_id_len=${clientId.length}`);
       return { error: 'E_CIMD_INVALID', message: 'invalid client' };
     }
-    let doc: Record<string, unknown>;
-    const cached = cimdCache.get(clientId);
-    if (cached && cached.exp > now()) {
-      doc = cached.doc;
-    } else {
-      try {
-        doc = await cimd(clientId);
-      } catch (e) {
-        // #13: never echo internal fetch details to the caller (blind-SSRF
-        // oracle); log server-side, return a generic message.
-        log(`CIMD fetch failed for ${logSafe(clientId, 128)}: ${logSafe(e instanceof Error ? e.message : 'non-Error rejection', 200)}`);
-        const slug = e instanceof SsrfBlockedError ? 'E_CIMD_SSRF_BLOCKED' : 'E_CIMD_INVALID';
-        return { error: slug, message: 'invalid client' };
-      }
-      cimdCache.set(clientId, { doc, exp: now() + CIMD_CACHE_TTL_MS }); // #15
-    }
-    if (doc.client_id !== clientId) return { error: 'E_CIMD_INVALID', message: 'invalid client' };
-    const uris = Array.isArray(doc.redirect_uris) ? (doc.redirect_uris as string[]) : [];
-    if (uris.length === 0) return { error: 'E_CIMD_INVALID', message: 'invalid client' };
-    // C6 #14: warn on a localhost-only redirect set (loopback impersonation).
-    if (uris.every((u) => { try { return isLoopbackHostname(new URL(u).hostname); } catch { return false; } })) {
+    // #15: cached only once it validates; the cache logs a failed fetch.
+    const got = await cimdClients.resolve(
+      clientId,
+      (doc) => doc.client_id === clientId && Array.isArray(doc.redirect_uris) && doc.redirect_uris.length > 0,
+    );
+    if ('busy' in got) return got;
+    // #13: never echo internal fetch details to the caller (blind-SSRF oracle).
+    if ('error' in got) return { error: got.error, message: 'invalid client' };
+    const uris = got.doc.redirect_uris as string[];
+    // C6 #14: warn on a localhost-only redirect set (loopback impersonation),
+    // once per fetch rather than on every sign-in the cache serves.
+    if (got.fresh && uris.every((u) => { try { return isLoopbackHostname(new URL(u).hostname); } catch { return false; } })) {
       log(`client ${logSafe(clientId, 128)} advertises only loopback redirect_uris`);
     }
     return { redirect_uris: uris, dcr: false };
@@ -492,6 +488,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
 
     if (!clientId) return json(res, 400, { error: 'invalid_request', message: 'client_id required', iss: base }, issHeader);
     const client = await validateClient(clientId);
+    if ('busy' in client) return clientUnavailable(res);
     if ('error' in client) return json(res, 400, { error: 'invalid_client', message: client.message, iss: base }, issHeader);
 
     // (2) exact redirect_uri match BEFORE minting anything (open-redirect defense)
