@@ -714,12 +714,154 @@ describe('a failed Google code exchange answers a generic page (H4 F12)', () => 
     expect(written.work).toBeUndefined();
   });
 
+  it('a long exchange detail is cut on its log line, with its length', async () => {
+    const logs: string[] = [];
+    const port = await start({
+      exchangeCode: async () => {
+        throw new Error('y'.repeat(1000));
+      },
+      log: (l) => logs.push(l),
+    });
+    const state = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).headers.location as string);
+    expect((await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`)).status).toBe(400);
+    expect(logs.filter((l) => l.startsWith('callback exchange failed'))).toEqual([`callback exchange failed flow=owner_gate: ${'y'.repeat(300)}...(len=1000)`]);
+  });
+
   it('a non-Error rejection still answers the generic page', async () => {
     const port = await start({ exchangeCode: () => Promise.reject(undefined) });
     const state = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).headers.location as string);
     const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`);
     expect(cb.status).toBe(400);
     expect(cb.text).toBe('invalid_grant: Google could not complete the sign-in; start again from your app');
+  });
+});
+
+describe('a hostile value reaches the log as one escaped, bounded line (H4 F7)', () => {
+  const UNSAFE = /[\r\n\u2028\u2029\p{Cc}]/u;
+  const NEL = String.fromCharCode(0x85);
+  const ALIAS = 'side\ncallback ok flow=alias_add alias=forged';
+  const ALIAS_LOGGED = 'side\\u000acallback ok flow=alias_add alias=forged';
+  const linesFrom = (logs: string[], prefix: string) => {
+    const hits = logs.filter((l) => l.startsWith(prefix));
+    for (const l of hits) expect(l).not.toMatch(UNSAFE);
+    return hits;
+  };
+
+  it('CIMD rejected names the issuer and the client_id length, never the client_id path', async () => {
+    const logs: string[] = [];
+    let fetched = 0;
+    const port = await start({
+      log: (l) => logs.push(l),
+      fetchCimd: async () => {
+        fetched++;
+        throw new SsrfBlockedError('unused');
+      },
+    });
+    const forged = `https://evil.example/${'p'.repeat(300)}\naudit line lost (forged)`;
+    const longHost = `https://${'h'.repeat(200)}.example/x`;
+    for (const clientId of [forged, longHost]) {
+      expect((await req(port, 'GET', `/authorize?${authorizeQuery({ client_id: clientId })}`)).status).toBe(400);
+    }
+    expect(linesFrom(logs, 'CIMD rejected')).toEqual([
+      `CIMD rejected: issuer=https://evil.example not allowlisted client_id_len=${forged.length}`,
+      `CIMD rejected: issuer=https://${'h'.repeat(72)}...(len=216) not allowlisted client_id_len=${longHost.length}`,
+    ]);
+    expect(logs.join('\n')).not.toContain('ppp');
+    expect(fetched).toBe(0);
+  });
+
+  it('CIMD fetch failed and the loopback-only warning escape and cap the client_id and the error', async () => {
+    const logs: string[] = [];
+    const port = await start({
+      log: (l) => logs.push(l),
+      fetchCimd: async (cid) => {
+        if (cid.includes('loop')) return { client_id: cid, redirect_uris: ['http://localhost/cb'] };
+        throw new Error('connect ECONNREFUSED\nCIMD rejected: forged');
+      },
+    });
+    const failing = 'https://claude.ai/x\nCIMD rejected: forged';
+    const loopback = `https://claude.ai/loop/${'q'.repeat(300)}${NEL}x`;
+    expect((await req(port, 'GET', `/authorize?${authorizeQuery({ client_id: failing })}`)).status).toBe(400);
+    await req(port, 'GET', `/authorize?${authorizeQuery({ client_id: loopback })}`);
+    expect(linesFrom(logs, 'CIMD fetch failed')).toEqual(['CIMD fetch failed for https://claude.ai/x\\u000aCIMD rejected: forged: connect ECONNREFUSED\\u000aCIMD rejected: forged']);
+    expect(linesFrom(logs, 'client ')).toEqual([`client ${loopback.slice(0, 128)}...(len=${loopback.length}) advertises only loopback redirect_uris`]);
+    expect(linesFrom(logs, 'CIMD rejected')).toEqual([]);
+  });
+
+  it('every alias_add line escapes the alias, the error and the refusal slug', async () => {
+    const logs: string[] = [];
+    let outcome: 'throw' | 'refuse' | 'ok' = 'throw';
+    const port = await start({
+      log: (l) => logs.push(l),
+      bindTenantAlias: () => {
+        if (outcome === 'throw') throw new Error('disk\nfull');
+        if (outcome === 'refuse') return { refused: { slug: `E_${'X'.repeat(100)}`, message: 'no' } };
+        return undefined;
+      },
+    });
+    for (const next of ['throw', 'refuse', 'ok'] as const) {
+      outcome = next;
+      const url = new URL(await currentAs!.mintFlowState({ flow: 'alias_add', alias: ALIAS, tenantId: 'tenant-a' }));
+      const state = stateFrom((await req(port, 'GET', `${url.pathname}${url.search}`)).headers.location as string);
+      await req(port, 'GET', `/callback?code=work-code&state=${encodeURIComponent(state)}`);
+    }
+    expect(linesFrom(logs, 'alias_add bind failed')).toEqual([`alias_add bind failed for "${ALIAS_LOGGED}": disk\\u000afull`]);
+    expect(linesFrom(logs, 'alias_add refused')).toEqual([`alias_add refused for "${ALIAS_LOGGED}": E_${'X'.repeat(62)}...(len=102)`]);
+    expect(linesFrom(logs, 'callback ok flow=alias_add')).toEqual([`callback ok flow=alias_add alias=${ALIAS_LOGGED}`]);
+  });
+
+  it('every alias_reauth line escapes the alias and the email Google returned', async () => {
+    const logs: string[] = [];
+    const port = await start({
+      log: (l) => logs.push(l),
+      aliasEmail: (a) => (a === ALIAS ? 'work@x.example' : undefined),
+      exchangeCode: async (code) =>
+        code === 'mismatch-code'
+          ? { tokens: { refresh_token: 'g-rt' }, email: 'stranger@x.example\n[as] forged' }
+          : code === 'short-code'
+            ? { tokens: { access_token: 'g-at' }, email: 'work@x.example' }
+            : { tokens: { refresh_token: 'g-rt', scope: code === 'narrow-code' ? 'narrow' : 'full' }, email: 'work@x.example' },
+      missingScopes: (_alias, granted) => (granted === 'narrow' ? ['drive'] : []),
+      hasToken: () => true,
+    });
+    for (const code of ['mismatch-code', 'short-code', 'narrow-code', 'ok-code']) {
+      const state = stateFrom((await req(port, 'GET', reauthPath(ALIAS))).headers.location as string);
+      await req(port, 'GET', `/callback?code=${code}&state=${encodeURIComponent(state)}`);
+    }
+    expect(linesFrom(logs, 'alias_reauth')).toEqual([
+      `alias_reauth identity mismatch for "${ALIAS_LOGGED}" (got stranger@x.example\\u000a[as] forged)`,
+      `alias_reauth for "${ALIAS_LOGGED}" returned no refresh token; stored token kept`,
+      `alias_reauth for "${ALIAS_LOGGED}" granted 1 fewer scope(s); stored token kept`,
+    ]);
+    expect(linesFrom(logs, 'callback ok flow=alias_reauth')).toEqual([`callback ok flow=alias_reauth alias=${ALIAS_LOGGED}`]);
+  });
+
+  it('a subject check that throws a multi-line message logs one line per grant', async () => {
+    const logs: string[] = [];
+    let broken = false;
+    const port = await start({
+      log: (l) => logs.push(l),
+      subjectActive: () => {
+        if (broken) throw new Error('registry\nlocked');
+        return true;
+      },
+    });
+    const codeFor = async () => {
+      const state = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`)).headers.location as string);
+      const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`);
+      return new URL(cb.headers.location as string).searchParams.get('code')!;
+    };
+    const redeem = async (code: string) =>
+      req(port, 'POST', '/token', form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, code_verifier: verifier, resource: `${BASE}/mcp` }));
+    const tok = JSON.parse((await redeem(await codeFor())).text);
+    const pendingCode = await codeFor();
+    broken = true;
+    expect((await redeem(pendingCode)).status).toBe(503);
+    expect((await req(port, 'POST', '/token', form({ grant_type: 'refresh_token', refresh_token: tok.refresh_token }))).status).toBe(503);
+    expect(linesFrom(logs, 'token deferred')).toEqual([
+      'token deferred grant=authorization_code: subject check failed: registry\\u000alocked',
+      'token deferred grant=refresh_token: subject check failed: registry\\u000alocked',
+    ]);
   });
 });
 
