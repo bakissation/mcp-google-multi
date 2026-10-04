@@ -448,7 +448,7 @@ describe('negative paths (one per §5.12 MUST)', () => {
 
   // alpha.57 signed a DCR pending with flow=alias_reauth; one still inside its
   // TTL at upgrade must not start the old unauthenticated re-auth.
-  it('POST /authorize refuses a pending that is not an owner sign-in', async () => {
+  it('POST /authorize refuses a pending signed with MCP_JWT_KEY, as an earlier release signed its alias_reauth ones', async () => {
     const asked: string[] = [];
     const port = await start({
       buildGoogleAuthUrl: ({ flow, state }) => {
@@ -645,6 +645,20 @@ describe('owner_gate Google leg is bound to the browser that started it (H4 F1)'
     expect(replay.text).toContain('E_STATE_INVALID');
     expect(replay.headers.location).toBeUndefined();
     expect(second.calls).toEqual({ exchange: 0, resolve: 0 });
+  });
+
+  it("sign-in artifacts expire by the AuthServer's clock, the one the replay guard uses", async () => {
+    let clock = Date.now() + 700_000;
+    const { calls, deps } = spied({ now: () => clock });
+    const port = await start(deps);
+    const attacker: Jar = new Map();
+    const { state } = await dcrGoogleState(port, attacker);
+    expect((await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: new Map() })).status).toBe(400);
+    clock += 601_000;
+    const replay = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: attacker });
+    expect(replay.status).toBe(400);
+    expect(replay.headers.location).toBeUndefined();
+    expect(calls).toEqual({ exchange: 0, resolve: 0 });
   });
 
   it('an approval refused for a full guard works on retry once a slot frees', async () => {
@@ -1354,7 +1368,8 @@ describe('alias_add flow + resolveSubject seam (S1.14)', () => {
       const ref = await refreshWith(port, tok.refresh_token);
       expect(ref.status).toBe(200);
       expect((await verifyAccessToken(JSON.parse(ref.text).access_token, BASE, secret)).sub).toBe('tenant-9');
-      // the code's jti was spent before the check; the client signs in again
+      // the code was given back, so the retry the 503 asked for redeems it, once
+      expect((await redeem(port, pendingCode)).status).toBe(200);
       expect(JSON.parse((await redeem(port, pendingCode)).text).message).toBe('authorization code already redeemed');
     });
   });

@@ -163,7 +163,9 @@ export interface AuthServer {
   /** Mint a signed, single-use, TTL-bound clientless flow URL
    * (`${base}/authorize?flow=...&state=<signed>`). The tenantId/bundles ride
    * INSIDE the signed state, so nothing at /authorize or /callback trusts a
-   * caller-supplied identity. Inert unless something calls it. */
+   * caller-supplied identity. The URL works only on this AuthServer, and only
+   * until its process restarts: sign-in artifacts are signed with a key each
+   * buildAuthServer call generates. Inert unless something calls it. */
   mintFlowState: (opts: { flow: 'alias_add'; alias: string; tenantId?: string; bundles?: string[]; nonce?: string }) => Promise<string>;
   /** The owner's re-auth link for `alias`: HMAC-signed, expiring, not single
    * use (a chat client may prefetch it). /authorize refuses any alias_reauth
@@ -321,7 +323,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   const secret = config.secret;
   // States, approvals and codes live minutes, and their single use rests on an
   // in-memory replay guard that a restart empties. So they are signed with a
-  // key only this process holds: a restart invalidates every one in flight,
+  // key only this AuthServer holds: a restart invalidates every one in flight,
   // instead of letting a spent or unreserved one pass the new, empty guard.
   const flowSecret = new Uint8Array(randomBytes(32));
   const accessTtl = config.accessTtlSec ?? ACCESS_TTL_DEFAULT;
@@ -460,12 +462,13 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       }
       let pending: StatePayload & { jti: string; exp: number };
       try {
-        pending = await verifyPending(form.pending ?? '', base, flowSecret);
+        pending = await verifyPending(form.pending ?? '', base, flowSecret, nowSec());
       } catch {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the approval is invalid or expired');
       }
-      // Only the client leg signs pendings, and it is always the owner sign-in;
-      // a pending signed before that rule (flow=alias_reauth) is refused here.
+      // Only the client leg signs pendings, and it is always the owner sign-in.
+      // Defence in depth: a pending from an earlier release, which could carry
+      // flow=alias_reauth, was signed with MCP_JWT_KEY and no longer verifies.
       if (pending.flow !== 'owner_gate') {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the approval is invalid or expired');
       }
@@ -492,7 +495,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     if (q.get('flow') === 'alias_add' && !clientId) {
       let minted: StatePayload & { jti: string; exp: number };
       try {
-        minted = await verifyState(q.get('state') ?? '', base, flowSecret);
+        minted = await verifyState(q.get('state') ?? '', base, flowSecret, nowSec());
       } catch {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the add-account link is invalid, expired, or tampered');
       }
@@ -585,7 +588,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     const stateToken = url.searchParams.get('state') ?? '';
     let st: StatePayload & { jti: string; exp: number };
     try {
-      st = await verifyState(stateToken, base, flowSecret);
+      st = await verifyState(stateToken, base, flowSecret, nowSec());
     } catch {
       return errorPage(res, 400, 'E_STATE_INVALID', 'state is invalid, expired, or tampered');
     }
@@ -720,7 +723,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     if (grant === 'authorization_code') {
       let code: Awaited<ReturnType<typeof verifyAuthzCode>>;
       try {
-        code = await verifyAuthzCode(form.code ?? '', base, flowSecret);
+        code = await verifyAuthzCode(form.code ?? '', base, flowSecret, nowSec());
       } catch {
         return json(res, 400, { error: 'invalid_grant', message: 'authorization code invalid or expired' });
       }
@@ -743,6 +746,8 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
           active = deps.subjectActive(code.sub);
         } catch (e) {
           log(`token deferred grant=authorization_code: subject check failed: ${e instanceof Error ? logSafe(e.message, 200) : 'non-Error throw'}`);
+          // Nothing was issued and PKCE passed, so the retry the 503 asks for may redeem it.
+          replay.unspend(code.jti);
           return subjectUnavailable(res);
         }
         if (!active) {

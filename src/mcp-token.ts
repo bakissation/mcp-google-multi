@@ -103,8 +103,10 @@ async function signArtifact(claims: Record<string, unknown>, purpose: string, ba
     .sign(secret);
 }
 
-async function verifyArtifact(token: string, purpose: string, base: string, secret: Uint8Array): Promise<Record<string, unknown> & { jti: string; exp: number }> {
-  const { payload } = await jwtVerify(token, secret, { issuer: base });
+// `nowSec`: the caller's clock, so expiry is judged by the same clock as the
+// replay guard that records the artifact's spend.
+async function verifyArtifact(token: string, purpose: string, base: string, secret: Uint8Array, nowSec?: number): Promise<Record<string, unknown> & { jti: string; exp: number }> {
+  const { payload } = await jwtVerify(token, secret, { issuer: base, ...(nowSec !== undefined ? { currentDate: new Date(nowSec * 1000) } : {}) });
   if (payload.purpose !== purpose) throw new Error(`wrong artifact purpose (${String(payload.purpose)})`);
   return { ...payload, jti: String(payload.jti ?? ''), exp: Number(payload.exp ?? 0) } as Record<string, unknown> & { jti: string; exp: number };
 }
@@ -113,8 +115,8 @@ export function signState(payload: StatePayload, base: string, secret: Uint8Arra
   return signArtifact(payload as unknown as Record<string, unknown>, 'mcp_state', base, secret, iat, ttlSec);
 }
 
-export async function verifyState(token: string, base: string, secret: Uint8Array): Promise<StatePayload & { jti: string; exp: number }> {
-  return (await verifyArtifact(token, 'mcp_state', base, secret)) as unknown as StatePayload & { jti: string; exp: number };
+export async function verifyState(token: string, base: string, secret: Uint8Array, nowSec?: number): Promise<StatePayload & { jti: string; exp: number }> {
+  return (await verifyArtifact(token, 'mcp_state', base, secret, nowSec)) as unknown as StatePayload & { jti: string; exp: number };
 }
 
 // --- alias_reauth link -------------------------------------------------------
@@ -156,16 +158,16 @@ export function signPending(payload: StatePayload, base: string, secret: Uint8Ar
   return signArtifact(payload as unknown as Record<string, unknown>, 'mcp_pending', base, secret, iat, ttlSec);
 }
 
-export async function verifyPending(token: string, base: string, secret: Uint8Array): Promise<StatePayload & { jti: string; exp: number }> {
-  return (await verifyArtifact(token, 'mcp_pending', base, secret)) as unknown as StatePayload & { jti: string; exp: number };
+export async function verifyPending(token: string, base: string, secret: Uint8Array, nowSec?: number): Promise<StatePayload & { jti: string; exp: number }> {
+  return (await verifyArtifact(token, 'mcp_pending', base, secret, nowSec)) as unknown as StatePayload & { jti: string; exp: number };
 }
 
 export function signAuthzCode(payload: CodePayload, base: string, secret: Uint8Array, iat: number, ttlSec = CODE_TTL_DEFAULT): Promise<string> {
   return signArtifact(payload as unknown as Record<string, unknown>, 'mcp_code', base, secret, iat, ttlSec);
 }
 
-export async function verifyAuthzCode(token: string, base: string, secret: Uint8Array): Promise<CodePayload & { jti: string; exp: number }> {
-  return (await verifyArtifact(token, 'mcp_code', base, secret)) as unknown as CodePayload & { jti: string; exp: number };
+export async function verifyAuthzCode(token: string, base: string, secret: Uint8Array, nowSec?: number): Promise<CodePayload & { jti: string; exp: number }> {
+  return (await verifyArtifact(token, 'mcp_code', base, secret, nowSec)) as unknown as CodePayload & { jti: string; exp: number };
 }
 
 // --- Replay guard (C10/C17: single-use, capped, TTL-evicted) ----------------
