@@ -27,6 +27,14 @@ import { decryptToken, encryptToken } from '../src/token-store.js';
 import { RefreshStore as PrevRefreshStore } from './fixtures/refresh-store-prev.js';
 import { legacyTok, onDisk, r1Bytes, seedFamilies, seedLegacy, specKey, specMac, specTag, specToken } from './_refresh-spec.js';
 
+/** Change one character in the middle of a JWT's signature. Changing the last
+ * ones can leave it intact: base64url decoding ignores the final character's
+ * low bits, so about one run in a thousand would not tamper at all. */
+const tamperSig = (jwt: string): string => {
+  const i = jwt.lastIndexOf('.') + 10;
+  return jwt.slice(0, i) + (jwt[i] === 'A' ? 'B' : 'A') + jwt.slice(i + 1);
+};
+
 const BASE = 'https://mcp.example.com';
 const secret = jwtSecretFrom('dGVzdC1qd3Qta2V5LXRoYXQtaXMtMzItYnl0ZXMh'); // any string key
 const other = jwtSecretFrom('a-different-key');
@@ -85,7 +93,7 @@ describe('signed state + authz code', () => {
   });
   it('rejects a tampered state', async () => {
     const st = await signState(payload, BASE, secret, iat);
-    await expect(verifyState(st.slice(0, -2) + 'xy', BASE, secret)).rejects.toBeTruthy();
+    await expect(verifyState(tamperSig(st), BASE, secret)).rejects.toBeTruthy();
   });
   it('rejects an expired state and an expired code', async () => {
     const st = await signState(payload, BASE, secret, iat - 10_000, 600);

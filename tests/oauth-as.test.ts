@@ -13,6 +13,14 @@ import { SsrfBlockedError } from '../src/ssrf-guard.js';
 import { CIMD_MAX_IN_FLIGHT } from '../src/cimd-cache.js';
 import { z } from "zod";
 
+/** Change one character in the middle of a JWT's signature. Changing the last
+ * ones can leave it intact: base64url decoding ignores the final character's
+ * low bits, so about one run in a thousand would not tamper at all. */
+const tamperSig = (jwt: string): string => {
+  const i = jwt.lastIndexOf('.') + 10;
+  return jwt.slice(0, i) + (jwt[i] === 'A' ? 'B' : 'A') + jwt.slice(i + 1);
+};
+
 const BASE = 'https://mcp.test';
 const CLIENT_ID = 'https://claude.ai/oauth/mcp-client';
 const REDIRECT = 'https://claude.ai/api/mcp/auth_callback';
@@ -275,7 +283,7 @@ describe('negative paths (one per §5.12 MUST)', () => {
     const port = await start();
     const authz = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
     const state = stateFrom(authz.headers.location as string);
-    const r = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state.slice(0, -2) + 'xx')}`);
+    const r = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(tamperSig(state))}`);
     expect(r.status).toBe(400);
     expect(r.text).toContain('E_STATE_INVALID');
   });
