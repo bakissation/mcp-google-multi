@@ -11,6 +11,7 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import type { Socket } from 'node:net';
 import type { HttpConfig } from './http-config.js';
 import { withArgNormalization, type ArgShape, type StrictArgOptions, withValidationEnvelope, type ValidationEnvelopeOptions } from './arg-normalize.js';
+import { logSafe } from './trim.js';
 // A host wrapping the log callbacks it hands core needs this, and trim has no package export.
 export { logSafe } from './trim.js';
 export type AuthOutcome =
@@ -232,7 +233,7 @@ export class HttpTransportHost {
           } finally {
             // A throwing log must not reach the destroy below: the answer is sent.
             try {
-              this.log(`500 internal_error path=${pathOf(req)}: ${e instanceof Error ? e.message : 'non-Error throw'}`);
+              this.log(`500 internal_error path=${pathOf(req)}: ${e instanceof Error ? logSafe(e.message, 200) : 'non-Error throw'}`);
             } catch {
               // nowhere left to report it
             }
@@ -366,12 +367,12 @@ export class HttpTransportHost {
   private frontGuard(req: IncomingMessage, res: ServerResponse): boolean {
     const { allowedHosts, allowedOrigins } = this.opts.config;
     if (!hostAllowed(req.headers.host, allowedHosts)) {
-      this.log(`403 host_rejected host=${req.headers.host ?? ''}`);
+      this.log(`403 host_rejected host=${logSafe(req.headers.host ?? '', 64)}`);
       this.fail(res, 403, 'host_rejected', 'Host not allowed (DNS-rebinding guard).');
       return false;
     }
     if (!originAllowed(req.headers.origin, allowedOrigins)) {
-      this.log(`403 origin_rejected origin=${req.headers.origin ?? ''}`);
+      this.log(`403 origin_rejected origin=${logSafe(req.headers.origin ?? '', 64)}`);
       this.fail(res, 403, 'origin_rejected', 'Origin not allowed.');
       return false;
     }

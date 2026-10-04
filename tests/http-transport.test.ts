@@ -541,6 +541,64 @@ describe('HttpTransportHost (BV-3: stateless dispatch)', () => {
     ]);
   });
 
+  // Node decodes header bytes as latin1, so an 8-bit byte reaches the log as a
+  // C1 control (NEL ends a line for some readers, CSI drives a terminal).
+  const NEL = String.fromCharCode(0x85);
+  const CSI = String.fromCharCode(0x9b);
+  const UNSAFE = /[\r\n\u2028\u2029\p{Cc}]/u;
+
+  it('a hostile or oversized Host logs one escaped, bounded line', async () => {
+    const logs: string[] = [];
+    const port = await startHost(() => ({ ok: true }), { log: (l) => logs.push(l) });
+    for (const host of [`evil${NEL}500 internal_error path=/forged`, `evil${CSI}2J`, 'h'.repeat(10_000)]) {
+      const res = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT, host }, body: initBody });
+      expect(res.status).toBe(403);
+    }
+    expect(logs.filter((l) => l.startsWith('403 '))).toEqual([
+      '403 host_rejected host=evil\\u0085500 internal_error path=/forged',
+      '403 host_rejected host=evil\\u009b2J',
+      `403 host_rejected host=${'h'.repeat(64)}...(len=10000)`,
+    ]);
+    for (const l of logs) expect(l).not.toMatch(UNSAFE);
+  });
+
+  it('a hostile, oversized or repeated Origin logs one escaped, bounded line', async () => {
+    const logs: string[] = [];
+    const port = await startHost(() => ({ ok: true }), { log: (l) => logs.push(l) });
+    const repeated = Array.from({ length: 400 }, (_, i) => `https://o${i}.example`);
+    for (const origin of [`https://evil.example${NEL}403 forged`, 'o'.repeat(12_000), repeated as unknown as string]) {
+      const res = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT, origin }, body: initBody });
+      expect(res.status).toBe(403);
+    }
+    const lines = logs.filter((l) => l.startsWith('403 '));
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toBe('403 origin_rejected origin=https://evil.example\\u0085403 forged');
+    expect(lines[1]).toBe(`403 origin_rejected origin=${'o'.repeat(64)}...(len=12000)`);
+    expect(lines[2]).toMatch(/^403 origin_rejected origin=https:\/\/o0\.example, https:\/\/o1\.example, .{24}\.\.\.\(len=\d{4,}\)$/);
+    for (const l of logs) expect(l).not.toMatch(UNSAFE);
+  });
+
+  it('a thrown message with line breaks, or a long one, stays one bounded 500 line', async () => {
+    const logs: string[] = [];
+    const port = await startHost(() => ({ ok: true }), {
+      log: (l) => logs.push(l),
+      routes: {
+        '/forge': async () => {
+          throw new Error('lock busy\n403 host_rejected host=forged\r\naudit line lost');
+        },
+        '/long': async () => {
+          throw new Error('x'.repeat(5000));
+        },
+      },
+    });
+    expect((await request(port, 'GET', '/forge')).status).toBe(500);
+    expect((await request(port, 'GET', '/long')).status).toBe(500);
+    expect(logs.filter((l) => l.startsWith('500 '))).toEqual([
+      '500 internal_error path=/forge: lock busy\\u000a403 host_rejected host=forged\\u000d\\u000aaudit line lost',
+      `500 internal_error path=/long: ${'x'.repeat(200)}...(len=5000)`,
+    ]);
+  });
+
   it('a host log that throws on the 500 line leaves the answered connection open', async () => {
     const port = await startHost(() => ({ ok: true }), {
       log: (l) => {
