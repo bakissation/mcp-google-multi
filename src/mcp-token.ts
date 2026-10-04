@@ -103,18 +103,18 @@ async function signArtifact(claims: Record<string, unknown>, purpose: string, ba
     .sign(secret);
 }
 
-async function verifyArtifact(token: string, purpose: string, base: string, secret: Uint8Array): Promise<Record<string, unknown> & { jti: string }> {
+async function verifyArtifact(token: string, purpose: string, base: string, secret: Uint8Array): Promise<Record<string, unknown> & { jti: string; exp: number }> {
   const { payload } = await jwtVerify(token, secret, { issuer: base });
   if (payload.purpose !== purpose) throw new Error(`wrong artifact purpose (${String(payload.purpose)})`);
-  return { ...payload, jti: String(payload.jti ?? '') } as Record<string, unknown> & { jti: string };
+  return { ...payload, jti: String(payload.jti ?? ''), exp: Number(payload.exp ?? 0) } as Record<string, unknown> & { jti: string; exp: number };
 }
 
 export function signState(payload: StatePayload, base: string, secret: Uint8Array, iat: number, ttlSec = STATE_TTL_DEFAULT): Promise<string> {
   return signArtifact(payload as unknown as Record<string, unknown>, 'mcp_state', base, secret, iat, ttlSec);
 }
 
-export async function verifyState(token: string, base: string, secret: Uint8Array): Promise<StatePayload & { jti: string }> {
-  return (await verifyArtifact(token, 'mcp_state', base, secret)) as unknown as StatePayload & { jti: string };
+export async function verifyState(token: string, base: string, secret: Uint8Array): Promise<StatePayload & { jti: string; exp: number }> {
+  return (await verifyArtifact(token, 'mcp_state', base, secret)) as unknown as StatePayload & { jti: string; exp: number };
 }
 
 // --- alias_reauth link -------------------------------------------------------
@@ -156,16 +156,16 @@ export function signPending(payload: StatePayload, base: string, secret: Uint8Ar
   return signArtifact(payload as unknown as Record<string, unknown>, 'mcp_pending', base, secret, iat, ttlSec);
 }
 
-export async function verifyPending(token: string, base: string, secret: Uint8Array): Promise<StatePayload & { jti: string }> {
-  return (await verifyArtifact(token, 'mcp_pending', base, secret)) as unknown as StatePayload & { jti: string };
+export async function verifyPending(token: string, base: string, secret: Uint8Array): Promise<StatePayload & { jti: string; exp: number }> {
+  return (await verifyArtifact(token, 'mcp_pending', base, secret)) as unknown as StatePayload & { jti: string; exp: number };
 }
 
 export function signAuthzCode(payload: CodePayload, base: string, secret: Uint8Array, iat: number, ttlSec = CODE_TTL_DEFAULT): Promise<string> {
   return signArtifact(payload as unknown as Record<string, unknown>, 'mcp_code', base, secret, iat, ttlSec);
 }
 
-export async function verifyAuthzCode(token: string, base: string, secret: Uint8Array): Promise<CodePayload & { jti: string }> {
-  return (await verifyArtifact(token, 'mcp_code', base, secret)) as unknown as CodePayload & { jti: string };
+export async function verifyAuthzCode(token: string, base: string, secret: Uint8Array): Promise<CodePayload & { jti: string; exp: number }> {
+  return (await verifyArtifact(token, 'mcp_code', base, secret)) as unknown as CodePayload & { jti: string; exp: number };
 }
 
 // --- Replay guard (C10/C17: single-use, capped, TTL-evicted) ----------------
@@ -173,26 +173,45 @@ export async function verifyAuthzCode(token: string, base: string, secret: Uint8
 /** `full`: there is no room without forgetting a jti that is still live. */
 export type ReplaySpend = 'ok' | 'replay' | 'full';
 
+/** A full guard refuses rather than sweeping again sooner than this. */
+const FULL_SWEEP_EVERY_MS = 1000;
+
 export class ReplayGuard {
-  private readonly seen = new Map<string, number>(); // jti -> expiry (ms)
+  private readonly seen = new Map<string, { exp: number; spent: boolean }>();
+  // A lower bound on every entry's expiry: below it nothing can have expired.
+  private earliest = Infinity;
+  private sweptAt = -Infinity;
 
   constructor(private readonly cap = REPLAY_CAP_DEFAULT) {}
 
+  /** Hold a slot for an artifact about to be handed out, so its spend can
+   * never meet a full guard. The flood then lands where the artifact is
+   * minted, and refusing there loses nothing. */
+  reserve(jti: string, ttlMs: number, nowMs: number): 'ok' | 'full' {
+    this.evictExpiredHead(nowMs);
+    if (!this.room(nowMs)) return 'full';
+    this.record(jti, nowMs + ttlMs, false);
+    return 'ok';
+  }
+
   /** Record a jti as spent. A full guard refuses instead of evicting a live
    * jti: a flood of spends would otherwise make a spent artifact usable again,
-   * such as a callback the browser binding refused (H4 F1). */
-  spend(jti: string, ttlMs: number, nowMs: number): ReplaySpend {
+   * such as a callback the browser binding refused (H4 F1). `artifactExpMs`
+   * keeps the record alive as long as the artifact itself, even when the clock
+   * stepped back between its signing and this spend. */
+  spend(jti: string, ttlMs: number, nowMs: number, artifactExpMs = 0): ReplaySpend {
     this.evictExpiredHead(nowMs);
-    const exp = this.seen.get(jti);
-    if (exp !== undefined) {
-      if (exp > nowMs) return 'replay';
-      this.seen.delete(jti);
+    const exp = Math.max(nowMs + ttlMs, artifactExpMs);
+    const held = this.seen.get(jti);
+    if (held && held.exp > nowMs) {
+      if (held.spent) return 'replay';
+      held.spent = true;
+      held.exp = Math.max(held.exp, exp);
+      return 'ok';
     }
-    if (this.seen.size >= this.cap) {
-      this.evictExpired(nowMs);
-      if (this.seen.size >= this.cap) return 'full';
-    }
-    this.seen.set(jti, nowMs + ttlMs);
+    if (held) this.seen.delete(jti);
+    if (!this.room(nowMs)) return 'full';
+    this.record(jti, exp, true);
     return 'ok';
   }
 
@@ -205,18 +224,34 @@ export class ReplayGuard {
     return this.seen.size;
   }
 
-  // Insertion order is spend order, so the oldest spends sit at the head; one
-  // with a short TTL behind a longer-lived one waits for the full sweep.
-  private evictExpiredHead(nowMs: number): void {
-    for (const [jti, exp] of this.seen) {
-      if (exp > nowMs) return;
-      this.seen.delete(jti);
-    }
+  private record(jti: string, exp: number, spent: boolean): void {
+    this.seen.set(jti, { exp, spent });
+    if (exp < this.earliest) this.earliest = exp;
   }
 
-  private evictExpired(nowMs: number): void {
-    for (const [jti, exp] of this.seen) {
-      if (exp <= nowMs) this.seen.delete(jti);
+  // While full, a refusal costs O(1): a sweep runs only once something can
+  // have expired, and at most once a second, so a flood cannot make every
+  // request walk the whole map.
+  private room(nowMs: number): boolean {
+    if (this.seen.size < this.cap) return true;
+    if (nowMs < this.earliest) return false;
+    if (nowMs >= this.sweptAt && nowMs - this.sweptAt < FULL_SWEEP_EVERY_MS) return false;
+    this.sweptAt = nowMs;
+    let earliest = Infinity;
+    for (const [jti, e] of this.seen) {
+      if (e.exp <= nowMs) this.seen.delete(jti);
+      else if (e.exp < earliest) earliest = e.exp;
+    }
+    this.earliest = earliest;
+    return this.seen.size < this.cap;
+  }
+
+  // Insertion order is mint or spend order, so with one TTL the head holds the
+  // earliest expiries; a short TTL behind a longer one waits for the sweep.
+  private evictExpiredHead(nowMs: number): void {
+    for (const [jti, e] of this.seen) {
+      if (e.exp > nowMs) return;
+      this.seen.delete(jti);
     }
   }
 }

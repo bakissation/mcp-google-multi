@@ -128,6 +128,30 @@ describe('ReplayGuard (C10/C17)', () => {
     expect(g.size).toBe(2);
     expect(g.spend('c', 1000, 1000)).toBe('ok');
   });
+  it('a reserved jti is spent once, even while the guard is full', () => {
+    const g = new ReplayGuard(2);
+    expect(g.reserve('r', 1000, 0)).toBe('ok');
+    expect(g.spend('x', 1000, 0)).toBe('ok');
+    expect(g.reserve('r2', 1000, 10)).toBe('full');
+    expect(g.spend('y', 1000, 10)).toBe('full');
+    expect(g.spend('r', 1000, 20)).toBe('ok');
+    expect(g.spend('r', 1000, 30)).toBe('replay');
+    expect(g.size).toBe(2);
+  });
+  it('a full guard sweeps at most once a second', () => {
+    const g = new ReplayGuard(2);
+    g.spend('long', 10_000, 0);
+    g.spend('s1', 100, 0);
+    expect(g.spend('x', 100, 200)).toBe('ok'); // sweeps s1 out
+    expect(g.spend('y', 100, 400)).toBe('full'); // x expired at 300, but the last sweep was 200 ms ago
+    expect(g.spend('y', 100, 1200)).toBe('ok');
+  });
+  it("a spend lasts as long as the artifact's own expiry, if that is later", () => {
+    const g = new ReplayGuard();
+    expect(g.spend('j', 100, 0, 5000)).toBe('ok');
+    expect(g.spend('j', 100, 1000)).toBe('replay');
+    expect(g.spend('j', 100, 5000)).toBe('ok');
+  });
   it('an expired jti behind a longer-lived one is accepted again, and makes room when full', () => {
     const g = new ReplayGuard(2);
     expect(g.spend('long', 10_000, 0)).toBe('ok');
