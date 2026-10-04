@@ -1,8 +1,9 @@
 // B13 / C11: SSRF guard for every server-side fetch (the CIMD client_id doc).
 // D4 decision (dependencies-and-bv §2.2): a small AUDITED private-range check,
 // no dependency — HTTPS-only, resolve-then-check ALL addresses (anti-rebind),
-// and cap redirects / size / time. Blocks 10/8, 172.16/12, 192.168/16, 127/8,
-// 169.254/16, 0/8, multicast, ::1, fc00::/7, fe80::/10, and v4-mapped forms.
+// no redirects followed, and capped size and time. Blocks 10/8, 172.16/12,
+// 192.168/16, 127/8, 169.254/16, 0/8, multicast, ::1, fc00::/7, fe80::/10, and
+// v4-mapped forms.
 
 import { lookup } from 'node:dns/promises';
 import { isIPv4, isIPv6, BlockList } from 'node:net';
@@ -11,6 +12,17 @@ export class SsrfBlockedError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'SsrfBlockedError';
+  }
+}
+
+/** A non-2xx answer, kept apart so the cache can tell an issuer that is
+ * overloaded for now from one that says the document is gone. */
+export class CimdHttpError extends SsrfBlockedError {
+  readonly status: number;
+  constructor(status: number) {
+    super(`CIMD fetch failed: HTTP ${status}`);
+    this.name = 'CimdHttpError';
+    this.status = status;
   }
 }
 
@@ -61,25 +73,46 @@ export interface SsrfDeps {
   resolveAll?: (host: string) => Promise<string[]>;
 }
 
+/** The most lookups started here that may be unsettled at once, abandoned ones included; process-wide, as the libuv threadpool is. */
+export const MAX_UNSETTLED_LOOKUPS = 4;
+let unsettledLookups = 0;
+
+/** The lookup cap refused to start one: transient for the cache, but never retried, since the hung lookups it waits on outlast any backoff. */
+class LookupBusyError extends Error {
+  readonly code = 'EAI_AGAIN';
+}
+
 async function defaultResolveAll(host: string): Promise<string[]> {
   // A bare IP literal needs no DNS; check it directly.
   if (isIPv4(host) || isIPv6(host)) return [host];
-  const results = await lookup(host, { all: true });
-  return results.map((r) => r.address);
+  // getaddrinfo keeps its thread until it returns, even once no attempt waits
+  // on it, so a new lookup past the cap would only queue behind the hung ones.
+  if (unsettledLookups >= MAX_UNSETTLED_LOOKUPS) {
+    throw new LookupBusyError(`DNS lookup for ${host} not started: ${MAX_UNSETTLED_LOOKUPS} earlier lookups have not returned`);
+  }
+  unsettledLookups++;
+  try {
+    const results = await lookup(host, { all: true });
+    return results.map((r) => r.address);
+  } finally {
+    unsettledLookups--;
+  }
 }
 
 /**
  * Assert a URL is safe to fetch server-side: HTTPS scheme, and every address
- * the host resolves to is public. Throws SsrfBlockedError otherwise, and
- * returns the resolved IPs.
+ * the host resolves to is public. Throws SsrfBlockedError otherwise, except
+ * that a resolver error with a transient code (a lookup that could not answer
+ * this time) is rethrown as is. Returns the resolved IPs.
  *
  * NOTE: this checks the host's addresses but does NOT pin them — the caller
  * fetches by hostname, so undici re-resolves at connect time (a check-time vs
  * connect-time TOCTOU / short-TTL rebind window). We deliberately do not pin
  * (CDN IPs rotate). The real anti-SSRF control is the caller-side issuer
  * allowlist (oauth-as validateClient rejects any non-allowlisted host BEFORE
- * fetching), so an attacker can't steer the fetch at an arbitrary hostname;
- * this public-range check is defense-in-depth on top of that.
+ * fetching, and fetchCimdDocument follows no redirect, so no hop leaves it),
+ * so an attacker can't steer the fetch at an arbitrary hostname; this
+ * public-range check is defense-in-depth on top of that.
  */
 export async function assertPublicHttpsUrl(rawUrl: string, deps: SsrfDeps = {}): Promise<{ url: URL; addresses: string[] }> {
   let url: URL;
@@ -96,6 +129,10 @@ export async function assertPublicHttpsUrl(rawUrl: string, deps: SsrfDeps = {}):
   try {
     addresses = await resolveAll(url.hostname);
   } catch (e) {
+    // A resolver that could not answer this time says nothing about the host,
+    // so the fetch may retry it; a name that does not exist stays a block.
+    const code = (e as { code?: unknown } | null)?.code;
+    if (typeof code === 'string' && TRANSIENT_CODES.has(code)) throw e;
     throw new SsrfBlockedError(`DNS resolution failed for ${url.hostname}: ${(e as Error).message}`);
   }
   if (addresses.length === 0) throw new SsrfBlockedError(`no addresses resolved for ${url.hostname}`);
@@ -108,10 +145,13 @@ export async function assertPublicHttpsUrl(rawUrl: string, deps: SsrfDeps = {}):
 }
 
 export interface CimdFetchOptions {
+  /** Default 5120: CIMD section 8.7 recommends at most 5 KB. */
   maxBytes?: number;
+  /** One attempt's cap, never past what is left of deadlineMs (default 5000). */
   timeoutMs?: number;
-  maxRedirects?: number;
-  /** Transient-network-error retries per hop (default 2 → up to 3 attempts). */
+  /** One budget for every attempt, DNS lookups and backoff included (default 8000). */
+  deadlineMs?: number;
+  /** Transient-network-error retries (default 1, so at most 2 attempts). */
   retries?: number;
   /** Base backoff between retries in ms; grows linearly per attempt (default 200). */
   retryBackoffMs?: number;
@@ -137,7 +177,7 @@ const TRANSIENT_CODES = new Set([
   'UND_ERR_SOCKET',
 ]);
 
-function isTransientFetchError(e: unknown): boolean {
+export function isTransientFetchError(e: unknown): boolean {
   if (e instanceof SsrfBlockedError) return false; // deterministic security/shape reject
   const name = (e as { name?: string } | null)?.name;
   if (name === 'AbortError' || name === 'TimeoutError') return true; // our per-attempt timeout: dead/slow peer
@@ -150,69 +190,76 @@ function isTransientFetchError(e: unknown): boolean {
   return false;
 }
 
+// dns.lookup cannot be cancelled, so an attempt stops waiting on it instead.
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    void work.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+  });
+}
+
 /**
- * SSRF-guarded fetch of a CIMD client-metadata document (JSON). Every hop
- * (including redirects) is HTTPS + public-IP checked; response is size- and
- * time-capped. Returns the parsed JSON object.
+ * SSRF-guarded fetch of a CIMD client-metadata document (JSON): HTTPS and
+ * public-IP checked, no redirect followed, size-capped, and every attempt
+ * inside one deadline. Returns the parsed JSON object.
  */
 export async function fetchCimdDocument(rawUrl: string, opts: CimdFetchOptions = {}): Promise<Record<string, unknown>> {
-  const maxBytes = opts.maxBytes ?? 64 * 1024;
+  const maxBytes = opts.maxBytes ?? 5120;
   const timeoutMs = opts.timeoutMs ?? 5000;
-  const maxRedirects = opts.maxRedirects ?? 3;
-  const retries = opts.retries ?? 2;
+  const deadline = Date.now() + (opts.deadlineMs ?? 8000);
+  const retries = opts.retries ?? 1;
   const backoffMs = opts.retryBackoffMs ?? 200;
   const doFetch = opts.fetchImpl ?? fetch;
   const sleep = opts.sleepImpl ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
-  let current = rawUrl;
-  for (let hop = 0; hop <= maxRedirects; hop++) {
-    let redirectTo: string | null = null;
-    let doc: Record<string, unknown> | null = null;
-    // Retry transient connection failures IN PLACE. Each attempt re-runs the
-    // resolve-then-check so a retry can never skip the anti-rebind guard, and
-    // the timer is per-attempt (armed across the body read, #10).
-    for (let attempt = 0; ; attempt++) {
-      await assertPublicHttpsUrl(current, opts.ssrf);
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
+  // Retry fast transient failures IN PLACE. Each attempt re-runs the
+  // resolve-then-check so a retry can never skip the anti-rebind guard, and
+  // the timer is per-attempt (armed across the lookup and the body read, #10).
+  for (let attempt = 0; ; attempt++) {
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(
+      () => {
+        timedOut = true;
+        controller.abort();
+      },
+      Math.max(0, Math.min(timeoutMs, deadline - Date.now())),
+    );
+    try {
+      await untilAborted(assertPublicHttpsUrl(rawUrl, opts.ssrf), controller.signal);
+      const res = await doFetch(rawUrl, { redirect: 'manual', signal: controller.signal, headers: { accept: 'application/json' } });
+      // CIMD section 5: a redirect is never followed. Only this URL passed the
+      // issuer allowlist, and a document behind a redirect could claim its client_id.
+      if (res.status >= 300 && res.status < 400) throw new SsrfBlockedError('CIMD redirect refused');
+      if (!res.ok) throw new CimdHttpError(res.status);
+      const text = await readCapped(res, maxBytes, controller);
+      let parsed: unknown;
       try {
-        const res = await doFetch(current, { redirect: 'manual', signal: controller.signal, headers: { accept: 'application/json' } });
-        if (res.status >= 300 && res.status < 400) {
-          const loc = res.headers.get('location');
-          if (!loc) throw new SsrfBlockedError('redirect without a Location header');
-          redirectTo = loc;
-          break;
-        }
-        if (!res.ok) throw new SsrfBlockedError(`CIMD fetch failed: HTTP ${res.status}`);
-        const text = await readCapped(res, maxBytes, controller);
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(text);
-        } catch {
-          throw new SsrfBlockedError('CIMD document is not valid JSON');
-        }
-        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-          throw new SsrfBlockedError('CIMD document is not a JSON object');
-        }
-        doc = parsed as Record<string, unknown>;
-        break;
-      } catch (e) {
-        if (attempt < retries && isTransientFetchError(e)) {
-          await sleep(backoffMs * (attempt + 1));
-          continue;
-        }
-        throw e;
-      } finally {
-        clearTimeout(timer);
+        parsed = JSON.parse(text);
+      } catch {
+        throw new SsrfBlockedError('CIMD document is not valid JSON');
       }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        throw new SsrfBlockedError('CIMD document is not a JSON object');
+      }
+      return parsed as Record<string, unknown>;
+    } catch (e) {
+      // A refused status throws with the body unread, and only an abort hands
+      // that connection back; the controller is this attempt's alone.
+      controller.abort();
+      const wait = backoffMs * (attempt + 1);
+      // A timed-out attempt may leave a lookup hung on the threadpool, ours or
+      // fetch's own at connect time, and a retry would start another beside it.
+      if (!timedOut && !(e instanceof LookupBusyError) && attempt < retries && isTransientFetchError(e) && deadline - Date.now() > wait) {
+        await sleep(wait);
+        continue;
+      }
+      throw e;
+    } finally {
+      clearTimeout(timer);
     }
-    if (redirectTo !== null) {
-      current = new URL(redirectTo, current).toString();
-      continue;
-    }
-    return doc as Record<string, unknown>;
   }
-  throw new SsrfBlockedError(`too many redirects (> ${maxRedirects})`);
 }
 
 /** Read a response body, aborting the moment it exceeds maxBytes (never buffers

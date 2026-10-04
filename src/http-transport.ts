@@ -11,6 +11,9 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import type { Socket } from 'node:net';
 import type { HttpConfig } from './http-config.js';
 import { withArgNormalization, type ArgShape, type StrictArgOptions, withValidationEnvelope, type ValidationEnvelopeOptions } from './arg-normalize.js';
+import { logSafe } from './trim.js';
+// A host wrapping the log callbacks it hands core needs this, and trim has no package export.
+export { logSafe } from './trim.js';
 export type AuthOutcome =
   | { ok: true; sub?: string }
   | { ok: false; status: number; body: string; headers?: Record<string, string> };
@@ -106,12 +109,23 @@ export function hostAllowed(host: string | undefined, allowed: string[]): boolea
   return allowed.includes(host) || allowed.includes(bare);
 }
 
-/** JSON-RPC method name(s) for an observability log line — no params, no PII. */
+const METHOD_NAME = /^[A-Za-z0-9_./$-]{1,64}$/;
+const BATCH_METHODS_SHOWN = 4;
+
+/** JSON-RPC method name(s) for an observability log line: no params, no PII.
+ * The method is the caller's: anything not shaped like a method name, which
+ * includes a value whose String() throws, is logged as `<invalid>`. */
 export function jsonRpcMethod(body: unknown): string {
-  const one = (b: unknown): string | undefined =>
-    b && typeof b === 'object' && 'method' in b ? String((b as { method: unknown }).method) : undefined;
-  if (Array.isArray(body)) return body.map(one).filter(Boolean).join(',') || 'batch';
-  return one(body) ?? 'unknown';
+  const one = (b: unknown): string | undefined => {
+    if (!b || typeof b !== 'object' || !('method' in b)) return undefined;
+    const m = (b as { method: unknown }).method;
+    return typeof m === 'string' && METHOD_NAME.test(m) ? m : '<invalid>';
+  };
+  if (!Array.isArray(body)) return one(body) ?? 'unknown';
+  const names = body.map(one).filter((n): n is string => n !== undefined);
+  if (names.length === 0) return 'batch';
+  const rest = names.length - BATCH_METHODS_SHOWN;
+  return rest > 0 ? `${names.slice(0, BATCH_METHODS_SHOWN).join(',')},+${rest}` : names.join(',');
 }
 
 
@@ -230,7 +244,7 @@ export class HttpTransportHost {
           } finally {
             // A throwing log must not reach the destroy below: the answer is sent.
             try {
-              this.log(`500 internal_error path=${pathOf(req)}: ${e instanceof Error ? e.message : 'non-Error throw'}`);
+              this.log(`500 internal_error path=${pathOf(req)}: ${e instanceof Error ? logSafe(e.message, 200) : 'non-Error throw'}`);
             } catch {
               // nowhere left to report it
             }
@@ -364,12 +378,12 @@ export class HttpTransportHost {
   private frontGuard(req: IncomingMessage, res: ServerResponse): boolean {
     const { allowedHosts, allowedOrigins } = this.opts.config;
     if (!hostAllowed(req.headers.host, allowedHosts)) {
-      this.log(`403 host_rejected host=${req.headers.host ?? ''}`);
+      this.log(`403 host_rejected host=${logSafe(req.headers.host ?? '', 64)}`);
       this.fail(res, 403, 'host_rejected', 'Host not allowed (DNS-rebinding guard).');
       return false;
     }
     if (!originAllowed(req.headers.origin, allowedOrigins)) {
-      this.log(`403 origin_rejected origin=${req.headers.origin ?? ''}`);
+      this.log(`403 origin_rejected origin=${logSafe(req.headers.origin ?? '', 64)}`);
       this.fail(res, 403, 'origin_rejected', 'Origin not allowed.');
       return false;
     }

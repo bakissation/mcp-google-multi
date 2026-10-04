@@ -17,7 +17,9 @@ import {
   ReplayGuard, RefreshStore, STATE_TTL_DEFAULT, CODE_TTL_DEFAULT, ACCESS_TTL_DEFAULT,
   type StatePayload,
 } from './mcp-token.js';
-import { fetchCimdDocument, SsrfBlockedError } from './ssrf-guard.js';
+import { fetchCimdDocument } from './ssrf-guard.js';
+import { CimdClientCache } from './cimd-cache.js';
+import { logSafe } from './trim.js';
 
 const CLAUDE_AI_FIXED_CALLBACK = 'https://claude.ai/api/mcp/auth_callback';
 
@@ -189,6 +191,11 @@ function subjectUnavailable(res: ServerResponse): true {
   return json(res, 503, { error: 'temporarily_unavailable', message: 'the sign-in could not be checked right now; retry shortly' }, { 'Retry-After': '5' });
 }
 
+// Not invalid_client: clients and people read that as a permanent misconfiguration.
+function clientUnavailable(res: ServerResponse): true {
+  return json(res, 503, { error: 'temporarily_unavailable', message: 'the client could not be checked right now; retry shortly' }, { 'Retry-After': '5' });
+}
+
 function redirect(res: ServerResponse, location: string, extraHeaders: Record<string, string> = {}): true {
   res.writeHead(302, { Location: location, ...extraHeaders });
   res.end();
@@ -342,10 +349,9 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     scopes_supported: ['mcp:use'],
   };
 
-  const cimdCache = new Map<string, { doc: Record<string, unknown>; exp: number }>();
-  const CIMD_CACHE_TTL_MS = 5 * 60_000;
+  const cimdClients = new CimdClientCache({ fetch: cimd, now, log });
 
-  async function validateClient(clientId: string): Promise<{ redirect_uris: string[]; dcr: boolean } | { error: string; message: string }> {
+  async function validateClient(clientId: string): Promise<{ redirect_uris: string[]; dcr: boolean } | { error: string; message: string } | { busy: true }> {
     const reg = registered.get(clientId);
     if (reg) return { redirect_uris: reg.redirect_uris, dcr: true };
     // C7/#5: validate the issuer host + scheme BEFORE any outbound fetch, so we
@@ -360,31 +366,23 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       return { error: 'E_CIMD_INVALID', message: 'invalid client' };
     }
     if (scheme !== 'https:' || !config.cimdIssuers.includes(issuerHost)) {
-      log(`CIMD rejected: client_id ${clientId} issuer not allowlisted`);
+      // The issuer and a length, never the path: an attacker picks the path freely.
+      log(`CIMD rejected: issuer=${logSafe(`${scheme}//${issuerHost}`, 80)} not allowlisted client_id_len=${clientId.length}`);
       return { error: 'E_CIMD_INVALID', message: 'invalid client' };
     }
-    let doc: Record<string, unknown>;
-    const cached = cimdCache.get(clientId);
-    if (cached && cached.exp > now()) {
-      doc = cached.doc;
-    } else {
-      try {
-        doc = await cimd(clientId);
-      } catch (e) {
-        // #13: never echo internal fetch details to the caller (blind-SSRF
-        // oracle); log server-side, return a generic message.
-        log(`CIMD fetch failed for ${clientId}: ${(e as Error).message}`);
-        const slug = e instanceof SsrfBlockedError ? 'E_CIMD_SSRF_BLOCKED' : 'E_CIMD_INVALID';
-        return { error: slug, message: 'invalid client' };
-      }
-      cimdCache.set(clientId, { doc, exp: now() + CIMD_CACHE_TTL_MS }); // #15
-    }
-    if (doc.client_id !== clientId) return { error: 'E_CIMD_INVALID', message: 'invalid client' };
-    const uris = Array.isArray(doc.redirect_uris) ? (doc.redirect_uris as string[]) : [];
-    if (uris.length === 0) return { error: 'E_CIMD_INVALID', message: 'invalid client' };
-    // C6 #14: warn on a localhost-only redirect set (loopback impersonation).
-    if (uris.every((u) => { try { return isLoopbackHostname(new URL(u).hostname); } catch { return false; } })) {
-      log(`client ${clientId} advertises only loopback redirect_uris`);
+    // #15: cached only once it validates; the cache logs a failed fetch.
+    const got = await cimdClients.resolve(
+      clientId,
+      (doc) => doc.client_id === clientId && Array.isArray(doc.redirect_uris) && doc.redirect_uris.length > 0,
+    );
+    if ('busy' in got) return got;
+    // #13: never echo internal fetch details to the caller (blind-SSRF oracle).
+    if ('error' in got) return { error: got.error, message: 'invalid client' };
+    const uris = got.doc.redirect_uris as string[];
+    // C6 #14: warn on a localhost-only redirect set (loopback impersonation),
+    // once per fetch rather than on every sign-in the cache serves.
+    if (got.fresh && uris.every((u) => { try { return isLoopbackHostname(new URL(u).hostname); } catch { return false; } })) {
+      log(`client ${logSafe(clientId, 128)} advertises only loopback redirect_uris`);
     }
     return { redirect_uris: uris, dcr: false };
   }
@@ -490,6 +488,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
 
     if (!clientId) return json(res, 400, { error: 'invalid_request', message: 'client_id required', iss: base }, issHeader);
     const client = await validateClient(clientId);
+    if ('busy' in client) return clientUnavailable(res);
     if ('error' in client) return json(res, 400, { error: 'invalid_client', message: client.message, iss: base }, issHeader);
 
     // (2) exact redirect_uri match BEFORE minting anything (open-redirect defense)
@@ -571,7 +570,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     } catch (e) {
       // The detail can name proxies and hosts; it goes to the log, not the browser.
       const detail = e instanceof Error ? e.message : typeof e === 'string' ? e : 'non-Error rejection';
-      log(`callback exchange failed flow=${st.flow}: ${detail.replace(/[\r\n]+/g, ' ')}`);
+      log(`callback exchange failed flow=${st.flow}: ${logSafe(detail, 300)}`);
       return errorPage(res, 400, 'invalid_grant', 'Google could not complete the sign-in; start again from your app');
     }
 
@@ -586,17 +585,17 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
         refusal = (out as AliasBindRefusal | undefined)?.refused;
       } catch (e) {
         // Any rejection reason, even none, must still reach this answer.
-        log(`alias_add bind failed for "${st.alias}": ${e instanceof Error ? e.message : typeof e === 'string' ? e : 'non-Error rejection'}`);
+        log(`alias_add bind failed for "${logSafe(st.alias, 64)}": ${logSafe(e instanceof Error ? e.message : typeof e === 'string' ? e : 'non-Error rejection', 200)}`);
         return errorPage(res, 500, 'E_ALIAS_ADD_FAILED', 'the account could not be saved; try the link again or ask for a fresh one');
       }
       if (refusal) {
         // The slug lands in a text/plain body; keep it a bare identifier.
         const slug = typeof refusal.slug === 'string' && /^[A-Za-z0-9_]+$/.test(refusal.slug) ? refusal.slug : 'access_denied';
         const message = typeof refusal.message === 'string' && refusal.message ? refusal.message : 'the account could not be linked';
-        log(`alias_add refused for "${st.alias}": ${slug}`);
+        log(`alias_add refused for "${logSafe(st.alias, 64)}": ${logSafe(slug, 64)}`);
         return errorPage(res, 403, slug, message);
       }
-      log(`callback ok flow=alias_add alias=${st.alias}`);
+      log(`callback ok flow=alias_add alias=${logSafe(st.alias, 64)}`);
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(`<!doctype html><meta charset=utf-8><p>Connected "${escapeHtml(st.alias)}". You can close this window and retry your request.</p>`);
       return true;
@@ -612,7 +611,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       const gotEmail = (exchanged.email ?? '').toLowerCase();
       const expected = (deps.aliasEmail?.(st.alias) ?? '').toLowerCase();
       if (!expected || !gotEmail || gotEmail !== expected) {
-        log(`alias_reauth identity mismatch for "${st.alias}" (got ${gotEmail || 'none'})`);
+        log(`alias_reauth identity mismatch for "${logSafe(st.alias, 64)}" (got ${logSafe(gotEmail || 'none', 254)})`);
         return errorPage(res, 403, 'access_denied', 'the Google account you signed in with is not the one configured for this alias');
       }
       // A completion without a refresh token (a Google URL built without
@@ -620,7 +619,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       // dies within the hour. Keep the stored token instead.
       const refreshToken = exchanged.tokens.refresh_token;
       if (typeof refreshToken !== 'string' || refreshToken === '') {
-        log(`alias_reauth for "${st.alias}" returned no refresh token; stored token kept`);
+        log(`alias_reauth for "${logSafe(st.alias, 64)}" returned no refresh token; stored token kept`);
         return errorPage(res, 400, 'E_REAUTH_INCOMPLETE', 'Google did not return a long-lived token, so the stored one was kept. Open the re-auth link again and approve access.');
       }
       const granted = typeof exchanged.tokens.scope === 'string' ? exchanged.tokens.scope : undefined;
@@ -630,13 +629,13 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       // for an hour and the Google URL's scope is not signed, so a narrower
       // grant is not necessarily the account holder's choice.
       if (missing.length > 0 && deps.hasToken?.(st.alias)) {
-        log(`alias_reauth for "${st.alias}" granted ${missing.length} fewer scope(s); stored token kept`);
+        log(`alias_reauth for "${logSafe(st.alias, 64)}" granted ${missing.length} fewer scope(s); stored token kept`);
         res.writeHead(400, { 'Content-Type': 'text/html' });
         res.end(`<!doctype html><meta charset=utf-8><p>E_SCOPE_NOT_GRANTED: Google did not grant ${missing.length} requested scope(s): ${listed}, so the stored access for "${escapeHtml(st.alias)}" was kept. Ask for a fresh re-auth link and leave every box ticked.</p>`);
         return true;
       }
       deps.writeToken?.(st.alias, exchanged.tokens);
-      log(`callback ok flow=alias_reauth alias=${st.alias}`);
+      log(`callback ok flow=alias_reauth alias=${logSafe(st.alias, 64)}`);
       // With no stored token a partial grant still beats none; say what is missing.
       const gap = missing.length
         ? `<p>Google did not grant ${missing.length} requested scope(s): ${listed}. Ask for a fresh re-auth link and leave every box ticked to restore them.</p>`
@@ -703,7 +702,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
         try {
           active = deps.subjectActive(code.sub);
         } catch (e) {
-          log(`token deferred grant=authorization_code: subject check failed: ${e instanceof Error ? e.message : 'non-Error throw'}`);
+          log(`token deferred grant=authorization_code: subject check failed: ${e instanceof Error ? logSafe(e.message, 200) : 'non-Error throw'}`);
           return subjectUnavailable(res);
         }
         if (!active) {
@@ -734,7 +733,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
         next = refresh.rotate(form.refresh_token ?? '', now(), accept);
       } catch (e) {
         if (!(e instanceof SubjectCheckUnavailable)) throw e;
-        log(`token deferred grant=refresh_token: subject check failed: ${e.cause instanceof Error ? e.cause.message : 'non-Error throw'}`);
+        log(`token deferred grant=refresh_token: subject check failed: ${e.cause instanceof Error ? logSafe(e.cause.message, 200) : 'non-Error throw'}`);
         return subjectUnavailable(res);
       }
       if (!next) return json(res, 400, { error: 'invalid_grant', message: 'unknown or rotated refresh token' });
@@ -748,14 +747,23 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   // POST /register (minimal DCR, D2). Parse the raw JSON body directly (the
   // redirect_uris array must survive intact).
   const register: RouteHandler = async (req, res) => {
-    let parsed: { redirect_uris?: unknown };
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(await readBody(req)) as { redirect_uris?: unknown };
+      parsed = JSON.parse(await readBody(req));
     } catch {
       return json(res, 400, { error: 'invalid_client_metadata', message: 'a JSON body with redirect_uris is required' });
     }
-    const redirectUris = Array.isArray(parsed.redirect_uris) ? parsed.redirect_uris.map(String) : [];
+    // Shape first: a throw here is an unauthenticated 500 per request, and a
+    // `null` body has no properties while String() throws on {"toString":1}.
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return json(res, 400, { error: 'invalid_client_metadata', message: 'a JSON body with redirect_uris is required' });
+    }
+    const raw = (parsed as { redirect_uris?: unknown }).redirect_uris;
+    const redirectUris = Array.isArray(raw) ? raw : [];
     if (redirectUris.length === 0) return json(res, 400, { error: 'invalid_client_metadata', message: 'redirect_uris required' });
+    if (!redirectUris.every((u): u is string => typeof u === 'string')) {
+      return json(res, 400, { error: 'invalid_client_metadata', message: 'every redirect_uri must be a string' });
+    }
     if (redirectUris.length > DCR_MAX_REDIRECT_URIS || redirectUris.some((u) => u.length > DCR_MAX_URI_LEN)) {
       return json(res, 400, { error: 'invalid_client_metadata', message: 'too many or oversized redirect_uris' });
     }

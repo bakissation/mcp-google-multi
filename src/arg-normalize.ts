@@ -7,7 +7,7 @@ import {
   type SiblingSpelling,
   type UnknownArgMode,
 } from './arg-strict.js';
-import { sliceClean } from './trim.js';
+import { logSafe, sliceClean } from './trim.js';
 
 // The SDK synthesizes input-validation failures as isError RESULTS, skipping
 // the handler entirely: no handler of ours runs, so no envelope exists and the
@@ -162,8 +162,9 @@ export function screenMessage(
   if (screened.unknown.length === 0 && screened.redundant.length === 0) return { action: 'forward', msg };
 
   const all = [...screened.unknown.map((u) => u.sent), ...screened.redundant];
-  // Key names only; argument VALUES never reach the log.
-  log(`[args] ${tool}: undeclared ${echoNames(all)}${opts.mode === 'warn' ? ' (dropped)' : ' (rejected)'}`);
+  // Key names only; argument VALUES never reach the log. The names are the
+  // caller's, so they are escaped here and only here: the envelope is JSON.
+  log(`[args] ${tool}: undeclared ${logSafe(echoNames(all), 600)}${opts.mode === 'warn' ? ' (dropped)' : ' (rejected)'}`);
   try {
     // Only ever a DECLARED key or the literal placeholder, so the metrics
     // closed-vocabulary rule holds: the caller's key is never persisted.

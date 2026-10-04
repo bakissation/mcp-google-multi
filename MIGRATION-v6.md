@@ -494,6 +494,25 @@ timeout names the lock file). The real message now goes to
 without the query string. The slug is unchanged; a caller that parsed the
 message must read the server log instead.
 
+`/http-transport`: a value taken from a request no longer reaches a log line
+as it arrived. The Host or Origin on `403 host_rejected host=` and
+`403 origin_rejected origin=` is cut to 64 characters and the message on
+`500 internal_error path=<pathname>: ` to 200; a cut value ends in
+`...(len=N)` with its full length. In every value, C0 and C1 controls, DEL,
+U+2028, U+2029 and the bidi and invisible format controls (U+061C, U+200E,
+U+200F, U+202A to U+202E, U+2066 to U+2069) are written as a literal
+`\uXXXX`, so no value can start a second line. A backslash is left as is, so
+a clean value reads exactly as before. The `200 /mcp method=` line prints the
+method only when it is a string of 1 to 64 characters from `[A-Za-z0-9_./$-]`,
+and `<invalid>` otherwise; a batch lists its first four methods, then `+N`.
+Before, the method was printed uncapped, and one whose `String()` throws
+turned an answered request into a `500 internal_error` line and a cut
+connection. The text before each value is unchanged, so a host can still
+match these lines by reason. The same escaping is exported as
+`logSafe(value, max)`: it never throws (a value that cannot be printed comes
+back as `<unprintable>`), and its output passes through it again unchanged
+under a cap it fits.
+
 Discovery cache: directory levels `loadMethodIndex` creates are now 0700. On
 the default path (`DISCOVERY_CACHE_PATH` unset) an existing directory this
 process owns also loses its group and other bits when a document is written,
@@ -520,6 +539,50 @@ The message now goes to `AuthServerDeps.log` as
 `callback exchange failed flow=<flow>: <message>`, on one line. The slug and
 status are unchanged, and a rejection that is not an `Error` gets the same
 page instead of an unhandled route error.
+
+`/oauth-as`: the CIMD client-metadata fetch follows the CIMD draft. A
+redirect is refused (`CIMD redirect refused`) instead of followed: before,
+only the first URL was checked against `MCP_CIMD_ALLOWED_ISSUERS`, so an open
+redirect on an allowlisted host could serve a document that claimed the
+original client_id. A document over 5,120 bytes is refused (was 64 KB). One
+8 s deadline covers the whole fetch, DNS lookup included, with one retry of a
+fast transient failure: a reset, a refused connection, or a resolver that
+could not answer (was two retries per hop, no timer covered the lookup, and
+any DNS failure was final). An attempt that times out is not retried, and
+while four earlier CIMD lookups have not returned, abandoned ones included, a
+new fetch starts none and fails at once as transient. At most four fetches
+run at once, and a request for a client_id already being fetched waits on
+that fetch. Over that cap `GET /authorize` answers 503
+`{"error":"temporarily_unavailable","message":"the client could not be
+checked right now; retry shortly"}` with `Retry-After: 5`, except that a
+client whose document validated in the last 24 hours is served that document.
+Only a document that validates is cached (5 minutes, at most 256 client_ids):
+one whose `client_id` does not match, or that lists no `redirect_uris`, is
+fetched again on the next request. A refetch that times out, cannot connect
+or resolve for now, or gets HTTP 408, 429 or 5xx keeps the cached copy, and a
+copy validated in the last 24 hours answers that request and every request
+waiting on it in place of the error (before, an issuer answering 503 failed
+the sign-in); any other failure, another HTTP status included, drops the
+copy. An injected `AuthServerDeps.fetchCimd` sits behind the same cap and
+cache; its errors keep the copy only when they are transient by name or code
+(`AbortError`, `TimeoutError`, `ECONNRESET` and the like), because the HTTP
+status rule relies on an error class that is not exported.
+
+`/oauth-as`: `AuthServerDeps.log` lines escape and cap what they echo, as
+`/http-transport` does: client_ids (128 characters), aliases (64), the email
+Google returned (254), refusal slugs (64) and error messages (200, or 300 on
+`callback exchange failed`, which now escapes a line break instead of
+collapsing it to a space). `CIMD rejected` now reads
+`CIMD rejected: issuer=<scheme>//<host> not allowlisted client_id_len=<N>`:
+the client_id's path, which an unauthenticated caller picks freely, is no
+longer logged. `CIMD fetch failed` is logged once per fetch rather than once
+per waiting request, the loopback-only `redirect_uris` warning once per fetch
+rather than on every sign-in, and over the cap
+`CIMD busy: in-flight cap reached` at most once a minute, the next one adding
+`(n=K suppressed)`. `POST /register` answers 400 `invalid_client_metadata` to
+a body that is not a JSON object, or to a `redirect_uris` entry that is not a
+string. Before, a `null` body or an entry like `{"toString":1}` was a 500, and
+a number entry was coerced to a string.
 
 `/mcp-token`: `RefreshStore` now looks a presented refresh token up among the
 store's own entries only, and drops on load any record without a string
