@@ -664,16 +664,25 @@ own expiry; `consume` keeps its boolean and answers false for both refusals.
 `ReplayGuard.reserve(jti, ttlMs, nowMs)` holds a slot for an artifact about
 to be handed out: every state sent to Google is reserved when it is minted,
 so its `/callback` always finds room and a refusal there is always recorded,
-and a flood is refused at `/authorize` instead. While full, a refusal costs
-O(1) and the guard sweeps for expired entries at most once a second. The
-default cap is 100,000 (was 10,000). On a full guard the browser steps answer
-503 `E_SIGNIN_BUSY` with `Retry-After: 60`, and `/token` answers 503
+and a flood is refused at `/authorize` instead. `ReplayGuard.unspend(jti)`
+gives back a spend whose next step could not go ahead, so an approval or
+add-account link refused for a full guard works on retry. Expired entries are
+dropped only when the guard is at its cap, in one sweep at most once a
+second, and a refusal in between costs O(1). The default cap is 100,000 (was
+10,000; about 13 MB when full). On a full guard the browser steps answer 503
+`E_SIGNIN_BUSY` with `Retry-After: 60`, and `/token` answers 503
 `temporarily_unavailable` with `Retry-After: 5`, instead of reading as a
 replay; `AuthServerDeps.log` gets `replay guard full: sign-in refused` at
-most once a minute. The guard lives in memory, so a restart forgets every
-spend while states signed before it stay valid for up to 10 minutes. A flood
-now blocks sign-ins instead of reopening them; a public deployment still
-needs a rate limit on `/authorize`, `/callback` and `/token` in front of it.
+most once a minute. Authorization codes are not reserved, so during a flood
+`/token` can refuse a sign-in that already passed `/callback`; the client may
+retry within the code's 60 s. States, approvals and authorization codes are
+signed with a key each process generates when it starts (`MCP_JWT_KEY` still
+signs access tokens and re-auth links), so a restart invalidates every
+sign-in in flight and the user starts it again, instead of a spent or
+unreserved one passing the new, empty guard. A flood now blocks sign-ins
+instead of reopening them, until about 10 minutes after it stops; a public
+deployment still needs a per-IP rate limit on `/authorize`, `/callback` and
+`/token` in front of it.
 
 ## 5. Auth changes
 
