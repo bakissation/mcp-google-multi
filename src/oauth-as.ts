@@ -8,6 +8,7 @@
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { isIPv4 } from 'node:net';
+import { decodeJwt } from 'jose';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AuthOutcome, RouteHandler } from './http-transport.js';
 import {
@@ -332,20 +333,22 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     deps.refreshStore ?? new RefreshStore(config.refreshStorePath, config.masterKey, { maxAgeSec: config.refreshMaxAgeSec, idleSec: config.refreshIdleSec, log });
   const nowSec = () => Math.floor(now() / 1000);
   // A full guard is refused at whatever rate the caller likes, so its line is
-  // written at most once a minute.
+  // written at most once a minute (or at once after the clock stepped back).
   let fullLoggedAt = -Infinity;
   let fullSuppressed = 0;
-  const spend = (jti: string, ttlSec: number): ReplaySpend => {
-    const at = now();
-    const r = replay.spend(jti, ttlSec * 1000, at);
-    if (r === 'full') {
-      if (at - fullLoggedAt < 60_000) fullSuppressed++;
-      else {
-        log(`replay guard full: sign-in refused${fullSuppressed > 0 ? ` (n=${fullSuppressed} suppressed)` : ''}`);
-        fullLoggedAt = at;
-        fullSuppressed = 0;
-      }
+  const noteFull = (at: number): void => {
+    if (at >= fullLoggedAt && at - fullLoggedAt < 60_000) {
+      fullSuppressed++;
+      return;
     }
+    log(`replay guard full: sign-in refused${fullSuppressed > 0 ? ` (n=${fullSuppressed} suppressed)` : ''}`);
+    fullLoggedAt = at;
+    fullSuppressed = 0;
+  };
+  const spend = (artifact: { jti: string; exp: number }, ttlSec: number): ReplaySpend => {
+    const at = now();
+    const r = replay.spend(artifact.jti, ttlSec * 1000, at, artifact.exp * 1000);
+    if (r === 'full') noteFull(at);
     return r;
   };
   const resolveSubject = deps.resolveSubject ?? ((email: string) => (config.ownerEmails.includes(email) ? { sub: 'owner' } : null));
@@ -424,6 +427,13 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       headers['Set-Cookie'] = `${bindCookieName(base, bind)}=${value}; ${bindCookieAttrs(base, STATE_TTL_DEFAULT)}`;
     }
     const state = await signState(sp, base, secret, nowSec());
+    // Its /callback must find a slot even while a flood fills the guard, or a
+    // refusal there (the browser binding) could not be recorded.
+    const at = now();
+    if (replay.reserve(String(decodeJwt(state).jti), STATE_TTL_DEFAULT * 1000, at) === 'full') {
+      noteFull(at);
+      return signInBusy(res);
+    }
     const authUrl = deps.buildGoogleAuthUrl
       ? deps.buildGoogleAuthUrl({ flow: sp.flow, alias: sp.alias, state, bundles: sp.bundles })
       : `https://accounts.google.com/o/oauth2/v2/auth?state=${encodeURIComponent(state)}`;
@@ -440,7 +450,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       } catch {
         return errorPage(res, 400, 'invalid_request', 'bad form');
       }
-      let pending: StatePayload & { jti: string };
+      let pending: StatePayload & { jti: string; exp: number };
       try {
         pending = await verifyPending(form.pending ?? '', base, secret);
       } catch {
@@ -451,7 +461,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       if (pending.flow !== 'owner_gate') {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the approval is invalid or expired');
       }
-      const spent = spend(pending.jti, STATE_TTL_DEFAULT);
+      const spent = spend(pending, STATE_TTL_DEFAULT);
       if (spent === 'full') return signInBusy(res);
       if (spent === 'replay') return errorPage(res, 400, 'E_STATE_INVALID', 'this approval was already used');
       const { jti: _drop, ...sp } = pending;
@@ -472,7 +482,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     // then re-sign fresh for the Google leg. A tampered tenantId breaks the
     // signature; a caller cannot supply one at all.
     if (q.get('flow') === 'alias_add' && !clientId) {
-      let minted: StatePayload & { jti: string };
+      let minted: StatePayload & { jti: string; exp: number };
       try {
         minted = await verifyState(q.get('state') ?? '', base, secret);
       } catch {
@@ -481,7 +491,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       if (minted.flow !== 'alias_add' || !minted.alias || !minted.tenantId) {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the add-account link is malformed');
       }
-      const spent = spend(minted.jti, STATE_TTL_DEFAULT);
+      const spent = spend(minted, STATE_TTL_DEFAULT);
       if (spent === 'full') return signInBusy(res);
       if (spent === 'replay') return errorPage(res, 400, 'E_STATE_INVALID', 'this add-account link was already used');
       const { jti: _spent, ...sp } = minted;
@@ -565,13 +575,13 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   const callback: RouteHandler = async (req, res, url) => {
     const code = url.searchParams.get('code') ?? '';
     const stateToken = url.searchParams.get('state') ?? '';
-    let st: StatePayload & { jti: string };
+    let st: StatePayload & { jti: string; exp: number };
     try {
       st = await verifyState(stateToken, base, secret);
     } catch {
       return errorPage(res, 400, 'E_STATE_INVALID', 'state is invalid, expired, or tampered');
     }
-    const spent = spend(st.jti, STATE_TTL_DEFAULT);
+    const spent = spend(st, STATE_TTL_DEFAULT);
     if (spent === 'full') return signInBusy(res);
     if (spent === 'replay') return errorPage(res, 400, 'E_STATE_INVALID', 'state has already been used (replay)');
     // After the spend, so a refused callback URL cannot be replayed from the
@@ -706,7 +716,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       } catch {
         return json(res, 400, { error: 'invalid_grant', message: 'authorization code invalid or expired' });
       }
-      const spent = spend(code.jti, CODE_TTL_DEFAULT);
+      const spent = spend(code, CODE_TTL_DEFAULT);
       if (spent === 'full') return subjectUnavailable(res);
       if (spent === 'replay') return json(res, 400, { error: 'invalid_grant', message: 'authorization code already redeemed' });
       if (form.redirect_uri !== code.redirect_uri) {

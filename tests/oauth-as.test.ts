@@ -582,26 +582,56 @@ describe('owner_gate Google leg is bound to the browser that started it (H4 F1)'
     expect(calls).toEqual({ exchange: 0, resolve: 0 });
   });
 
-  it('a flood of spends cannot make a refused callback usable again: a full replay guard answers 503', async () => {
+  /** Mint states with fresh browsers until /authorize answers 503 (the guard is full). */
+  async function floodToFull(port: number): Promise<Res> {
+    for (let i = 0; i < 20; i++) {
+      const r = await req(port, 'GET', `/authorize?${authorizeQuery()}`, { jar: new Map() });
+      if (r.status !== 302) return r;
+    }
+    throw new Error('the replay guard never filled');
+  }
+
+  it('a flood after the refusal cannot make the refused callback usable again', async () => {
     const { calls, logs, deps } = spied({ replayGuard: new ReplayGuard(4) });
     const port = await start(deps);
     const attacker: Jar = new Map();
     const { state } = await dcrGoogleState(port, attacker);
-    const refused = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: new Map() });
-    expect(refused.status).toBe(400);
-    const flood: Res[] = [];
-    for (let i = 0; i < 4; i++) {
-      const fresh = stateFrom((await req(port, 'GET', `/authorize?${authorizeQuery()}`, { jar: new Map() })).headers.location as string);
-      flood.push(await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(fresh)}`, { jar: new Map() }));
-    }
-    expect(flood.map((r) => r.status)).toEqual([400, 400, 503, 503]);
-    expect(flood[2].text).toContain('E_SIGNIN_BUSY');
-    expect(flood[2].headers['retry-after']).toBe('60');
+    expect((await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: new Map() })).status).toBe(400);
+    const busy = await floodToFull(port);
+    expect(busy.status).toBe(503);
+    expect(busy.text).toContain('E_SIGNIN_BUSY');
+    expect(busy.headers['retry-after']).toBe('60');
+    expect(busy.headers['set-cookie']).toBeUndefined();
     const replay = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: attacker });
     expect(replay.status).toBe(400);
     expect(replay.headers.location).toBeUndefined();
     expect(calls).toEqual({ exchange: 0, resolve: 0 });
     expect(logs.filter((l) => l.startsWith('replay guard full'))).toEqual(['replay guard full: sign-in refused']);
+  });
+
+  it('a flood before the callback cannot leave it unspent: its slot was reserved when the state was minted', async () => {
+    const { calls, deps } = spied({ replayGuard: new ReplayGuard(4) });
+    const port = await start(deps);
+    const attacker: Jar = new Map();
+    const { state } = await dcrGoogleState(port, attacker);
+    expect((await floodToFull(port)).status).toBe(503);
+    const victim = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: new Map() });
+    expect(victim.status).toBe(400);
+    expect(victim.text).toContain('E_BROWSER_MISMATCH');
+    const replay = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: attacker });
+    expect(replay.status).toBe(400);
+    expect(replay.headers.location).toBeUndefined();
+    expect(calls).toEqual({ exchange: 0, resolve: 0 });
+  });
+
+  it('after the clock steps back, the next full-guard line is written at once', async () => {
+    let clock = Date.now();
+    const { logs, deps } = spied({ replayGuard: new ReplayGuard(1), now: () => clock });
+    const port = await start(deps);
+    expect((await floodToFull(port)).status).toBe(503);
+    clock -= 3_600_000;
+    expect((await req(port, 'GET', `/authorize?${authorizeQuery()}`, { jar: new Map() })).status).toBe(503);
+    expect(logs.filter((l) => l.startsWith('replay guard full'))).toEqual(['replay guard full: sign-in refused', 'replay guard full: sign-in refused']);
   });
 
   it('a full replay guard answers 503 at /token, not invalid_grant', async () => {
