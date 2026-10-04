@@ -548,8 +548,10 @@ that was reachable from the internet:
 
 `/mcp-token`: refresh tokens have a new format. A token is `r1.` followed by
 91 base64url characters. It carries its family id and a generation number,
-authenticated with a key derived from `MASTER_KEY`, and the store keeps only
-each family's current generation (hashed). Presenting any token a family has
+authenticated with a key derived from `MASTER_KEY` (a passphrase key goes
+through scrypt first, so the first refresh-token operation after start costs
+about 32 MB and a fraction of a second once), and the store keeps only each
+family's current generation (hashed). Presenting any token a family has
 rotated away, however long ago, now revokes the family for the rest of its
 life. Before, the store remembered at most 2,000 rotated-away tokens, and an
 older one was only refused. The store no longer keeps a list of rotated-away

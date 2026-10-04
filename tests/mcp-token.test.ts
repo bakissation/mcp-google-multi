@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { rmSync, mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -308,6 +308,20 @@ describe('RefreshStore generations (F2)', () => {
     expect(next.readUInt32BE(16)).toBe(0x01020305);
     expect(next.subarray(36).equals(specMac(MK, next.subarray(0, 36)))).toBe(true);
     expect(onDisk(file, MK).families[spec.fid]).toMatchObject({ gen: 0x01020305, cur: createHash('sha256').update(next).digest('base64url') });
+  });
+
+  it('G0b a passphrase MASTER_KEY reaches the MAC key through scrypt, not one hash', () => {
+    expect(specKey(KEY).toString('hex')).toBe('59ba1aac916a4f7289406e9bc6ecd9912b6520a68b9196e51c02a352ad673f3f');
+    const { s, file } = storeAt();
+    const t = s.issue(1000, 'owner');
+    const bytes = r1Bytes(t);
+    expect(bytes.subarray(36).equals(specMac(KEY, bytes.subarray(0, 36)))).toBe(true);
+    const fastKey = Buffer.from('2ede0631587fbd67ddf3a92424936d10a19767a56d00134675a68e8d02d6c70d', 'hex');
+    const fastMac = createHmac('sha256', fastKey).update('mcp-google-multi refresh r1\n').update(bytes.subarray(0, 36)).digest();
+    const fast = specToken(KEY, fidOf(t), 0, { rand: bytes.subarray(20, 36), mac: fastMac }).token;
+    expect(refreshFamilyTagger(KEY)(fast)).toBeNull();
+    expect(s.rotate(fast, 2000)).toBeNull();
+    expect(onDisk(file, KEY).families[fidOf(t).toString('base64url')]).toMatchObject({ gen: 0 });
   });
 
   it('G1 fifty rotations leave one family record and no rotated-away tokens', () => {

@@ -4,7 +4,7 @@
 // the rotated refresh-token store. Keyed by the provisioned MCP_JWT_KEY
 // (B5), so tokens survive a restart as long as the key persists.
 
-import { createHash, createHmac, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, hkdfSync, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { SignJWT, jwtVerify } from 'jose';
@@ -220,6 +220,11 @@ const R1_BODY = 36;
 const R1_BYTES = 68;
 const R1_MAC_DOMAIN = Buffer.from('mcp-google-multi refresh r1\n');
 const R1_KEY_INFO = 'mcp-google-multi:refresh-mac:v1';
+// Every r1 token carries a MAC under a key from MASTER_KEY, so a passphrase
+// key (deriveKey's bare-sha256 branch) would let one leaked token test
+// guesses offline at hash speed. scrypt gives that branch a work factor.
+const R1_SCRYPT_SALT = 'mcp-google-multi:refresh-mac:scrypt:v1';
+const R1_SCRYPT = { N: 1 << 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 } as const;
 const GEN_MAX = 0xffffffff;
 const LEGACY_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 /** With a lifetime set, a stored time further ahead than this is pulled back to the clock. */
@@ -254,8 +259,17 @@ const sha256 = (b: Buffer | string): Buffer => createHash('sha256').update(b).di
 /** A non-secret tag for log lines and rate-limit keys: never the token. */
 const familyTag = (family: Buffer | string): string => sha256(family).toString('hex').slice(0, 8);
 
+// Keyed on the master key: scrypt runs once per process, not once per store.
+const macKeyMemo = new Map<string, Buffer>();
+
 function refreshMacKey(masterKey: string): Buffer {
-  return Buffer.from(hkdfSync('sha256', deriveKey(masterKey), Buffer.alloc(0), R1_KEY_INFO, 32));
+  const hit = macKeyMemo.get(masterKey);
+  if (hit) return hit;
+  const raw = deriveKey(masterKey);
+  const ikm = Buffer.from(masterKey, 'base64').length === 32 ? raw : scryptSync(masterKey, R1_SCRYPT_SALT, 32, R1_SCRYPT);
+  const key = Buffer.from(hkdfSync('sha256', ikm, Buffer.alloc(0), R1_KEY_INFO, 32));
+  macKeyMemo.set(masterKey, key);
+  return key;
 }
 
 function r1Mac(key: Buffer, body: Buffer): Buffer {

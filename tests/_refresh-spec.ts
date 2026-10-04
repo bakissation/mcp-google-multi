@@ -3,12 +3,23 @@
 // format slip there disagrees with this file instead of agreeing with itself,
 // and a family at generation 5,000 is written directly instead of by 5,000
 // fsynced rotations.
-import { createHash, createHmac, hkdfSync, randomBytes } from 'node:crypto';
+import { createHash, createHmac, hkdfSync, randomBytes, scryptSync } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { decryptToken, deriveKey, encryptToken } from '../src/token-store.js';
 
+const specKeys = new Map<string, Buffer>();
+
+/** A passphrase (anything but base64 of 32 bytes) goes through scrypt before HKDF. */
 export function specKey(masterKey: string): Buffer {
-  return Buffer.from(hkdfSync('sha256', deriveKey(masterKey), Buffer.alloc(0), 'mcp-google-multi:refresh-mac:v1', 32));
+  let k = specKeys.get(masterKey);
+  if (!k) {
+    const ikm = Buffer.from(masterKey, 'base64').length === 32
+      ? deriveKey(masterKey)
+      : scryptSync(masterKey, 'mcp-google-multi:refresh-mac:scrypt:v1', 32, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+    k = Buffer.from(hkdfSync('sha256', ikm, Buffer.alloc(0), 'mcp-google-multi:refresh-mac:v1', 32));
+    specKeys.set(masterKey, k);
+  }
+  return k;
 }
 
 export function specMac(masterKey: string, body: Buffer): Buffer {
