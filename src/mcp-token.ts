@@ -14,7 +14,7 @@ import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 export const ACCESS_TTL_DEFAULT = 600; // seconds
 export const STATE_TTL_DEFAULT = 600;
 export const CODE_TTL_DEFAULT = 60;
-export const REPLAY_CAP_DEFAULT = 10_000;
+export const REPLAY_CAP_DEFAULT = 100_000;
 
 /** Derive the HS256 secret (32 bytes) from the provisioned MCP_JWT_KEY string. */
 export function jwtSecretFrom(jwtKey: string): Uint8Array {
@@ -170,26 +170,48 @@ export async function verifyAuthzCode(token: string, base: string, secret: Uint8
 
 // --- Replay guard (C10/C17: single-use, capped, TTL-evicted) ----------------
 
+/** `full`: there is no room without forgetting a jti that is still live. */
+export type ReplaySpend = 'ok' | 'replay' | 'full';
+
 export class ReplayGuard {
   private readonly seen = new Map<string, number>(); // jti -> expiry (ms)
 
   constructor(private readonly cap = REPLAY_CAP_DEFAULT) {}
 
-  /** Record a jti as spent. Returns false if it was already spent (replay). */
-  consume(jti: string, ttlMs: number, nowMs: number): boolean {
-    this.evictExpired(nowMs);
-    if (this.seen.has(jti)) return false;
+  /** Record a jti as spent. A full guard refuses instead of evicting a live
+   * jti: a flood of spends would otherwise make a spent artifact usable again,
+   * such as a callback the browser binding refused (H4 F1). */
+  spend(jti: string, ttlMs: number, nowMs: number): ReplaySpend {
+    this.evictExpiredHead(nowMs);
+    const exp = this.seen.get(jti);
+    if (exp !== undefined) {
+      if (exp > nowMs) return 'replay';
+      this.seen.delete(jti);
+    }
     if (this.seen.size >= this.cap) {
-      // drop the oldest-inserted entry to bound memory (C17)
-      const oldest = this.seen.keys().next().value;
-      if (oldest !== undefined) this.seen.delete(oldest);
+      this.evictExpired(nowMs);
+      if (this.seen.size >= this.cap) return 'full';
     }
     this.seen.set(jti, nowMs + ttlMs);
-    return true;
+    return 'ok';
+  }
+
+  /** `spend` as a boolean: false for a replay and for a full guard alike. */
+  consume(jti: string, ttlMs: number, nowMs: number): boolean {
+    return this.spend(jti, ttlMs, nowMs) === 'ok';
   }
 
   get size(): number {
     return this.seen.size;
+  }
+
+  // Insertion order is spend order, so the oldest spends sit at the head; one
+  // with a short TTL behind a longer-lived one waits for the full sweep.
+  private evictExpiredHead(nowMs: number): void {
+    for (const [jti, exp] of this.seen) {
+      if (exp > nowMs) return;
+      this.seen.delete(jti);
+    }
   }
 
   private evictExpired(nowMs: number): void {

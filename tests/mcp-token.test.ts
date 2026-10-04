@@ -118,6 +118,24 @@ describe('ReplayGuard (C10/C17)', () => {
     for (let i = 0; i < 10; i++) g.consume(`j${i}`, 100_000, 0);
     expect(g.size).toBeLessThanOrEqual(3);
   });
+  it('refuses rather than forgets a live jti when full (H4 F1)', () => {
+    const g = new ReplayGuard(2);
+    expect(g.spend('a', 1000, 0)).toBe('ok');
+    expect(g.spend('b', 1000, 0)).toBe('ok');
+    expect(g.spend('c', 1000, 10)).toBe('full');
+    expect(g.consume('c', 1000, 10)).toBe(false);
+    expect(g.spend('a', 1000, 20)).toBe('replay');
+    expect(g.size).toBe(2);
+    expect(g.spend('c', 1000, 1000)).toBe('ok');
+  });
+  it('an expired jti behind a longer-lived one is accepted again, and makes room when full', () => {
+    const g = new ReplayGuard(2);
+    expect(g.spend('long', 10_000, 0)).toBe('ok');
+    expect(g.spend('short', 100, 0)).toBe('ok');
+    expect(g.spend('short', 100, 200)).toBe('ok');
+    expect(g.spend('long', 10_000, 200)).toBe('replay');
+    expect(g.spend('other', 100, 400)).toBe('ok');
+  });
 });
 
 describe('RefreshStore (C14 rotation)', () => {
