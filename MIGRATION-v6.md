@@ -569,10 +569,12 @@ refresh. An expired session is refused (`invalid_grant`) and removed. Both
 are unset by default: sessions last until revoked, as before. A value that is
 not a positive whole number throws `E_REFRESH_OPTION_INVALID`. With a
 lifetime set, a stored time more than five minutes ahead of the clock is
-pulled back to it. The optional `log` receives a line for every revoked,
-dropped or expired family; its lines carry a short family tag, never a token
-or a subject. A store file written by a newer release (any `format` other
-than 2) is refused with `E_REFRESH_STORE_FORMAT` rather than read as empty;
+pulled back to it. The optional `log` receives one line per revoked or
+dropped family, with a short family tag (`tag=` and 8 hex characters), and
+count lines (`n=`) for expired sessions, sessions dropped by `accept` and
+clamped timestamps. No line carries a token or a subject. A store file
+written by a newer release (any `format` other than 2) is refused with
+`E_REFRESH_STORE_FORMAT` rather than read as empty;
 `assertRefreshStoreReadable(path, masterKey)` runs the same check at boot (and
 throws `E_REFRESH_STORE_UNREADABLE` for a file that does not decrypt).
 `refreshFamilyTagger(masterKey)` returns a function that maps a well-formed
