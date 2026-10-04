@@ -319,6 +319,11 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   const base = config.base;
   const resource = config.resourceUri;
   const secret = config.secret;
+  // States, approvals and codes live minutes, and their single use rests on an
+  // in-memory replay guard that a restart empties. So they are signed with a
+  // key only this process holds: a restart invalidates every one in flight,
+  // instead of letting a spent or unreserved one pass the new, empty guard.
+  const flowSecret = new Uint8Array(randomBytes(32));
   const accessTtl = config.accessTtlSec ?? ACCESS_TTL_DEFAULT;
   const cimd = deps.fetchCimd ?? ((clientId: string) => fetchCimdDocument(clientId));
   const replay = deps.replayGuard ?? new ReplayGuard();
@@ -416,7 +421,9 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
   }
 
-  async function toGoogle(res: ServerResponse, sp: StatePayload): Promise<true> {
+  /** `incoming`: the artifact spent to get here. If no slot is left for the
+   * new state it is unspent, so retrying it works once a slot frees. */
+  async function toGoogle(res: ServerResponse, sp: StatePayload, incoming?: string): Promise<true> {
     // H4 F1: without this, a Google URL minted here and forwarded to someone
     // else signs THEM in and hands their subject to the starting client.
     const headers: Record<string, string> = {};
@@ -426,11 +433,12 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       sp = { ...sp, bind };
       headers['Set-Cookie'] = `${bindCookieName(base, bind)}=${value}; ${bindCookieAttrs(base, STATE_TTL_DEFAULT)}`;
     }
-    const state = await signState(sp, base, secret, nowSec());
+    const state = await signState(sp, base, flowSecret, nowSec());
     // Its /callback must find a slot even while a flood fills the guard, or a
     // refusal there (the browser binding) could not be recorded.
     const at = now();
     if (replay.reserve(String(decodeJwt(state).jti), STATE_TTL_DEFAULT * 1000, at) === 'full') {
+      if (incoming) replay.unspend(incoming);
       noteFull(at);
       return signInBusy(res);
     }
@@ -452,7 +460,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       }
       let pending: StatePayload & { jti: string; exp: number };
       try {
-        pending = await verifyPending(form.pending ?? '', base, secret);
+        pending = await verifyPending(form.pending ?? '', base, flowSecret);
       } catch {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the approval is invalid or expired');
       }
@@ -466,7 +474,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       if (spent === 'replay') return errorPage(res, 400, 'E_STATE_INVALID', 'this approval was already used');
       const { jti: _drop, ...sp } = pending;
       void _drop;
-      return toGoogle(res, sp as StatePayload);
+      return toGoogle(res, sp as StatePayload, pending.jti);
     }
     const q = url.searchParams;
     const clientId = q.get('client_id') ?? '';
@@ -484,7 +492,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     if (q.get('flow') === 'alias_add' && !clientId) {
       let minted: StatePayload & { jti: string; exp: number };
       try {
-        minted = await verifyState(q.get('state') ?? '', base, secret);
+        minted = await verifyState(q.get('state') ?? '', base, flowSecret);
       } catch {
         return errorPage(res, 400, 'E_STATE_INVALID', 'the add-account link is invalid, expired, or tampered');
       }
@@ -496,7 +504,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
       if (spent === 'replay') return errorPage(res, 400, 'E_STATE_INVALID', 'this add-account link was already used');
       const { jti: _spent, ...sp } = minted;
       void _spent;
-      return toGoogle(res, sp as StatePayload);
+      return toGoogle(res, sp as StatePayload, minted.jti);
     }
 
     // In-call re-auth (BV-1): a user-clicked `flow=alias_reauth` link has NO
@@ -554,7 +562,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     // it — their redirect_uris come from an issuer-allowlisted document a rogue
     // cannot forge, so there is nothing to spoof.
     if (client.dcr) {
-      const pendingToken = await signPending(statePayload, base, secret, nowSec());
+      const pendingToken = await signPending(statePayload, base, flowSecret, nowSec());
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': "frame-ancestors 'none'", 'X-Frame-Options': 'DENY' });
       res.end(
         `<!doctype html><meta charset=utf-8><title>Authorize access</title>` +
@@ -577,7 +585,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     const stateToken = url.searchParams.get('state') ?? '';
     let st: StatePayload & { jti: string; exp: number };
     try {
-      st = await verifyState(stateToken, base, secret);
+      st = await verifyState(stateToken, base, flowSecret);
     } catch {
       return errorPage(res, 400, 'E_STATE_INVALID', 'state is invalid, expired, or tampered');
     }
@@ -691,7 +699,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     const authzCode = await signAuthzCode(
       { redirect_uri: st.redirect_uri, code_challenge: st.code_challenge, resource: st.resource, sub: subject.sub },
       base,
-      secret,
+      flowSecret,
       nowSec(),
     );
     log('callback ok flow=owner_gate');
@@ -712,7 +720,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     if (grant === 'authorization_code') {
       let code: Awaited<ReturnType<typeof verifyAuthzCode>>;
       try {
-        code = await verifyAuthzCode(form.code ?? '', base, secret);
+        code = await verifyAuthzCode(form.code ?? '', base, flowSecret);
       } catch {
         return json(res, 400, { error: 'invalid_grant', message: 'authorization code invalid or expired' });
       }
@@ -845,7 +853,7 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
     const state = await signState(
       { flow, client_id: '', redirect_uri: '', code_challenge: '', resource, alias, tenantId, bundles, nonce },
       base,
-      secret,
+      flowSecret,
       nowSec(),
     );
     return `${base}/authorize?flow=${flow}&state=${encodeURIComponent(state)}`;

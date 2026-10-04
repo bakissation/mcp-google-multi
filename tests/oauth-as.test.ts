@@ -624,6 +624,41 @@ describe('owner_gate Google leg is bound to the browser that started it (H4 F1)'
     expect(calls).toEqual({ exchange: 0, resolve: 0 });
   });
 
+  it('a restart invalidates every sign-in in flight, so a callback refused before it cannot be finished after it', async () => {
+    const first = spied();
+    const port1 = await start(first.deps);
+    const attacker: Jar = new Map();
+    const { state } = await dcrGoogleState(port1, attacker);
+    expect((await req(port1, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: new Map() })).status).toBe(400);
+    const second = spied();
+    const port2 = await start(second.deps);
+    const replay = await req(port2, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(state)}`, { jar: attacker });
+    expect(replay.status).toBe(400);
+    expect(replay.text).toContain('E_STATE_INVALID');
+    expect(replay.headers.location).toBeUndefined();
+    expect(second.calls).toEqual({ exchange: 0, resolve: 0 });
+  });
+
+  it('an approval refused for a full guard works on retry once a slot frees', async () => {
+    let clock = Date.now();
+    const port = await start({ replayGuard: new ReplayGuard(4), now: () => clock });
+    // two 600 s state slots and one 60 s code slot; the approval's spend takes the last
+    await req(port, 'GET', `/authorize?${authorizeQuery()}`, { jar: new Map() });
+    const jar: Jar = new Map();
+    const owner = await req(port, 'GET', `/authorize?${authorizeQuery()}`, { jar });
+    const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(stateFrom(owner.headers.location as string))}`, { jar });
+    const code = new URL(cb.headers.location as string).searchParams.get('code')!;
+    expect((await req(port, 'POST', '/token', form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, code_verifier: verifier, resource: `${BASE}/mcp` }))).status).toBe(200);
+    const dcr: Jar = new Map();
+    const reg = JSON.parse((await req(port, 'POST', '/register', { jar: dcr, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ redirect_uris: [ATTACKER_CB] }) })).text);
+    const page = await req(port, 'GET', `/authorize?${authorizeQuery({ client_id: reg.client_id, redirect_uri: ATTACKER_CB })}`, { jar: dcr });
+    const pending = page.text.match(/name="pending" value="([^"]+)"/)![1];
+    expect((await req(port, 'POST', '/authorize', { jar: dcr, ...form({ pending }) })).status).toBe(503);
+    clock += 61_000;
+    expect((await req(port, 'POST', '/authorize', { jar: dcr, ...form({ pending }) })).status).toBe(302);
+    expect((await req(port, 'POST', '/authorize', { jar: dcr, ...form({ pending }) })).status).toBe(400);
+  });
+
   it('after the clock steps back, the next full-guard line is written at once', async () => {
     let clock = Date.now();
     const { logs, deps } = spied({ replayGuard: new ReplayGuard(1), now: () => clock });
