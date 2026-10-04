@@ -952,6 +952,30 @@ describe('DCR /register bounds (unbounded-store DoS guard)', () => {
     expect(r.status).toBe(400);
   });
 
+  it('a body that is not an object, or a redirect_uri that is not a string, answers 400 and logs no 500', async () => {
+    const logs: string[] = [];
+    const registeredClients = new Map<string, { redirect_uris: string[] }>();
+    const port = await start({ log: (l) => logs.push(l), registeredClients });
+    const bodies = [
+      'null',
+      '[]',
+      '[{"redirect_uris":["https://c.example/cb"]}]',
+      '5',
+      '"https://c.example/cb"',
+      '{"redirect_uris":[{"toString":1}]}',
+      '{"redirect_uris":[5]}',
+      '{"redirect_uris":["https://c.example/cb",null]}',
+      '{"redirect_uris":"https://c.example/cb"}',
+    ];
+    for (const body of bodies) {
+      const r = await req(port, 'POST', '/register', { headers: { 'content-type': 'application/json' }, body });
+      expect(r.status, body).toBe(400);
+      expect(JSON.parse(r.text).error).toBe('invalid_client_metadata');
+    }
+    expect(logs.filter((l) => l.startsWith('500'))).toEqual([]);
+    expect(registeredClients.size).toBe(0);
+  });
+
   it('FIFO-evicts the oldest registration once at capacity (store stays bounded)', async () => {
     const registeredClients = new Map<string, { redirect_uris: string[] }>();
     for (let i = 0; i < DCR_MAX_CLIENTS; i++) registeredClients.set(`seed-${i}`, { redirect_uris: ['https://s.example/cb'] });

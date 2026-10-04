@@ -747,14 +747,23 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   // POST /register (minimal DCR, D2). Parse the raw JSON body directly (the
   // redirect_uris array must survive intact).
   const register: RouteHandler = async (req, res) => {
-    let parsed: { redirect_uris?: unknown };
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(await readBody(req)) as { redirect_uris?: unknown };
+      parsed = JSON.parse(await readBody(req));
     } catch {
       return json(res, 400, { error: 'invalid_client_metadata', message: 'a JSON body with redirect_uris is required' });
     }
-    const redirectUris = Array.isArray(parsed.redirect_uris) ? parsed.redirect_uris.map(String) : [];
+    // Shape first: a throw here is an unauthenticated 500 per request, and a
+    // `null` body has no properties while String() throws on {"toString":1}.
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return json(res, 400, { error: 'invalid_client_metadata', message: 'a JSON body with redirect_uris is required' });
+    }
+    const raw = (parsed as { redirect_uris?: unknown }).redirect_uris;
+    const redirectUris = Array.isArray(raw) ? raw : [];
     if (redirectUris.length === 0) return json(res, 400, { error: 'invalid_client_metadata', message: 'redirect_uris required' });
+    if (!redirectUris.every((u): u is string => typeof u === 'string')) {
+      return json(res, 400, { error: 'invalid_client_metadata', message: 'every redirect_uri must be a string' });
+    }
     if (redirectUris.length > DCR_MAX_REDIRECT_URIS || redirectUris.some((u) => u.length > DCR_MAX_URI_LEN)) {
       return json(res, 400, { error: 'invalid_client_metadata', message: 'too many or oversized redirect_uris' });
     }
