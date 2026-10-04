@@ -6,8 +6,13 @@ import {
   assertPublicHttpsUrl,
   fetchCimdDocument,
   isTransientFetchError,
+  MAX_UNSETTLED_LOOKUPS,
   SsrfBlockedError,
 } from '../src/ssrf-guard.js';
+
+// Only the default-resolver tests reach dns.lookup; every other test injects resolveAll.
+const dnsLookup = vi.hoisted(() => vi.fn());
+vi.mock('node:dns/promises', () => ({ lookup: dnsLookup }));
 
 describe('private-range detection (C11)', () => {
   it('blocks IPv4 private / loopback / link-local / metadata / multicast', () => {
@@ -287,6 +292,60 @@ describe('fetchCimdDocument', () => {
         expect(lookups).toBe(1);
       } finally {
         vi.useRealTimers();
+      }
+    });
+
+    it('an attempt that gave up on its lookup is not retried, so one fetch leaves at most one lookup behind', async () => {
+      vi.useFakeTimers();
+      try {
+        let lookups = 0;
+        const p = fetchCimdDocument('https://claude.ai/x', {
+          ssrf: {
+            resolveAll: () => {
+              lookups++;
+              return new Promise<string[]>(() => {});
+            },
+          },
+          fetchImpl: async () => okResp('{}'),
+        });
+        const settled = await settleAt(p, 5000);
+        expect((settled as Error).name).toBe('AbortError');
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(lookups).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe('the default resolver', () => {
+    const answered = [{ address: '93.184.216.34', family: 4 }];
+    const ok = async () => okResp(JSON.stringify({ client_id: 'https://claude.ai/x' }));
+
+    it('starts no lookup while MAX_UNSETTLED_LOOKUPS earlier ones, abandoned ones included, have not returned', async () => {
+      const hung: Array<(a: typeof answered) => void> = [];
+      dnsLookup.mockImplementation(() => new Promise((r) => hung.push(r)));
+      try {
+        const abandoned = await Promise.all(
+          Array.from({ length: MAX_UNSETTLED_LOOKUPS }, () => fetchCimdDocument('https://claude.ai/x', { deadlineMs: 20, fetchImpl: ok }).catch((e: unknown) => e)),
+        );
+        for (const e of abandoned) expect((e as Error).name).toBe('AbortError');
+        expect(dnsLookup).toHaveBeenCalledTimes(MAX_UNSETTLED_LOOKUPS);
+
+        const err = await fetchCimdDocument('https://claude.ai/x', { deadlineMs: 50, retryBackoffMs: 0, sleepImpl: async () => {}, fetchImpl: ok }).catch((e: unknown) => e);
+        expect(dnsLookup).toHaveBeenCalledTimes(MAX_UNSETTLED_LOOKUPS);
+        expect(err).not.toBeInstanceOf(SsrfBlockedError);
+        expect(isTransientFetchError(err)).toBe(true);
+
+        // A lookup that returns, however late, frees its slot.
+        for (const r of hung.splice(0)) r(answered);
+        await new Promise((r) => setTimeout(r, 0));
+        dnsLookup.mockImplementation(async () => answered);
+        await expect(fetchCimdDocument('https://claude.ai/x', { fetchImpl: ok })).resolves.toEqual({ client_id: 'https://claude.ai/x' });
+        expect(dnsLookup).toHaveBeenCalledTimes(MAX_UNSETTLED_LOOKUPS + 1);
+      } finally {
+        for (const r of hung.splice(0)) r(answered);
+        dnsLookup.mockReset();
       }
     });
   });

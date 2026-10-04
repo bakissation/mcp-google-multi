@@ -62,11 +62,25 @@ export interface SsrfDeps {
   resolveAll?: (host: string) => Promise<string[]>;
 }
 
+/** The most lookups started here that may be unsettled at once, abandoned ones included; process-wide, as the libuv threadpool is. */
+export const MAX_UNSETTLED_LOOKUPS = 4;
+let unsettledLookups = 0;
+
 async function defaultResolveAll(host: string): Promise<string[]> {
   // A bare IP literal needs no DNS; check it directly.
   if (isIPv4(host) || isIPv6(host)) return [host];
-  const results = await lookup(host, { all: true });
-  return results.map((r) => r.address);
+  // getaddrinfo keeps its thread until it returns, even once no attempt waits
+  // on it, so a new lookup past the cap would only queue behind the hung ones.
+  if (unsettledLookups >= MAX_UNSETTLED_LOOKUPS) {
+    throw Object.assign(new Error(`DNS lookup for ${host} not started: ${MAX_UNSETTLED_LOOKUPS} earlier lookups have not returned`), { code: 'EAI_AGAIN' });
+  }
+  unsettledLookups++;
+  try {
+    const results = await lookup(host, { all: true });
+    return results.map((r) => r.address);
+  } finally {
+    unsettledLookups--;
+  }
 }
 
 /**
@@ -188,8 +202,12 @@ export async function fetchCimdDocument(rawUrl: string, opts: CimdFetchOptions =
   for (let attempt = 0; ; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Math.max(0, Math.min(timeoutMs, deadline - Date.now())));
+    let lookupPending = true;
     try {
-      await untilAborted(assertPublicHttpsUrl(rawUrl, opts.ssrf), controller.signal);
+      const checked = assertPublicHttpsUrl(rawUrl, opts.ssrf).finally(() => {
+        lookupPending = false;
+      });
+      await untilAborted(checked, controller.signal);
       const res = await doFetch(rawUrl, { redirect: 'manual', signal: controller.signal, headers: { accept: 'application/json' } });
       // CIMD section 5: a redirect is never followed. Only this URL passed the
       // issuer allowlist, and a document behind a redirect could claim its client_id.
@@ -208,7 +226,8 @@ export async function fetchCimdDocument(rawUrl: string, opts: CimdFetchOptions =
       return parsed as Record<string, unknown>;
     } catch (e) {
       const wait = backoffMs * (attempt + 1);
-      if (attempt < retries && isTransientFetchError(e) && deadline - Date.now() > wait) {
+      // A retry would start a second lookup beside the one this attempt gave up on.
+      if (!lookupPending && attempt < retries && isTransientFetchError(e) && deadline - Date.now() > wait) {
         await sleep(wait);
         continue;
       }
