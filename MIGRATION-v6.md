@@ -658,15 +658,22 @@ authorization code that is still live to make room. Before, a full guard
 dropped its oldest entry, so a flood of cheap sign-in steps could make a
 spent artifact usable again, among them a callback the owner_gate browser
 binding had refused, which could then be finished from the browser that
-started it. `ReplayGuard.spend(jti, ttlMs, nowMs)` returns `ok`, `replay` or
-`full`; `consume` keeps its boolean and answers false for both refusals. The
-default cap is 100,000 (was 10,000). On a full guard the browser steps of the
-sign-in answer 503 `E_SIGNIN_BUSY` with `Retry-After: 60`, and `/token`
-answers 503 `temporarily_unavailable` with `Retry-After: 5`, instead of
-reading as a replay; `AuthServerDeps.log` gets `replay guard full: sign-in
-refused` at most once a minute. A public deployment still needs a rate limit
-on `/authorize`, `/callback` and `/token` in front of it, since a flood now
-delays sign-ins instead of reopening them.
+started it. `ReplayGuard.spend(jti, ttlMs, nowMs, artifactExpMs?)` returns
+`ok`, `replay` or `full`, and keeps the record at least until the artifact's
+own expiry; `consume` keeps its boolean and answers false for both refusals.
+`ReplayGuard.reserve(jti, ttlMs, nowMs)` holds a slot for an artifact about
+to be handed out: every state sent to Google is reserved when it is minted,
+so its `/callback` always finds room and a refusal there is always recorded,
+and a flood is refused at `/authorize` instead. While full, a refusal costs
+O(1) and the guard sweeps for expired entries at most once a second. The
+default cap is 100,000 (was 10,000). On a full guard the browser steps answer
+503 `E_SIGNIN_BUSY` with `Retry-After: 60`, and `/token` answers 503
+`temporarily_unavailable` with `Retry-After: 5`, instead of reading as a
+replay; `AuthServerDeps.log` gets `replay guard full: sign-in refused` at
+most once a minute. The guard lives in memory, so a restart forgets every
+spend while states signed before it stay valid for up to 10 minutes. A flood
+now blocks sign-ins instead of reopening them; a public deployment still
+needs a rate limit on `/authorize`, `/callback` and `/token` in front of it.
 
 ## 5. Auth changes
 
