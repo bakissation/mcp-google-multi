@@ -11,7 +11,7 @@ import { logSafe } from './trim.js';
 export const CIMD_TTL_MS = 5 * 60_000;
 /** The oldest validated document still served while the cap is full or the issuer cannot answer. */
 export const CIMD_MAX_STALE_MS = 24 * 60 * 60_000;
-/** Fetches at once. Their lookups are capped apart (ssrf-guard), as a lookup outlives a fetch that gave up on it. */
+/** Fetches at once. A lookup can outlive the fetch that gave up on it, so ssrf-guard caps its own lookups apart. */
 export const CIMD_MAX_IN_FLIGHT = 4;
 export const CIMD_CACHE_MAX = 256;
 const BUSY_LOG_EVERY_MS = 60_000;

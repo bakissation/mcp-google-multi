@@ -278,7 +278,7 @@ describe('fetchCimdDocument', () => {
       return settled;
     }
 
-    it('a slow lookup, a stalled body and the retry all end at 8 s', async () => {
+    it('two slow lookups, a reset, the backoff and a stalled body all end at 8 s', async () => {
       vi.useFakeTimers();
       try {
         let lookups = 0;
@@ -292,13 +292,14 @@ describe('fetchCimdDocument', () => {
           },
           fetchImpl: async (_u, init) => {
             fetches++;
+            if (fetches === 1) throw transient();
             return stalledBody(init!.signal!);
           },
         });
         const settled = await settleAt(p, 8000);
         expect((settled as Error).name).toBe('AbortError');
-        // the first attempt timed out in its body at 5 s, the retry in its lookup
-        expect({ lookups, fetches }).toEqual({ lookups: 2, fetches: 1 });
+        // the reset at 3 s is retried at 3.2 s; that attempt's timer is what is left of the 8 s
+        expect({ lookups, fetches }).toEqual({ lookups: 2, fetches: 2 });
       } finally {
         vi.useRealTimers();
       }
@@ -322,6 +323,26 @@ describe('fetchCimdDocument', () => {
         const settled = await settleAt(p, 1500);
         expect((settled as Error).name).toBe('AbortError');
         expect(lookups).toBe(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('an attempt that timed out connecting is not retried, so a hung connect-time lookup gets no company', async () => {
+      vi.useFakeTimers();
+      try {
+        let fetches = 0;
+        const p = fetchCimdDocument('https://claude.ai/x', {
+          ssrf,
+          fetchImpl: (_u, init) => {
+            fetches++;
+            return new Promise<Response>((_r, reject) => init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason)));
+          },
+        });
+        const settled = await settleAt(p, 5000);
+        expect((settled as Error).name).toBe('AbortError');
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(fetches).toBe(1);
       } finally {
         vi.useRealTimers();
       }
@@ -364,8 +385,11 @@ describe('fetchCimdDocument', () => {
         for (const e of abandoned) expect((e as Error).name).toBe('AbortError');
         expect(dnsLookup).toHaveBeenCalledTimes(MAX_UNSETTLED_LOOKUPS);
 
-        const err = await fetchCimdDocument('https://claude.ai/x', { deadlineMs: 50, retryBackoffMs: 0, sleepImpl: async () => {}, fetchImpl: ok }).catch((e: unknown) => e);
+        const sleep = vi.fn(async () => {});
+        const err = await fetchCimdDocument('https://claude.ai/x', { deadlineMs: 50, retryBackoffMs: 0, sleepImpl: sleep, fetchImpl: ok }).catch((e: unknown) => e);
         expect(dnsLookup).toHaveBeenCalledTimes(MAX_UNSETTLED_LOOKUPS);
+        // the hung lookups it waits on outlast any backoff, so it is not retried
+        expect(sleep).not.toHaveBeenCalled();
         expect(err).not.toBeInstanceOf(SsrfBlockedError);
         expect(isTransientFetchError(err)).toBe(true);
 

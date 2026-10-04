@@ -546,25 +546,27 @@ only the first URL was checked against `MCP_CIMD_ALLOWED_ISSUERS`, so an open
 redirect on an allowlisted host could serve a document that claimed the
 original client_id. A document over 5,120 bytes is refused (was 64 KB). One
 8 s deadline covers the whole fetch, DNS lookup included, with one retry of a
-transient failure, a resolver that could not answer included (was two
-retries per hop, no timer covered the lookup, and any DNS failure was
-final). An attempt that times out in its DNS lookup is not retried,
-and while four earlier CIMD lookups have not returned, abandoned ones
-included, a new fetch starts none and fails as a timeout would.
-At most four fetches run at once, and a request for a client_id
-already being fetched waits on that fetch. Over that cap `GET /authorize`
-answers 503 `{"error":"temporarily_unavailable","message":"the client could
-not be checked right now; retry shortly"}` with `Retry-After: 5`, except that
-a client whose document validated in the last 24 hours is served that
-document. Only a document that validates is cached (5 minutes, at most 256
-client_ids): one whose `client_id` does not match, or that lists no
-`redirect_uris`, is fetched again on the next request. A refetch that times
-out, cannot connect or resolve for now, or gets HTTP 408, 429 or 5xx keeps the
-cached copy, and a copy validated in the last 24 hours answers that request
-and every request waiting on it in place of the error (before, an issuer
-answering 503 failed the sign-in); any other failure, another HTTP status
-included, drops the copy. An injected `AuthServerDeps.fetchCimd` sits behind
-the same cap and cache.
+fast transient failure: a reset, a refused connection, or a resolver that
+could not answer (was two retries per hop, no timer covered the lookup, and
+any DNS failure was final). An attempt that times out is not retried, and
+while four earlier CIMD lookups have not returned, abandoned ones included, a
+new fetch starts none and fails at once as transient. At most four fetches
+run at once, and a request for a client_id already being fetched waits on
+that fetch. Over that cap `GET /authorize` answers 503
+`{"error":"temporarily_unavailable","message":"the client could not be
+checked right now; retry shortly"}` with `Retry-After: 5`, except that a
+client whose document validated in the last 24 hours is served that document.
+Only a document that validates is cached (5 minutes, at most 256 client_ids):
+one whose `client_id` does not match, or that lists no `redirect_uris`, is
+fetched again on the next request. A refetch that times out, cannot connect
+or resolve for now, or gets HTTP 408, 429 or 5xx keeps the cached copy, and a
+copy validated in the last 24 hours answers that request and every request
+waiting on it in place of the error (before, an issuer answering 503 failed
+the sign-in); any other failure, another HTTP status included, drops the
+copy. An injected `AuthServerDeps.fetchCimd` sits behind the same cap and
+cache; its errors keep the copy only when they are transient by name or code
+(`AbortError`, `TimeoutError`, `ECONNRESET` and the like), because the HTTP
+status rule relies on an error class that is not exported.
 
 `/oauth-as`: `AuthServerDeps.log` lines escape and cap what they echo, as
 `/http-transport` does: client_ids (128 characters), aliases (64), the email

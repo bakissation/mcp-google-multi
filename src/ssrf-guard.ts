@@ -77,13 +77,18 @@ export interface SsrfDeps {
 export const MAX_UNSETTLED_LOOKUPS = 4;
 let unsettledLookups = 0;
 
+/** The lookup cap refused to start one: transient for the cache, but never retried, since the hung lookups it waits on outlast any backoff. */
+class LookupBusyError extends Error {
+  readonly code = 'EAI_AGAIN';
+}
+
 async function defaultResolveAll(host: string): Promise<string[]> {
   // A bare IP literal needs no DNS; check it directly.
   if (isIPv4(host) || isIPv6(host)) return [host];
   // getaddrinfo keeps its thread until it returns, even once no attempt waits
   // on it, so a new lookup past the cap would only queue behind the hung ones.
   if (unsettledLookups >= MAX_UNSETTLED_LOOKUPS) {
-    throw Object.assign(new Error(`DNS lookup for ${host} not started: ${MAX_UNSETTLED_LOOKUPS} earlier lookups have not returned`), { code: 'EAI_AGAIN' });
+    throw new LookupBusyError(`DNS lookup for ${host} not started: ${MAX_UNSETTLED_LOOKUPS} earlier lookups have not returned`);
   }
   unsettledLookups++;
   try {
@@ -96,8 +101,9 @@ async function defaultResolveAll(host: string): Promise<string[]> {
 
 /**
  * Assert a URL is safe to fetch server-side: HTTPS scheme, and every address
- * the host resolves to is public. Throws SsrfBlockedError otherwise, and
- * returns the resolved IPs.
+ * the host resolves to is public. Throws SsrfBlockedError otherwise, except
+ * that a resolver error with a transient code (a lookup that could not answer
+ * this time) is rethrown as is. Returns the resolved IPs.
  *
  * NOTE: this checks the host's addresses but does NOT pin them — the caller
  * fetches by hostname, so undici re-resolves at connect time (a check-time vs
@@ -207,18 +213,21 @@ export async function fetchCimdDocument(rawUrl: string, opts: CimdFetchOptions =
   const doFetch = opts.fetchImpl ?? fetch;
   const sleep = opts.sleepImpl ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
-  // Retry transient connection failures IN PLACE. Each attempt re-runs the
+  // Retry fast transient failures IN PLACE. Each attempt re-runs the
   // resolve-then-check so a retry can never skip the anti-rebind guard, and
   // the timer is per-attempt (armed across the lookup and the body read, #10).
   for (let attempt = 0; ; attempt++) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.max(0, Math.min(timeoutMs, deadline - Date.now())));
-    let lookupPending = true;
+    let timedOut = false;
+    const timer = setTimeout(
+      () => {
+        timedOut = true;
+        controller.abort();
+      },
+      Math.max(0, Math.min(timeoutMs, deadline - Date.now())),
+    );
     try {
-      const checked = assertPublicHttpsUrl(rawUrl, opts.ssrf).finally(() => {
-        lookupPending = false;
-      });
-      await untilAborted(checked, controller.signal);
+      await untilAborted(assertPublicHttpsUrl(rawUrl, opts.ssrf), controller.signal);
       const res = await doFetch(rawUrl, { redirect: 'manual', signal: controller.signal, headers: { accept: 'application/json' } });
       // CIMD section 5: a redirect is never followed. Only this URL passed the
       // issuer allowlist, and a document behind a redirect could claim its client_id.
@@ -240,8 +249,9 @@ export async function fetchCimdDocument(rawUrl: string, opts: CimdFetchOptions =
       // that connection back; the controller is this attempt's alone.
       controller.abort();
       const wait = backoffMs * (attempt + 1);
-      // A retry would start a second lookup beside the one this attempt gave up on.
-      if (!lookupPending && attempt < retries && isTransientFetchError(e) && deadline - Date.now() > wait) {
+      // A timed-out attempt may leave a lookup hung on the threadpool, ours or
+      // fetch's own at connect time, and a retry would start another beside it.
+      if (!timedOut && !(e instanceof LookupBusyError) && attempt < retries && isTransientFetchError(e) && deadline - Date.now() > wait) {
         await sleep(wait);
         continue;
       }
