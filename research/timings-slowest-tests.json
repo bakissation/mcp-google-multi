@@ -1,0 +1,302 @@
+[
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) delivers a finished big response whole to a client that stops reading longer than Node's keep-alive timeout",
+    "duration": 15547.551698,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) delivers a big response that finished writing before the close began whole to a slow reader that pipelines a large body after it",
+    "duration": 15467.410050999999,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) delivers a started big response whole to a slow reader that pipelines a large body after the close began",
+    "duration": 15087.328947000002,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) delivers a big response not yet started whole to a slow reader that pipelines a large body after the close began",
+    "duration": 15023.466947000008,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close a second close({ graceMs }) after the last response finished writing still delivers it whole to a slow reader",
+    "duration": 15021.558779999992,
+    "status": "passed"
+  },
+  {
+    "file": "tests/metrics-integration.test.ts",
+    "name": "metrics end-to-end (stdio) on: dispatches land in the day file with tool counts, slugs and validation; report --json round-trips",
+    "duration": 1847.690927,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-boot-smoke.test.ts",
+    "name": "index.ts HTTP bootstrap smoke (subprocess) boots the real server and serves health, metadata, auth and an authenticated /mcp",
+    "duration": 1826.55017,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) stops reading a connection once a request arrives after the close, so a pipelined flood never piles up",
+    "duration": 1513.207018,
+    "status": "passed"
+  },
+  {
+    "file": "tests/empty-registry.test.ts",
+    "name": "empty registry, end-to-end via the CLI http boot with accounts but no MCP_OWNER_EMAILS still refuses: E_OWNER_EMAILS_REQUIRED",
+    "duration": 1103.066381,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) never handles a request pipelined after the close began, ends its side after the last one before it, and cuts the connection when the grace ends",
+    "duration": 1007.7208150000006,
+    "status": "passed"
+  },
+  {
+    "file": "tests/metrics-integration.test.ts",
+    "name": "metrics end-to-end (stdio) off is off: 3 dispatches create no state dir and no metrics dir",
+    "duration": 968.072714,
+    "status": "passed"
+  },
+  {
+    "file": "tests/empty-registry.test.ts",
+    "name": "empty registry, end-to-end via the CLI http boot with an empty registry (single-owner) still refuses on accounts first",
+    "duration": 880.9190680000006,
+    "status": "passed"
+  },
+  {
+    "file": "tests/generated-tools.test.ts",
+    "name": "gen-tools generator matches the committed barrel",
+    "duration": 849.0967330000001,
+    "status": "passed"
+  },
+  {
+    "file": "tests/empty-registry.test.ts",
+    "name": "empty registry, end-to-end via the CLI `doctor` RUNS and reports the missing accounts (no module-load crash)",
+    "duration": 845.027999,
+    "status": "passed"
+  },
+  {
+    "file": "tests/exports-map.test.ts",
+    "name": "compose is import-side-effect-free importing src/compose.ts never parses argv, starts a server, or exits non-zero",
+    "duration": 843.0042919999999,
+    "status": "passed"
+  },
+  {
+    "file": "tests/empty-registry.test.ts",
+    "name": "empty registry, end-to-end via the CLI the SERVER still REFUSES to boot on an empty registry",
+    "duration": 825.869827,
+    "status": "passed"
+  },
+  {
+    "file": "tests/empty-registry.test.ts",
+    "name": "empty registry, end-to-end via the CLI `account import` RUNS on an empty registry (bootstraps a fresh machine)",
+    "duration": 775.0495530000001,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost (stateless dispatch) per-subject lock lanes are independent: one tenant's slow call never queues another's",
+    "duration": 714.799321,
+    "status": "passed"
+  },
+  {
+    "file": "tests/live-account-arg.test.ts",
+    "name": "real tools keep fan-out and validate live every curated and generated read tool with an account accepts \"*\" and a CSV",
+    "duration": 570.15251,
+    "status": "passed"
+  },
+  {
+    "file": "tests/oauth-as.test.ts",
+    "name": "happy path (legs A + B) authorize -> callback(owner) -> token -> /mcp -> refresh",
+    "duration": 337.8750400000001,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) stops accepting but lets a multi-megabyte response in flight arrive whole",
+    "duration": 321.94244300000037,
+    "status": "passed"
+  },
+  {
+    "file": "tests/live-account-arg.test.ts",
+    "name": "real tools keep fan-out and validate live tools/list advertises \"*\" plus the live aliases on read tools and the live aliases on write tools",
+    "duration": 314.93090800000004,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost (stateless dispatch) two subjects resolving to ONE server share its lane and never overlap on it",
+    "duration": 306.993469,
+    "status": "passed"
+  },
+  {
+    "file": "tests/mcp-token.test.ts",
+    "name": "RefreshStore generations a token minted under another master key names nothing",
+    "duration": 271.36144000000013,
+    "status": "passed"
+  },
+  {
+    "file": "tests/mcp-token.test.ts",
+    "name": "RefreshStore rotation rotates on each use; a clean chain keeps working",
+    "duration": 254.84859500000005,
+    "status": "passed"
+  },
+  {
+    "file": "tests/registry-transfer.test.ts",
+    "name": "encrypt/decrypt bundle (passphrase) envelope is scrypt v2: per-bundle salt, no two exports alike (S-sec)",
+    "duration": 239.05113400000005,
+    "status": "passed"
+  },
+  {
+    "file": "tests/registry-transfer.test.ts",
+    "name": "encrypt/decrypt bundle (passphrase) rejects a decrypted blob that is not a valid bundle",
+    "duration": 209.24478599999998,
+    "status": "passed"
+  },
+  {
+    "file": "tests/token-store.test.ts",
+    "name": "token-store crypto does not let tmp cleanup failures mask the rename error",
+    "duration": 206.27085699999998,
+    "status": "passed"
+  },
+  {
+    "file": "tests/token-store.test.ts",
+    "name": "token-store crypto gives up on the rename after bounded attempts",
+    "duration": 204.298274,
+    "status": "passed"
+  },
+  {
+    "file": "tests/registry-transfer.test.ts",
+    "name": "encrypt/decrypt bundle (passphrase) round-trips under the correct passphrase",
+    "duration": 195.55336799999998,
+    "status": "passed"
+  },
+  {
+    "file": "tests/registry-transfer.test.ts",
+    "name": "encrypt/decrypt bundle (passphrase) a wrong passphrase throws BundleDecryptError, not a raw crypto error",
+    "duration": 186.45259799999997,
+    "status": "passed"
+  },
+  {
+    "file": "tests/google-api.test.ts",
+    "name": "google_api_call bounds google_api_search: a caller-sized query scans only a capped keyword set",
+    "duration": 177.02013999999997,
+    "status": "passed"
+  },
+  {
+    "file": "tests/schema-identity-guard.test.ts",
+    "name": "static identity-field guard no registered tool declares an identity-shaped input field",
+    "duration": 175.89303100000006,
+    "status": "passed"
+  },
+  {
+    "file": "tests/surface-honesty.test.ts",
+    "name": "unknown tool name ranks only the first few unknown keys against the service sibling keys",
+    "duration": 173.95373299999994,
+    "status": "passed"
+  },
+  {
+    "file": "tests/mcp-token.test.ts",
+    "name": "RefreshStore earlier-release records nothing is evicted: the oldest of 2,001 earlier-release tokens still revokes after 20 new rotations",
+    "duration": 169.94435899999985,
+    "status": "passed"
+  },
+  {
+    "file": "tests/registry.test.ts",
+    "name": "ToolRegistry gates drive_transfer move as a delete while copy stays create-gated",
+    "duration": 167.67828899999995,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) refuses a grace a timer cannot hold, and leaves the host serving",
+    "duration": 163.78000299999258,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost lane bounds a client that leaves before its body is read releases its slot",
+    "duration": 160.95887100000027,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) cuts a request still running when the grace ends",
+    "duration": 158.42306699999972,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) waits for a request still being authenticated after its client left",
+    "duration": 157.885045,
+    "status": "passed"
+  },
+  {
+    "file": "tests/mcp-token.test.ts",
+    "name": "RefreshStore generations a passphrase MASTER_KEY reaches the MAC key through scrypt, not one hash",
+    "duration": 144.39894800000002,
+    "status": "passed"
+  },
+  {
+    "file": "tests/schema-identity-guard.test.ts",
+    "name": "static identity-field guard the exception list carries no dead entries (every one still exists)",
+    "duration": 143.53494899999998,
+    "status": "passed"
+  },
+  {
+    "file": "tests/mcp-token.test.ts",
+    "name": "RefreshStore pre-auth cost refreshFamilyTagger tags a family the same at every generation and nothing else",
+    "duration": 136.91222400000015,
+    "status": "passed"
+  },
+  {
+    "file": "tests/live-account-arg.test.ts",
+    "name": "real tools keep fan-out and validate live an alias added after build is valid on curated and generated tools, read and write",
+    "duration": 129.75898699999993,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost lane bounds the lane slot is released on every exit",
+    "duration": 119.39454599999999,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost lane bounds a request pipelined behind a held one is never dispatched once its connection is gone",
+    "duration": 115.1580829999998,
+    "status": "passed"
+  },
+  {
+    "file": "tests/arg-strict.test.ts",
+    "name": "suggestion work is bounded on caller input a max-length unknown name against every tool name costs almost nothing",
+    "duration": 114.71104600000001,
+    "status": "passed"
+  },
+  {
+    "file": "tests/tenant-purge.test.ts",
+    "name": "RefreshStore.purgeTenant drops only sub-matching active records; other subs keep rotating",
+    "duration": 111.97214000000002,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) answers a route pipelined behind an /mcp response that has not started",
+    "duration": 108.35228400000005,
+    "status": "passed"
+  },
+  {
+    "file": "tests/http-transport.test.ts",
+    "name": "HttpTransportHost graceful close close({ graceMs }) lets a request still reading its body finish, and tells its client the connection closes",
+    "duration": 106.83501299999989,
+    "status": "passed"
+  }
+]

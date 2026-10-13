@@ -1,0 +1,467 @@
+[
+  {
+    "name": "tests/http-transport.test.ts",
+    "duration": 82149.78002929688,
+    "numTests": 70
+  },
+  {
+    "name": "tests/empty-registry.test.ts",
+    "duration": 4440.919189453125,
+    "numTests": 11
+  },
+  {
+    "name": "tests/metrics-integration.test.ts",
+    "duration": 2815.69091796875,
+    "numTests": 2
+  },
+  {
+    "name": "tests/http-boot-smoke.test.ts",
+    "duration": 1826.550048828125,
+    "numTests": 1
+  },
+  {
+    "name": "tests/mcp-token.test.ts",
+    "duration": 1453.377685546875,
+    "numTests": 77
+  },
+  {
+    "name": "tests/oauth-as.test.ts",
+    "duration": 1081.424072265625,
+    "numTests": 103
+  },
+  {
+    "name": "tests/live-account-arg.test.ts",
+    "duration": 1028.53173828125,
+    "numTests": 8
+  },
+  {
+    "name": "tests/exports-map.test.ts",
+    "duration": 946.00439453125,
+    "numTests": 6
+  },
+  {
+    "name": "tests/registry-transfer.test.ts",
+    "duration": 939.42578125,
+    "numTests": 17
+  },
+  {
+    "name": "tests/generated-tools.test.ts",
+    "duration": 913.99169921875,
+    "numTests": 27
+  },
+  {
+    "name": "tests/token-store.test.ts",
+    "duration": 515.57861328125,
+    "numTests": 26
+  },
+  {
+    "name": "tests/surface-honesty.test.ts",
+    "duration": 475.48779296875,
+    "numTests": 19
+  },
+  {
+    "name": "tests/context-threading.test.ts",
+    "duration": 470.149169921875,
+    "numTests": 18
+  },
+  {
+    "name": "tests/schema-identity-guard.test.ts",
+    "duration": 320.6259765625,
+    "numTests": 3
+  },
+  {
+    "name": "tests/google-api.test.ts",
+    "duration": 270.790771484375,
+    "numTests": 23
+  },
+  {
+    "name": "tests/registry.test.ts",
+    "duration": 203.785400390625,
+    "numTests": 58
+  },
+  {
+    "name": "tests/arg-strict.test.ts",
+    "duration": 164.15283203125,
+    "numTests": 27
+  },
+  {
+    "name": "tests/tenant-purge.test.ts",
+    "duration": 154.533203125,
+    "numTests": 10
+  },
+  {
+    "name": "tests/config-registry.test.ts",
+    "duration": 132.937744140625,
+    "numTests": 52
+  },
+  {
+    "name": "tests/ssrf-guard.test.ts",
+    "duration": 130.274658203125,
+    "numTests": 29
+  },
+  {
+    "name": "tests/usage-metrics.test.ts",
+    "duration": 110.863525390625,
+    "numTests": 34
+  },
+  {
+    "name": "tests/oauth-consent.test.ts",
+    "duration": 82.831298828125,
+    "numTests": 9
+  },
+  {
+    "name": "tests/attachment-guards.test.ts",
+    "duration": 64.758056640625,
+    "numTests": 7
+  },
+  {
+    "name": "tests/arg-normalize.test.ts",
+    "duration": 47.671875,
+    "numTests": 33
+  },
+  {
+    "name": "tests/metrics-tap.test.ts",
+    "duration": 46.955078125,
+    "numTests": 16
+  },
+  {
+    "name": "tests/scope-profiles.test.ts",
+    "duration": 44.56884765625,
+    "numTests": 12
+  },
+  {
+    "name": "tests/fanout.test.ts",
+    "duration": 42.227294921875,
+    "numTests": 23
+  },
+  {
+    "name": "tests/master-key.test.ts",
+    "duration": 41.281005859375,
+    "numTests": 19
+  },
+  {
+    "name": "tests/cimd-cache.test.ts",
+    "duration": 36.410400390625,
+    "numTests": 14
+  },
+  {
+    "name": "tests/discovery-client.test.ts",
+    "duration": 34.1865234375,
+    "numTests": 78
+  },
+  {
+    "name": "tests/markdown-send.test.ts",
+    "duration": 33.879638671875,
+    "numTests": 6
+  },
+  {
+    "name": "tests/client.test.ts",
+    "duration": 32.17626953125,
+    "numTests": 8
+  },
+  {
+    "name": "tests/compose-raw.test.ts",
+    "duration": 30.555908203125,
+    "numTests": 7
+  },
+  {
+    "name": "tests/gmail-read.test.ts",
+    "duration": 27.22705078125,
+    "numTests": 15
+  },
+  {
+    "name": "tests/doctor.test.ts",
+    "duration": 26.49560546875,
+    "numTests": 39
+  },
+  {
+    "name": "tests/metrics-cli.test.ts",
+    "duration": 26.3603515625,
+    "numTests": 7
+  },
+  {
+    "name": "tests/env-load.test.ts",
+    "duration": 25.460693359375,
+    "numTests": 9
+  },
+  {
+    "name": "tests/http-config.test.ts",
+    "duration": 25.455322265625,
+    "numTests": 20
+  },
+  {
+    "name": "tests/local-files.test.ts",
+    "duration": 25.366943359375,
+    "numTests": 4
+  },
+  {
+    "name": "tests/default-account.test.ts",
+    "duration": 24.923828125,
+    "numTests": 12
+  },
+  {
+    "name": "tests/wizard-transport.test.ts",
+    "duration": 24.570068359375,
+    "numTests": 6
+  },
+  {
+    "name": "tests/account-wizard.test.ts",
+    "duration": 21.683349609375,
+    "numTests": 24
+  },
+  {
+    "name": "tests/envelope-consistency.test.ts",
+    "duration": 20.364013671875,
+    "numTests": 7
+  },
+  {
+    "name": "tests/markdown-read.test.ts",
+    "duration": 19.968017578125,
+    "numTests": 4
+  },
+  {
+    "name": "tests/errors.test.ts",
+    "duration": 19.15625,
+    "numTests": 60
+  },
+  {
+    "name": "tests/server-instructions.test.ts",
+    "duration": 18.73681640625,
+    "numTests": 3
+  },
+  {
+    "name": "tests/fanout-containment.test.ts",
+    "duration": 17.869384765625,
+    "numTests": 7
+  },
+  {
+    "name": "tests/visibility-modes.test.ts",
+    "duration": 14.5107421875,
+    "numTests": 12
+  },
+  {
+    "name": "tests/field-mask-helpers.test.ts",
+    "duration": 14.302734375,
+    "numTests": 18
+  },
+  {
+    "name": "tests/open-url.test.ts",
+    "duration": 14.08984375,
+    "numTests": 6
+  },
+  {
+    "name": "tests/scope-observability.test.ts",
+    "duration": 13.623291015625,
+    "numTests": 25
+  },
+  {
+    "name": "tests/write-control.test.ts",
+    "duration": 13.161376953125,
+    "numTests": 20
+  },
+  {
+    "name": "tests/client-config.test.ts",
+    "duration": 12.341064453125,
+    "numTests": 15
+  },
+  {
+    "name": "tests/slides.test.ts",
+    "duration": 12.291259765625,
+    "numTests": 7
+  },
+  {
+    "name": "tests/coerce.test.ts",
+    "duration": 12.197998046875,
+    "numTests": 17
+  },
+  {
+    "name": "tests/trim.test.ts",
+    "duration": 12.140869140625,
+    "numTests": 24
+  },
+  {
+    "name": "tests/discover.test.ts",
+    "duration": 12.0888671875,
+    "numTests": 6
+  },
+  {
+    "name": "tests/read-batch.test.ts",
+    "duration": 11.7734375,
+    "numTests": 9
+  },
+  {
+    "name": "tests/api-probe.test.ts",
+    "duration": 11.3466796875,
+    "numTests": 10
+  },
+  {
+    "name": "tests/empty-id-guard.test.ts",
+    "duration": 11.001953125,
+    "numTests": 10
+  },
+  {
+    "name": "tests/drive-dx.test.ts",
+    "duration": 10.365234375,
+    "numTests": 10
+  },
+  {
+    "name": "tests/docs-read.test.ts",
+    "duration": 10.335205078125,
+    "numTests": 18
+  },
+  {
+    "name": "tests/accounts-tool.test.ts",
+    "duration": 10.244140625,
+    "numTests": 13
+  },
+  {
+    "name": "tests/analytics.test.ts",
+    "duration": 9.557861328125,
+    "numTests": 12
+  },
+  {
+    "name": "tests/optional-bundles.test.ts",
+    "duration": 9.2744140625,
+    "numTests": 10
+  },
+  {
+    "name": "tests/gmail-mime.test.ts",
+    "duration": 9.205078125,
+    "numTests": 24
+  },
+  {
+    "name": "tests/mcpb-manifest.test.ts",
+    "duration": 8.787353515625,
+    "numTests": 6
+  },
+  {
+    "name": "tests/identity.test.ts",
+    "duration": 8.554443359375,
+    "numTests": 5
+  },
+  {
+    "name": "tests/deploy-templates.test.ts",
+    "duration": 8.362548828125,
+    "numTests": 16
+  },
+  {
+    "name": "tests/list-result.test.ts",
+    "duration": 7.79931640625,
+    "numTests": 9
+  },
+  {
+    "name": "tests/reply-autofill.test.ts",
+    "duration": 7.45947265625,
+    "numTests": 8
+  },
+  {
+    "name": "tests/privileged-writes.test.ts",
+    "duration": 7.390625,
+    "numTests": 13
+  },
+  {
+    "name": "tests/service-error-bundles.test.ts",
+    "duration": 7.313232421875,
+    "numTests": 6
+  },
+  {
+    "name": "tests/docs-insert.test.ts",
+    "duration": 7.307373046875,
+    "numTests": 10
+  },
+  {
+    "name": "tests/outbound-allowlist.test.ts",
+    "duration": 7.255615234375,
+    "numTests": 12
+  },
+  {
+    "name": "tests/write-disabled-hint.test.ts",
+    "duration": 6.54052734375,
+    "numTests": 9
+  },
+  {
+    "name": "tests/contact-resolver.test.ts",
+    "duration": 6.532470703125,
+    "numTests": 9
+  },
+  {
+    "name": "tests/stdout-purity.test.ts",
+    "duration": 6.35888671875,
+    "numTests": 1
+  },
+  {
+    "name": "tests/boot-gates.test.ts",
+    "duration": 5.77294921875,
+    "numTests": 5
+  },
+  {
+    "name": "tests/drive-query.test.ts",
+    "duration": 5.67724609375,
+    "numTests": 9
+  },
+  {
+    "name": "tests/drive-transfer.test.ts",
+    "duration": 5.28955078125,
+    "numTests": 11
+  },
+  {
+    "name": "tests/hint-provider.test.ts",
+    "duration": 4.693359375,
+    "numTests": 4
+  },
+  {
+    "name": "tests/scope-catalog-personal.test.ts",
+    "duration": 4.371337890625,
+    "numTests": 2
+  },
+  {
+    "name": "tests/reset.test.ts",
+    "duration": 4.352783203125,
+    "numTests": 6
+  },
+  {
+    "name": "tests/setup-prompt.test.ts",
+    "duration": 4.311767578125,
+    "numTests": 7
+  },
+  {
+    "name": "tests/registry-entry.test.ts",
+    "duration": 4.286376953125,
+    "numTests": 5
+  },
+  {
+    "name": "tests/toolsets.test.ts",
+    "duration": 4.222412109375,
+    "numTests": 6
+  },
+  {
+    "name": "tests/semantic-guards.test.ts",
+    "duration": 3.8251953125,
+    "numTests": 5
+  },
+  {
+    "name": "tests/drive-read-mime.test.ts",
+    "duration": 3.6298828125,
+    "numTests": 4
+  },
+  {
+    "name": "tests/reauth-hint.test.ts",
+    "duration": 3.52587890625,
+    "numTests": 3
+  },
+  {
+    "name": "tests/path-safety.test.ts",
+    "duration": 3.306640625,
+    "numTests": 6
+  },
+  {
+    "name": "tests/services-gates.test.ts",
+    "duration": 3.224365234375,
+    "numTests": 5
+  },
+  {
+    "name": "tests/net-tuning.test.ts",
+    "duration": 2.282958984375,
+    "numTests": 6
+  }
+]
