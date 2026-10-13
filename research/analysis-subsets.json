@@ -1,0 +1,110 @@
+[
+  {
+    "subset": "tests__deploy-templates.test",
+    "superset": "tests__setup-prompt.test",
+    "subsetSize": 166,
+    "supersetSize": 169
+  },
+  {
+    "subset": "tests__mcpb-manifest.test",
+    "superset": "tests__setup-prompt.test",
+    "subsetSize": 166,
+    "supersetSize": 169
+  },
+  {
+    "subset": "tests__metrics-integration.test",
+    "superset": "tests__setup-prompt.test",
+    "subsetSize": 166,
+    "supersetSize": 169
+  },
+  {
+    "subset": "tests__path-safety.test",
+    "superset": "tests__setup-prompt.test",
+    "subsetSize": 166,
+    "supersetSize": 169
+  },
+  {
+    "subset": "tests__registry-entry.test",
+    "superset": "tests__setup-prompt.test",
+    "subsetSize": 166,
+    "supersetSize": 169
+  },
+  {
+    "subset": "tests__stdout-purity.test",
+    "superset": "tests__setup-prompt.test",
+    "subsetSize": 166,
+    "supersetSize": 169
+  },
+  {
+    "subset": "tests__scope-catalog-personal.test",
+    "superset": "tests__account-wizard.test",
+    "subsetSize": 170,
+    "supersetSize": 254
+  },
+  {
+    "subset": "tests__toolsets.test",
+    "superset": "tests__surface-honesty.test",
+    "subsetSize": 171,
+    "supersetSize": 719
+  },
+  {
+    "subset": "tests__markdown-read.test",
+    "superset": "tests__gmail-read.test",
+    "subsetSize": 174,
+    "supersetSize": 245
+  },
+  {
+    "subset": "tests__hint-provider.test",
+    "superset": "tests__discover.test",
+    "subsetSize": 177,
+    "supersetSize": 353
+  },
+  {
+    "subset": "tests__markdown-send.test",
+    "superset": "tests__context-threading.test",
+    "subsetSize": 182,
+    "supersetSize": 1293
+  },
+  {
+    "subset": "tests__reauth-hint.test",
+    "superset": "tests__accounts-tool.test",
+    "subsetSize": 183,
+    "supersetSize": 257
+  },
+  {
+    "subset": "tests__exports-map.test",
+    "superset": "tests__drive-dx.test",
+    "subsetSize": 185,
+    "supersetSize": 252
+  },
+  {
+    "subset": "tests__empty-registry.test",
+    "superset": "tests__config-registry.test",
+    "subsetSize": 187,
+    "supersetSize": 326
+  },
+  {
+    "subset": "tests__http-boot-smoke.test",
+    "superset": "tests__mcp-token.test",
+    "subsetSize": 205,
+    "supersetSize": 511
+  },
+  {
+    "subset": "tests__write-disabled-hint.test",
+    "superset": "tests__registry.test",
+    "subsetSize": 220,
+    "supersetSize": 518
+  },
+  {
+    "subset": "tests__services-gates.test",
+    "superset": "tests__surface-honesty.test",
+    "subsetSize": 309,
+    "supersetSize": 719
+  },
+  {
+    "subset": "tests__empty-id-guard.test",
+    "superset": "tests__schema-identity-guard.test",
+    "subsetSize": 563,
+    "supersetSize": 688
+  }
+]

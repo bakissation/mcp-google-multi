@@ -1,0 +1,467 @@
+[
+  {
+    "slug": "tests__deploy-templates.test",
+    "lines": 166,
+    "pct": 2.29
+  },
+  {
+    "slug": "tests__mcpb-manifest.test",
+    "lines": 166,
+    "pct": 2.29
+  },
+  {
+    "slug": "tests__metrics-integration.test",
+    "lines": 166,
+    "pct": 2.29
+  },
+  {
+    "slug": "tests__path-safety.test",
+    "lines": 166,
+    "pct": 2.29
+  },
+  {
+    "slug": "tests__registry-entry.test",
+    "lines": 166,
+    "pct": 2.29
+  },
+  {
+    "slug": "tests__stdout-purity.test",
+    "lines": 166,
+    "pct": 2.29
+  },
+  {
+    "slug": "tests__setup-prompt.test",
+    "lines": 169,
+    "pct": 2.33
+  },
+  {
+    "slug": "tests__scope-catalog-personal.test",
+    "lines": 170,
+    "pct": 2.35
+  },
+  {
+    "slug": "tests__toolsets.test",
+    "lines": 171,
+    "pct": 2.36
+  },
+  {
+    "slug": "tests__env-load.test",
+    "lines": 172,
+    "pct": 2.38
+  },
+  {
+    "slug": "tests__net-tuning.test",
+    "lines": 172,
+    "pct": 2.38
+  },
+  {
+    "slug": "tests__list-result.test",
+    "lines": 174,
+    "pct": 2.4
+  },
+  {
+    "slug": "tests__markdown-read.test",
+    "lines": 174,
+    "pct": 2.4
+  },
+  {
+    "slug": "tests__boot-gates.test",
+    "lines": 177,
+    "pct": 2.44
+  },
+  {
+    "slug": "tests__hint-provider.test",
+    "lines": 177,
+    "pct": 2.44
+  },
+  {
+    "slug": "tests__open-url.test",
+    "lines": 181,
+    "pct": 2.5
+  },
+  {
+    "slug": "tests__markdown-send.test",
+    "lines": 182,
+    "pct": 2.51
+  },
+  {
+    "slug": "tests__compose-raw.test",
+    "lines": 183,
+    "pct": 2.53
+  },
+  {
+    "slug": "tests__reauth-hint.test",
+    "lines": 183,
+    "pct": 2.53
+  },
+  {
+    "slug": "tests__exports-map.test",
+    "lines": 185,
+    "pct": 2.56
+  },
+  {
+    "slug": "tests__coerce.test",
+    "lines": 186,
+    "pct": 2.57
+  },
+  {
+    "slug": "tests__empty-registry.test",
+    "lines": 187,
+    "pct": 2.58
+  },
+  {
+    "slug": "tests__local-files.test",
+    "lines": 188,
+    "pct": 2.6
+  },
+  {
+    "slug": "tests__gmail-mime.test",
+    "lines": 202,
+    "pct": 2.79
+  },
+  {
+    "slug": "tests__http-boot-smoke.test",
+    "lines": 205,
+    "pct": 2.83
+  },
+  {
+    "slug": "tests__semantic-guards.test",
+    "lines": 207,
+    "pct": 2.86
+  },
+  {
+    "slug": "tests__outbound-allowlist.test",
+    "lines": 211,
+    "pct": 2.91
+  },
+  {
+    "slug": "tests__docs-insert.test",
+    "lines": 213,
+    "pct": 2.94
+  },
+  {
+    "slug": "tests__drive-read-mime.test",
+    "lines": 213,
+    "pct": 2.94
+  },
+  {
+    "slug": "tests__drive-transfer.test",
+    "lines": 216,
+    "pct": 2.98
+  },
+  {
+    "slug": "tests__privileged-writes.test",
+    "lines": 216,
+    "pct": 2.98
+  },
+  {
+    "slug": "tests__http-config.test",
+    "lines": 219,
+    "pct": 3.02
+  },
+  {
+    "slug": "tests__write-disabled-hint.test",
+    "lines": 220,
+    "pct": 3.04
+  },
+  {
+    "slug": "tests__contact-resolver.test",
+    "lines": 221,
+    "pct": 3.05
+  },
+  {
+    "slug": "tests__client-config.test",
+    "lines": 222,
+    "pct": 3.07
+  },
+  {
+    "slug": "tests__drive-query.test",
+    "lines": 222,
+    "pct": 3.07
+  },
+  {
+    "slug": "tests__oauth-consent.test",
+    "lines": 222,
+    "pct": 3.07
+  },
+  {
+    "slug": "tests__write-control.test",
+    "lines": 223,
+    "pct": 3.08
+  },
+  {
+    "slug": "tests__analytics.test",
+    "lines": 224,
+    "pct": 3.09
+  },
+  {
+    "slug": "tests__fanout.test",
+    "lines": 230,
+    "pct": 3.18
+  },
+  {
+    "slug": "tests__optional-bundles.test",
+    "lines": 231,
+    "pct": 3.19
+  },
+  {
+    "slug": "tests__attachment-guards.test",
+    "lines": 239,
+    "pct": 3.3
+  },
+  {
+    "slug": "tests__master-key.test",
+    "lines": 239,
+    "pct": 3.3
+  },
+  {
+    "slug": "tests__gmail-read.test",
+    "lines": 245,
+    "pct": 3.38
+  },
+  {
+    "slug": "tests__registry-transfer.test",
+    "lines": 247,
+    "pct": 3.41
+  },
+  {
+    "slug": "tests__arg-strict.test",
+    "lines": 251,
+    "pct": 3.47
+  },
+  {
+    "slug": "tests__drive-dx.test",
+    "lines": 252,
+    "pct": 3.48
+  },
+  {
+    "slug": "tests__cimd-cache.test",
+    "lines": 253,
+    "pct": 3.49
+  },
+  {
+    "slug": "tests__account-wizard.test",
+    "lines": 254,
+    "pct": 3.51
+  },
+  {
+    "slug": "tests__trim.test",
+    "lines": 254,
+    "pct": 3.51
+  },
+  {
+    "slug": "tests__docs-read.test",
+    "lines": 255,
+    "pct": 3.52
+  },
+  {
+    "slug": "tests__field-mask-helpers.test",
+    "lines": 255,
+    "pct": 3.52
+  },
+  {
+    "slug": "tests__reply-autofill.test",
+    "lines": 255,
+    "pct": 3.52
+  },
+  {
+    "slug": "tests__accounts-tool.test",
+    "lines": 257,
+    "pct": 3.55
+  },
+  {
+    "slug": "tests__service-error-bundles.test",
+    "lines": 258,
+    "pct": 3.56
+  },
+  {
+    "slug": "tests__envelope-consistency.test",
+    "lines": 270,
+    "pct": 3.73
+  },
+  {
+    "slug": "tests__reset.test",
+    "lines": 273,
+    "pct": 3.77
+  },
+  {
+    "slug": "tests__identity.test",
+    "lines": 275,
+    "pct": 3.8
+  },
+  {
+    "slug": "tests__scope-profiles.test",
+    "lines": 276,
+    "pct": 3.81
+  },
+  {
+    "slug": "tests__discovery-client.test",
+    "lines": 279,
+    "pct": 3.85
+  },
+  {
+    "slug": "tests__ssrf-guard.test",
+    "lines": 283,
+    "pct": 3.91
+  },
+  {
+    "slug": "tests__api-probe.test",
+    "lines": 285,
+    "pct": 3.94
+  },
+  {
+    "slug": "tests__client.test",
+    "lines": 294,
+    "pct": 4.06
+  },
+  {
+    "slug": "tests__token-store.test",
+    "lines": 302,
+    "pct": 4.17
+  },
+  {
+    "slug": "tests__scope-observability.test",
+    "lines": 304,
+    "pct": 4.2
+  },
+  {
+    "slug": "tests__services-gates.test",
+    "lines": 309,
+    "pct": 4.27
+  },
+  {
+    "slug": "tests__metrics-cli.test",
+    "lines": 316,
+    "pct": 4.36
+  },
+  {
+    "slug": "tests__slides.test",
+    "lines": 322,
+    "pct": 4.45
+  },
+  {
+    "slug": "tests__config-registry.test",
+    "lines": 326,
+    "pct": 4.5
+  },
+  {
+    "slug": "tests__read-batch.test",
+    "lines": 327,
+    "pct": 4.52
+  },
+  {
+    "slug": "tests__default-account.test",
+    "lines": 341,
+    "pct": 4.71
+  },
+  {
+    "slug": "tests__errors.test",
+    "lines": 342,
+    "pct": 4.72
+  },
+  {
+    "slug": "tests__visibility-modes.test",
+    "lines": 343,
+    "pct": 4.74
+  },
+  {
+    "slug": "tests__server-instructions.test",
+    "lines": 351,
+    "pct": 4.85
+  },
+  {
+    "slug": "tests__discover.test",
+    "lines": 353,
+    "pct": 4.88
+  },
+  {
+    "slug": "tests__metrics-tap.test",
+    "lines": 363,
+    "pct": 5.01
+  },
+  {
+    "slug": "tests__fanout-containment.test",
+    "lines": 365,
+    "pct": 5.04
+  },
+  {
+    "slug": "tests__usage-metrics.test",
+    "lines": 415,
+    "pct": 5.73
+  },
+  {
+    "slug": "tests__wizard-transport.test",
+    "lines": 418,
+    "pct": 5.77
+  },
+  {
+    "slug": "tests__tenant-purge.test",
+    "lines": 433,
+    "pct": 5.98
+  },
+  {
+    "slug": "tests__arg-normalize.test",
+    "lines": 482,
+    "pct": 6.66
+  },
+  {
+    "slug": "tests__doctor.test",
+    "lines": 495,
+    "pct": 6.84
+  },
+  {
+    "slug": "tests__generated-tools.test",
+    "lines": 507,
+    "pct": 7
+  },
+  {
+    "slug": "tests__mcp-token.test",
+    "lines": 511,
+    "pct": 7.06
+  },
+  {
+    "slug": "tests__registry.test",
+    "lines": 518,
+    "pct": 7.15
+  },
+  {
+    "slug": "tests__google-api.test",
+    "lines": 546,
+    "pct": 7.54
+  },
+  {
+    "slug": "tests__http-transport.test",
+    "lines": 560,
+    "pct": 7.73
+  },
+  {
+    "slug": "tests__empty-id-guard.test",
+    "lines": 563,
+    "pct": 7.78
+  },
+  {
+    "slug": "tests__live-account-arg.test",
+    "lines": 648,
+    "pct": 8.95
+  },
+  {
+    "slug": "tests__schema-identity-guard.test",
+    "lines": 688,
+    "pct": 9.5
+  },
+  {
+    "slug": "tests__surface-honesty.test",
+    "lines": 719,
+    "pct": 9.93
+  },
+  {
+    "slug": "tests__oauth-as.test",
+    "lines": 1105,
+    "pct": 15.26
+  },
+  {
+    "slug": "tests__context-threading.test",
+    "lines": 1293,
+    "pct": 17.86
+  }
+]
