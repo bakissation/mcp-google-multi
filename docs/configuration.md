@@ -116,7 +116,7 @@ By default the server speaks **stdio** (`MCP_TRANSPORT=stdio`), the zero-network
 | `MCP_PUBLIC_URL` | `http://<host>:<port>` | the canonical public base URL; `${MCP_PUBLIC_URL}/mcp` is the endpoint clients connect to |
 | `MCP_OWNER_EMAILS` | *(required for http)* | CSV of Google emails allowed to authenticate; the server refuses to start HTTP without it |
 | `MCP_ALLOWED_ORIGINS` | — | extra Origins to allow beyond `MCP_PUBLIC_URL` and `https://claude.ai` |
-| `MCP_CIMD_ALLOWED_ISSUERS` | `claude.ai` | CSV host allowlist for OAuth client-metadata documents |
+| `MCP_CIMD_ALLOWED_ISSUERS` | `claude.ai` | CSV host allowlist for OAuth client-metadata documents. Other clients that pick CIMD are refused with `invalid_client` until their host is listed, e.g. `claude.ai,chatgpt.com` for Codex or ChatGPT |
 | `MCP_ACCESS_TTL` | `600` | MCP access-token lifetime (seconds) |
 | `MCP_JWT_KEY` | auto | signing key for the server's own MCP tokens; resolved like `MASTER_KEY` (env > OS keychain > `mcp-jwt.key` file > generated). Regenerating it only signs clients out |
 

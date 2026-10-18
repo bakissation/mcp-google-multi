@@ -5,7 +5,7 @@ By default the server runs **locally over stdio** — your MCP client launches i
 Remote HTTP changes the security model. Locally, the process **is** the owner. Remotely, anyone who can reach the URL can try to authenticate, so the server ships a small OAuth 2.1 authorization server and **refuses to start HTTP** until you name the Google account(s) allowed in — the *owner gate*. Two rules are non-negotiable for every recipe below:
 
 - **`MCP_OWNER_EMAILS`** must list the Google email(s) allowed to sign in. Empty ⇒ startup fails with `E_OWNER_EMAILS_REQUIRED`. This is the entire multi-tenant defense; there is no default.
-- **`MCP_PUBLIC_URL`** must be the externally reachable **HTTPS** origin (e.g. `https://mcp.example.com`). The server keeps binding to `127.0.0.1`, but every OAuth metadata document, redirect, and JWT `aud` is derived from this URL. Get it wrong and every `/mcp` call 401-loops (the #1 interop bug).
+- **`MCP_PUBLIC_URL`** must be the externally reachable **HTTPS** origin (e.g. `https://mcp.example.com`) for anything reachable beyond this machine. `http://127.0.0.1:<port>` is accepted for local use only; the server does not refuse `http://` on other hosts, so over plain HTTP the sign-in and tokens travel unencrypted. The server keeps binding to `127.0.0.1`, but every OAuth metadata document, redirect, and JWT `aud` is derived from this URL. Get it wrong and every `/mcp` call 401-loops (the #1 interop bug).
 
 Pick your path:
 
@@ -50,7 +50,7 @@ COMPOSE_PROFILES=caddy docker compose up -d
 
 Caddy obtains and renews the certificate automatically; nothing else to configure.
 
-- **Image tags**: the compose file tracks the stable major (`:6`). Until 6.0.0 stable ships, set `MCP_IMAGE_TAG=beta` (or `dev`) in `.env`. Exact versions (`:6.0.0`) work too.
+- **Image tags**: the compose file tracks the stable major (`:6`). Set `MCP_IMAGE_TAG` in `.env` to pin an exact version (`:6.0.0`) or to follow a prerelease channel (`beta`, `dev`).
 - **Upgrade**: `docker compose pull && docker compose up -d`.
 - **State**: tokens + the auto-provisioned `MASTER_KEY` file live in the `mcp-config` volume — keep it. Recreating the volume invalidates every stored token.
 - The Google **redirect URI** and Claude connection steps below apply to this option too.
@@ -97,7 +97,7 @@ MCP_OWNER_EMAILS=<owner@example.com> \
   npx -y mcp-google-multi
 ```
 
-Until 6.0.0 ships on npm `latest` (which still serves 5.x, stdio-only), use `mcp-google-multi@staging` (beta) or `@dev` (alpha).
+HTTP transport needs 6.0.0 or later, which npm `latest` serves (5.x is stdio-only).
 
 Confirm it's alive: `curl https://mcp.example.com/health` returns `{"status":"ok","transport":"http",…}` (no secrets).
 
