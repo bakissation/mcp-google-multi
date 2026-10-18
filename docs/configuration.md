@@ -149,7 +149,7 @@ Reads are never gated. **Every create/update/delete is off until you opt in** â€
 | `safe-writes` | create + update on your own data, plus moving items to or from Trash (permanent deletes and privileged writes blocked) |
 | `full-writes` | everything |
 
-`GOOGLE_READ_ONLY=true` overrides all; an invalid `GOOGLE_PROFILE` falls back to `read-only`. For fine control: `GOOGLE_WRITE_ALLOW="calendar:*, sheets:update*"` and `GOOGLE_WRITE_DENY="*:delete*"` (deny wins). The policy applies identically to curated tools, generated tools, and the escape hatch.
+`GOOGLE_READ_ONLY=true` overrides all; an invalid `GOOGLE_PROFILE` falls back to `read-only`. For fine control: `GOOGLE_WRITE_ALLOW="calendar:*, sheets:update*"` and `GOOGLE_WRITE_DENY="*:delete*"` (deny wins). Each tool matches as `service:cud` and as `service:op` (its name minus the service prefix), so a tool named after its own class shares that class's pattern: `drive:update` matches `drive_update` and every other update-class Drive tool (`drive_move`, `drive_permission_update`, â€¦). The policy applies identically to curated tools, generated tools, and the escape hatch.
 
 ### What `safe-writes` refuses beyond deletes
 
