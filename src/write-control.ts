@@ -188,6 +188,20 @@ export function denyReason(tool: ToolRef, policy: Policy): DenyReason | undefine
   return { rule: 'profile', profile: policy.profile };
 }
 
+const CUD_CLASSES: readonly string[] = ['read', 'create', 'update', 'delete'];
+
+// The allow-list vocabulary is service:cud or service:op, never the tool
+// name, so suggesting the name would hand back a pattern that never matches.
+function allowSuggestion(tool: ToolRef): string {
+  const op = opOf(tool);
+  const pattern = `${tool.service}:${op}`;
+  // An op spelled like a cud class (drive_update) is also that class's pattern.
+  if (CUD_CLASSES.includes(op)) {
+    return `allow it with GOOGLE_WRITE_ALLOW="${pattern}", which also allows every other ${op}-class ${tool.service} tool`;
+  }
+  return `allow just this one with GOOGLE_WRITE_ALLOW="${pattern}"`;
+}
+
 function denyHint(tool: ToolRef, reason: DenyReason): string {
   if (reason.rule === 'read_only') {
     return 'GOOGLE_READ_ONLY=true refuses every write, ahead of the profile and the allow-list, so neither of those can enable this. Unset GOOGLE_READ_ONLY to allow writes.';
@@ -199,15 +213,13 @@ function denyHint(tool: ToolRef, reason: DenyReason): string {
     const what = reason.kind === 'push_registration'
       ? 'registers a push channel, which sends this account\'s activity to an external URL'
       : 'needs a scope that acts on the whole organization, on legal holds, on billing, or on deployed code';
-    return `"${tool.name}" ${what}, so "${reason.profile}" refuses it whatever its verb. Use GOOGLE_PROFILE=full-writes, or allow just this one with GOOGLE_WRITE_ALLOW="${tool.service}:${opOf(tool)}".`;
+    return `"${tool.name}" ${what}, so "${reason.profile}" refuses it whatever its verb. Use GOOGLE_PROFILE=full-writes, or ${allowSuggestion(tool)}.`;
   }
   const usable = profilesAllowing(tool).filter((p) => p !== reason.profile);
   const profiles = usable.length > 0
     ? `Use GOOGLE_PROFILE=${usable.join(' or ')}`
     : 'No profile permits this operation';
-  // The allow-list vocabulary is service:cud or service:op, never the tool
-  // name, so suggesting the name would hand back a pattern that never matches.
-  return `Profile "${reason.profile}" does not permit ${tool.cud}. ${profiles}, or allow just this one with GOOGLE_WRITE_ALLOW="${tool.service}:${opOf(tool)}".`;
+  return `Profile "${reason.profile}" does not permit ${tool.cud}. ${profiles}, or ${allowSuggestion(tool)}.`;
 }
 
 export function writeDisabledResult(tool: ToolRef, policy: Policy, account?: string) {

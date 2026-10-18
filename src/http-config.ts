@@ -54,8 +54,9 @@ export function resolveTransport(env: NodeJS.ProcessEnv = process.env): Transpor
 
 /**
  * Canonicalize a public base URL. WHATWG `URL` already lowercases the
- * scheme+host and omits a default port from `.host`; this adds the HTTPS-only
- * scheme check, strips fragment/query/userinfo, and removes a trailing slash.
+ * scheme+host and omits a default port from `.host`; this restricts the scheme
+ * to http(s), strips fragment/query/userinfo, and removes a trailing slash.
+ * `http:` stays accepted for a loopback single-owner setup (docs/internals.md).
  */
 export function canonicalizePublicUrl(raw: string): string {
   let u: URL;

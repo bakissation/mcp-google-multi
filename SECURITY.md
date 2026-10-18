@@ -6,9 +6,10 @@ This project follows semantic versioning. Please upgrade before reporting.
 
 | Version | npm dist-tag | Security fixes |
 |---|---|---|
-| 5.4.x (latest stable minor) | `latest` | yes |
+| 6.0.x (latest stable minor) | `latest` | yes |
+| 5.4.x | — | critical fixes only |
 | < 5.4 | — | no |
-| 6.0.0 prereleases | `staging` (beta), `dev` (alpha) | in the next prerelease only; earlier prereleases are not patched |
+| 6.x prereleases | `staging` (beta), `dev` (alpha) | in the next prerelease only; earlier prereleases are not patched |
 
 ## Reporting a vulnerability
 
