@@ -10,8 +10,8 @@ name: mcp-google-multi
 
 services:
   mcp:
-    # Tracks the stable major by default. During the 6.0.0 prerelease window,
-    # set MCP_IMAGE_TAG=beta (or dev) in .env.
+    # Tracks the stable major by default. Set MCP_IMAGE_TAG in .env to pin a
+    # version (6.0.0) or follow a prerelease channel (beta, dev).
     image: ghcr.io/bakissation/mcp-google-multi:${MCP_IMAGE_TAG:-6}
     env_file: .env
     init: true # distroless has no init; SIGTERM must reach node for a clean shutdown

@@ -75,6 +75,28 @@ describe('the suggested allow pattern is one the matcher accepts', () => {
   it('suggests the operation, not the blunt service wildcard', () => {
     expect(hintOf(TRASH, policy({ profile: 'read-only' }))).toContain('"gmail:trash"');
   });
+
+  // #312: drive_update's op IS its cud, so "drive:update" also matches
+  // drive_move, drive_permission_update and the rest of the update class.
+  it('does not call a class-wide pattern "just this one"', () => {
+    const UPDATE = { name: 'drive_update', service: 'drive', cud: 'update' as Cud };
+    const h = hintOf(UPDATE as typeof TRASH, policy({ profile: 'read-only' }));
+    expect(h).toContain('GOOGLE_WRITE_ALLOW="drive:update"');
+    expect(h).not.toContain('just this one');
+    expect(h).toContain('every other update-class drive tool');
+    for (const sibling of ['drive_move', 'drive_permission_update']) {
+      expect(isAllowed({ name: sibling, service: 'drive', cud: 'update' }, policy({ profile: 'read-only', allow: ['drive:update'] }))).toBe(true);
+    }
+  });
+
+  it('a "just this one" pattern permits no sibling of the same class', () => {
+    const MOVE = { name: 'drive_move', service: 'drive', cud: 'update' as Cud };
+    const h = hintOf(MOVE as typeof TRASH, policy({ profile: 'read-only' }));
+    expect(h).toContain('allow just this one with GOOGLE_WRITE_ALLOW="drive:move"');
+    for (const sibling of ['drive_update', 'drive_permission_update']) {
+      expect(isAllowed({ name: sibling, service: 'drive', cud: 'update' }, policy({ profile: 'read-only', allow: ['drive:move'] }))).toBe(false);
+    }
+  });
 });
 
 describe('denyReason', () => {

@@ -59,9 +59,10 @@ jobs:
   # OIDC metadata-only publish (ownership proof: npm's mcpName field); skips
   # prereleases (no listing benefit) and tolerates registry resets; safe to re-run.
   registry:
-    needs: release
+    needs: [release, docker]
     if: >-
       !cancelled() && needs.release.result == 'success' &&
+      needs.docker.result == 'success' &&
       needs.release.outputs.version != '' &&
       needs.release.outputs.channel == 'latest'
     runs-on: ubuntu-latest
