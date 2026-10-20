@@ -121,8 +121,8 @@ A write a profile refuses comes back as `{ error: "write_disabled", message,
 hint, retriable: false }` rather than a silent no-op or a generic failure.
 The `hint` names the exact rule that refused it (a deny pattern, the
 privileged-write rule, or the active profile) and what would need to change;
-read it rather than retrying the same call. This applies identically to
-curated tools, generated tools, and the `google_api_call` escape hatch.
+read it rather than retrying the same call. This applies to curated tools.
+A generated tool or `google_api_call` follows a different rule: see section 7.
 
 ## 6. Argument names are exact
 
@@ -153,10 +153,22 @@ If a service has no curated or generated tool for the operation you need
    that method id and whichever of path params, query params, or a JSON body
    it needs.
 
-The escape hatch runs through the same write-control policy as named tools
-(the read/create/update/delete class is derived from the method's HTTP verb
-and name), returns JSON only (binary media is refused with a pointer to
-`drive_download` / `drive_export`), and a response over about 100k
-characters may be cut by the client, so narrow a large request. Prefer a named curated or
-generated tool when one exists: it is more token-lean and better typed than
-building the call by hand.
+A read through the escape hatch is never gated, same as everywhere else. A
+write (the class is derived from the method's HTTP verb and name) follows a
+different rule than named tools: `GOOGLE_READ_ONLY` or a matching
+`GOOGLE_WRITE_DENY` still refuses outright, and `GOOGLE_PROFILE=full-writes`
+(with `GOOGLE_OUTBOUND_ALLOWLIST` unset) still allows outright, but every
+other case, including `GOOGLE_WRITE_ALLOW` (allow lists no longer open the
+escape hatch at all), asks the connected human to confirm the real call
+before it runs. Expect a write through `google_api_call` or a generated
+tool (anything called by its full name directly, not through a curated
+tool) to pause for that confirmation unless the deployment runs
+`full-writes`; a client that cannot be asked gets back `{ error:
+"elicitation_unsupported", ... }` instead, and a decline or cancel comes
+back as `{ error: "write_declined", ... }`; neither is worth retrying
+without changing the write-control configuration or using a curated tool
+instead. The escape hatch returns JSON only (binary media is refused with a
+pointer to `drive_download` / `drive_export`), and a response over about
+100k characters may be cut by the client, so narrow a large request. Prefer
+a named curated or generated tool when one exists: it is more token-lean
+and better typed than building the call by hand.

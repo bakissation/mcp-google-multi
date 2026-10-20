@@ -43,9 +43,51 @@ export function accountSet(
   };
 }
 
-export function fakeServer() {
+/** Simulated client response to a server-side elicitation request
+ * (registry.elicitConfirmation -> server.server.elicitInput). 'unsupported'
+ * (the default) declares NO elicitation capability at all, so
+ * elicitConfirmation's fast-fail check refuses before ever calling
+ * elicitInput; 'accept' | 'decline' | 'cancel' resolve with that action; a
+ * function gets the raw prompt message and decides per call. 'throws' and
+ * 'unexpected' both declare the capability (unlike 'unsupported') but then
+ * have the call itself misbehave once attempted: 'throws' simulates a
+ * capable client whose answer never arrives (a timeout, a dropped
+ * connection), 'unexpected' simulates a result whose action is neither
+ * accept/decline/cancel, which registry.elicitConfirmation treats the same
+ * way (refuse, never proceed without a real answer). */
+export type ElicitMode =
+  | 'accept'
+  | 'decline'
+  | 'cancel'
+  | 'unsupported'
+  | 'throws'
+  | 'unexpected'
+  | ((message: string) => 'accept' | 'decline' | 'cancel');
+
+export function fakeServer(opts: { elicit?: ElicitMode } = {}) {
   const handlers: Record<string, Handler> = {};
   const schemas: Record<string, z.ZodRawShape> = {};
+  const elicitInput = vi.fn(async (params: { message: string }) => {
+    const mode = opts.elicit ?? 'unsupported';
+    const action = typeof mode === 'function' ? mode(params.message) : mode;
+    if (action === 'unsupported') {
+      throw new Error('elicitation not supported by this client (test harness default)');
+    }
+    if (action === 'throws') {
+      throw new Error('simulated: no answer arrived (timeout or dropped connection)');
+    }
+    if (action === 'unexpected') {
+      return { action: 'something_else' };
+    }
+    return { action };
+  });
+  // registry.elicitConfirmation checks this BEFORE ever calling elicitInput
+  // (same fast-fail pattern account-wizard.ts's form elicitation uses), so
+  // the capability must be advertised whenever the harness is told to
+  // simulate a client that can actually answer, including one that then
+  // fails mid-call ('throws'/'unexpected') rather than never having the
+  // capability at all ('unsupported').
+  const elicitationCapable = (opts.elicit ?? 'unsupported') !== 'unsupported';
   const server = {
     registerTool: (name: string, config: { inputSchema?: z.ZodRawShape }, handler: Handler) => {
       handlers[name] = handler;
@@ -53,9 +95,13 @@ export function fakeServer() {
       return 'ok';
     },
     sendToolListChanged: vi.fn(),
-    server: { setRequestHandler: () => {}, getClientCapabilities: () => undefined },
+    server: {
+      setRequestHandler: () => {},
+      getClientCapabilities: () => (elicitationCapable ? { elicitation: { form: {} } } : undefined),
+      elicitInput,
+    },
   };
-  return { server, handlers, schemas };
+  return { server, handlers, schemas, elicitInput };
 }
 
 export interface HarnessOptions {
@@ -70,6 +116,8 @@ export interface HarnessOptions {
   /** Full control over the raw client response, when respond is not enough. */
   requestImpl?: (req: GoogleRequest) => Promise<unknown>;
   mode?: 'eager' | 'lazy';
+  /** Simulated response to a server-side elicitation (escape hatch ask). */
+  elicit?: ElicitMode;
 }
 
 export const DEFAULT_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
@@ -102,8 +150,8 @@ export function toolHarness(opts: HarnessOptions = {}) {
     getClient,
     tokenStore,
   } as unknown as IdentityContext;
-  const { server, handlers, schemas } = fakeServer();
-  buildRegistry(server as never, ctx, opts.mode ?? 'eager');
+  const { server, handlers, schemas, elicitInput } = fakeServer({ elicit: opts.elicit });
+  const registry = buildRegistry(server as never, ctx, opts.mode ?? 'eager');
 
   /** Validates args against the tool's registered schema, as the SDK does, then calls it. */
   async function call(name: string, args: Record<string, unknown> = {}): Promise<ToolResult> {
@@ -134,7 +182,7 @@ export function toolHarness(opts: HarnessOptions = {}) {
 
   const requests = (): GoogleRequest[] => request.mock.calls.map(([r]) => r as GoogleRequest);
 
-  return { ctx, call, requests, request, getClient, tokenStore, handlers, schemas };
+  return { ctx, call, requests, request, getClient, tokenStore, handlers, schemas, elicitInput, registry };
 }
 
 export const parseResult = (r: ToolResult) => JSON.parse(r.content[0].text);

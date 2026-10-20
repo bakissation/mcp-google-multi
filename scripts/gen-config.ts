@@ -185,6 +185,157 @@ export const CURATED_METHOD_IDS: string[] = [
   'webmasters.sites.list',
 ];
 
+// Every Discovery method id a curated tool calls, mapped to the name(s)
+// of every curated tool that calls it: not a hand-picked subset, so
+// write-control sees the method the way every one of its curated callers
+// is actually named. A method several curated tools share (e.g. every
+// sheets formatting tool calling spreadsheets.batchUpdate) lists all of
+// them: deny-any-name wins (see escapeHatchNames / escapeHatchVerdict), so
+// an operator's deny on ANY one of those tools' names also covers the
+// shared raw method. Derived by reading each curated registration's own
+// Discovery call; re-derive with `npx tsx scripts/extract-curated-method-map.ts`
+// and review the diff after adding or changing a curated tool.
+export const CURATED_METHOD_TOOLS: Record<string, string[]> = {
+  'analyticsadmin.accountSummaries.list': ['analytics_account_summaries'],
+  'analyticsdata.properties.getMetadata': ['analytics_get_metadata'],
+  'analyticsdata.properties.runRealtimeReport': ['analytics_run_realtime_report'],
+  'analyticsdata.properties.runReport': ['analytics_run_report'],
+  'calendar.calendarList.list': ['calendar_list_calendars'],
+  'calendar.calendars.insert': ['calendar_create_calendar'],
+  'calendar.events.delete': ['calendar_delete_event'],
+  'calendar.events.get': ['calendar_get_event', 'calendar_respond_event', 'calendar_update_event'],
+  'calendar.events.insert': ['calendar_create_event'],
+  'calendar.events.instances': ['calendar_list_instances'],
+  'calendar.events.list': ['calendar_list_events'],
+  'calendar.events.move': ['calendar_move_event'],
+  'calendar.events.patch': ['calendar_respond_event', 'calendar_update_event'],
+  'calendar.events.quickAdd': ['calendar_quick_add'],
+  'calendar.freebusy.query': ['calendar_get_freebusy'],
+  'chat.spaces.get': ['chat_spaces_get'],
+  'chat.spaces.list': ['chat_spaces_list'],
+  'chat.spaces.messages.create': ['chat_messages_create'],
+  'chat.spaces.messages.list': ['chat_messages_list'],
+  'directory.groups.list': ['admin_groups_list'],
+  'directory.members.list': ['admin_group_members_list'],
+  'directory.users.get': ['admin_users_get'],
+  'directory.users.list': ['admin_users_list'],
+  'directory.users.patch': ['admin_users_update'],
+  'docs.documents.batchUpdate': ['docs_add_tab', 'docs_batch_update', 'docs_create_footer', 'docs_create_header', 'docs_create_named_range', 'docs_create_paragraph_bullets', 'docs_delete_footer', 'docs_delete_header', 'docs_delete_named_range', 'docs_delete_paragraph_bullets', 'docs_delete_range', 'docs_delete_tab', 'docs_insert_inline_image', 'docs_insert_page_break', 'docs_insert_section_break', 'docs_insert_table', 'docs_insert_text', 'docs_modify_table', 'docs_replace_named_range_content', 'docs_replace_text', 'docs_update_document_style', 'docs_update_paragraph_style', 'docs_update_style', 'docs_update_tab_properties'],
+  'docs.documents.create': ['docs_create'],
+  'docs.documents.get': ['docs_get', 'docs_read'],
+  'drive.about.get': ['drive_get_about'],
+  'drive.accessproposals.list': ['drive_access_proposal_list'],
+  'drive.accessproposals.resolve': ['drive_access_proposal_resolve'],
+  'drive.comments.create': ['drive_comment_create'],
+  'drive.comments.delete': ['drive_comment_delete'],
+  'drive.comments.get': ['drive_comment_get'],
+  'drive.comments.list': ['drive_comment_list'],
+  'drive.comments.update': ['drive_comment_update'],
+  'drive.drives.get': ['drive_shared_drive_get'],
+  'drive.drives.list': ['drive_shared_drives_list'],
+  'drive.files.copy': ['drive_copy', 'drive_transfer'],
+  'drive.files.create': ['drive_create_folder', 'drive_transfer', 'drive_upload'],
+  'drive.files.delete': ['drive_delete'],
+  'drive.files.emptyTrash': ['drive_empty_trash'],
+  'drive.files.export': ['drive_export', 'drive_read', 'drive_transfer'],
+  'drive.files.get': ['drive_download', 'drive_export', 'drive_move', 'drive_read', 'drive_transfer', 'drive_update'],
+  'drive.files.list': ['drive_list', 'drive_search'],
+  'drive.files.update': ['drive_move', 'drive_transfer', 'drive_trash', 'drive_untrash', 'drive_update'],
+  'drive.permissions.create': ['drive_share', 'drive_transfer'],
+  'drive.permissions.delete': ['drive_remove_permission', 'drive_transfer'],
+  'drive.permissions.list': ['drive_list_permissions'],
+  'drive.permissions.update': ['drive_permission_update'],
+  'drive.replies.create': ['drive_reply_create'],
+  'drive.replies.delete': ['drive_reply_delete'],
+  'drive.replies.list': ['drive_reply_list'],
+  'drive.replies.update': ['drive_reply_update'],
+  'drive.revisions.delete': ['drive_revision_delete'],
+  'drive.revisions.list': ['drive_revision_list'],
+  'drive.revisions.update': ['drive_revision_update'],
+  'forms.forms.batchUpdate': ['forms_batch_update'],
+  'forms.forms.create': ['forms_create'],
+  'forms.forms.get': ['forms_get'],
+  'forms.forms.responses.get': ['forms_response_get'],
+  'forms.forms.responses.list': ['forms_responses_list'],
+  'forms.forms.setPublishSettings': ['forms_set_publish_settings'],
+  'forms.forms.watches.list': ['forms_watches_list'],
+  'gmail.users.drafts.create': ['gmail_create_draft'],
+  'gmail.users.drafts.delete': ['gmail_delete_draft'],
+  'gmail.users.drafts.get': ['gmail_get_draft', 'gmail_send_draft'],
+  'gmail.users.drafts.list': ['gmail_list_drafts'],
+  'gmail.users.drafts.send': ['gmail_send_draft'],
+  'gmail.users.getProfile': ['gmail_get_profile'],
+  'gmail.users.history.list': ['gmail_list_history'],
+  'gmail.users.labels.create': ['gmail_create_label'],
+  'gmail.users.labels.delete': ['gmail_delete_label'],
+  'gmail.users.labels.list': ['gmail_list_labels'],
+  'gmail.users.messages.attachments.get': ['gmail_download_attachment'],
+  'gmail.users.messages.batchDelete': ['gmail_batch_delete'],
+  'gmail.users.messages.batchModify': ['gmail_batch_modify'],
+  'gmail.users.messages.delete': ['gmail_delete'],
+  'gmail.users.messages.get': ['gmail_create_draft', 'gmail_read', 'gmail_read_batch', 'gmail_search', 'gmail_send'],
+  'gmail.users.messages.list': ['gmail_search'],
+  'gmail.users.messages.modify': ['gmail_modify_labels'],
+  'gmail.users.messages.send': ['gmail_send'],
+  'gmail.users.messages.trash': ['gmail_trash'],
+  'gmail.users.settings.getVacation': ['gmail_get_vacation'],
+  'gmail.users.settings.updateVacation': ['gmail_set_vacation'],
+  'gmail.users.threads.get': ['gmail_read_thread'],
+  'meet.conferenceRecords.get': ['meet_conference_record_get'],
+  'meet.conferenceRecords.list': ['meet_conference_records_list'],
+  'meet.conferenceRecords.recordings.list': ['meet_recordings_list'],
+  'meet.conferenceRecords.transcripts.entries.list': ['meet_transcript_entries_list'],
+  'meet.conferenceRecords.transcripts.list': ['meet_transcripts_list'],
+  'people.contactGroups.create': ['contacts_group_create'],
+  'people.contactGroups.get': ['contacts_group_members'],
+  'people.contactGroups.list': ['contacts_groups_list'],
+  'people.people.connections.list': ['contacts_list'],
+  'people.people.createContact': ['contacts_create'],
+  'people.people.deleteContact': ['contacts_delete'],
+  'people.people.get': ['contacts_get', 'contacts_update'],
+  'people.people.getBatchGet': ['contacts_group_members'],
+  'people.people.searchContacts': ['contacts_resolve', 'contacts_search'],
+  'people.people.updateContact': ['contacts_update'],
+  'reports.activities.list': ['reports_activities_list'],
+  'searchconsole.urlInspection.index.inspect': ['searchconsole_url_inspect'],
+  'sheets.spreadsheets.batchUpdate': ['sheets_add_conditional_format_rule', 'sheets_add_named_range', 'sheets_add_sheet', 'sheets_auto_resize_dimensions', 'sheets_batch_update', 'sheets_clear_basic_filter', 'sheets_delete_dimension', 'sheets_delete_named_range', 'sheets_delete_sheet', 'sheets_duplicate_sheet', 'sheets_find_replace', 'sheets_format_cells', 'sheets_insert_dimension', 'sheets_merge_cells', 'sheets_set_basic_filter', 'sheets_set_data_validation', 'sheets_sort_range', 'sheets_unmerge_cells', 'sheets_update_borders', 'sheets_update_sheet_properties'],
+  'sheets.spreadsheets.create': ['sheets_create'],
+  'sheets.spreadsheets.get': ['sheets_format_cells', 'sheets_get'],
+  'sheets.spreadsheets.values.append': ['sheets_append_rows'],
+  'sheets.spreadsheets.values.batchClear': ['sheets_batch_clear'],
+  'sheets.spreadsheets.values.batchGet': ['sheets_batch_read'],
+  'sheets.spreadsheets.values.batchUpdate': ['sheets_batch_write'],
+  'sheets.spreadsheets.values.clear': ['sheets_clear_range'],
+  'sheets.spreadsheets.values.get': ['sheets_read_range'],
+  'sheets.spreadsheets.values.update': ['sheets_write_range'],
+  'slides.presentations.batchUpdate': ['slides_batch_update'],
+  'slides.presentations.create': ['slides_create'],
+  'slides.presentations.get': ['slides_get'],
+  'slides.presentations.pages.get': ['slides_page_get'],
+  'slides.presentations.pages.getThumbnail': ['slides_page_thumbnail'],
+  'tasks.tasklists.delete': ['tasks_list_delete'],
+  'tasks.tasklists.get': ['tasks_list_get'],
+  'tasks.tasklists.insert': ['tasks_list_insert'],
+  'tasks.tasklists.list': ['tasks_lists_list'],
+  'tasks.tasklists.patch': ['tasks_list_update'],
+  'tasks.tasks.clear': ['tasks_clear'],
+  'tasks.tasks.delete': ['tasks_delete'],
+  'tasks.tasks.get': ['tasks_get'],
+  'tasks.tasks.insert': ['tasks_insert'],
+  'tasks.tasks.list': ['tasks_list'],
+  'tasks.tasks.move': ['tasks_move'],
+  'tasks.tasks.patch': ['tasks_update'],
+  'webmasters.searchanalytics.query': ['searchconsole_searchanalytics_query'],
+  'webmasters.sitemaps.delete': ['searchconsole_sitemaps_delete'],
+  'webmasters.sitemaps.get': ['searchconsole_sitemaps_get'],
+  'webmasters.sitemaps.list': ['searchconsole_sitemaps_list'],
+  'webmasters.sitemaps.submit': ['searchconsole_sitemaps_submit'],
+  'webmasters.sites.add': ['searchconsole_sites_add'],
+  'webmasters.sites.delete': ['searchconsole_sites_delete'],
+  'webmasters.sites.get': ['searchconsole_sites_get'],
+  'webmasters.sites.list': ['searchconsole_sites_list'],
+};
+
 // 'opaque' forces the single coerceJson body even when flat; 'typed' lifts the
 // prop-count cap, but the generator still throws if the method has nested/$ref props.
 export const BODY_OVERRIDES: Record<string, 'typed' | 'opaque'> = {
@@ -199,11 +350,21 @@ export const CUD_OVERRIDES: Record<string, Cud> = {
   // One-time consent flag on the property: a state write, not a creation.
   'analyticsadmin.properties.acknowledgeUserDataCollection': 'update',
   // The effect is an ARGUMENT, not the method name, so verb inference can't
-  // reach these; all three can deprovision or wipe a device remotely.
+  // reach these; all four can deprovision or wipe a device remotely.
+  // ROUND 7 (MEDIUM 4): the customer.devices.chromeos.* keys previously
+  // carried a stale "directory.v1." infix that never matched the real
+  // method id (admin.customer.devices.chromeos.*, no "directory.v1."
+  // segment: see src/tools/generated/admin.ts), so the override silently
+  // never applied; both generated tools fell back to verb inference
+  // (issueCommand -> create, batchChangeStatus -> update) instead of the
+  // intended delete. google_api_call independently computed delete for
+  // neither id either (see src/tools/google-api.ts's CUD_OVERRIDES
+  // lookup), so GOOGLE_WRITE_DENY="*:delete*" missed both of these remote
+  // device actions on every path. Fixed to the real ids.
   'directory.chromeosdevices.action': 'delete',
   'directory.mobiledevices.action': 'delete',
-  'admin.directory.v1.customer.devices.chromeos.issueCommand': 'delete',
-  'admin.directory.v1.customer.devices.chromeos.batchChangeStatus': 'delete',
+  'admin.customer.devices.chromeos.issueCommand': 'delete',
+  'admin.customer.devices.chromeos.batchChangeStatus': 'delete',
   // POST only because of the body; this tests and reports without changing
   // state. `run` isn't a blanket read verb; script.scripts.run executes code.
   'searchconsole.urlTestingTools.mobileFriendlyTest.run': 'read',

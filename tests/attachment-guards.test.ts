@@ -11,8 +11,23 @@ beforeEach(() => { base = mkdtempSync(path.join(tmpdir(), 'attach-')); });
 afterEach(() => { rmSync(base, { recursive: true, force: true }); });
 
 describe('readAttachments security guards', () => {
-  it('relative path is rejected', async () => {
-    await expect(readAttachments([{ path: 'rel/file.txt' }], 0)).rejects.toThrow(/absolute/);
+  // GOOGLE_LOCAL_FILES_DIR confines every host-file path to a root; a
+  // relative path now resolves inside that root (tests/setup.ts pins it to
+  // os.tmpdir()) rather than being rejected outright for not being absolute.
+  it('a relative path resolves inside the configured local-files root', async () => {
+    const name = `attach-rel-${Date.now()}.txt`;
+    const abs = path.join(tmpdir(), name);
+    writeFileSync(abs, 'hi');
+    try {
+      const out = await readAttachments([{ path: name }], 0);
+      expect(out![0].content.toString()).toBe('hi');
+    } finally {
+      rmSync(abs, { force: true });
+    }
+  });
+
+  it('a relative path that does not exist under the root is reported not found, not a security refusal', async () => {
+    await expect(readAttachments([{ path: 'rel/file-does-not-exist.txt' }], 0)).rejects.toThrow(/not found|unreadable/i);
   });
 
   it('a file inside the config/token dir is refused (secret-exfil guard)', async () => {

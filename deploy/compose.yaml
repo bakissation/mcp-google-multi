@@ -25,6 +25,11 @@ services:
       # Tokens + the auto-provisioned MASTER_KEY file live here. Losing this
       # volume (or recreating it) invalidates every stored Google token.
       - mcp-config:/home/nonroot/.config/mcp-google-multi
+      # Host-file tools (drive_upload/drive_update localPath, downloads,
+      # Gmail attachments) are confined to GOOGLE_LOCAL_FILES_DIR (set in the
+      # image to /data/files); a separate volume from the config one above,
+      # so uploads/downloads never share storage with tokens/master.key.
+      - mcp-files:/data/files
     healthcheck:
       # Exec-form node probe: the distroless image has no shell or curl. The
       # PRM well-known route answers unauthenticated; any HTTP response = alive.
@@ -57,5 +62,6 @@ services:
 
 volumes:
   mcp-config:
+  mcp-files:
   caddy-data:
   caddy-config:
