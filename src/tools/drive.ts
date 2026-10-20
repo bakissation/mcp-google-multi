@@ -7,7 +7,7 @@ import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } from './_errors.js';
 import { hostFilesRefused, openLocalReadStream, openInternalReadStream, prepareLocalDest, localFileErrorResult, LocalFileError } from './_local-files.js';
-import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
+import { checkOutbound, checkOutboundGrantee, driveGranteeFromAccessProposal, driveGranteeFromPermission, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
 import { capText, listResult } from '../trim.js';
 import * as fs from 'fs';
@@ -963,6 +963,19 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       try {
         const auth = await getClientFn(account as Account);
         const drive = driveClient({ version: 'v3', auth });
+        // This call's own body never carries the grantee (only role/
+        // expiration): look the real grantee up by permissionId rather than
+        // trust anything the caller claims it is.
+        if (resolveOutboundAllowlist()) {
+          const current = await drive.permissions.get({
+            fileId,
+            permissionId,
+            supportsAllDrives: true,
+            fields: 'type,domain,emailAddress',
+          });
+          const outbound = checkOutboundGrantee('drive_permission_update', driveGranteeFromPermission(current.data), String(account));
+          if (outbound) return outbound;
+        }
         const requestBody: any = {};
         if (role) requestBody.role = role;
         if (expirationTime) requestBody.expirationTime = expirationTime;
@@ -1341,6 +1354,12 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       },
     },
     async ({ account, fileId, revisionId, keepForever, published, publishAuto, publishedOutsideDomain }) => {
+      // Publishing makes the revision reachable without an invite (the
+      // allowlist cannot scope that to specific recipients the way a
+      // share/grant can), so it is refused outright while the allowlist is active.
+      if ((published || publishedOutsideDomain) && resolveOutboundAllowlist()) {
+        return outboundDeniedEnvelope('drive_revision_update publish', ['(publishing exposes it beyond any addressable recipient)'], String(account));
+      }
       try {
         const auth = await getClientFn(account as Account);
         const drive = driveClient({ version: 'v3', auth });
@@ -1440,6 +1459,14 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       try {
         const auth = await getClientFn(account as Account);
         const drive = driveClient({ version: 'v3', auth });
+        // ACCEPT grants access to whoever the proposal names; DENY/other
+        // actions grant nothing and need no check. The real recipient is a
+        // property of the proposal itself, not of this call's own body.
+        if (action === 'ACCEPT' && resolveOutboundAllowlist()) {
+          const proposal = await drive.accessproposals.get({ fileId, proposalId });
+          const outbound = checkOutboundGrantee('drive_access_proposal_resolve', driveGranteeFromAccessProposal(proposal.data), String(account));
+          if (outbound) return outbound;
+        }
         const requestBody: any = { action };
         if (role) requestBody.role = role;
         if (view) requestBody.view = view;

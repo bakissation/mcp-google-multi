@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   checkOutbound,
   checkOutboundForMethod,
@@ -9,6 +9,7 @@ import {
 import { setHintProvider } from '../src/hint-provider.js';
 import { GENERATED_METHOD_TOOLS } from '../src/tools/generated/method-map.js';
 import { inferCud } from '../src/registry.js';
+import { toolHarness, parseResult, type GoogleRequest } from './_tool-harness.js';
 
 const ENV = { GOOGLE_OUTBOUND_ALLOWLIST: 'a@corp.com, @corp.com , Boss@Partner.io' };
 
@@ -240,6 +241,174 @@ describe('checkOutboundForMethod: fail closed on grantee-pattern writes with no 
       expect(r, methodId).not.toBeNull();
       expect(JSON.parse(r!.content[0].text).error, methodId).toBe('recipient_not_allowed');
     }
+  });
+});
+
+// MEDIUM (item 3): the seven M1 cases the prior fail-closed sweep still
+// missed, because each has its own specific, understood body shape that
+// the generic pattern-match/fail-closed fallback never reaches.
+describe('checkOutboundForMethod: M1 per-method rules (item 3)', () => {
+  it('classroom guardian invitations: invitedEmailAddress is gated', () => {
+    const blocked = checkOutboundForMethod(
+      'classroom.userProfiles.guardianInvitations.create',
+      { invitedEmailAddress: 'evil@evil.example' },
+      'a', ENV, { httpMethod: 'POST' },
+    );
+    expect(blocked).not.toBeNull();
+    expect(JSON.parse(blocked!.content[0].text).error).toBe('recipient_not_allowed');
+
+    const allowed = checkOutboundForMethod(
+      'classroom.userProfiles.guardianInvitations.create',
+      { invitedEmailAddress: 'a@corp.com' },
+      'a', ENV, { httpMethod: 'POST' },
+    );
+    expect(allowed).toBeNull();
+  });
+
+  it('chat.spaces.setup: an unlisted memberships[].member.name users/<email> is gated', () => {
+    const blocked = checkOutboundForMethod(
+      'chat.spaces.setup',
+      { space: { spaceType: 'SPACE' }, memberships: [{ member: { name: 'users/evil@evil.example', type: 'HUMAN' } }] },
+      'a', ENV, { httpMethod: 'POST' },
+    );
+    expect(blocked).not.toBeNull();
+    expect(JSON.parse(blocked!.content[0].text).error).toBe('recipient_not_allowed');
+
+    const allowed = checkOutboundForMethod(
+      'chat.spaces.setup',
+      { space: { spaceType: 'SPACE' }, memberships: [{ member: { name: 'users/a@corp.com', type: 'HUMAN' } }] },
+      'a', ENV, { httpMethod: 'POST' },
+    );
+    expect(allowed).toBeNull();
+  });
+
+  it('directory.users.patch/insert/update: an unlisted recoveryEmail is gated; absence is not', () => {
+    for (const methodId of ['directory.users.patch', 'directory.users.insert', 'directory.users.update']) {
+      const blocked = checkOutboundForMethod(methodId, { recoveryEmail: 'evil@evil.example' }, 'a', ENV, { httpMethod: 'PATCH' });
+      expect(blocked, methodId).not.toBeNull();
+      expect(JSON.parse(blocked!.content[0].text).error, methodId).toBe('recipient_not_allowed');
+
+      // Most admin updates never touch recoveryEmail; that must stay allowed.
+      const untouched = checkOutboundForMethod(methodId, { name: { givenName: 'x' } }, 'a', ENV, { httpMethod: 'PATCH' });
+      expect(untouched, methodId).toBeNull();
+    }
+  });
+
+  it('drive.revisions.update: publishing is refused outright; a non-publishing update is not', () => {
+    const published = checkOutboundForMethod('drive.revisions.update', { published: true }, 'a', ENV, { httpMethod: 'PATCH' });
+    expect(published).not.toBeNull();
+    expect(JSON.parse(published!.content[0].text).error).toBe('recipient_not_allowed');
+
+    const outsideDomain = checkOutboundForMethod('drive.revisions.update', { publishedOutsideDomain: true }, 'a', ENV, { httpMethod: 'PATCH' });
+    expect(outsideDomain).not.toBeNull();
+
+    const pinOnly = checkOutboundForMethod('drive.revisions.update', { keepForever: true }, 'a', ENV, { httpMethod: 'PATCH' });
+    expect(pinOnly).toBeNull();
+  });
+
+  it('gmail.users.settings.updateVacation: an unrestricted auto-reply is refused outright; a restricted one is not', () => {
+    const unrestricted = checkOutboundForMethod('gmail.users.settings.updateVacation', { enableAutoReply: true }, 'a', ENV, { httpMethod: 'PUT' });
+    expect(unrestricted).not.toBeNull();
+    expect(JSON.parse(unrestricted!.content[0].text).error).toBe('recipient_not_allowed');
+
+    const restricted = checkOutboundForMethod(
+      'gmail.users.settings.updateVacation', { enableAutoReply: true, restrictToDomain: true }, 'a', ENV, { httpMethod: 'PUT' },
+    );
+    expect(restricted).toBeNull();
+
+    const disabling = checkOutboundForMethod('gmail.users.settings.updateVacation', { enableAutoReply: false }, 'a', ENV, { httpMethod: 'PUT' });
+    expect(disabling).toBeNull();
+  });
+
+  it('drive.accessproposals.resolve: ACCEPT fails closed on body alone (the requester is not in this call\'s body); DENY is unaffected', () => {
+    // Even a body that LOOKS safe (an allowlisted-sounding role, nothing
+    // resembling an email) must still fail closed: the real recipient is a
+    // property of the proposal server-side, never of this call's own body.
+    const accept = checkOutboundForMethod('drive.accessproposals.resolve', { action: 'ACCEPT', role: ['writer'] }, 'a', ENV, { httpMethod: 'POST' });
+    expect(accept).not.toBeNull();
+    expect(JSON.parse(accept!.content[0].text).error).toBe('recipient_not_allowed');
+
+    const deny = checkOutboundForMethod('drive.accessproposals.resolve', { action: 'DENY' }, 'a', ENV, { httpMethod: 'POST' });
+    expect(deny).toBeNull();
+  });
+
+  it('drive.permissions.update: fails closed regardless of the body, even one claiming an allowlisted grantee (the real grantee is the permissionId path param, not the body)', () => {
+    const r = checkOutboundForMethod(
+      'drive.permissions.update',
+      { role: 'writer', type: 'user', emailAddress: 'a@corp.com' },
+      'a', ENV, { httpMethod: 'PATCH', pathParams: { permissionId: 'EXTERNAL_PERM_ID' } },
+    );
+    expect(r).not.toBeNull();
+    expect(JSON.parse(r!.content[0].text).error).toBe('recipient_not_allowed');
+  });
+});
+
+// MEDIUM (item 3), curated-twin coverage: drive_permission_update and
+// drive_access_proposal_resolve each look the real grantee up themselves
+// (permissions.get / accessproposals.get) rather than trust their own
+// call's body/args, since neither carries the grantee at all. These run
+// through the actual tool handler, not checkOutboundForMethod, to prove
+// the curated path is wired, not just the escape hatch.
+describe('curated twins look the real grantee up instead of trusting their own args (item 3)', () => {
+  const prior = process.env.GOOGLE_OUTBOUND_ALLOWLIST;
+  beforeEach(() => {
+    process.env.GOOGLE_OUTBOUND_ALLOWLIST = 'a@corp.com,@corp.com';
+  });
+  afterEach(() => {
+    if (prior === undefined) delete process.env.GOOGLE_OUTBOUND_ALLOWLIST;
+    else process.env.GOOGLE_OUTBOUND_ALLOWLIST = prior;
+  });
+
+  it('drive_permission_update refuses when the permission being patched belongs to an unlisted grantee', async () => {
+    const h = toolHarness({
+      requestImpl: async (req: GoogleRequest) => {
+        if ((req.method ?? 'GET').toUpperCase() === 'GET') {
+          return { data: { type: 'user', emailAddress: 'evil@evil.example' }, headers: new Headers() };
+        }
+        throw new Error('permissions.update should never be reached');
+      },
+    });
+    const res = await h.call('drive_permission_update', { account: 'test', fileId: 'f1', permissionId: 'EXTERNAL_PERM_ID', role: 'writer' });
+    expect(res.isError).toBe(true);
+    expect(parseResult(res).error).toBe('recipient_not_allowed');
+  });
+
+  it('drive_permission_update proceeds when the real grantee (looked up) is allowlisted', async () => {
+    const h = toolHarness({
+      requestImpl: async (req: GoogleRequest) => {
+        if ((req.method ?? 'GET').toUpperCase() === 'GET') {
+          return { data: { type: 'user', emailAddress: 'a@corp.com' }, headers: new Headers() };
+        }
+        return { data: { id: 'EXTERNAL_PERM_ID', role: 'writer' }, headers: new Headers() };
+      },
+    });
+    const res = await h.call('drive_permission_update', { account: 'test', fileId: 'f1', permissionId: 'EXTERNAL_PERM_ID', role: 'writer' });
+    expect(res.isError).toBeFalsy();
+  });
+
+  it('drive_access_proposal_resolve ACCEPT refuses when the proposal\'s recipient is unlisted', async () => {
+    const h = toolHarness({
+      requestImpl: async (req: GoogleRequest) => {
+        if ((req.method ?? 'GET').toUpperCase() === 'GET') {
+          return { data: { recipientEmailAddress: 'evil@evil.example' }, headers: new Headers() };
+        }
+        throw new Error('accessproposals.resolve should never be reached');
+      },
+    });
+    const res = await h.call('drive_access_proposal_resolve', { account: 'test', fileId: 'f1', proposalId: 'p1', action: 'ACCEPT', role: ['writer'] });
+    expect(res.isError).toBe(true);
+    expect(parseResult(res).error).toBe('recipient_not_allowed');
+  });
+
+  it('drive_access_proposal_resolve DENY is never gated (it grants nothing, so no lookup is even made)', async () => {
+    const h = toolHarness({
+      requestImpl: async (req: GoogleRequest) => {
+        if ((req.method ?? 'GET').toUpperCase() === 'GET') throw new Error('DENY must not look the proposal up at all');
+        return { data: { resolved: true }, headers: new Headers() };
+      },
+    });
+    const res = await h.call('drive_access_proposal_resolve', { account: 'test', fileId: 'f1', proposalId: 'p1', action: 'DENY' });
+    expect(res.isError).toBeFalsy();
   });
 });
 

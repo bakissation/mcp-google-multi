@@ -89,7 +89,6 @@ const RAW_SEND_METHODS = new Set(['gmail.users.messages.send', 'gmail.users.draf
  */
 const GRANTEE_METHODS = new Set([
   'drive.permissions.create',
-  'drive.permissions.update',
   'gmail.users.settings.delegates.create',
   'gmail.users.settings.forwardingAddresses.create',
   'gmail.users.settings.sendAs.create',
@@ -97,7 +96,28 @@ const GRANTEE_METHODS = new Set([
   'calendar.acl.insert',
   'calendar.acl.update',
   'calendar.acl.patch',
+  'classroom.userProfiles.guardianInvitations.create',
+  'directory.users.patch',
+  'directory.users.insert',
+  'directory.users.update',
+  'chat.spaces.setup',
 ]);
+
+/**
+ * Writes whose body cannot be trusted to carry the real grantee at all:
+ * drive.permissions.update only takes role/expirationTime (the grantee is
+ * named by the permissionId path parameter, which Google resolves
+ * server-side; a caller-supplied body claiming a safe emailAddress proves
+ * nothing about who permissionId actually names), and
+ * drive.accessproposals.resolve's body is just an ACCEPT/DENY action (the
+ * requester is a property of the proposal itself, not of this call). Both
+ * need a server lookup (permissions.get / accessproposals.get) to resolve
+ * for real; the curated tools that wrap them do that lookup directly (they
+ * already hold the client). The generic escape-hatch/generated-tool path
+ * does not have a good place to thread that lookup through, so it fails
+ * closed instead of trusting an unverifiable body.
+ */
+const BODY_UNTRUSTED_METHODS = new Set(['drive.permissions.update', 'drive.accessproposals.resolve']);
 
 interface GranteeCheck {
   /** Plain addresses to run through the allowlist. */
@@ -124,6 +144,46 @@ function asNonEmptyString(v: unknown): string | undefined {
 
 const UNRECOGNIZED: GranteeCheck = { emails: [], domains: [], public: false, understood: false };
 
+/** Shared by drive.permissions.create's body (type/domain/emailAddress) and
+ * drive_permission_update's own permissions.get lookup (same resource
+ * shape, fetched instead of trusted from the body; see BODY_UNTRUSTED_METHODS). */
+export function driveGranteeFromPermission(perm: { type?: string | null; domain?: string | null; emailAddress?: string | null } | null | undefined): GranteeCheck {
+  const type = perm?.type ?? undefined;
+  if (type === 'anyone') return { emails: [], domains: [], public: true, understood: true };
+  if (type === 'domain') {
+    const domain = asNonEmptyString(perm?.domain);
+    return domain ? { emails: [], domains: [`@${domain.toLowerCase()}`], public: false, understood: true } : UNRECOGNIZED;
+  }
+  if (type === 'user' || type === 'group') {
+    const email = asNonEmptyString(perm?.emailAddress);
+    return email ? { emails: [email], domains: [], public: false, understood: true } : UNRECOGNIZED;
+  }
+  return UNRECOGNIZED;
+}
+
+/** The access proposal's own recipient (the person who gains access if an
+ * ACCEPT goes through), for drive_access_proposal_resolve's own
+ * accessproposals.get lookup; see BODY_UNTRUSTED_METHODS. */
+export function driveGranteeFromAccessProposal(proposal: { recipientEmailAddress?: string | null; requesterEmailAddress?: string | null } | null | undefined): GranteeCheck {
+  const email = asNonEmptyString(proposal?.recipientEmailAddress) ?? asNonEmptyString(proposal?.requesterEmailAddress);
+  return email ? { emails: [email], domains: [], public: false, understood: true } : UNRECOGNIZED;
+}
+
+/** Applies an already-resolved GranteeCheck against the allowlist: the
+ * entry point curated tools use once they have looked up a grantee
+ * themselves (drive_permission_update, drive_access_proposal_resolve), the
+ * same logic checkOutboundForMethod applies to a body/path-derived one. */
+export function checkOutboundGrantee(kind: string, grantee: GranteeCheck, account: string, env: NodeJS.ProcessEnv = process.env) {
+  const list = resolveOutboundAllowlist(env);
+  if (!list) return null;
+  if (!grantee.understood) return unrecognizedShapeEnvelope(kind, account);
+  if (grantee.public) return outboundDeniedEnvelope(`${kind} grantee`, ['anyone (public)'], account, env);
+  const blockedDomains = grantee.domains.filter((d) => !list.entries.includes(d));
+  if (blockedDomains.length > 0) return outboundDeniedEnvelope(`${kind} domain grantee`, blockedDomains, account, env);
+  if (grantee.emails.length > 0) return checkOutbound(`${kind} grantee`, grantee.emails, account, env);
+  return null;
+}
+
 /** The grantee(s) a known resource-scoped write method's body carries, or
  * null when the method isn't one of GRANTEE_METHODS (caller falls back to
  * the generic emailAddress/email key walk). */
@@ -131,18 +191,31 @@ function granteeCheck(methodId: string, body: unknown): GranteeCheck | null {
   const b = asRecord(body) ?? {};
   switch (methodId) {
     case 'drive.permissions.create':
-    case 'drive.permissions.update': {
-      const type = asNonEmptyString(b.type);
-      if (type === 'anyone') return { emails: [], domains: [], public: true, understood: true };
-      if (type === 'domain') {
-        const domain = asNonEmptyString(b.domain);
-        return domain ? { emails: [], domains: [`@${domain.toLowerCase()}`], public: false, understood: true } : UNRECOGNIZED;
+      return driveGranteeFromPermission(b as { type?: string | null; domain?: string | null; emailAddress?: string | null });
+    case 'classroom.userProfiles.guardianInvitations.create': {
+      const email = asNonEmptyString(b.invitedEmailAddress);
+      return email ? { emails: [email], domains: [], public: false, understood: true } : UNRECOGNIZED;
+    }
+    case 'directory.users.patch':
+    case 'directory.users.insert':
+    case 'directory.users.update': {
+      // recoveryEmail is optional on a user resource; most calls don't
+      // touch it at all, so its absence is not an unrecognised shape.
+      const recoveryEmail = asNonEmptyString(b.recoveryEmail);
+      return recoveryEmail
+        ? { emails: [recoveryEmail], domains: [], public: false, understood: true }
+        : { emails: [], domains: [], public: false, understood: true };
+    }
+    case 'chat.spaces.setup': {
+      const memberships = Array.isArray(b.memberships) ? b.memberships : [];
+      const emails: string[] = [];
+      for (const m of memberships) {
+        const mem = asRecord(m);
+        const member = mem ? asRecord(mem.member) : undefined;
+        const name = member ? asNonEmptyString(member.name) : undefined;
+        if (name?.startsWith('users/') && name.slice('users/'.length).includes('@')) emails.push(name.slice('users/'.length));
       }
-      if (type === 'user' || type === 'group') {
-        const email = asNonEmptyString(b.emailAddress);
-        return email ? { emails: [email], domains: [], public: false, understood: true } : UNRECOGNIZED;
-      }
-      return UNRECOGNIZED;
+      return { emails, domains: [], public: false, understood: true };
     }
     case 'gmail.users.settings.delegates.create': {
       const email = asNonEmptyString(b.delegateEmail);
@@ -244,6 +317,50 @@ function pathParamGrantee(methodId: string, pathParams: Record<string, unknown> 
   return null;
 }
 
+/** Writes refused outright while the allowlist is active because they
+ * expose content/access in a way no single email address could permit
+ * (there is nothing an operator could add to the allowlist to allow
+ * them): publishing a Drive revision makes it reachable by anyone with
+ * the link, or by the whole domain, not by an addressable recipient; an
+ * unrestricted Gmail vacation auto-reply answers every incoming sender,
+ * not just allowlisted ones. */
+function dangerousDefaultRefusal(methodId: string, body: unknown): string | null {
+  const b = asRecord(body) ?? {};
+  if (methodId === 'drive.revisions.update') {
+    if (b.published === true || b.publishedOutsideDomain === true) {
+      return 'publishing a revision makes it reachable without an invite, which the allowlist cannot scope to specific recipients';
+    }
+    return null;
+  }
+  if (methodId === 'gmail.users.settings.updateVacation') {
+    const enabling = b.enableAutoReply === true;
+    const restricted = b.restrictToContacts === true || b.restrictToDomain === true;
+    if (enabling && !restricted) {
+      return 'an unrestricted auto-reply answers every sender, including ones outside the allowlist; set restrictToContacts or restrictToDomain';
+    }
+    return null;
+  }
+  return null;
+}
+
+function dangerousDefaultEnvelope(methodId: string, reason: string, account: string) {
+  return {
+    content: [
+      {
+        type: 'text' as const,
+        text: JSON.stringify({
+          error: 'recipient_not_allowed',
+          message: `${methodId} is refused while GOOGLE_OUTBOUND_ALLOWLIST is active: ${reason}.`,
+          hint: 'Unset GOOGLE_OUTBOUND_ALLOWLIST, or avoid this call, to proceed.',
+          retriable: false,
+          account,
+        }),
+      },
+    ],
+    isError: true as const,
+  };
+}
+
 function unrecognizedShapeEnvelope(methodId: string, account: string) {
   return {
     content: [
@@ -301,6 +418,18 @@ export function checkOutboundForMethod(
 ) {
   const list = resolveOutboundAllowlist(env);
   if (!list) return null;
+
+  const dangerous = dangerousDefaultRefusal(methodId, body);
+  if (dangerous) return dangerousDefaultEnvelope(methodId, dangerous, account);
+
+  // drive.accessproposals.resolve only grants anything on ACCEPT (DENY/
+  // CANCEL are harmless); drive.permissions.update's body never carries
+  // the grantee at all. See BODY_UNTRUSTED_METHODS.
+  if (BODY_UNTRUSTED_METHODS.has(methodId)) {
+    const isHarmlessProposalAction = methodId === 'drive.accessproposals.resolve' && asRecord(body)?.action !== 'ACCEPT';
+    if (!isHarmlessProposalAction) return unrecognizedShapeEnvelope(methodId, account);
+  }
+
   if (RAW_SEND_METHODS.has(methodId)) {
     return {
       content: [

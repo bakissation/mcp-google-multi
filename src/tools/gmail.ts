@@ -8,7 +8,7 @@ import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
 import { hostFilesRefused, prepareLocalDest, assertLocalPathAllowed, localFileErrorResult, LocalFileError } from './_local-files.js';
-import { checkOutbound, resolveOutboundAllowlist } from '../outbound-allowlist.js';
+import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import addressparser from 'nodemailer/lib/addressparser/index.js';
 import { lookup as lookupMime } from 'mime-types';
 import { sliceClean } from '../trim.js';
@@ -1439,6 +1439,16 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
       },
     },
     async ({ account, enableAutoReply, responseSubject, responseBodyPlainText, startTime, endTime, restrictToContacts, restrictToDomain }) => {
+      // An unrestricted auto-reply answers every incoming sender, not just
+      // allowlisted ones, so enabling it without either restriction is
+      // refused outright while the allowlist is active.
+      if (enableAutoReply && !restrictToContacts && !restrictToDomain && resolveOutboundAllowlist()) {
+        return outboundDeniedEnvelope(
+          'gmail_set_vacation auto-reply',
+          ['(every sender, not just allowlisted ones; set restrictToContacts or restrictToDomain)'],
+          String(account),
+        );
+      }
       try {
         const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
