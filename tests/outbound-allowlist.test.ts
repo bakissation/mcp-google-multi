@@ -496,6 +496,39 @@ describe('curated twins look the real grantee up instead of trusting their own a
     const res = await h.call('drive_access_proposal_resolve', { account: 'test', fileId: 'f1', proposalId: 'p1', action: 'DENY' });
     expect(res.isError).toBeFalsy();
   });
+
+  // LOW (round 4 test hardening): item 3 covered gmail_set_vacation and
+  // drive_revision_update's own refusal logic via checkOutboundForMethod/
+  // dangerousDefaultRefusal directly; these go through the real curated
+  // tool handler instead, the same way the drive_permission_update and
+  // drive_access_proposal_resolve cases above do.
+  it('gmail_set_vacation refuses enabling an unrestricted auto-reply', async () => {
+    const h = toolHarness({ respond: () => ({}) });
+    const res = await h.call('gmail_set_vacation', { account: 'test', enableAutoReply: true, responseBodyPlainText: 'hi' });
+    expect(res.isError).toBe(true);
+    expect(parseResult(res).error).toBe('recipient_not_allowed');
+    expect(h.requests()).toHaveLength(0); // refused before the API call, not after
+  });
+
+  it('gmail_set_vacation still succeeds when restricted to contacts or domain', async () => {
+    const h = toolHarness({ respond: () => ({ enableAutoReply: true, restrictToDomain: true }) });
+    const res = await h.call('gmail_set_vacation', { account: 'test', enableAutoReply: true, restrictToDomain: true });
+    expect(res.isError).toBeFalsy();
+  });
+
+  it('drive_revision_update refuses publishing a revision', async () => {
+    const h = toolHarness({ respond: () => ({}) });
+    const res = await h.call('drive_revision_update', { account: 'test', fileId: 'f1', revisionId: 'r1', published: true });
+    expect(res.isError).toBe(true);
+    expect(parseResult(res).error).toBe('recipient_not_allowed');
+    expect(h.requests()).toHaveLength(0);
+  });
+
+  it('drive_revision_update still succeeds for a non-publishing change (keepForever)', async () => {
+    const h = toolHarness({ respond: () => ({ id: 'r1', keepForever: true }) });
+    const res = await h.call('drive_revision_update', { account: 'test', fileId: 'f1', revisionId: 'r1', keepForever: true });
+    expect(res.isError).toBeFalsy();
+  });
 });
 
 // LOW (item 5): the grantee-pattern fail-closed fallback over-blocked

@@ -836,14 +836,15 @@ describe('google_api_call write-control name resolution', () => {
       for (const { methodId, op, service } of cases) {
         const names = escapeHatchNames(service, methodId);
         const narrowToolName = `${service}_${op}`;
-        expect(names.allow, `${methodId}: ${narrowToolName} must not be the only thing granting the escape hatch here`).not.toEqual([narrowToolName]);
+        // None of trash/insert_text/respond_event/create_folder is a CUD
+        // value, so unlike e.g. "drive:update" there is no documented
+        // service:cud wildcard reading that could legitimately make this
+        // allow match anyway; the assertion below is unconditional.
+        expect(names.allow, `${methodId}: ${narrowToolName} must not be in the escape hatch's allow set here`).not.toContain(narrowToolName);
         const policy: Policy = { profile: 'read-only', readOnly: false, allow: [`${service}:${op}`], deny: [] };
         const verdict = isAllowedByAnyName(names.deny, names.allow, { service, cud: 'update', scopes: [] }, names.primary, policy);
-        // Under 6.0.1 this was allowed=true (the bug); the fix must refuse
-        // unless the narrow name happens to equal a method-wide name too.
-        if (!names.allow.includes(narrowToolName)) {
-          expect(verdict.allowed, `${methodId} via ${narrowToolName}: escape hatch must refuse (6.0.1 behaviour)`).toBe(false);
-        }
+        // Under 6.0.1 this was allowed=true (the bug); the fix must refuse.
+        expect(verdict.allowed, `${methodId} via ${narrowToolName}: escape hatch must refuse (6.0.1 behaviour)`).toBe(false);
       }
     });
 
