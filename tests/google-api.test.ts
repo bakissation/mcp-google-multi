@@ -869,5 +869,49 @@ describe('google_api_call write-control name resolution', () => {
       const ambiguous = writeEntries.filter((e) => !isUnambiguous(e.methodId));
       expect(ambiguous.length).toBeGreaterThan(20);
     });
+
+    // MEDIUM (round 4, M3): lastSegmentName is a GENERIC pattern (service +
+    // the method's last dot segment), not derived from any real
+    // registration, so it can spell some OTHER method's real curated tool
+    // name by pure coincidence (drive.permissions.update's lastSegmentName
+    // "drive_update" is ALSO the actual curated tool name for the
+    // unrelated drive.files.update). Letting that into allow meant a
+    // narrow allow on the real "drive_update" tool widened to grant the
+    // escape hatch on every method whose lastSegmentName happens to match
+    // it too. Full sweep over the whole curated+generated surface: for
+    // every method id, no name in `allow` may be a curated tool's real
+    // name unless that curated tool is actually registered for THIS method.
+    it('M3: no escape-hatch allow name is a real curated tool name of some OTHER method', () => {
+      const curatedAll = new Set(Object.values(CURATED_METHOD_TOOLS).flat());
+      const ids = new Set([...Object.keys(CURATED_METHOD_TOOLS), ...Object.keys(GENERATED_METHOD_TOOLS)]);
+      const collisions: string[] = [];
+      for (const id of ids) {
+        const service = id.split('.')[0];
+        const names = escapeHatchNames(service, id);
+        const own = new Set(CURATED_METHOD_TOOLS[id] ?? []);
+        const bad = names.allow.filter((x) => curatedAll.has(x) && !own.has(x));
+        if (bad.length > 0) collisions.push(`${id} -> allow also via curated ${bad.join(',')}`);
+      }
+      expect(collisions, collisions.join('\n')).toEqual([]);
+    });
+
+    // A clean (non-cud-ambiguous) instance of M3, verified end to end
+    // through isAllowedByAnyName, not just the name-level sweep above:
+    // "trash" is not a CUD value, so GOOGLE_WRITE_ALLOW="gmail:trash" only
+    // ever matched via service:op, never via the service:cud wildcard
+    // (unlike e.g. "drive:update", which is unavoidably ambiguous between
+    // naming the specific drive_update tool and allowing every update-
+    // class drive write by design; docs/configuration.md documents that
+    // the latter wins, so those collisions are not re-asserted end to end
+    // here). gmail_trash is the curated tool for gmail.users.messages.trash;
+    // gmail.users.threads.trash's lastSegmentName happened to spell the
+    // same name, so this allow widened to also open the unrelated thread-
+    // trash method's escape hatch.
+    it('M3: allowing gmail:trash does not also open the unrelated gmail.users.threads.trash via the escape hatch', () => {
+      const names = escapeHatchNames('gmail', 'gmail.users.threads.trash');
+      const policy: Policy = { profile: 'read-only', readOnly: false, allow: ['gmail:trash'], deny: [] };
+      const verdict = isAllowedByAnyName(names.deny, names.allow, { service: 'gmail', cud: 'delete', scopes: [] }, names.primary, policy);
+      expect(verdict.allowed).toBe(false);
+    });
   });
 });

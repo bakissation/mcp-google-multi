@@ -93,6 +93,27 @@ const EXTRA_METHOD_TOOLS: Record<string, string[]> = {
   'sheets.spreadsheets.sheets.copyTo': ['sheets_copy_sheet_to'],
 };
 
+// Every curated tool name (including EXTRA_METHOD_TOOLS), and every
+// generated tool name, across the WHOLE surface, not just this method:
+// used to detect when the generic lastSegmentName fallback below happens
+// to spell some OTHER method's real tool name exactly (e.g. "drive_update"
+// is the actual curated tool for drive.files.update, but is ALSO the
+// generic lastSegmentName for drive.permissions.update and
+// drive.revisions.update, which share none of its semantics). Computed
+// once and cached: both maps are static for the life of the process.
+let allCuratedNamesCache: Set<string> | undefined;
+function allCuratedNames(): Set<string> {
+  if (!allCuratedNamesCache) {
+    allCuratedNamesCache = new Set([...Object.values(CURATED_METHOD_TOOLS).flat(), ...Object.values(EXTRA_METHOD_TOOLS).flat()]);
+  }
+  return allCuratedNamesCache;
+}
+let allGeneratedNamesCache: Set<string> | undefined;
+function allGeneratedNames(): Set<string> {
+  if (!allGeneratedNamesCache) allGeneratedNamesCache = new Set(Object.values(GENERATED_METHOD_TOOLS));
+  return allGeneratedNamesCache;
+}
+
 export interface EscapeHatchNames {
   /** Every name a deny glob is checked against: every curated tool name
    * sharing this method, its generated twin, the full method-path name,
@@ -140,6 +161,17 @@ export function escapeHatchNames(policyService: string, methodId: string): Escap
     return out;
   };
 
+  // lastSegmentName is a GENERIC pattern (service + the method's last dot
+  // segment), not derived from any real registration, so it can collide
+  // with an unrelated method's actual tool name by coincidence. Deny
+  // always includes it regardless (a deny can only narrow what gets
+  // through); allow drops it whenever it spells some OTHER curated or
+  // generated tool's real name, since letting it through there would
+  // widen a narrow allow on that OTHER tool into this, unrelated, method.
+  const lastSegmentIsForeignToolName =
+    (allCuratedNames().has(lastSegmentName) && !curatedNames.includes(lastSegmentName)) ||
+    (allGeneratedNames().has(lastSegmentName) && lastSegmentName !== generatedName);
+
   const deny = dedupe([
     ...curatedNames,
     ...(generatedName ? [generatedName] : []),
@@ -150,7 +182,7 @@ export function escapeHatchNames(policyService: string, methodId: string): Escap
     ...(curatedNames.length === 1 ? curatedNames : []),
     ...(generatedName ? [generatedName] : []),
     ...(fullPathName ? [fullPathName] : []),
-    lastSegmentName,
+    ...(lastSegmentIsForeignToolName ? [] : [lastSegmentName]),
   ]);
   const primary = curatedNames.length === 1 ? curatedNames[0] : generatedName ?? fullPathName ?? lastSegmentName;
   return { deny, allow, primary };
