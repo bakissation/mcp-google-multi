@@ -354,24 +354,37 @@ export class ToolRegistry {
   /**
    * Server-side MCP elicitation: asks the connected human to confirm an
    * escape-hatch write. `unsupported` covers every way asking can fail
-   * (no elicitation capability, the negotiated protocol era replaced the
-   * push-style request, a timeout, a closed connection, ...) uniformly,
-   * since the caller's only correct response to any of them is the same:
-   * refuse rather than silently proceed without an answer.
+   * (no elicitation capability, the transport cannot deliver a mid-call
+   * request, the negotiated protocol era replaced the push-style
+   * request, a timeout, a closed connection, ...) uniformly, since the
+   * caller's only correct response to any of them is the same: refuse
+   * rather than silently proceed without an answer.
    *
-   * The capability check up front (same pattern account-wizard.ts's form
-   * elicitation already uses) matters most on the HTTP (EE) transport: a
-   * stateless, single-response dispatch (see docs/internals.md) cannot
-   * actually deliver a mid-call server-to-client request once the one
-   * JSON response for this call has been claimed, so a client that never
-   * declared the capability would otherwise hang until elicitInput's own
-   * request timeout, not fail fast. A client that DOES declare the
-   * capability but is still talking over that same transport shape can
-   * still hang until the timeout; that gap is a known limitation of
-   * stateless HTTP dispatch, not something this check can close, and is
-   * documented in docs/configuration.md.
+   * `policy.transport === 'http'` refuses before ever touching
+   * elicitInput, regardless of what the client declared. This server's
+   * HTTP (EE) transport dispatches every `/mcp` call through a fresh,
+   * disposable transport with `enableJsonResponse: true` (see
+   * docs/internals.md); a mid-call server-to-client request has nothing
+   * to be delivered over there, so even a client that DID declare the
+   * capability would otherwise just hang until elicitInput's own
+   * request timeout before this failed closed anyway, not fail fast.
+   * stdio keeps one live connection for the whole call, so it is
+   * unaffected and still attempts a real elicitation below.
+   *
+   * The capability check (same pattern account-wizard.ts's form
+   * elicitation already uses) covers the remaining case on stdio: a
+   * client that never declared the capability is refused immediately
+   * too, instead of attempting the call and only finding out once
+   * elicitInput's own request timeout elapses.
    */
   async elicitConfirmation(message: string): Promise<{ action: 'accept' | 'decline' | 'cancel' } | { action: 'unsupported'; reason: string }> {
+    if (this.policy.transport === 'http') {
+      return {
+        action: 'unsupported',
+        reason:
+          'elicitation is not available over this server\'s HTTP transport; escape-hatch writes here need GOOGLE_PROFILE=full-writes (with GOOGLE_OUTBOUND_ALLOWLIST unset), or a curated tool',
+      };
+    }
     const caps = this.server.server.getClientCapabilities?.() as { elicitation?: { form?: unknown } } | undefined;
     if (caps?.elicitation?.form === undefined) {
       return { action: 'unsupported', reason: 'the connected client has not declared elicitation support' };

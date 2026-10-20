@@ -928,6 +928,39 @@ describe('escape hatch: round 6 human-confirmation model', () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  // FOLLOW-UP: the HTTP (EE) transport dispatches every call through a
+  // fresh, disposable, stateless transport that cannot deliver a mid-call
+  // elicitation request at all; a client that DID declare the capability
+  // would otherwise still hang until elicitInput's own request timeout
+  // before failing closed anyway. policy.transport === 'http' now refuses
+  // immediately regardless of what the client declared, without ever
+  // calling elicitInput, so this never hangs.
+  it('over the HTTP transport, a client that declared elicitation support is still refused immediately, without calling elicitInput', async () => {
+    const httpPolicy: Policy = { ...ASK_POLICY, transport: 'http' };
+    const { call, request, dir, elicitInput } = setup(httpPolicy, { elicit: 'accept' }); // capability declared
+    cleanupDirs.push(dir);
+    const res = await call(CALL);
+    expect(res.isError).toBe(true);
+    const payload = JSON.parse(res.content[0].text);
+    expect(payload.error).toBe('elicitation_unsupported');
+    expect(payload.message).toContain('HTTP');
+    expect(payload.hint).toContain('full-writes');
+    expect(payload.hint).toContain('curated tool');
+    expect(elicitInput).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  // stdio (the default / unset transport) is unaffected: a capable,
+  // accepting client still gets asked and still runs the call.
+  it('over stdio, a client that declared elicitation support is still asked (unaffected by the HTTP fast-fail)', async () => {
+    const { call, request, dir, elicitInput } = setup(ASK_POLICY, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    const res = await call(CALL);
+    expect(res.isError).toBeUndefined();
+    expect(elicitInput).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it('deny wins before an ask is ever made, even under full-writes', async () => {
     const policy: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: ['gmail:send'] };
     const { call, request, dir, elicitInput } = setup(policy, { elicit: 'accept' });
