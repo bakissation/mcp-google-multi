@@ -6,8 +6,9 @@ import { ToolRegistry, inferCud } from '../src/registry.js';
 import { nearestMethodIds, registerEscapeTools, escapeHatchNames } from '../src/tools/google-api.js';
 import { clearDiscoveryMemoryCache, searchMethods } from '../src/discovery-client.js';
 import { setHintProvider, type HintCase } from '../src/hint-provider.js';
-import { isAllowed, isAllowedByAnyName, type Policy } from '../src/write-control.js';
+import { isAllowed, escapeHatchVerdict, type Policy } from '../src/write-control.js';
 import { CURATED_METHOD_TOOLS, GENERATED_METHOD_TOOLS } from '../src/tools/generated/method-map.js';
+import type { ElicitMode } from './_tool-harness.js';
 
 const FIXTURE = {
   baseUrl: 'https://gmail.googleapis.com/',
@@ -232,15 +233,21 @@ const SEARCHCONSOLE_FIXTURE = {
   },
 };
 
-function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string> } = {}) {
+function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string>; elicit?: ElicitMode } = {}) {
   const registered: { name: string; handler: (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }> }[] = [];
+  const elicitInput = vi.fn(async (params: { message: string }) => {
+    const mode = opts.elicit ?? 'unsupported';
+    const action = typeof mode === 'function' ? mode(params.message) : mode;
+    if (action === 'unsupported') throw new Error('elicitation not supported by this client (test harness default)');
+    return { action };
+  });
   const server = {
     registerTool: (name: string, _config: never, handler: never) => {
       registered.push({ name, handler });
       return 'ok';
     },
     sendToolListChanged: vi.fn(),
-    server: { setRequestHandler: () => {} },
+    server: { setRequestHandler: () => {}, elicitInput },
   };
   const registry = new ToolRegistry(server as never, policy);
   const request = vi.fn(async () => ({ data: { ok: true } }));
@@ -263,7 +270,7 @@ function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string> } = {}) {
   });
   const call = registered.find((r) => r.name === 'google_api_call')!.handler;
   const search = registered.find((r) => r.name === 'google_api_search')!.handler;
-  return { registry, call, search, request, dir };
+  return { registry, call, search, request, dir, elicitInput };
 }
 
 const READ_ONLY: Policy = { profile: 'read-only', readOnly: false, allow: [], deny: [] };
@@ -377,8 +384,13 @@ describe('google_api_call', () => {
     expect(url).toContain('q=x');
   });
 
-  it('enforces write-control on CUD methods', async () => {
-    const { call, request, dir } = setup(READ_ONLY);
+  // ROUND 6: under the (default) read-only PROFILE, a write via the escape
+  // hatch is no longer an immediate write_disabled; it asks a human (the
+  // GOOGLE_READ_ONLY hard flag, not the profile, is what refuses without
+  // asking; see the round-6 ask-model describe block below). A client that
+  // cannot answer still ends up refused, just via elicitation_unsupported.
+  it('a CUD method under the default read-only profile asks rather than refusing outright, and still refuses when nothing can answer', async () => {
+    const { call, request, dir, elicitInput } = setup(READ_ONLY);
     cleanupDirs.push(dir);
     const res = await call({
       account: 'test',
@@ -387,7 +399,8 @@ describe('google_api_call', () => {
       pathParams: { userId: 'me', id: 'abc' },
     });
     expect(res.isError).toBe(true);
-    expect(JSON.parse(res.content[0].text).error).toBe('write_disabled');
+    expect(JSON.parse(res.content[0].text).error).toBe('elicitation_unsupported');
+    expect(elicitInput).toHaveBeenCalledTimes(1);
     expect(request).not.toHaveBeenCalled();
   });
 
@@ -404,9 +417,14 @@ describe('google_api_call', () => {
     expect(request).toHaveBeenCalledWith(expect.objectContaining({ method: 'DELETE' }));
   });
 
-  it('blocks POST-based permanent deletes under safe-writes', async () => {
+  // ROUND 6: safe-writes through the escape hatch is in the "ask" bucket
+  // now, same as every other non-full-writes profile; it is no longer a
+  // hard write_disabled on its own (a deny glob still would be, see the
+  // name-resolution describe block below). Declining or not being askable
+  // still refuses the permanent delete; accepting lets it through.
+  it('a permanent delete under safe-writes asks rather than hard-refusing; decline (or no elicitation support) still refuses', async () => {
     const SAFE: Policy = { profile: 'safe-writes', readOnly: false, allow: [], deny: [] };
-    const { call, request, dir } = setup(SAFE);
+    const { call, request, dir, elicitInput } = setup(SAFE, { elicit: 'decline' });
     cleanupDirs.push(dir);
     const res = await call({
       account: 'test',
@@ -416,8 +434,24 @@ describe('google_api_call', () => {
       body: { ids: ['a'] },
     });
     expect(res.isError).toBe(true);
-    expect(JSON.parse(res.content[0].text).error).toBe('write_disabled');
+    expect(JSON.parse(res.content[0].text).error).toBe('write_declined');
+    expect(elicitInput).toHaveBeenCalledTimes(1);
     expect(request).not.toHaveBeenCalled();
+  });
+
+  it('the same permanent delete under safe-writes goes through on accept', async () => {
+    const SAFE: Policy = { profile: 'safe-writes', readOnly: false, allow: [], deny: [] };
+    const { call, request, dir } = setup(SAFE, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    const res = await call({
+      account: 'test',
+      api: 'gmail',
+      methodId: 'gmail.users.messages.batchDelete',
+      pathParams: { userId: 'me' },
+      body: { ids: ['a'] },
+    });
+    expect(res.isError).toBeUndefined();
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST', data: { ids: ['a'] } }));
   });
 
   it('matches deny globs against the named-tool service namespace', async () => {
@@ -645,8 +679,12 @@ describe('google_api_call write-control name resolution', () => {
     expect(request).not.toHaveBeenCalled();
   });
 
-  it('without a matching deny, the same resource-scoped methods still execute (not a blanket new refusal)', async () => {
-    const { call, request, dir } = setup(SAFE);
+  // ROUND 6: without a matching deny, this is the ask bucket under
+  // safe-writes, not a blanket new refusal; accepting still runs it
+  // (the point this test originally made, just via the human confirmation
+  // step rather than an outright pass).
+  it('without a matching deny, the same resource-scoped method asks and still runs on accept (not a blanket new refusal)', async () => {
+    const { call, request, dir, elicitInput } = setup(SAFE, { elicit: 'accept' });
     cleanupDirs.push(dir);
     const res = await call({
       account: 'test',
@@ -656,6 +694,7 @@ describe('google_api_call write-control name resolution', () => {
       body: { role: 'reader', type: 'user', emailAddress: 'a@corp.example' },
     });
     expect(res.isError).toBeUndefined();
+    expect(elicitInput).toHaveBeenCalledTimes(1);
     expect(request).toHaveBeenCalledTimes(1);
   });
 
@@ -696,46 +735,46 @@ describe('google_api_call write-control name resolution', () => {
     });
   });
 
-  // LOW (allow semantics): deny on any candidate name wins, ALLOW on any
-  // candidate name must also win (over the profile); the previous
-  // implementation treated "every name must pass" as if allow needed
-  // unanimous consent too, so an explicit GOOGLE_WRITE_ALLOW stopped
-  // working through the escape hatch the moment the full-path or
-  // last-segment synthetic name did not separately match the same glob.
-  it('GOOGLE_WRITE_ALLOW="gmail:send" grants gmail.users.messages.send via the escape hatch under read-only', async () => {
+  // ROUND 6: GOOGLE_WRITE_ALLOW no longer opens the escape hatch at all;
+  // only full-writes does (deny still wins first, unaffected). An allow
+  // glob that would have granted this under 6.0.1 now still triggers the
+  // human ask, exactly as a policy with no allow list at all would.
+  it('GOOGLE_WRITE_ALLOW="gmail:send" no longer grants gmail.users.messages.send outright; it still asks', async () => {
     const policy: Policy = { profile: 'read-only', readOnly: false, allow: ['gmail:send'], deny: [] };
-    const { call, request, dir } = setup(policy);
+    const { call, request, dir, elicitInput } = setup(policy, { elicit: 'decline' });
     cleanupDirs.push(dir);
     const res = await call({ account: 'test', api: 'gmail', methodId: 'gmail.users.messages.send', pathParams: { userId: 'me' }, body: { raw: 'x' } });
-    expect(res.isError).toBeUndefined();
-    expect(request).toHaveBeenCalledTimes(1);
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('write_declined');
+    expect(elicitInput).toHaveBeenCalledTimes(1);
+    expect(request).not.toHaveBeenCalled();
   });
 
-  // LOW (allow semantics): the profile's own exceptions (TRASH_MOVE_TOOLS)
-  // are keyed to the REAL tool name. gmail.users.messages.trash's curated
-  // name is gmail_trash (in TRASH_MOVE_TOOLS), but its full-path synthetic
-  // name gmail_users_messages_trash is not; safe-writes must decide on the
-  // real name, not refuse because a synthetic name does not carry the
-  // exception.
-  it('safe-writes allows gmail.users.messages.trash via the escape hatch like curated gmail_trash', async () => {
-    const { call, request, dir } = setup(SAFE);
+  // ROUND 6: the profile's own exceptions (TRASH_MOVE_TOOLS) only matter to
+  // isAllowed(), the curated gate; the escape hatch never consulted it (see
+  // escapeHatchVerdict), so safe-writes asks here too, same as any other
+  // non-full-writes write through the escape hatch. Accepting lets it
+  // through, same end result gmail_trash (curated) still gets unconditionally.
+  it('safe-writes asks (not auto-allows) for gmail.users.messages.trash via the escape hatch; accepting runs it', async () => {
+    const { call, request, dir } = setup(SAFE, { elicit: 'accept' });
     cleanupDirs.push(dir);
     const res = await call({ account: 'test', api: 'gmail', methodId: 'gmail.users.messages.trash', pathParams: { userId: 'me', id: 'm1' } });
     expect(res.isError).toBeUndefined();
     expect(request).toHaveBeenCalledTimes(1);
   });
 
-  // M2 sweep: EVERY method id this server knows a real tool name for (the
-  // full CURATED_METHOD_TOOLS map derived from the curated registrations
-  // themselves (not a hand-picked sample), plus every GENERATED_METHOD_TOOLS
-  // entry) gives the same write-control verdict through isAllowed directly
-  // (as the named tool would see) and through the escape hatch's
-  // candidate-name resolution, under both a matching deny and a matching
-  // allow. inferCud(name) stands in for the method's real cud throughout
-  // (both sides of each comparison use it), so this isolates the NAME
-  // resolution this fix is about from cud computation, which is covered
-  // elsewhere.
-  describe('M2: parity sweep over every curated and generated method id', () => {
+  // M2 sweep (round 6 shape): escape-hatch DENY-name resolution is
+  // unchanged (deny on any candidate name, including the full-path and
+  // last-segment synthetic names, still wins before anything else, same
+  // as every round-3-to-5 test above). What this sweep no longer checks
+  // is an escape-hatch ALLOW side: GOOGLE_WRITE_ALLOW does not touch the
+  // escape hatch at all any more (isAllowedByAnyName and
+  // escapeHatchNames().allow are both gone), so the M2/M3 collision
+  // concerns those used to cover (a narrow curated allow accidentally
+  // widening to the whole raw method, or to an unrelated method sharing a
+  // synthetic name) no longer apply: there is no allow-side name
+  // resolution left to collide.
+  describe('M2 (round 6): deny-name parity sweep over every curated and generated method id', () => {
     function serviceOf(toolName: string): string {
       const i = toolName.indexOf('_');
       return i === -1 ? toolName : toolName.slice(0, i);
@@ -758,16 +797,7 @@ describe('google_api_call write-control name resolution', () => {
       expect(writeEntries.length).toBeGreaterThan(300);
     });
 
-    // A method several curated tools share (docs/sheets batchUpdate,
-    // drive.files.update's move/trash/untrash/transfer/rename) has no
-    // single curated identity; "unambiguous" below means either a
-    // generated method (always exactly one tool, by construction) or a
-    // curated one with exactly one curated tool for it.
-    function isUnambiguous(methodId: string): boolean {
-      return (CURATED_METHOD_TOOLS[methodId]?.length ?? 0) <= 1;
-    }
-
-    it('a deny on the real tool op denies the same call via the escape hatch (every entry, ambiguous or not)', () => {
+    it('a deny on the real tool op denies the same call via isAllowed AND via the escape hatch (every entry, ambiguous or not)', () => {
       for (const { methodId, toolName } of writeEntries) {
         const service = serviceOf(toolName);
         const cud = inferCud(toolName);
@@ -776,17 +806,14 @@ describe('google_api_call write-control name resolution', () => {
         expect(direct, `${methodId} via ${toolName}: the named tool itself should be denied`).toBe(false);
         const names = escapeHatchNames(service, methodId);
         expect(names.deny, `${methodId} via ${toolName}`).toContain(toolName);
-        const verdict = isAllowedByAnyName(names.deny, names.allow, { service, cud, scopes: [] }, names.primary, policy);
-        expect(verdict.allowed, `${methodId} via ${toolName}: the escape hatch should be denied too`).toBe(false);
+        // full-writes would otherwise auto-allow outright; a deny match
+        // must still win over that, same requirement as before round 6.
+        const verdict = escapeHatchVerdict(names.deny, { service, cud, scopes: [] }, names.primary, policy, false);
+        expect(verdict.decision, `${methodId} via ${toolName}: the escape hatch should be denied too`).toBe('deny');
       }
     });
 
-    // MEDIUM (item 2): an allow on one narrow curated tool must not open
-    // the whole raw method when other curated tools share it (the named
-    // tool itself stays grantable either way; only the escape hatch's
-    // broader reach is restricted). For an unambiguous entry (one tool,
-    // curated or generated) the two still agree, same as before.
-    it('an allow on the real tool op always grants the named tool directly', () => {
+    it('an allow on the real tool op always grants the named tool directly (isAllowed, unaffected by round 6)', () => {
       for (const { methodId, toolName } of writeEntries) {
         const service = serviceOf(toolName);
         const cud = inferCud(toolName);
@@ -796,167 +823,155 @@ describe('google_api_call write-control name resolution', () => {
       }
     });
 
-    // MEDIUM (item 2), the exact shape of the reported bug: when a raw
-    // method is shared by several curated tools, a narrow curated name
-    // (e.g. drive_trash) must not, on its own, be eligible to open the
-    // whole method through the escape hatch. Deny stays "any name" (the
-    // sweep above covers that); allow must drop to the method-wide names
-    // only. This is a direct, pure check of escapeHatchNames's output, not
-    // of isAllowedByAnyName's glob matching, to avoid conflating two
-    // different things under time pressure.
-    it('escape-hatch allow excludes a narrow curated name when the method has more than one curated tool', () => {
-      let ambiguousChecked = 0;
-      for (const [methodId, curatedNames] of Object.entries(CURATED_METHOD_TOOLS)) {
-        if (curatedNames.length <= 1) continue;
-        const service = serviceOf(curatedNames[0]);
-        const names = escapeHatchNames(service, methodId);
-        for (const name of curatedNames) {
-          expect(names.deny, `${methodId}: deny must still cover ${name}`).toContain(name);
-          // A narrow curated name may only appear in allow if it happens to
-          // equal a method-wide name already there (docs_batch_update is
-          // such a case: it IS the raw-passthrough tool for its method).
-          if (names.allow.includes(name)) {
-            const methodWideWithoutCurated = names.allow.filter((n) => !curatedNames.includes(n) || n === name);
-            expect(methodWideWithoutCurated.length, `${methodId}: ${name} in allow must coincide with a method-wide name`).toBeGreaterThan(0);
-          }
-        }
-        expect(curatedNames.every((n) => names.allow.includes(n)), `${methodId}: allow must not include every shared curated tool (6.0.1 bug)`).toBe(false);
-        ambiguousChecked += 1;
-      }
-      expect(ambiguousChecked).toBeGreaterThan(5);
-    });
-
-    it('6.0.1-regression probe: drive:trash, docs:insert_text, calendar:respond_event, drive:create_folder no longer open their whole method via allow', () => {
-      const cases: Array<{ methodId: string; op: string; service: string }> = [
-        { methodId: 'drive.files.update', op: 'trash', service: 'drive' },
-        { methodId: 'docs.documents.batchUpdate', op: 'insert_text', service: 'docs' },
-        { methodId: 'calendar.events.patch', op: 'respond_event', service: 'calendar' },
-        { methodId: 'drive.files.create', op: 'create_folder', service: 'drive' },
-      ];
-      for (const { methodId, op, service } of cases) {
-        const names = escapeHatchNames(service, methodId);
-        const narrowToolName = `${service}_${op}`;
-        // None of trash/insert_text/respond_event/create_folder is a CUD
-        // value, so unlike e.g. "drive:update" there is no documented
-        // service:cud wildcard reading that could legitimately make this
-        // allow match anyway; the assertion below is unconditional.
-        expect(names.allow, `${methodId}: ${narrowToolName} must not be in the escape hatch's allow set here`).not.toContain(narrowToolName);
-        const policy: Policy = { profile: 'read-only', readOnly: false, allow: [`${service}:${op}`], deny: [] };
-        const verdict = isAllowedByAnyName(names.deny, names.allow, { service, cud: 'update', scopes: [] }, names.primary, policy);
-        // Under 6.0.1 this was allowed=true (the bug); the fix must refuse.
-        expect(verdict.allowed, `${methodId} via ${narrowToolName}: escape hatch must refuse (6.0.1 behaviour)`).toBe(false);
-      }
-    });
-
-    it('with no matching allow or deny, the profile verdict on the primary name matches the named tool (unambiguous entries)', () => {
+    it('without a deny, every write entry asks through the escape hatch unless the profile is full-writes', () => {
       for (const policy of [
         { profile: 'read-only', readOnly: false, allow: [], deny: [] } as Policy,
         { profile: 'safe-writes', readOnly: false, allow: [], deny: [] } as Policy,
-        { profile: 'full-writes', readOnly: false, allow: [], deny: [] } as Policy,
       ]) {
         for (const { methodId, toolName } of writeEntries) {
-          if (!isUnambiguous(methodId)) continue; // no single real identity to compare against; see isUnambiguous
           const service = serviceOf(toolName);
           const cud = inferCud(toolName);
-          const direct = isAllowed({ name: toolName, service, cud, scopes: [] }, policy);
           const names = escapeHatchNames(service, methodId);
-          const verdict = isAllowedByAnyName(names.deny, names.allow, { service, cud, scopes: [] }, names.primary, policy);
-          expect(verdict.allowed, `${methodId} via ${toolName} under profile ${policy.profile}`).toBe(direct);
+          const verdict = escapeHatchVerdict(names.deny, { service, cud, scopes: [] }, names.primary, policy, false);
+          expect(verdict.decision, `${methodId} via ${toolName} under profile ${policy.profile}`).toBe('ask');
         }
       }
     });
 
-    it('sanity: the sweep actually contains ambiguous (multi-curated-tool) entries, so the allow test above is not vacuous', () => {
-      const ambiguous = writeEntries.filter((e) => !isUnambiguous(e.methodId));
-      expect(ambiguous.length).toBeGreaterThan(20);
-    });
-
-    // MEDIUM (round 4, M3): lastSegmentName is a GENERIC pattern (service +
-    // the method's last dot segment), not derived from any real
-    // registration, so it can spell some OTHER method's real curated tool
-    // name by pure coincidence (drive.permissions.update's lastSegmentName
-    // "drive_update" is ALSO the actual curated tool name for the
-    // unrelated drive.files.update). Letting that into allow meant a
-    // narrow allow on the real "drive_update" tool widened to grant the
-    // escape hatch on every method whose lastSegmentName happens to match
-    // it too. Full sweep over the whole curated+generated surface: for
-    // every method id, no name in `allow` may be a curated tool's real
-    // name unless that curated tool is actually registered for THIS method.
-    it('M3: no escape-hatch allow name is a real curated tool name of some OTHER method', () => {
-      const curatedAll = new Set(Object.values(CURATED_METHOD_TOOLS).flat());
-      const ids = new Set([...Object.keys(CURATED_METHOD_TOOLS), ...Object.keys(GENERATED_METHOD_TOOLS)]);
-      const collisions: string[] = [];
-      for (const id of ids) {
-        const service = id.split('.')[0];
-        const names = escapeHatchNames(service, id);
-        const own = new Set(CURATED_METHOD_TOOLS[id] ?? []);
-        const bad = names.allow.filter((x) => curatedAll.has(x) && !own.has(x));
-        if (bad.length > 0) collisions.push(`${id} -> allow also via curated ${bad.join(',')}`);
+    it('without a deny, full-writes allows every write entry outright (outbound allowlist off)', () => {
+      const policy: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: [] };
+      for (const { methodId, toolName } of writeEntries) {
+        const service = serviceOf(toolName);
+        const cud = inferCud(toolName);
+        const names = escapeHatchNames(service, methodId);
+        const verdict = escapeHatchVerdict(names.deny, { service, cud, scopes: [] }, names.primary, policy, false);
+        expect(verdict.decision, `${methodId} via ${toolName}`).toBe('allow');
       }
-      expect(collisions, collisions.join('\n')).toEqual([]);
     });
 
-    // Same sweep, the GENERATED-name branch: no escape-hatch allow name
-    // may be the generated tool name GENERATED_METHOD_TOOLS assigns to a
-    // DIFFERENT method id either (allCuratedNames and allGeneratedNames
-    // are two separate collections in the fix; a regression could drop
-    // or break either one independently of the other). No such collision
-    // actually exists in the current generated surface (gencol.ts-style
-    // sweep: 0), so this sweep stays green on its own; it exists to catch
-    // one appearing in a future Discovery update.
-    it('M3: no escape-hatch allow name is a real generated tool name of some OTHER method', () => {
-      const generatedOwner = new Map(Object.entries(GENERATED_METHOD_TOOLS).map(([id, name]) => [name, id]));
-      const ids = new Set([...Object.keys(CURATED_METHOD_TOOLS), ...Object.keys(GENERATED_METHOD_TOOLS)]);
-      const collisions: string[] = [];
-      for (const id of ids) {
-        const service = id.split('.')[0];
-        const names = escapeHatchNames(service, id);
-        for (const name of names.allow) {
-          const genOwnerId = generatedOwner.get(name);
-          if (genOwnerId && genOwnerId !== id) collisions.push(`${id} -> allow also via generated ${name} (owned by ${genOwnerId})`);
-        }
+    it('without a deny, full-writes asks (not allows) every write entry when the outbound allowlist is active', () => {
+      const policy: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: [] };
+      for (const { methodId, toolName } of writeEntries) {
+        const service = serviceOf(toolName);
+        const cud = inferCud(toolName);
+        const names = escapeHatchNames(service, methodId);
+        const verdict = escapeHatchVerdict(names.deny, { service, cud, scopes: [] }, names.primary, policy, true);
+        expect(verdict.decision, `${methodId} via ${toolName}`).toBe('ask');
       }
-      expect(collisions, collisions.join('\n')).toEqual([]);
     });
+  });
+});
 
-    // A clean (non-cud-ambiguous) instance of M3, verified end to end
-    // through isAllowedByAnyName, not just the name-level sweep above:
-    // "trash" is not a CUD value, so GOOGLE_WRITE_ALLOW="gmail:trash" only
-    // ever matched via service:op, never via the service:cud wildcard
-    // (unlike e.g. "drive:update", which is unavoidably ambiguous between
-    // naming the specific drive_update tool and allowing every update-
-    // class drive write by design; docs/configuration.md documents that
-    // the latter wins, so those collisions are not re-asserted end to end
-    // here). gmail_trash is the curated tool for gmail.users.messages.trash;
-    // gmail.users.threads.trash's lastSegmentName happened to spell the
-    // same name, so this allow widened to also open the unrelated thread-
-    // trash method's escape hatch.
-    it('M3: allowing gmail:trash does not also open the unrelated gmail.users.threads.trash via the escape hatch', () => {
-      const names = escapeHatchNames('gmail', 'gmail.users.threads.trash');
-      const policy: Policy = { profile: 'read-only', readOnly: false, allow: ['gmail:trash'], deny: [] };
-      const verdict = isAllowedByAnyName(names.deny, names.allow, { service: 'gmail', cud: 'delete', scopes: [] }, names.primary, policy);
-      expect(verdict.allowed).toBe(false);
-    });
+// ROUND 6: the escape hatch (google_api_call and every generated per-method
+// tool) now asks a human via MCP elicitation before an unreviewed write,
+// except a hard refusal (GOOGLE_READ_ONLY, or a matching deny) and except
+// full-writes with GOOGLE_OUTBOUND_ALLOWLIST unset. This covers every
+// branch the owner's redesign specifies, end to end through google_api_call;
+// tests/safe-writes-trash.test.ts and tests/privileged-writes.test.ts cover
+// the same decision for a GENERATED per-method tool, and
+// tests/outbound-allowlist.test.ts covers that curated tools are unaffected.
+describe('escape hatch: round 6 human-confirmation model', () => {
+  const ASK_POLICY: Policy = { profile: 'safe-writes', readOnly: false, allow: [], deny: [] };
+  const CALL = { account: 'test', api: 'gmail', methodId: 'gmail.users.messages.send', pathParams: { userId: 'me' }, body: { raw: 'x' } };
 
-    // OWNER DECISION (round 5, item 6): a service:cud wildcard must not
-    // open a push registration via google_api_call either. Deny keeps
-    // the full candidate set; naming the real tool, or a true service
-    // wildcard, still allows it.
-    it('allowing forms:create does not open forms.forms.watches.create through google_api_call; forms_forms_watches_create or forms:* does', () => {
-      const names = escapeHatchNames('forms', 'forms.forms.watches.create');
-      const base = { service: 'forms', cud: 'create' as const, scopes: [] };
+  it('accept runs the call and sends the account, method, verb, path params and a body summary in the prompt', async () => {
+    const { call, request, dir, elicitInput } = setup(ASK_POLICY, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    const res = await call(CALL);
+    expect(res.isError).toBeUndefined();
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(elicitInput).toHaveBeenCalledTimes(1);
+    const prompt = (elicitInput.mock.calls[0][0] as { message: string }).message;
+    expect(prompt).toContain('test');
+    expect(prompt).toContain('gmail.users.messages.send');
+    expect(prompt).toContain('POST');
+    expect(prompt).toContain('userId');
+    expect(prompt).toContain('raw');
+  });
 
-      const cudWildcard: Policy = { profile: 'read-only', readOnly: false, allow: ['forms:create'], deny: [] };
-      expect(isAllowedByAnyName(names.deny, names.allow, base, names.primary, cudWildcard).allowed).toBe(false);
+  it('decline refuses with write_declined and never calls Google', async () => {
+    const { call, request, dir } = setup(ASK_POLICY, { elicit: 'decline' });
+    cleanupDirs.push(dir);
+    const res = await call(CALL);
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('write_declined');
+    expect(request).not.toHaveBeenCalled();
+  });
 
-      const namedExactly: Policy = { profile: 'read-only', readOnly: false, allow: ['forms:forms_watches_create'], deny: [] };
-      expect(isAllowedByAnyName(names.deny, names.allow, base, names.primary, namedExactly).allowed).toBe(true);
+  it('cancel refuses with write_declined too, and never calls Google', async () => {
+    const { call, request, dir } = setup(ASK_POLICY, { elicit: 'cancel' });
+    cleanupDirs.push(dir);
+    const res = await call(CALL);
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('write_declined');
+    expect(request).not.toHaveBeenCalled();
+  });
 
-      const serviceWildcard: Policy = { profile: 'read-only', readOnly: false, allow: ['forms:*'], deny: [] };
-      expect(isAllowedByAnyName(names.deny, names.allow, base, names.primary, serviceWildcard).allowed).toBe(true);
+  it('a client without elicitation support refuses with elicitation_unsupported and a hint naming both ways forward', async () => {
+    const { call, request, dir } = setup(ASK_POLICY); // default: unsupported
+    cleanupDirs.push(dir);
+    const res = await call(CALL);
+    expect(res.isError).toBe(true);
+    const payload = JSON.parse(res.content[0].text);
+    expect(payload.error).toBe('elicitation_unsupported');
+    expect(payload.hint).toContain('full-writes');
+    expect(payload.hint).toContain('curated tool');
+    expect(request).not.toHaveBeenCalled();
+  });
 
-      const denyCudWildcard: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: ['forms:create'] };
-      expect(isAllowedByAnyName(names.deny, names.allow, base, names.primary, denyCudWildcard).allowed).toBe(false);
-    });
+  it('deny wins before an ask is ever made, even under full-writes', async () => {
+    const policy: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: ['gmail:send'] };
+    const { call, request, dir, elicitInput } = setup(policy, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    const res = await call(CALL);
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('write_disabled');
+    expect(elicitInput).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  // GOOGLE_READ_ONLY is a hard kill switch, distinct from GOOGLE_PROFILE:
+  // it refuses outright, the same as it always has, never asking.
+  it('the hard GOOGLE_READ_ONLY flag refuses without ever asking, even under full-writes', async () => {
+    const policy: Policy = { profile: 'full-writes', readOnly: true, allow: [], deny: [] };
+    const { call, request, dir, elicitInput } = setup(policy, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    const res = await call(CALL);
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('write_disabled');
+    expect(elicitInput).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('full-writes with the outbound allowlist unset skips the ask and runs the call outright', async () => {
+    const policy: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: [] };
+    const { call, request, dir, elicitInput } = setup(policy);
+    cleanupDirs.push(dir);
+    const res = await call(CALL);
+    expect(res.isError).toBeUndefined();
+    expect(elicitInput).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  // GOOGLE_OUTBOUND_ALLOWLIST being active removes full-writes' own
+  // auto-allow for the escape hatch specifically (point d of the model):
+  // a body-shaped write there could still address someone the allowlist
+  // was meant to block, so it falls back to asking a human like every
+  // other profile does.
+  it('full-writes WITH the outbound allowlist active asks instead of skipping', async () => {
+    const prior = process.env.GOOGLE_OUTBOUND_ALLOWLIST;
+    process.env.GOOGLE_OUTBOUND_ALLOWLIST = 'a@corp.com';
+    try {
+      const policy: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: [] };
+      const { call, request, dir, elicitInput } = setup(policy, { elicit: 'accept' });
+      cleanupDirs.push(dir);
+      const res = await call(CALL);
+      expect(res.isError).toBeUndefined();
+      expect(elicitInput).toHaveBeenCalledTimes(1);
+      expect(request).toHaveBeenCalledTimes(1);
+    } finally {
+      if (prior === undefined) delete process.env.GOOGLE_OUTBOUND_ALLOWLIST;
+      else process.env.GOOGLE_OUTBOUND_ALLOWLIST = prior;
+    }
   });
 });
