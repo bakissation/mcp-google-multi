@@ -289,6 +289,25 @@ function matchesGranteePattern(methodId: string): boolean {
   return methodId.split('.').some((segment) => GRANTEE_RESOURCE_SEGMENTS.has(segment));
 }
 
+/** Grantee-pattern methods that never add an outside recipient, so the
+ * generic fail-closed fallback below is a false positive for them:
+ * contactGroups.members.modify only reorganizes the caller's OWN existing
+ * contacts into groups (resourceNamesToAdd/Delete are people/<id> resource
+ * names, never emails); nothing is granted to anyone new. */
+const ALWAYS_SAFE_GRANTEE_PATTERN_METHODS = new Set(['people.contactGroups.members.modify']);
+
+/** A sendAs patch/update touching only signature and/or displayName
+ * changes nothing about WHO can send as this identity (the fields that do
+ * -- sendAsEmail, replyToAddress, treatAsAlias -- are absent), so it is
+ * harmless regardless of the allowlist. */
+function isHarmlessSendAsPatch(methodId: string, body: unknown): boolean {
+  if (methodId !== 'gmail.users.settings.sendAs.patch' && methodId !== 'gmail.users.settings.sendAs.update') return false;
+  const b = asRecord(body);
+  if (!b) return true; // nothing at all to change is harmless
+  const SAFE_FIELDS = new Set(['signature', 'displayName']);
+  return Object.keys(b).every((k) => SAFE_FIELDS.has(k));
+}
+
 function mergeGrantee(a: GranteeCheck | null, b: GranteeCheck | null): GranteeCheck {
   const parts = [a, b].filter((x): x is GranteeCheck => x !== null);
   return {
@@ -370,6 +389,28 @@ function unrecognizedShapeEnvelope(methodId: string, account: string) {
           error: 'recipient_not_allowed',
           message: `${methodId} has a body shape the outbound allowlist does not recognize while it is active.`,
           hint: 'Refused rather than risk an unexamined grantee; check the field names against the Discovery schema for this method.',
+          retriable: false,
+          account,
+        }),
+      },
+    ],
+    isError: true as const,
+  };
+}
+
+// Distinct wording from unrecognizedShapeEnvelope: this path never looked
+// at a body shape at all (the write just has no method-specific rule yet),
+// so "a body shape ... does not recognize" would be inaccurate, including
+// for calls with no body (most DELETEs).
+function noRuleForGranteePatternEnvelope(methodId: string, account: string) {
+  return {
+    content: [
+      {
+        type: 'text' as const,
+        text: JSON.stringify({
+          error: 'recipient_not_allowed',
+          message: `${methodId} writes to a grantee-shaped resource with no specific rule yet while the outbound allowlist is active.`,
+          hint: 'Refused rather than risk an unexamined grantee; use a curated tool that enforces the allowlist, or ask for a rule covering this method.',
           retriable: false,
           account,
         }),
@@ -471,9 +512,23 @@ export function checkOutboundForMethod(
   // grantee-shaped (permissions, members, memberships, delegates, sendAs,
   // invitations, accessBindings, students, teachers, ...) is refused rather
   // than fall back to a key walk that was never taught this method's fields.
-  const isRead = opts.httpMethod !== undefined && /^(get|head)$/i.test(opts.httpMethod);
-  if (!isRead && matchesGranteePattern(methodId)) {
-    return unrecognizedShapeEnvelope(methodId, account);
+  // Three exceptions, because the pattern alone over-blocks: a DELETE only
+  // revokes access (nothing is granted by removing a grantee); a handful of
+  // methods that match the pattern never grant access to anyone outside the
+  // caller's own data (ALWAYS_SAFE_GRANTEE_PATTERN_METHODS); and a sendAs
+  // patch/update touching only signature/displayName changes nothing about
+  // who can send as the identity.
+  const httpVerb = (opts.httpMethod ?? '').toUpperCase();
+  const isRead = /^(GET|HEAD)$/.test(httpVerb);
+  const isRemoval = httpVerb === 'DELETE';
+  if (
+    !isRead &&
+    !isRemoval &&
+    !ALWAYS_SAFE_GRANTEE_PATTERN_METHODS.has(methodId) &&
+    !isHarmlessSendAsPatch(methodId, body) &&
+    matchesGranteePattern(methodId)
+  ) {
+    return noRuleForGranteePatternEnvelope(methodId, account);
   }
 
   return checkOutbound(`${methodId} recipient`, collectBodyRecipients(body), account, env);

@@ -188,6 +188,16 @@ describe('checkOutboundForMethod: fail closed on grantee-pattern writes with no 
     'calendar.acl.patch',
   ]);
 
+  // LOW (item 5): these match the grantee-pattern but are harmless, so an
+  // EMPTY body (what this sweep probes with) is now correctly allowed,
+  // not fail-closed; gmail.users.settings.sendAs.patch with a real
+  // identity-changing field is still covered separately below.
+  const ALWAYS_ALLOWED_EMPTY_BODY = new Set([
+    'gmail.users.settings.sendAs.patch',
+    'gmail.users.settings.sendAs.update',
+    'people.contactGroups.members.modify',
+  ]);
+
   // The reviewer's named probe cases: each previously passed through the
   // generic emailAddress/email key walk untouched (none of these fields are
   // named "email"/"emailAddress"), so GOOGLE_OUTBOUND_ALLOWLIST gated nothing.
@@ -236,6 +246,8 @@ describe('checkOutboundForMethod: fail closed on grantee-pattern writes with no 
     if (EXPLICIT_RULE_METHODS.has(methodId)) return; // has its own shape rule; covered above
     if (inferCud(toolName) === 'read') {
       expect(checkOutboundForMethod(methodId, {}, 'a', ENV, { httpMethod: 'GET' }), methodId).toBeNull();
+    } else if (ALWAYS_ALLOWED_EMPTY_BODY.has(methodId)) {
+      expect(checkOutboundForMethod(methodId, {}, 'a', ENV, { httpMethod: 'POST' }), methodId).toBeNull();
     } else {
       const r = checkOutboundForMethod(methodId, {}, 'a', ENV, { httpMethod: 'POST' });
       expect(r, methodId).not.toBeNull();
@@ -409,6 +421,54 @@ describe('curated twins look the real grantee up instead of trusting their own a
     });
     const res = await h.call('drive_access_proposal_resolve', { account: 'test', fileId: 'f1', proposalId: 'p1', action: 'DENY' });
     expect(res.isError).toBeFalsy();
+  });
+});
+
+// LOW (item 5): the grantee-pattern fail-closed fallback over-blocked
+// removals and a couple of harmless writes, with a "body shape" error that
+// did not even apply to a bodyless DELETE.
+describe('checkOutboundForMethod: the grantee-pattern fallback does not over-block removals (item 5)', () => {
+  const removals: Array<[string, unknown]> = [
+    ['calendar.acl.delete', undefined],
+    ['gmail.users.settings.delegates.delete', undefined],
+    ['gmail.users.settings.forwardingAddresses.delete', undefined],
+    ['gmail.users.settings.sendAs.delete', undefined],
+    ['chat.spaces.members.delete', undefined],
+  ];
+
+  it.each(removals)('%s (a DELETE) is not fail-closed: revoking access is always safe', (methodId, body) => {
+    expect(checkOutboundForMethod(methodId, body, 'a', ENV, { httpMethod: 'DELETE' }), methodId).toBeNull();
+  });
+
+  it('the same resource as a non-DELETE write is still fail-closed (DELETE is the exemption, not the resource)', () => {
+    const r = checkOutboundForMethod('gmail.users.settings.delegates.create' /* has its own rule, but confirms POST isn't exempt */, {}, 'a', ENV, {
+      httpMethod: 'POST',
+    });
+    expect(r).not.toBeNull();
+  });
+
+  it('a sendAs patch touching only signature/displayName is allowed; one touching replyToAddress is still refused', () => {
+    expect(checkOutboundForMethod('gmail.users.settings.sendAs.patch', { signature: '<p>Thanks</p>' }, 'a', ENV, { httpMethod: 'PATCH' })).toBeNull();
+    expect(
+      checkOutboundForMethod('gmail.users.settings.sendAs.patch', { displayName: 'Jane Doe', signature: 'hi' }, 'a', ENV, { httpMethod: 'PATCH' }),
+    ).toBeNull();
+    const blocked = checkOutboundForMethod('gmail.users.settings.sendAs.patch', { replyToAddress: 'evil@evil.example' }, 'a', ENV, { httpMethod: 'PATCH' });
+    expect(blocked).not.toBeNull();
+    expect(JSON.parse(blocked!.content[0].text).error).toBe('recipient_not_allowed');
+  });
+
+  it('people.contactGroups.members.modify is allowed: it reorganizes the caller\'s own contacts, granting nothing to anyone new', () => {
+    expect(
+      checkOutboundForMethod('people.contactGroups.members.modify', { resourceNamesToAdd: ['people/c1'] }, 'a', ENV, { httpMethod: 'POST' }),
+    ).toBeNull();
+  });
+
+  it('the error for an unexempted grantee-pattern write accurately describes a missing rule, not a body shape', () => {
+    const r = checkOutboundForMethod('cloudidentity.groups.memberships.create', { preferredMemberKey: { id: 'x@evil.example' } }, 'a', ENV, {
+      httpMethod: 'POST',
+    });
+    expect(r).not.toBeNull();
+    expect(JSON.parse(r!.content[0].text).message).toContain('no specific rule yet');
   });
 });
 
