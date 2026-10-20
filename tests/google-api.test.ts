@@ -261,6 +261,8 @@ function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string>; elicit?: 
     const mode = opts.elicit ?? 'unsupported';
     const action = typeof mode === 'function' ? mode(params.message) : mode;
     if (action === 'unsupported') throw new Error('elicitation not supported by this client (test harness default)');
+    if (action === 'throws') throw new Error('simulated: no answer arrived (timeout or dropped connection)');
+    if (action === 'unexpected') return { action: 'something_else' };
     return { action };
   });
   // registry.elicitConfirmation checks this BEFORE calling elicitInput; see
@@ -1246,6 +1248,36 @@ describe('escape hatch: round 7 prompt integrity', () => {
     expect(payload.error).toBe('invalid_params');
     expect(payload.message).toContain('note');
     expect(elicitInput).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+});
+
+// LOW: elicitInput itself can misbehave even once the client HAS declared
+// the capability (a timeout, a dropped connection, an SDK returning
+// something that is not accept/decline/cancel); registry.elicitConfirmation
+// must refuse in every one of those cases too, the same as "never asked
+// at all", rather than risk proceeding without a real answer.
+describe('escape hatch: elicitInput misbehaving after capability was declared', () => {
+  const SAFE: Policy = { profile: 'safe-writes', readOnly: false, allow: [], deny: [] };
+  const CALL = { account: 'test', api: 'gmail', methodId: 'gmail.users.messages.send', pathParams: { userId: 'me' }, body: { raw: SAMPLE_RAW } };
+
+  it('a capable client whose answer never arrives (elicitInput throws) still refuses closed', async () => {
+    const { call, request, dir, elicitInput } = setup(SAFE, { elicit: 'throws' });
+    cleanupDirs.push(dir);
+    const res = await call(CALL);
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('elicitation_unsupported');
+    expect(elicitInput).toHaveBeenCalledTimes(1);
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('a capable client whose result action is not accept/decline/cancel still refuses closed', async () => {
+    const { call, request, dir, elicitInput } = setup(SAFE, { elicit: 'unexpected' });
+    cleanupDirs.push(dir);
+    const res = await call(CALL);
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('elicitation_unsupported');
+    expect(elicitInput).toHaveBeenCalledTimes(1);
     expect(request).not.toHaveBeenCalled();
   });
 });
