@@ -2,13 +2,15 @@
 // control (a hijacked agent cannot mail/invite/share outside the operator's list). Off by default.
 //
 // Only serves CURATED tools now (drive_share, drive_permission_update,
-// drive_access_proposal_resolve, gmail_send/create_draft/send_draft,
-// calendar attendees, gmail delegates/forwarding/sendAs/filters). The
-// escape hatch (google_api_call and every generated per-method tool) no
-// longer has its own content-based reasoning here at all: a write there
-// either fails closed on an explicit deny, is allowed outright under
-// full-writes with this allowlist off, or asks a human via elicitation,
-// who sees the real body and decides (src/tools/_escape-hatch.ts).
+// drive_access_proposal_resolve, drive_revision_update, gmail_send/
+// create_draft/send_draft, gmail_set_vacation, calendar attendees). The
+// escape hatch (google_api_call and every generated per-method tool,
+// including the raw gmail.users.settings.delegates/forwardingAddresses/
+// sendAs/filters methods this file used to gate) no longer has its own
+// content-based reasoning here at all: a write there either fails closed
+// on an explicit deny, is allowed outright under full-writes with this
+// allowlist off, or asks a human via elicitation, who sees the real body
+// and decides (src/tools/_escape-hatch.ts).
 
 import { hints } from './hint-provider.js';
 
