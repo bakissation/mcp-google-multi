@@ -257,7 +257,7 @@ const estimateEncoded = (rawBytes: number) => Math.ceil((rawBytes * 4) / 3);
 const attachmentSchema = z
   .array(
     z.object({
-      path: z.string().describe('Absolute local path to the file to attach'),
+      path: z.string().describe('Path to the file to attach, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it.'),
       filename: z.string().optional().describe('MIME filename; defaults to the path basename'),
       contentType: z.string().optional().describe('MIME type; defaults to a lookup on the filename'),
     }),
@@ -861,7 +861,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
         messageId: z.string().min(1).describe('The Gmail message ID'),
         attachmentId: z.string().min(1).describe('The attachment ID from gmail_read response'),
         filename: z.string().describe('Filename to save as (e.g. report.xlsx)'),
-        savePath: z.string().min(1).describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server), e.g. /home/user/Downloads; the file name comes from `filename`'),
+        savePath: z.string().min(1).describe('Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`.'),
       },
     },
     async ({ account, messageId, attachmentId, filename, savePath }) => {

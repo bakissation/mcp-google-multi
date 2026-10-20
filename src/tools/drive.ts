@@ -399,7 +399,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         contentBase64: z.string().optional().describe(`Base64-encoded file content. Exactly one of contentBase64${localFiles ? ' or localPath' : ''} is required. Decoded size is capped at ${MAX_UPLOAD_BASE64_BYTES / (1024 * 1024)} MB.`),
         ...(localFiles
           ? {
-              localPath: z.string().min(1).optional().describe('Absolute path of the SOURCE file on disk to upload (on the machine running the server; this is not savePath). Exactly one of contentBase64 or localPath is required.'),
+              localPath: z.string().min(1).optional().describe('Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64 or localPath is required.'),
             }
           : {}),
         mimeType: z.string().optional().describe('Source MIME type of the content (inferred from filename if omitted). With `convertTo`, this is the format Drive imports from.'),
@@ -481,7 +481,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().min(1).describe('Google Drive file ID'),
-        savePath: z.string().min(1).describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server); the file name comes from `filename`'),
+        savePath: z.string().min(1).describe('Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`.'),
         filename: z.string().optional().describe('Filename to save as (defaults to the file name in Drive)'),
       },
     },
@@ -533,7 +533,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().min(1).describe('Google Drive file ID'),
         mimeType: z.string().describe('Target export MIME type (e.g. "application/pdf", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")'),
-        savePath: z.string().min(1).describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server); the file name comes from `filename`'),
+        savePath: z.string().min(1).describe('Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`.'),
         filename: z.string().optional().describe('Filename to save as (defaults to the Drive name plus the extension implied by mimeType)'),
       },
     },
@@ -623,7 +623,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         newParentFolderId: z.string().optional().describe('Move to this folder, named newParentFolderId here, not parentFolderId'),
         ...(localFiles
           ? {
-              localPath: z.string().optional().describe('Replace file content with this local file (path on the machine running the server)'),
+              localPath: z.string().optional().describe('Replace file content with this local file, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it.'),
               mimeType: z.string().optional().describe('MIME type of the replacement file (required if localPath is provided)'),
               convertTo: z.enum(CONVERT_TO_VALUES).optional().describe('When replacing content via localPath, convert the new content into this native Google Workspace type on import: "document" | "spreadsheet" | "presentation" | "drawing" (full application/vnd.google-apps.* ids also accepted).'),
             }
