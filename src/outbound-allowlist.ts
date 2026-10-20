@@ -153,27 +153,74 @@ function snakeToCamel(key: string): string {
   return key.replace(/_([a-z0-9])/gi, (_, c: string) => c.toUpperCase());
 }
 
-function normalizeBodyKeys(v: unknown, depth = 0): unknown {
-  if (depth > 12) return v; // pathological nesting: stop rewriting, not throwing
-  if (Array.isArray(v)) return v.map((x) => normalizeBodyKeys(x, depth + 1));
-  if (v && typeof v === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-      out[snakeToCamel(k)] = normalizeBodyKeys(val, depth + 1);
-    }
-    return out;
-  }
-  return v;
+interface NormalizeResult {
+  value: unknown;
+  /** True anywhere in the (sub)tree two differently-spelled source keys
+   * (e.g. enable_auto_reply and enableAutoReply) normalised to the same
+   * key: which one "won" is iteration-order noise, not a shape any check
+   * below should trust. */
+  ambiguous: boolean;
 }
 
-// A boolean gate (enableAutoReply, published, ...) must treat anything
-// other than absent/null/false/"false" as true: proto3 JSON accepts a
-// bool field written as a string ("true"), and this check must not be the
-// more permissive reader between the two.
+function normalizeBodyKeysDeep(v: unknown, depth: number): NormalizeResult {
+  if (depth > 12) return { value: v, ambiguous: false }; // pathological nesting: stop rewriting, not throwing
+  if (Array.isArray(v)) {
+    let ambiguous = false;
+    const value = v.map((x) => {
+      const r = normalizeBodyKeysDeep(x, depth + 1);
+      ambiguous = ambiguous || r.ambiguous;
+      return r.value;
+    });
+    return { value, ambiguous };
+  }
+  if (v && typeof v === 'object') {
+    // Object.create(null): a bracket-assigned key literally named
+    // "__proto__" on a plain {} would invoke Object.prototype's own
+    // __proto__ SETTER (a [[Set]], not a [[DefineOwnProperty]]), silently
+    // repointing this object's prototype instead of storing a normal
+    // data property; a null-prototype object has no such setter to invoke.
+    const out: Record<string, unknown> = Object.create(null);
+    let ambiguous = false;
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      const camel = snakeToCamel(k);
+      if (camel in out) ambiguous = true;
+      const r = normalizeBodyKeysDeep(val, depth + 1);
+      ambiguous = ambiguous || r.ambiguous;
+      out[camel] = r.value;
+    }
+    return { value: out, ambiguous };
+  }
+  return { value: v, ambiguous: false };
+}
+
+function normalizeBodyKeys(v: unknown): NormalizeResult {
+  return normalizeBodyKeysDeep(v, 0);
+}
+
+// A boolean gate that turns something ON (enableAutoReply, published,
+// publishedOutsideDomain, ...) must treat anything other than absent/
+// null/false/"false" as true: proto3 JSON accepts a bool field written
+// as a string ("true"), and this check must not be the more permissive
+// reader between the two, or a value Google would reject outright could
+// quietly fail to register as "this call does something dangerous".
 function isTruthyGate(v: unknown): boolean {
   if (v === undefined || v === null || v === false) return false;
   if (typeof v === 'string' && v.trim().toLowerCase() === 'false') return false;
   return true;
+}
+
+// A boolean gate that turns a RESTRICTION on (restrictToContacts,
+// restrictToDomain) is read the other way around: only a strict `true`,
+// or a string that trims and lowercases to "true", counts. Anything else
+// -- "0", "no", "", 0, [false], an object -- must NOT be read as "the
+// restriction is in effect", the way isTruthyGate's lenient reading would
+// (every one of those is truthy by isTruthyGate's rule, since none of
+// them is exactly false or the string "false"); Google likely parses
+// those non-boolean, non-"true"/"false" values as false, meaning the
+// restriction would NOT actually be on.
+function isStrictlyTrue(v: unknown): boolean {
+  if (v === true) return true;
+  return typeof v === 'string' && v.trim().toLowerCase() === 'true';
 }
 
 const UNRECOGNIZED: GranteeCheck = { emails: [], domains: [], public: false, understood: false };
@@ -241,6 +288,10 @@ function granteeCheck(methodId: string, body: unknown): GranteeCheck | null {
         : { emails: [], domains: [], public: false, understood: true };
     }
     case 'chat.spaces.setup': {
+      // memberships present but not an array (a number-keyed object, a
+      // bare string, ...) is an unrecognised shape, not zero memberships:
+      // Array.isArray's false branch must not be read as "nothing here".
+      if (b.memberships !== undefined && !Array.isArray(b.memberships)) return UNRECOGNIZED;
       const memberships = Array.isArray(b.memberships) ? b.memberships : [];
       const emails: string[] = [];
       for (const m of memberships) {
@@ -396,7 +447,7 @@ function dangerousDefaultRefusal(methodId: string, normalizedBody: unknown): str
   }
   if (methodId === 'gmail.users.settings.updateVacation') {
     const enabling = isTruthyGate(b.enableAutoReply);
-    const restricted = isTruthyGate(b.restrictToContacts) || isTruthyGate(b.restrictToDomain);
+    const restricted = isStrictlyTrue(b.restrictToContacts) || isStrictlyTrue(b.restrictToDomain);
     if (enabling && !restricted) {
       return 'an unrestricted auto-reply answers every sender, including ones outside the allowlist; set restrictToContacts or restrictToDomain';
     }
@@ -508,7 +559,11 @@ export function checkOutboundForMethod(
   // rule or scan that only ever reads the camelCase key would otherwise
   // miss the exact same field spelled the other way. Normalise once, and
   // use normalizedBody (never the original body) in every check below.
-  const normalizedBody = normalizeBodyKeys(body);
+  const { value: normalizedBody, ambiguous } = normalizeBodyKeys(body);
+  // Two source keys collided onto the same normalised name (e.g.
+  // enable_auto_reply and enableAutoReply both present): which value
+  // "won" is iteration-order noise, not a shape any rule below can trust.
+  if (ambiguous) return unrecognizedShapeEnvelope(methodId, account);
 
   const dangerous = dangerousDefaultRefusal(methodId, normalizedBody);
   if (dangerous) return dangerousDefaultEnvelope(methodId, dangerous, account);

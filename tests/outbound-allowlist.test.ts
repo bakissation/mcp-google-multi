@@ -427,6 +427,67 @@ describe('checkOutboundForMethod: M1 per-method rules (item 3)', () => {
     const r = checkOutboundForMethod('gmail.users.settings.sendAs.patch', { signature: 'x', display_name: 'y' }, 'a', ENV, { httpMethod: 'PATCH' });
     expect(r).toBeNull();
   });
+
+  // MEDIUM (round 5, item 1): restrictToContacts/restrictToDomain were
+  // read with the same lenient isTruthyGate as the enabling flag, so a
+  // value Google likely parses as false ("0", "no", "", 0, [false]) was
+  // misread as "the restriction is on" and let the call through.
+  it('restrictToContacts/restrictToDomain only count as restricting on a strict true, not a lenient-truthy value', () => {
+    const notActuallyRestricting = [0, '0', 'no', '', [false], 'False' /* case-insensitive false is still false */];
+    for (const v of notActuallyRestricting) {
+      const r = checkOutboundForMethod('gmail.users.settings.updateVacation', { enableAutoReply: true, restrictToContacts: v }, 'a', ENV, { httpMethod: 'PUT' });
+      expect(r, `restrictToContacts: ${JSON.stringify(v)}`).not.toBeNull();
+      expect(JSON.parse(r!.content[0].text).error, JSON.stringify(v)).toBe('recipient_not_allowed');
+    }
+    const domainArrayFalse = checkOutboundForMethod(
+      'gmail.users.settings.updateVacation', { enableAutoReply: true, restrictToDomain: [false] }, 'a', ENV, { httpMethod: 'PUT' },
+    );
+    expect(domainArrayFalse).not.toBeNull();
+    // A strict true, or a string that trims/lowercases to "true", still restricts.
+    expect(checkOutboundForMethod('gmail.users.settings.updateVacation', { enableAutoReply: true, restrictToContacts: true }, 'a', ENV, { httpMethod: 'PUT' })).toBeNull();
+    expect(checkOutboundForMethod('gmail.users.settings.updateVacation', { enableAutoReply: true, restrictToContacts: ' TRUE ' }, 'a', ENV, { httpMethod: 'PUT' })).toBeNull();
+  });
+
+  // LOW (round 5, item 2): two source keys that normalise to the same
+  // name (enable_auto_reply and enableAutoReply) is ambiguous, not a
+  // "last one wins" resolution; whichever value iteration order happens
+  // to apply last is not something any rule should trust.
+  it('two differently-spelled source keys normalising to the same key are refused as an unrecognised shape', () => {
+    const cases: Array<[string, unknown, string]> = [
+      ['gmail.users.settings.updateVacation', { enable_auto_reply: true, enableAutoReply: false }, 'PUT'],
+      ['gmail.users.settings.updateVacation', { enableAutoReply: false, enable_auto_reply: true }, 'PUT'],
+      ['gmail.users.settings.updateVacation', { enableAutoReply: true, restrict_to_contacts: true, restrictToContacts: false }, 'PUT'],
+      ['drive.revisions.update', { published_outside_domain: 'TRUE', publishedOutsideDomain: false }, 'PATCH'],
+    ];
+    for (const [methodId, body, httpMethod] of cases) {
+      const r = checkOutboundForMethod(methodId, body, 'a', ENV, { httpMethod });
+      expect(r, `${methodId}: ${JSON.stringify(body)}`).not.toBeNull();
+      expect(JSON.parse(r!.content[0].text).error, methodId).toBe('recipient_not_allowed');
+    }
+    // A single spelling, even an unusual one, is not ambiguous.
+    expect(checkOutboundForMethod('gmail.users.settings.updateVacation', { enableAutoReply: false }, 'a', ENV, { httpMethod: 'PUT' })).toBeNull();
+  });
+
+  it('normalising a body containing a literal "__proto__" key does not pollute the object used for the checks', () => {
+    const body = JSON.parse('{"type":"user","__proto__":{"emailAddress":"ok@corp.com"},"email_address":"evil@evil.example"}');
+    const r = checkOutboundForMethod('drive.permissions.create', body, 'a', ENV, { httpMethod: 'POST' });
+    expect(r).not.toBeNull(); // the real (normalised) emailAddress is evil@evil.example, not allowlisted
+    expect(JSON.parse(r!.content[0].text).error).toBe('recipient_not_allowed');
+  });
+
+  // LOW (round 5, item 3): memberships present but not an array (a
+  // number-keyed object, a bare string) hit Array.isArray's false branch
+  // and were read as "no memberships", not as an unrecognised shape.
+  it('chat.spaces.setup: memberships present but not an array is refused, not treated as empty', () => {
+    for (const memberships of [{ 0: { member: { name: 'users/112233' } } }, { member: { name: 'users/112233' } }, 'users/1']) {
+      const r = checkOutboundForMethod('chat.spaces.setup', { space: { spaceType: 'SPACE' }, memberships }, 'a', ENV, { httpMethod: 'POST' });
+      expect(r, JSON.stringify(memberships)).not.toBeNull();
+      expect(JSON.parse(r!.content[0].text).error, JSON.stringify(memberships)).toBe('recipient_not_allowed');
+    }
+    // Absent, or a real empty array, is still a legitimate "no memberships yet".
+    expect(checkOutboundForMethod('chat.spaces.setup', { space: { spaceType: 'SPACE' } }, 'a', ENV, { httpMethod: 'POST' })).toBeNull();
+    expect(checkOutboundForMethod('chat.spaces.setup', { space: { spaceType: 'SPACE' }, memberships: [] }, 'a', ENV, { httpMethod: 'POST' })).toBeNull();
+  });
 });
 
 // MEDIUM (item 3), curated-twin coverage: drive_permission_update and
