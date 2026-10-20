@@ -146,7 +146,7 @@ Download a binary file from Drive to local disk. For Google Workspace formats (D
 |---|---|---|---|
 | `account` | string | optional | Google account alias |
 | `fileId` | string | required | Google Drive file ID |
-| `savePath` | string | required | Absolute DIRECTORY path to save into (created if missing, on the machine running the server); the file name comes from `filename` |
+| `savePath` | string | required | Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`. |
 | `filename` | string | optional | Filename to save as (defaults to the file name in Drive) |
 
 ## `drive_empty_trash`
@@ -170,7 +170,7 @@ Export a Google Workspace document (Doc, Sheet, Slide) to a standard format and 
 | `account` | string | optional | Google account alias |
 | `fileId` | string | required | Google Drive file ID |
 | `mimeType` | string | required | Target export MIME type (e.g. "application/pdf", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document") |
-| `savePath` | string | required | Absolute DIRECTORY path to save into (created if missing, on the machine running the server); the file name comes from `filename` |
+| `savePath` | string | required | Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`. |
 | `filename` | string | optional | Filename to save as (defaults to the Drive name plus the extension implied by mimeType) |
 
 ## `drive_get_about`
@@ -464,7 +464,7 @@ Rename, move, or replace content of a Drive file. Any combination in one call. F
 | `fileId` | string | required | Google Drive file ID |
 | `newName` | string | optional | New filename |
 | `newParentFolderId` | string | optional | Move to this folder, named newParentFolderId here, not parentFolderId |
-| `localPath` | string | optional | Replace file content with this local file (path on the machine running the server) |
+| `localPath` | string | optional | Replace file content with this local file, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it. |
 | `mimeType` | string | optional | MIME type of the replacement file (required if localPath is provided) |
 | `convertTo` | enum | optional | When replacing content via localPath, convert the new content into this native Google Workspace type on import: "document" \| "spreadsheet" \| "presentation" \| "drawing" (full application/vnd.google-apps.* ids also accepted). |
 
@@ -479,7 +479,7 @@ Upload a file to Google Drive, from inline base64 content or (when this server e
 | `account` | string | optional | Google account alias |
 | `filename` | string | required | Name as it appears in Drive |
 | `contentBase64` | string | optional | Base64-encoded file content. Exactly one of contentBase64 or localPath is required. Decoded size is capped at 10 MB. |
-| `localPath` | string | optional | Absolute path of the SOURCE file on disk to upload (on the machine running the server; this is not savePath). Exactly one of contentBase64 or localPath is required. |
+| `localPath` | string | optional | Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64 or localPath is required. |
 | `mimeType` | string | optional | Source MIME type of the content (inferred from filename if omitted). With `convertTo`, this is the format Drive imports from. |
 | `convertTo` | enum | optional | Convert the upload into this native Google Workspace type on import: "document" \| "spreadsheet" \| "presentation" \| "drawing" (full application/vnd.google-apps.* ids also accepted). E.g. upload .md/.html/.docx/.txt with convertTo=document to get a real Google Doc. Source must be an importable format. Omit to store the file as-is. |
 | `parentFolderId` | string | optional | Parent folder ID, not parentId. Defaults to My Drive root |

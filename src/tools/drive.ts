@@ -6,8 +6,8 @@ import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } from './_errors.js';
-import { hostFilesRefused, openLocalReadStream, prepareLocalDest } from './_local-files.js';
-import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
+import { hostFilesRefused, openLocalReadStream, openInternalReadStream, prepareLocalDest, cleanupPartialWrite, localFileErrorResult, LocalFileError } from './_local-files.js';
+import { checkOutbound, checkOutboundGrantee, driveGranteeFromAccessProposal, driveGranteeFromPermission, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
 import { capText, listResult } from '../trim.js';
 import * as fs from 'fs';
@@ -399,7 +399,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         contentBase64: z.string().optional().describe(`Base64-encoded file content. Exactly one of contentBase64${localFiles ? ' or localPath' : ''} is required. Decoded size is capped at ${MAX_UPLOAD_BASE64_BYTES / (1024 * 1024)} MB.`),
         ...(localFiles
           ? {
-              localPath: z.string().min(1).optional().describe('Absolute path of the SOURCE file on disk to upload (on the machine running the server; this is not savePath). Exactly one of contentBase64 or localPath is required.'),
+              localPath: z.string().min(1).optional().describe('Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64 or localPath is required.'),
             }
           : {}),
         mimeType: z.string().optional().describe('Source MIME type of the content (inferred from filename if omitted). With `convertTo`, this is the format Drive imports from.'),
@@ -468,6 +468,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        if (error instanceof LocalFileError) return localFileErrorResult(error, account as string);
         return handleDriveError(error, account as Account);
       }
     },
@@ -480,7 +481,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().min(1).describe('Google Drive file ID'),
-        savePath: z.string().min(1).describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server); the file name comes from `filename`'),
+        savePath: z.string().min(1).describe('Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`.'),
         filename: z.string().optional().describe('Filename to save as (defaults to the file name in Drive)'),
       },
     },
@@ -492,20 +493,33 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         const name = filename
           ?? (await drive.files.get({ fileId, fields: 'name', supportsAllDrives: true })).data.name
           ?? fileId;
-        const dest = prepareLocalDest(savePath, name);
+        const dest = await prepareLocalDest(savePath, name);
         const res = await drive.files.get(
           { fileId, alt: 'media', supportsAllDrives: true },
           { responseType: 'stream' },
         );
 
-        // pipeline destroys both streams on source/sink error; raw .pipe leaks the partial file.
-        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600 }));
+        // pipeline destroys both streams on source/sink error; raw .pipe leaks the
+        // partial file. wx: prepareLocalDest already checked existence, this is
+        // the belt-and-suspenders race guard, never silently clobber.
+        try {
+          await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600, flags: 'wx' }));
+        } catch (err) {
+          // A failed download must not leave a partial file behind blocking
+          // a retry with local_path_exists; best-effort, original error wins.
+          // EEXIST means wx itself refused to open: the TOCTOU race lost to
+          // another call that already owns dest, so this call never wrote
+          // anything there and must not delete that other call's file.
+          await cleanupPartialWrite(dest, err);
+          throw err;
+        }
 
         const { size } = fs.statSync(dest);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ savedPath: dest, bytes: size }, null, 2) }],
         };
       } catch (error: any) {
+        if (error instanceof LocalFileError) return localFileErrorResult(error, account as string);
         return handleDriveError(error, account as Account);
       }
     },
@@ -519,7 +533,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().min(1).describe('Google Drive file ID'),
         mimeType: z.string().describe('Target export MIME type (e.g. "application/pdf", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")'),
-        savePath: z.string().min(1).describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server); the file name comes from `filename`'),
+        savePath: z.string().min(1).describe('Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`.'),
         filename: z.string().optional().describe('Filename to save as (defaults to the Drive name plus the extension implied by mimeType)'),
       },
     },
@@ -534,20 +548,33 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           const ext = mime.extension(exportMime);
           name = `${meta.data.name ?? fileId}${ext ? `.${ext}` : ''}`;
         }
-        const dest = prepareLocalDest(savePath, name);
+        const dest = await prepareLocalDest(savePath, name);
         const res = await drive.files.export(
           { fileId, mimeType: exportMime },
           { responseType: 'stream' },
         );
 
-        // pipeline destroys both streams on source/sink error; raw .pipe leaks the partial file.
-        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600 }));
+        // pipeline destroys both streams on source/sink error; raw .pipe leaks the
+        // partial file. wx: prepareLocalDest already checked existence, this is
+        // the belt-and-suspenders race guard, never silently clobber.
+        try {
+          await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600, flags: 'wx' }));
+        } catch (err) {
+          // A failed download must not leave a partial file behind blocking
+          // a retry with local_path_exists; best-effort, original error wins.
+          // EEXIST means wx itself refused to open: the TOCTOU race lost to
+          // another call that already owns dest, so this call never wrote
+          // anything there and must not delete that other call's file.
+          await cleanupPartialWrite(dest, err);
+          throw err;
+        }
 
         const { size } = fs.statSync(dest);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ savedPath: dest, bytes: size }, null, 2) }],
         };
       } catch (error: any) {
+        if (error instanceof LocalFileError) return localFileErrorResult(error, account as string);
         return handleDriveError(error, account as Account);
       }
     },
@@ -596,7 +623,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         newParentFolderId: z.string().optional().describe('Move to this folder, named newParentFolderId here, not parentFolderId'),
         ...(localFiles
           ? {
-              localPath: z.string().optional().describe('Replace file content with this local file (path on the machine running the server)'),
+              localPath: z.string().optional().describe('Replace file content with this local file, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it.'),
               mimeType: z.string().optional().describe('MIME type of the replacement file (required if localPath is provided)'),
               convertTo: z.enum(CONVERT_TO_VALUES).optional().describe('When replacing content via localPath, convert the new content into this native Google Workspace type on import: "document" | "spreadsheet" | "presentation" | "drawing" (full application/vnd.google-apps.* ids also accepted).'),
             }
@@ -645,6 +672,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        if (error instanceof LocalFileError) return localFileErrorResult(error, account as string);
         return handleDriveError(error, account as Account);
       }
     },
@@ -941,6 +969,19 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       try {
         const auth = await getClientFn(account as Account);
         const drive = driveClient({ version: 'v3', auth });
+        // This call's own body never carries the grantee (only role/
+        // expiration): look the real grantee up by permissionId rather than
+        // trust anything the caller claims it is.
+        if (resolveOutboundAllowlist()) {
+          const current = await drive.permissions.get({
+            fileId,
+            permissionId,
+            supportsAllDrives: true,
+            fields: 'type,domain,emailAddress',
+          });
+          const outbound = checkOutboundGrantee('drive_permission_update', driveGranteeFromPermission(current.data), String(account));
+          if (outbound) return outbound;
+        }
         const requestBody: any = {};
         if (role) requestBody.role = role;
         if (expirationTime) requestBody.expirationTime = expirationTime;
@@ -1319,6 +1360,12 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       },
     },
     async ({ account, fileId, revisionId, keepForever, published, publishAuto, publishedOutsideDomain }) => {
+      // Publishing makes the revision reachable without an invite (the
+      // allowlist cannot scope that to specific recipients the way a
+      // share/grant can), so it is refused outright while the allowlist is active.
+      if ((published || publishedOutsideDomain) && resolveOutboundAllowlist()) {
+        return outboundDeniedEnvelope('drive_revision_update publish', ['(publishing exposes it beyond any addressable recipient)'], String(account));
+      }
       try {
         const auth = await getClientFn(account as Account);
         const drive = driveClient({ version: 'v3', auth });
@@ -1418,6 +1465,14 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       try {
         const auth = await getClientFn(account as Account);
         const drive = driveClient({ version: 'v3', auth });
+        // ACCEPT grants access to whoever the proposal names; DENY/other
+        // actions grant nothing and need no check. The real recipient is a
+        // property of the proposal itself, not of this call's own body.
+        if (action === 'ACCEPT' && resolveOutboundAllowlist()) {
+          const proposal = await drive.accessproposals.get({ fileId, proposalId });
+          const outbound = checkOutboundGrantee('drive_access_proposal_resolve', driveGranteeFromAccessProposal(proposal.data), String(account));
+          if (outbound) return outbound;
+        }
         const requestBody: any = { action };
         if (role) requestBody.role = role;
         if (view) requestBody.view = view;
@@ -1847,7 +1902,11 @@ async function downloadAndUpload(
       },
       media: {
         mimeType: plan.kind === 'native' ? plan.exportMime : (sourceMime ?? 'application/octet-stream'),
-        body: await openLocalReadStream(tmp),
+        // tmp is the server's own staging file, not a caller argument: it
+        // must not go through the GOOGLE_LOCAL_FILES_DIR guard (which would
+        // refuse it outright once that root differs from os.tmpdir(), and
+        // would create the root as an unwanted side effect even then).
+        body: await openInternalReadStream(tmp),
       },
       supportsAllDrives: true,
       fields: 'id,name,mimeType,webViewLink',

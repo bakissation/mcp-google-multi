@@ -130,7 +130,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry, deps: Execut
   }, deps);
   registerGeneratedTool(registry, {
     name: "admin_customer_devices_chromeos_batch_change_status",
-    cud: "update",
+    cud: "delete",
     description: "Changes the status of a batch of ChromeOS devices. For more information about changing a ChromeOS device state [Repair, repurpose, or retire ChromeOS devices](h",
     method: { id: "admin.customer.devices.chromeos.batchChangeStatus", httpMethod: "POST", path: "admin/directory/v1/customer/{customerId}/devices/chromeos:batchChangeStatus", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customerId"], scopes: S_admin_directory_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
@@ -178,7 +178,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry, deps: Execut
   }, deps);
   registerGeneratedTool(registry, {
     name: "admin_customer_devices_chromeos_issue_command",
-    cud: "create",
+    cud: "delete",
     description: "Issues a command for the device to execute.",
     method: { id: "admin.customer.devices.chromeos.issueCommand", httpMethod: "POST", path: "admin/directory/v1/customer/{customerId}/devices/chromeos/{deviceId}:issueCommand", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customerId","deviceId"], scopes: S_admin_directory_v1[1] },
     params: [{"field":"customerId","api":"customerId","location":"path"},{"field":"deviceId","api":"deviceId","location":"path"},{"field":"fields","api":"fields","location":"query"}],

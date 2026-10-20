@@ -31,6 +31,13 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # CURATED_METHOD_TOOLS feeds write-control's escape-hatch name
+      # resolution (google_api_call); a curated tool that starts or stops
+      # calling a Discovery method would otherwise silently drift the map
+      # without anyone noticing. See scripts/extract-curated-method-map.ts.
+      - name: Curated method map drift check
+        run: npx tsx scripts/extract-curated-method-map.ts --check
+
       - name: Build
         run: npm run build
 

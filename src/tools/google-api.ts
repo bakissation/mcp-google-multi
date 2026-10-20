@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../registry.js';
-import { isAllowed, writeDisabledResult, type Policy } from '../write-control.js';
+import type { Policy } from '../write-control.js';
+import { escapeHatchGate } from './_escape-hatch.js';
 import { accountArgLive } from '../accounts.js';
 import { getClient } from '../client.js';
 import { coerceJson } from './_coerce.js';
@@ -18,6 +19,7 @@ import {
   MAX_SEARCH_QUERY,
 } from '../discovery-client.js';
 import { hints } from '../hint-provider.js';
+import { CURATED_METHOD_TOOLS, GENERATED_METHOD_TOOLS, CUD_OVERRIDES } from './generated/method-map.js';
 
 
 // Policy/toolset namespace for each API alias must match the NAMED tools' service
@@ -70,6 +72,57 @@ export function nearestMethodIds(methodId: string, index: DiscoveryMethod[]): st
     .map((x) => x.id);
 }
 
+// Mirrors scripts/gen-tools.ts's snakeCase: src/ and scripts/ are separate
+// compilation roots (see tsconfig.scripts.json), so the convention is
+// duplicated rather than imported. A drift between the two would only widen
+// the escape hatch's own full-path name, never narrow it: escapeHatchNames
+// below also carries the last-segment and real-tool names, so write-control
+// degrades gracefully, and the parity test below would catch a drift anyway.
+function snakeSegment(segment: string): string {
+  return segment.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+// A handful of Discovery methods that DO have their own generated twin
+// (so they are not in CURATED_METHOD_TOOLS, which only covers methods a
+// curated tool implements in place of generating one) are ALSO called, as
+// a secondary step, by an unrelated curated tool: e.g. sheets_copy_sheet_to
+// also calls sheets.spreadsheets.sheets.copyTo, the same method its own
+// generated twin sheets_spreadsheets_sheets_copy_to wraps. Listed here so a
+// deny written against that curated tool's name reaches the escape hatch
+// for this method too, not just its generated twin's name.
+export const EXTRA_METHOD_TOOLS: Record<string, string[]> = {
+  'sheets.spreadsheets.sheets.copyTo': ['sheets_copy_sheet_to'],
+};
+
+export interface EscapeHatchNames {
+  /** Every name a deny glob is checked against: every curated tool name
+   * sharing this method, its generated twin, the full method-path name,
+   * the legacy last-segment name. Denying any one of them can only narrow
+   * what gets through, never widen it, so listing every curated tool here
+   * (even when several share one raw method) is always safe. The escape
+   * hatch has no allow-list of its own anymore (write-control.ts); only
+   * full-writes auto-allows, everything else asks a human. */
+  deny: string[];
+  /** The real tool name when exactly one exists (curated or generated),
+   * else the full-path name: shown in the human confirmation prompt and
+   * used to build a sensible message when this call is denied outright. */
+  primary: string;
+}
+
+/** Every name write-control might reasonably know this operation by. */
+export function escapeHatchNames(policyService: string, methodId: string): EscapeHatchNames {
+  const curatedNames = CURATED_METHOD_TOOLS[methodId] ?? EXTRA_METHOD_TOOLS[methodId] ?? [];
+  const generatedName = GENERATED_METHOD_TOOLS[methodId];
+  const tail = methodId.split('.').slice(1);
+  const fullPathName = tail.length > 0 ? `${policyService}_${tail.map(snakeSegment).join('_')}` : undefined;
+  const lastSegment = methodId.split('.').pop() ?? methodId;
+  const lastSegmentName = `${policyService}_${snakeSegment(lastSegment)}`;
+
+  const deny = [...new Set([...curatedNames, ...(generatedName ? [generatedName] : []), ...(fullPathName ? [fullPathName] : []), lastSegmentName])];
+  const primary = curatedNames.length === 1 ? curatedNames[0] : generatedName ?? fullPathName ?? lastSegmentName;
+  return { deny, primary };
+}
+
 function describeMethod(m: DiscoveryMethod) {
   return {
     api: m.api,
@@ -78,7 +131,7 @@ function describeMethod(m: DiscoveryMethod) {
     path: m.path,
     description: m.description,
     requiredParams: m.requiredParams,
-    cud: cudFromMethod(m),
+    cud: CUD_OVERRIDES[m.id] ?? cudFromMethod(m),
   };
 }
 
@@ -165,9 +218,11 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
     {
       description:
         'Invoke any Google Workspace REST method by Discovery id (escape hatch for operations without a ' +
-        'dedicated tool). Find methods with google_api_search first. Subject to the same write-control ' +
-        'policy as named tools. On reads, pass a `fields` query param (Google partial response) to keep ' +
-        'the payload small. Returns JSON only — for binary/file content (media downloads, ' +
+        'dedicated tool). Find methods with google_api_search first. A write asks the connected human to ' +
+        'confirm the real call (account, verb, params, a destinations-first body summary) unless ' +
+        'GOOGLE_PROFILE=full-writes with no outbound allowlist; GOOGLE_READ_ONLY or a matching ' +
+        'GOOGLE_WRITE_DENY still refuse outright. On reads, pass a `fields` query param (Google partial ' +
+        'response) to keep the payload small. Returns JSON only; for binary/file content (media downloads, ' +
         'drive.files.export) use drive_download / drive_export instead.',
       inputSchema: {
         account: accountEnum.describe('Google account alias (omit for the default account)'),
@@ -240,16 +295,58 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         );
       }
 
+      // ROUND 7 (MEDIUM 3): an undeclared pathParams key has no effect on
+      // the actual call (expandPath only substitutes {placeholders} the
+      // method's own path template names), but it was still echoed into
+      // the confirmation prompt verbatim, letting a caller stuff fake
+      // prompt text into a key the method never asked for. Rejected
+      // outright rather than silently ignored.
+      const declaredPathParams = new Set(Object.entries(method.params).filter(([, p]) => p.location === 'path').map(([n]) => n));
+      const unknownPathParams = Object.keys((pathParams as Record<string, unknown> | undefined) ?? {}).filter((k) => !declaredPathParams.has(k));
+      if (unknownPathParams.length > 0) {
+        return jsonResult(
+          {
+            error: 'invalid_params',
+            message: `${method.id} does not declare path param(s): ${unknownPathParams.join(', ')}.`,
+            hint: `Declared path params for ${method.id}: ${[...declaredPathParams].join(', ') || '(none)'}.`,
+            retriable: false,
+            account,
+          },
+          true,
+        );
+      }
+
       // The RESOLVED index id only, never the caller's methodId argument.
       registry.usageMetrics?.recordEscapeMethod(method.id);
-      const cud = cudFromMethod(method);
+      // CUD_OVERRIDES corrects the handful of methods HTTP-verb inference
+      // misreads (MEDIUM 4: the effect is an argument, not the method name,
+      // e.g. a ChromeOS device "action" that can remote-wipe it); a
+      // generated method's own twin applies the identical override at gen
+      // time (scripts/gen-tools.ts), so a GOOGLE_WRITE_DENY glob keyed on
+      // the real write class matches here exactly as it would there.
+      const cud = CUD_OVERRIDES[method.id] ?? cudFromMethod(method);
       const policyService = serviceForAlias(apiKey);
-      const lastSegment = method.id.split('.').pop() ?? method.id;
-      // The escape hatch self-gates, so it needs the same scope signal as the registry
-      // wrapper, or a privileged method would slip past safe-writes here while its generated twin is refused.
-      const toolRef = { name: `${policyService}_${lastSegment}`, service: policyService, cud, scopes: method.scopes };
-      if (cud !== 'read' && !isAllowed(toolRef, policy)) {
-        return writeDisabledResult(toolRef, policy, account as string);
+      // Checked under every name the operation can have (real tool(s), full
+      // method path, legacy last-segment) because a method whose id ends in
+      // a generic verb, such as drive.permissions.create or
+      // gmail.users.settings.filters.create, would otherwise lose its
+      // resource and collapse onto a generic drive_create / gmail_create
+      // that an operator's resource-scoped GOOGLE_WRITE_DENY could not tell
+      // apart from an ordinary write. Deny on any name wins outright;
+      // everything else that reaches here either auto-allows under
+      // full-writes or asks a human (see escapeHatchGate).
+      if (cud !== 'read') {
+        const names = escapeHatchNames(policyService, method.id);
+        const gate = await escapeHatchGate(registry, names.deny, names.primary, { service: policyService, cud, scopes: method.scopes }, policy, {
+          account: account as string,
+          accountEmail: registry.accountSet().configs[account as string]?.email,
+          methodId: method.id,
+          httpMethod: method.httpMethod,
+          pathParams: pathParams as Record<string, unknown> | undefined,
+          queryParams: queryParams as Record<string, unknown> | undefined,
+          body,
+        });
+        if (gate) return gate;
       }
 
       return executeApiMethod(

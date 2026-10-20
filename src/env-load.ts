@@ -76,6 +76,15 @@ export function loadEnvFiles(paths: EnvLoadPaths = {}): EnvLoadResult {
 
 let lastLoad: { bootKeys: Set<string>; loaded: string[] } | undefined;
 
+/** The .env files this process actually loaded a secret from (candidates
+ * that did not exist are not included). Used by the local-file guard to
+ * refuse reading or writing a file the server itself sourced secrets from,
+ * even though it sits outside the config/token directory (e.g. a project
+ * root .env, or MCP_GOOGLE_MULTI_ENV pointing elsewhere entirely). */
+export function getLoadedEnvFiles(): string[] {
+  return lastLoad?.loaded ?? [];
+}
+
 /**
  * Which layer supplied `key`: the real process env, or the first loaded .env
  * file defining it (autoload never overwrites, so first wins). undefined when

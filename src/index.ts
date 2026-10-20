@@ -117,7 +117,10 @@ async function main() {
     console.log(`Services: ${registry.services().join(', ')}`);
     console.log(`Discovery mode: ${registry.mode}${registry.mode === 'lazy' ? ' (expand at runtime with discover_all)' : ''}`);
     console.log(`Tool surface: ${counts.eager} eager (discover + escape hatch), ${counts.revealed} advertised, ${counts.hidden} deferred`);
-    console.log(`Escape hatch: google_api_call CUD verdicts follow profile=${policy.profile} and your allow/deny globs`);
+    console.log(
+      `Escape hatch: google_api_call and generated tools ignore GOOGLE_WRITE_ALLOW; GOOGLE_READ_ONLY/GOOGLE_WRITE_DENY still refuse ` +
+        `outright, full-writes (no outbound allowlist) still allows outright, everything else asks a human${policy.transport === 'http' ? ' (refused immediately over HTTP: see docs/configuration.md)' : ''}; current profile=${policy.profile}`,
+    );
     const { getAccountSet } = await import('./accounts.js');
     const set = getAccountSet();
     console.log(`Default account: ${set.defaultAccount ? `${set.defaultAccount} (${set.defaultAccountSource})` : '(none — "account" is required per call)'}`);

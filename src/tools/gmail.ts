@@ -7,12 +7,10 @@ import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
-import { hostFilesRefused, prepareLocalDest } from './_local-files.js';
-import { checkOutbound } from '../outbound-allowlist.js';
+import { hostFilesRefused, prepareLocalDest, cleanupPartialWrite, assertLocalPathAllowed, localFileErrorResult, LocalFileError } from './_local-files.js';
+import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import addressparser from 'nodemailer/lib/addressparser/index.js';
 import { lookup as lookupMime } from 'mime-types';
-import { configDir } from '../config-file.js';
-import { getTokenDir } from '../accounts.js';
 import { sliceClean } from '../trim.js';
 import type { GmailMessageHeader, GmailMessageFull, GmailAttachment } from '../types.js';
 import * as path from 'path';
@@ -24,6 +22,19 @@ function getHeader(
   name: string,
 ): string {
   return headers?.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? '';
+}
+
+// RFC 5322 permits a header field to repeat; most generators comma-join
+// recipients into a single To/Cc/Bcc line, but a raw, hand-built message
+// (e.g. one substituted in via gmail.users.drafts.update, which the
+// outbound allowlist cannot otherwise inspect) could carry a SECOND To/Cc/
+// Bcc line instead. getHeader's .find only ever sees the first match, so a
+// recipient check built on it alone would miss every repeat.
+function getHeaderAll(
+  headers: { name?: string | null; value?: string | null }[] | undefined,
+  name: string,
+): string[] {
+  return (headers ?? []).filter((h) => h.name?.toLowerCase() === name.toLowerCase()).map((h) => h.value ?? '');
 }
 
 function pickHeaders(
@@ -246,7 +257,7 @@ const estimateEncoded = (rawBytes: number) => Math.ceil((rawBytes * 4) / 3);
 const attachmentSchema = z
   .array(
     z.object({
-      path: z.string().describe('Absolute local path to the file to attach'),
+      path: z.string().describe('Path to the file to attach, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it.'),
       filename: z.string().optional().describe('MIME filename; defaults to the path basename'),
       contentType: z.string().optional().describe('MIME type; defaults to a lookup on the filename'),
     }),
@@ -256,57 +267,28 @@ const attachmentSchema = z
 
 /** Reads attachment files into buffers (THIS server reads them, never
  * MailComposer), enforces absolute-path + total-size guards, and derives the
- * MIME filename via basename so a caller name can't inject path separators. */
-// Deny reading inside the server's own secret dirs; mailing out master.key /
-// <alias>.enc / mcp-jwt.key would be account takeover (also guards against a prompt-injected attach path).
-function isInside(dir: string, target: string): boolean {
-  let d = path.resolve(dir);
-  let t = path.resolve(target);
-  // Windows path comparison is case-insensitive; without folding, a
-  // drive-letter/casing difference makes path.relative report "outside".
-  if (process.platform === 'win32') {
-    d = d.toLowerCase();
-    t = t.toLowerCase();
-  }
-  const rel = path.relative(d, t);
-  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
-}
-
-/** Deny if realTarget resolves inside `dir` (both realpath'd so a symlinked
- * dir or 8.3/extended-prefix form can't slip past). */
-async function isInsideRealDir(dir: string, realTarget: string): Promise<boolean> {
-  let realDir: string;
-  try {
-    realDir = await fs.promises.realpath(dir);
-  } catch {
-    return false; // dir does not exist → target cannot be inside it
-  }
-  return isInside(realDir, realTarget);
-}
-
+ * MIME filename via basename so a caller name can't inject path separators.
+ * The absolute-path + config/token-dir confinement rule itself lives in
+ * assertLocalPathAllowed (src/tools/_local-files.ts), shared with Drive's
+ * upload/update/download/export so the two surfaces cannot drift apart. */
 export async function readAttachments(
   raw: Array<{ path: string; filename?: string; contentType?: string }> | undefined,
   bodyBytes: number,
 ): Promise<ComposeAttachment[] | undefined> {
   if (!raw || raw.length === 0) return undefined;
-  const denied = [configDir(), getTokenDir()];
   const out: ComposeAttachment[] = [];
   let total = bodyBytes;
   for (const a of raw) {
-    if (!path.isAbsolute(a.path)) {
-      throw new GmailComposeError('validation_error', `attachment path must be absolute: ${path.basename(a.path)}`);
-    }
-    // Resolve symlinks BEFORE any confinement check, or a symlink defeats it.
+    // Resolve symlinks BEFORE any confinement check (inside the helper), or a
+    // symlink defeats it; read the resolved real path, not the caller's.
     let real: string;
     try {
-      real = await fs.promises.realpath(a.path);
-    } catch {
-      throw new GmailComposeError('E_ATTACHMENT_NOT_FOUND', `attachment not found or unreadable: ${path.basename(a.path)}`);
-    }
-    for (const d of denied) {
-      if (await isInsideRealDir(d, real)) {
-        throw new GmailComposeError('E_ATTACHMENT_FORBIDDEN', `refusing to attach a file inside the server's config/token directory: ${path.basename(a.path)}`);
+      real = await assertLocalPathAllowed(a.path, 'read');
+    } catch (err) {
+      if (err instanceof LocalFileError) {
+        throw new GmailComposeError('E_ATTACHMENT_FORBIDDEN', `refusing to attach this file (outside the allowed local-files root, or inside the server's config/token directory): ${path.basename(a.path)}`);
       }
+      throw new GmailComposeError('E_ATTACHMENT_NOT_FOUND', `attachment not found or unreadable: ${path.basename(a.path)}`);
     }
     // stat BEFORE read: reject non-regular files (a FIFO would block readFile
     // forever) and over-cap files without buffering them.
@@ -879,7 +861,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
         messageId: z.string().min(1).describe('The Gmail message ID'),
         attachmentId: z.string().min(1).describe('The attachment ID from gmail_read response'),
         filename: z.string().describe('Filename to save as (e.g. report.xlsx)'),
-        savePath: z.string().min(1).describe('Absolute DIRECTORY path to save into (created if missing, on the machine running the server), e.g. /home/user/Downloads; the file name comes from `filename`'),
+        savePath: z.string().min(1).describe('Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`.'),
       },
     },
     async ({ account, messageId, attachmentId, filename, savePath }) => {
@@ -897,13 +879,26 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
         if (!data) throw new Error('No attachment data returned');
 
         const buffer = Buffer.from(data, 'base64url');
-        const fullPath = prepareLocalDest(savePath, filename);
-        await fs.promises.writeFile(fullPath, buffer, { mode: 0o600 });
+        const fullPath = await prepareLocalDest(savePath, filename);
+        try {
+          // wx: never silently clobber; prepareLocalDest already checked
+          // existence, this is the belt-and-suspenders race guard.
+          await fs.promises.writeFile(fullPath, buffer, { mode: 0o600, flag: 'wx' });
+        } catch (err) {
+          // A failed download must not leave a partial file behind blocking
+          // a retry with local_path_exists; best-effort, original error wins.
+          // EEXIST means wx itself refused to open: the TOCTOU race lost to
+          // another call that already owns fullPath, so this call never
+          // wrote anything there and must not delete that other call's file.
+          await cleanupPartialWrite(fullPath, err);
+          throw err;
+        }
 
         return {
           content: [{ type: 'text' as const, text: `Saved to ${fullPath} (${buffer.length} bytes)` }],
         };
       } catch (error: any) {
+        if (error instanceof LocalFileError) return localFileErrorResult(error, account as string);
         const mapped = composeErrorResult(error, account as Account);
         return mapped ?? handleGmailError(error, account as Account);
       }
@@ -1223,6 +1218,29 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
       try {
         const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
+        // A draft is only ever recipient-checked when it is composed
+        // (gmail_create_draft). Its raw content can be replaced afterward
+        // through google_api_call (gmail.users.drafts.update), which the
+        // allowlist cannot inspect (raw base64 RFC 822) and so refuses
+        // outright; this re-checks the draft's actual To/Cc/Bcc right
+        // before send so that chain, or any other way a draft's content
+        // changed after creation, cannot slip an unlisted recipient through.
+        if (resolveOutboundAllowlist()) {
+          // drafts.get has no metadataHeaders param (unlike messages.get);
+          // format: 'full' is the only format guaranteed to include headers.
+          const draft = await gmail.users.drafts.get({
+            userId: 'me',
+            id: draftId,
+            format: 'full',
+          });
+          const headers = draft.data.message?.payload?.headers ?? [];
+          const recipients = ['To', 'Cc', 'Bcc']
+            .flatMap((name) => getHeaderAll(headers, name))
+            .flatMap((value) => parseAddresses(value))
+            .map((a) => a.address);
+          const outbound = checkOutbound('gmail_send_draft recipient', recipients, account as Account);
+          if (outbound) return outbound;
+        }
         const res = await gmail.users.drafts.send({
           userId: 'me',
           requestBody: { id: draftId },
@@ -1438,6 +1456,16 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
       },
     },
     async ({ account, enableAutoReply, responseSubject, responseBodyPlainText, startTime, endTime, restrictToContacts, restrictToDomain }) => {
+      // An unrestricted auto-reply answers every incoming sender, not just
+      // allowlisted ones, so enabling it without either restriction is
+      // refused outright while the allowlist is active.
+      if (enableAutoReply && !restrictToContacts && !restrictToDomain && resolveOutboundAllowlist()) {
+        return outboundDeniedEnvelope(
+          'gmail_set_vacation auto-reply',
+          ['(every sender, not just allowlisted ones; set restrictToContacts or restrictToDomain)'],
+          String(account),
+        );
+      }
       try {
         const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
