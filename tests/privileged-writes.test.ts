@@ -49,6 +49,24 @@ describe('safe-writes refuses privileged writes whatever the verb', () => {
     expect(privilegeOf(FORMS_WATCHES_RENEW)).toBe('push_registration');
   });
 
+  // OWNER DECISION (round 5, item 6): a service:cud wildcard (forms:create)
+  // must not open a push registration; naming it explicitly, or a true
+  // wildcard (forms:*), still does. Deny is unaffected either way.
+  it('a bare service:cud allow (forms:create) does not open forms_forms_watches_create; naming it, or forms:*, does', () => {
+    expect(isAllowed(FORMS_WATCHES_CREATE, safe({ allow: ['forms:create'] }))).toBe(false);
+    expect(isAllowed(FORMS_WATCHES_CREATE, safe({ allow: ['forms:forms_watches_create'] }))).toBe(true);
+    expect(isAllowed(FORMS_WATCHES_CREATE, safe({ allow: ['forms:*'] }))).toBe(true);
+    // Deny keeps the full candidate set regardless: forms:create still
+    // blocks the push registration too, same as before this fix.
+    expect(isAllowed(FORMS_WATCHES_CREATE, { profile: 'full-writes', readOnly: false, allow: [], deny: ['forms:create'] })).toBe(false);
+  });
+
+  it('an ordinary create tool (not a push registration) is unaffected: forms:create still allows it', () => {
+    const ordinary = { name: 'forms_create', service: 'forms', cud: 'create' as const, scopes: [S('forms.body')] };
+    expect(privilegeOf(ordinary)).toBeUndefined();
+    expect(isAllowed(ordinary, safe({ allow: ['forms:create'] }))).toBe(true);
+  });
+
   it('does not flag forms_forms_watches_delete as a push registration: cancelling one grants nothing', () => {
     // Unrelated to this: safe-writes refuses deletes generically, so this
     // is not expected to be allowed either; only that it is refused as an

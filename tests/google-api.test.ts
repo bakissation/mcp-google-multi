@@ -937,5 +937,26 @@ describe('google_api_call write-control name resolution', () => {
       const verdict = isAllowedByAnyName(names.deny, names.allow, { service: 'gmail', cud: 'delete', scopes: [] }, names.primary, policy);
       expect(verdict.allowed).toBe(false);
     });
+
+    // OWNER DECISION (round 5, item 6): a service:cud wildcard must not
+    // open a push registration via google_api_call either. Deny keeps
+    // the full candidate set; naming the real tool, or a true service
+    // wildcard, still allows it.
+    it('allowing forms:create does not open forms.forms.watches.create through google_api_call; forms_forms_watches_create or forms:* does', () => {
+      const names = escapeHatchNames('forms', 'forms.forms.watches.create');
+      const base = { service: 'forms', cud: 'create' as const, scopes: [] };
+
+      const cudWildcard: Policy = { profile: 'read-only', readOnly: false, allow: ['forms:create'], deny: [] };
+      expect(isAllowedByAnyName(names.deny, names.allow, base, names.primary, cudWildcard).allowed).toBe(false);
+
+      const namedExactly: Policy = { profile: 'read-only', readOnly: false, allow: ['forms:forms_watches_create'], deny: [] };
+      expect(isAllowedByAnyName(names.deny, names.allow, base, names.primary, namedExactly).allowed).toBe(true);
+
+      const serviceWildcard: Policy = { profile: 'read-only', readOnly: false, allow: ['forms:*'], deny: [] };
+      expect(isAllowedByAnyName(names.deny, names.allow, base, names.primary, serviceWildcard).allowed).toBe(true);
+
+      const denyCudWildcard: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: ['forms:create'] };
+      expect(isAllowedByAnyName(names.deny, names.allow, base, names.primary, denyCudWildcard).allowed).toBe(false);
+    });
   });
 });
