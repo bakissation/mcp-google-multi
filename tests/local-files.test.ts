@@ -216,10 +216,13 @@ describe('localFilesDisabledByEnv (GOOGLE_LOCAL_FILES switch parsing)', () => {
     }
   });
 
-  it('an unrecognised value warns to stderr and leaves host files enabled (the default)', () => {
+  // LOW (item 7): an unrecognised value must fail CLOSED (host files
+  // disabled), not fail open. A typo or unsupported value silently leaving
+  // host-file tools reachable is the wrong direction to fail in.
+  it('an unrecognised value warns to stderr and fails closed (host files disabled)', () => {
     const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
-      expect(localFilesDisabledByEnv({ GOOGLE_LOCAL_FILES: 'maybe' })).toBe(false);
+      expect(localFilesDisabledByEnv({ GOOGLE_LOCAL_FILES: 'maybe' })).toBe(true);
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy.mock.calls[0][0]).toContain('GOOGLE_LOCAL_FILES="maybe"');
     } finally {

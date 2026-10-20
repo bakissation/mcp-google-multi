@@ -68,7 +68,13 @@ function isInside(dir: string, target: string): boolean {
     t = t.toLowerCase();
   }
   const rel = path.relative(d, t);
-  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+  if (rel === '') return true;
+  if (path.isAbsolute(rel)) return false;
+  // A real escape is exactly ".." (target is dir's parent) or starts with
+  // "../" (target is outside, via an ancestor); a leaf merely NAMED with
+  // leading dots (e.g. "..notes.txt", directly inside `dir`) is not an
+  // escape, even though the string also starts with the two characters "..".
+  return rel !== '..' && !rel.startsWith(`..${path.sep}`);
 }
 
 /** Deny if realTarget resolves inside `dir` (both realpath'd so a symlinked
@@ -128,13 +134,40 @@ export function localFilesRoot(env: NodeJS.ProcessEnv = process.env, homedir: ()
 
 let loggedRoot: string | undefined;
 
-/** Resolves GOOGLE_LOCAL_FILES_DIR (or its default), creates it on first use
- * (mode 0700, owner-only) if missing, and logs the effective root once per
- * process (repeated calls, or a differently-configured root in a later
- * call, e.g. across tests, are not re-logged / re-logged only on change). */
+/** Logs the configured (or default) root once per process, WITHOUT
+ * creating it. Safe to call eagerly at startup (and from `config check`):
+ * the root itself is created lazily, only on the first actual host-file
+ * use (see ensureLocalFilesRoot), so a read-only or missing HOME at boot
+ * (hardened systemd, an isolated service user) can never fail server
+ * startup over a feature that might never be used this run. */
+export function logLocalFilesRootAtStartup(env: NodeJS.ProcessEnv = process.env, homedir: () => string = os.homedir): void {
+  try {
+    const root = localFilesRoot(env, homedir);
+    if (loggedRoot !== root) {
+      loggedRoot = root;
+      process.stderr.write(`Host-file tools (uploads, downloads, attachments), when used, are confined to: ${root}\n`);
+    }
+  } catch {
+    // Best-effort only: never let a log line fail startup.
+  }
+}
+
+/** Resolves GOOGLE_LOCAL_FILES_DIR (or its default) and creates it (mode
+ * 0700, owner-only) if missing. Called lazily, from assertLocalPathAllowed
+ * only, on the first actual host-file use, never at startup: mkdir can
+ * fail (a read-only or missing HOME, the root already existing as a plain
+ * file), and that failure must surface as an ordinary refused tool call,
+ * not an uncaught throw out of request handling. */
 export function ensureLocalFilesRoot(env: NodeJS.ProcessEnv = process.env, homedir: () => string = os.homedir): string {
   const root = localFilesRoot(env, homedir);
-  fs.mkdirSync(root, { recursive: true, mode: 0o700 });
+  try {
+    fs.mkdirSync(root, { recursive: true, mode: 0o700 });
+  } catch (err) {
+    throw new LocalFileError(
+      'forbidden',
+      `could not create or access the local-files root (${root}): ${(err as Error).message}`,
+    );
+  }
   if (loggedRoot !== root) {
     loggedRoot = root;
     process.stderr.write(`Host-file tools (uploads, downloads, attachments) are confined to: ${root}\n`);
@@ -152,7 +185,7 @@ export function ensureLocalFilesRoot(env: NodeJS.ProcessEnv = process.env, homed
  * inside the server's own config/token directory (master.key, tokens/*.enc,
  * mcp-tokens.enc), the Discovery cache dir, or /proc (which includes
  * /proc/self/environ: the process's own environment, holding the same
- * secrets a .env file does) — nor BE one of the .env files this process
+ * secrets a .env file does), nor BE one of the .env files this process
  * actually loaded a secret from, wherever they live. `kind: 'read'`
  * requires the path to exist (realpath resolves it directly, so a missing
  * file's ENOENT surfaces unchanged to the caller); `kind: 'write'` only
@@ -197,19 +230,21 @@ const LOCAL_FILES_OFF = new Set(['off', '0', 'false', 'no']);
 const LOCAL_FILES_ON = new Set(['on', '1', 'true', 'yes']);
 
 /** True when GOOGLE_LOCAL_FILES is set to an off-synonym (off|0|false|no,
- * any case — same switch parsing as GOOGLE_USAGE_METRICS), the operator
+ * any case, the same switch parsing as GOOGLE_USAGE_METRICS), the operator
  * switch that removes every host-file tool/param regardless of context
- * (see compose.ts). An unrecognised non-empty value warns and leaves host
- * files at their default (enabled), the same way an unrecognised
- * GOOGLE_USAGE_METRICS falls back to its own default rather than guessing. */
+ * (see compose.ts). Unset (or empty) leaves host files at their default
+ * (enabled). An unrecognised non-empty value fails CLOSED (treated as
+ * off), with a warning: a typo in a security-relevant switch must narrow
+ * the surface, not silently widen it the way GOOGLE_USAGE_METRICS's own
+ * fail-open-to-its-default is fine to for a telemetry switch. */
 export function localFilesDisabledByEnv(env: NodeJS.ProcessEnv = process.env): boolean {
   const raw = env.GOOGLE_LOCAL_FILES;
   if (raw === undefined || raw.trim() === '') return false;
   const v = raw.trim().toLowerCase();
   if (LOCAL_FILES_OFF.has(v)) return true;
   if (LOCAL_FILES_ON.has(v)) return false;
-  process.stderr.write(`GOOGLE_LOCAL_FILES="${raw}" is not a valid value (off|0|false|no / on|1|true|yes); host-file tools stay enabled\n`);
-  return false;
+  process.stderr.write(`GOOGLE_LOCAL_FILES="${raw}" is not a valid value (off|0|false|no / on|1|true|yes); host-file tools are disabled (fail closed)\n`);
+  return true;
 }
 
 /** Resolve and validate a download/export destination directory, then
@@ -237,15 +272,14 @@ export async function prepareLocalDest(savePath: string, filename: string): Prom
 
 // createReadStream's open failure surfaces as an unhandled 'error' event that
 // kills the process; opening the fd first turns it into a normal rejection.
-export async function openLocalReadStream(localPath: string): Promise<fs.ReadStream> {
-  const realPath = await assertLocalPathAllowed(localPath, 'read');
-  const handle = await fs.promises.open(realPath, 'r');
+async function openFdReadStream(absolutePath: string): Promise<fs.ReadStream> {
+  const handle = await fs.promises.open(absolutePath, 'r');
   // open() succeeds on a directory; fail it here rather than as an async read error.
   if ((await handle.stat()).isDirectory()) {
     await handle.close();
-    throw Object.assign(new Error(`EISDIR: illegal operation on a directory, read '${localPath}'`), {
+    throw Object.assign(new Error(`EISDIR: illegal operation on a directory, read '${absolutePath}'`), {
       code: 'EISDIR',
-      path: localPath,
+      path: absolutePath,
     });
   }
   const stream = handle.createReadStream();
@@ -253,4 +287,25 @@ export async function openLocalReadStream(localPath: string): Promise<fs.ReadStr
   // one only closes the unhandled-'error' crash path.
   stream.on('error', () => {});
   return stream;
+}
+
+/**
+ * Reads a path the SERVER itself created and fully controls (e.g.
+ * drive_transfer's download+upload fallback staging a file under
+ * os.tmpdir() before re-uploading it): this is not a caller-supplied
+ * argument, so it must not go through assertLocalPathAllowed. The
+ * GOOGLE_LOCAL_FILES_DIR root is an allow-list for host-file TOOL
+ * arguments (localPath/savePath/attachment paths); the server's own
+ * internal plumbing is not one of those, and must not even have the side
+ * effect of creating that root (it may not exist, GOOGLE_LOCAL_FILES may
+ * be off, or the caller may not be the owner; none of that should matter
+ * for a file the server made for itself and will delete when done).
+ */
+export async function openInternalReadStream(absolutePath: string): Promise<fs.ReadStream> {
+  return openFdReadStream(absolutePath);
+}
+
+export async function openLocalReadStream(localPath: string): Promise<fs.ReadStream> {
+  const realPath = await assertLocalPathAllowed(localPath, 'read');
+  return openFdReadStream(realPath);
 }

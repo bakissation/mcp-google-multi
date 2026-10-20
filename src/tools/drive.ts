@@ -6,7 +6,7 @@ import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } from './_errors.js';
-import { hostFilesRefused, openLocalReadStream, prepareLocalDest, localFileErrorResult, LocalFileError } from './_local-files.js';
+import { hostFilesRefused, openLocalReadStream, openInternalReadStream, prepareLocalDest, localFileErrorResult, LocalFileError } from './_local-files.js';
 import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
 import { capText, listResult } from '../trim.js';
@@ -1869,7 +1869,11 @@ async function downloadAndUpload(
       },
       media: {
         mimeType: plan.kind === 'native' ? plan.exportMime : (sourceMime ?? 'application/octet-stream'),
-        body: await openLocalReadStream(tmp),
+        // tmp is the server's own staging file, not a caller argument: it
+        // must not go through the GOOGLE_LOCAL_FILES_DIR guard (which would
+        // refuse it outright once that root differs from os.tmpdir(), and
+        // would create the root as an unwanted side effect even then).
+        body: await openInternalReadStream(tmp),
       },
       supportsAllDrives: true,
       fields: 'id,name,mimeType,webViewLink',
