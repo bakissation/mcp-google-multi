@@ -697,7 +697,7 @@ describe('google_api_call write-control name resolution', () => {
   });
 
   // LOW (allow semantics): deny on any candidate name wins, ALLOW on any
-  // candidate name must also win (over the profile) — the previous
+  // candidate name must also win (over the profile); the previous
   // implementation treated "every name must pass" as if allow needed
   // unanimous consent too, so an explicit GOOGLE_WRITE_ALLOW stopped
   // working through the escape hatch the moment the full-path or
@@ -727,7 +727,7 @@ describe('google_api_call write-control name resolution', () => {
 
   // M2 sweep: EVERY method id this server knows a real tool name for (the
   // full CURATED_METHOD_TOOLS map derived from the curated registrations
-  // themselves — not a hand-picked sample — plus every GENERATED_METHOD_TOOLS
+  // themselves (not a hand-picked sample), plus every GENERATED_METHOD_TOOLS
   // entry) gives the same write-control verdict through isAllowed directly
   // (as the named tool would see) and through the escape hatch's
   // candidate-name resolution, under both a matching deny and a matching
@@ -758,7 +758,16 @@ describe('google_api_call write-control name resolution', () => {
       expect(writeEntries.length).toBeGreaterThan(300);
     });
 
-    it('a deny on the real tool op denies the same call via the escape hatch', () => {
+    // A method several curated tools share (docs/sheets batchUpdate,
+    // drive.files.update's move/trash/untrash/transfer/rename) has no
+    // single curated identity; "unambiguous" below means either a
+    // generated method (always exactly one tool, by construction) or a
+    // curated one with exactly one curated tool for it.
+    function isUnambiguous(methodId: string): boolean {
+      return (CURATED_METHOD_TOOLS[methodId]?.length ?? 0) <= 1;
+    }
+
+    it('a deny on the real tool op denies the same call via the escape hatch (every entry, ambiguous or not)', () => {
       for (const { methodId, toolName } of writeEntries) {
         const service = serviceOf(toolName);
         const cud = inferCud(toolName);
@@ -766,44 +775,99 @@ describe('google_api_call write-control name resolution', () => {
         const direct = isAllowed({ name: toolName, service, cud, scopes: [] }, policy);
         expect(direct, `${methodId} via ${toolName}: the named tool itself should be denied`).toBe(false);
         const names = escapeHatchNames(service, methodId);
-        expect(names, `${methodId} via ${toolName}`).toContain(toolName);
-        const verdict = isAllowedByAnyName(names, { service, cud, scopes: [] }, names[0], policy);
+        expect(names.deny, `${methodId} via ${toolName}`).toContain(toolName);
+        const verdict = isAllowedByAnyName(names.deny, names.allow, { service, cud, scopes: [] }, names.primary, policy);
         expect(verdict.allowed, `${methodId} via ${toolName}: the escape hatch should be denied too`).toBe(false);
       }
     });
 
-    it('an allow on the real tool op grants the call under read-only, via the escape hatch', () => {
+    // MEDIUM (item 2): an allow on one narrow curated tool must not open
+    // the whole raw method when other curated tools share it (the named
+    // tool itself stays grantable either way; only the escape hatch's
+    // broader reach is restricted). For an unambiguous entry (one tool,
+    // curated or generated) the two still agree, same as before.
+    it('an allow on the real tool op always grants the named tool directly', () => {
       for (const { methodId, toolName } of writeEntries) {
         const service = serviceOf(toolName);
         const cud = inferCud(toolName);
         const policy: Policy = { profile: 'read-only', readOnly: false, allow: [`${service}:${opOf(toolName)}`], deny: [] };
         const direct = isAllowed({ name: toolName, service, cud, scopes: [] }, policy);
-        expect(direct, `${methodId} via ${toolName}: allow should grant the named tool`).toBe(true);
-        const names = escapeHatchNames(service, methodId);
-        const verdict = isAllowedByAnyName(names, { service, cud, scopes: [] }, names[0], policy);
-        expect(verdict.allowed, `${methodId} via ${toolName}: allow should grant the escape hatch too`).toBe(true);
+        expect(direct, `${methodId} via ${toolName}: allow should always grant the named tool`).toBe(true);
       }
     });
 
-    it('with no matching allow or deny, the profile verdict on the primary name matches the named tool', () => {
+    // MEDIUM (item 2), the exact shape of the reported bug: when a raw
+    // method is shared by several curated tools, a narrow curated name
+    // (e.g. drive_trash) must not, on its own, be eligible to open the
+    // whole method through the escape hatch. Deny stays "any name" (the
+    // sweep above covers that); allow must drop to the method-wide names
+    // only. This is a direct, pure check of escapeHatchNames's output, not
+    // of isAllowedByAnyName's glob matching, to avoid conflating two
+    // different things under time pressure.
+    it('escape-hatch allow excludes a narrow curated name when the method has more than one curated tool', () => {
+      let ambiguousChecked = 0;
+      for (const [methodId, curatedNames] of Object.entries(CURATED_METHOD_TOOLS)) {
+        if (curatedNames.length <= 1) continue;
+        const service = serviceOf(curatedNames[0]);
+        const names = escapeHatchNames(service, methodId);
+        for (const name of curatedNames) {
+          expect(names.deny, `${methodId}: deny must still cover ${name}`).toContain(name);
+          // A narrow curated name may only appear in allow if it happens to
+          // equal a method-wide name already there (docs_batch_update is
+          // such a case: it IS the raw-passthrough tool for its method).
+          if (names.allow.includes(name)) {
+            const methodWideWithoutCurated = names.allow.filter((n) => !curatedNames.includes(n) || n === name);
+            expect(methodWideWithoutCurated.length, `${methodId}: ${name} in allow must coincide with a method-wide name`).toBeGreaterThan(0);
+          }
+        }
+        expect(curatedNames.every((n) => names.allow.includes(n)), `${methodId}: allow must not include every shared curated tool (6.0.1 bug)`).toBe(false);
+        ambiguousChecked += 1;
+      }
+      expect(ambiguousChecked).toBeGreaterThan(5);
+    });
+
+    it('6.0.1-regression probe: drive:trash, docs:insert_text, calendar:respond_event, drive:create_folder no longer open their whole method via allow', () => {
+      const cases: Array<{ methodId: string; op: string; service: string }> = [
+        { methodId: 'drive.files.update', op: 'trash', service: 'drive' },
+        { methodId: 'docs.documents.batchUpdate', op: 'insert_text', service: 'docs' },
+        { methodId: 'calendar.events.patch', op: 'respond_event', service: 'calendar' },
+        { methodId: 'drive.files.create', op: 'create_folder', service: 'drive' },
+      ];
+      for (const { methodId, op, service } of cases) {
+        const names = escapeHatchNames(service, methodId);
+        const narrowToolName = `${service}_${op}`;
+        expect(names.allow, `${methodId}: ${narrowToolName} must not be the only thing granting the escape hatch here`).not.toEqual([narrowToolName]);
+        const policy: Policy = { profile: 'read-only', readOnly: false, allow: [`${service}:${op}`], deny: [] };
+        const verdict = isAllowedByAnyName(names.deny, names.allow, { service, cud: 'update', scopes: [] }, names.primary, policy);
+        // Under 6.0.1 this was allowed=true (the bug); the fix must refuse
+        // unless the narrow name happens to equal a method-wide name too.
+        if (!names.allow.includes(narrowToolName)) {
+          expect(verdict.allowed, `${methodId} via ${narrowToolName}: escape hatch must refuse (6.0.1 behaviour)`).toBe(false);
+        }
+      }
+    });
+
+    it('with no matching allow or deny, the profile verdict on the primary name matches the named tool (unambiguous entries)', () => {
       for (const policy of [
         { profile: 'read-only', readOnly: false, allow: [], deny: [] } as Policy,
         { profile: 'safe-writes', readOnly: false, allow: [], deny: [] } as Policy,
         { profile: 'full-writes', readOnly: false, allow: [], deny: [] } as Policy,
       ]) {
         for (const { methodId, toolName } of writeEntries) {
+          if (!isUnambiguous(methodId)) continue; // no single real identity to compare against; see isUnambiguous
           const service = serviceOf(toolName);
           const cud = inferCud(toolName);
           const direct = isAllowed({ name: toolName, service, cud, scopes: [] }, policy);
           const names = escapeHatchNames(service, methodId);
-          // Use the SAME real tool name as the primary so a method shared by
-          // several curated tools (docs/sheets batchUpdate) is compared
-          // against the one it's actually naming here, not an arbitrary pick.
-          const primary = names.includes(toolName) ? toolName : names[0];
-          const verdict = isAllowedByAnyName(names, { service, cud, scopes: [] }, primary, policy);
+          const verdict = isAllowedByAnyName(names.deny, names.allow, { service, cud, scopes: [] }, names.primary, policy);
           expect(verdict.allowed, `${methodId} via ${toolName} under profile ${policy.profile}`).toBe(direct);
         }
       }
+    });
+
+    it('sanity: the sweep actually contains ambiguous (multi-curated-tool) entries, so the allow test above is not vacuous', () => {
+      const ambiguous = writeEntries.filter((e) => !isUnambiguous(e.methodId));
+      expect(ambiguous.length).toBeGreaterThan(20);
     });
   });
 });

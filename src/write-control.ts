@@ -167,19 +167,34 @@ export interface AnyNameVerdict {
 
 /**
  * Multi-name variant for the escape hatch, which has no single fixed tool
- * name for a Discovery method: `names` lists every name the operation can
- * be known by (one or more real tool names when the method has curated or
- * generated twins, the full method-path name, the legacy last-segment
- * name). Deny on any name wins; allow on any name wins over the profile;
- * otherwise the profile decides using `primaryName` alone, never "any
- * name" — the profile's own exceptions (TRASH_MOVE_TOOLS) are keyed to the
- * real tool's name, and judging them against a synthetic name that was
- * never meant to carry that exception would wrongly refuse (e.g.
+ * name for a Discovery method. `denyNames` lists every name the operation
+ * can be known by (every curated tool name sharing this method, its
+ * generated twin, the full method-path name, the legacy last-segment
+ * name): deny on any one of them wins, which can only narrow what the
+ * profile/allow-list would otherwise permit, never widen it, so including
+ * every curated tool's name here is always safe.
+ *
+ * `allowNames` is deliberately a SMALLER set: the generated twin, the
+ * full-path name, and the legacy last-segment name always, but a curated
+ * tool's own name only when `denyNames` names exactly one (the caller
+ * decides this; see escapeHatchNames). A raw Discovery method several
+ * curated tools share (e.g. every drive.files.update caller: move, trash,
+ * untrash, transfer, a plain rename) has no single tool whose narrow allow
+ * glob (`drive:trash`) it would be safe to let open the WHOLE method: an
+ * allow naming one of those operations must not also grant every other one
+ * reachable through the same raw call.
+ *
+ * Otherwise (neither an explicit deny nor an explicit allow matched) the
+ * profile decides using `primaryName` alone, never "any name": the
+ * profile's own exceptions (TRASH_MOVE_TOOLS) are keyed to the real tool's
+ * name, and judging them against a synthetic name that was never meant to
+ * carry that exception would wrongly refuse (e.g.
  * `gmail.users.messages.trash`'s full-path name `gmail_users_messages_trash`
  * is not in TRASH_MOVE_TOOLS even though its real name `gmail_trash` is).
  */
 export function isAllowedByAnyName(
-  names: readonly string[],
+  denyNames: readonly string[],
+  allowNames: readonly string[],
   base: { service: string; cud: Cud; scopes?: readonly string[] },
   primaryName: string,
   policy: Policy,
@@ -187,10 +202,11 @@ export function isAllowedByAnyName(
   const primaryRef: ToolRef = { name: primaryName, service: base.service, cud: base.cud, scopes: base.scopes };
   if (base.cud === 'read') return { allowed: true, ref: primaryRef };
   if (policy.readOnly) return { allowed: false, ref: primaryRef };
-  const refs = names.map((name): ToolRef => ({ name, service: base.service, cud: base.cud, scopes: base.scopes }));
-  const deniedRef = refs.find((ref) => matchesAny(ref, policy.deny));
+  const denyRefs = denyNames.map((name): ToolRef => ({ name, service: base.service, cud: base.cud, scopes: base.scopes }));
+  const deniedRef = denyRefs.find((ref) => matchesAny(ref, policy.deny));
   if (deniedRef) return { allowed: false, ref: deniedRef };
-  if (refs.some((ref) => matchesAny(ref, policy.allow))) return { allowed: true, ref: primaryRef };
+  const allowRefs = allowNames.map((name): ToolRef => ({ name, service: base.service, cud: base.cud, scopes: base.scopes }));
+  if (allowRefs.some((ref) => matchesAny(ref, policy.allow))) return { allowed: true, ref: primaryRef };
   return { allowed: profileAllows(policy.profile, primaryRef), ref: primaryRef };
 }
 

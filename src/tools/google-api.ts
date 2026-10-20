@@ -81,49 +81,79 @@ function snakeSegment(segment: string): string {
   return segment.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 }
 
+// A handful of Discovery methods that DO have their own generated twin
+// (so they are not in CURATED_METHOD_TOOLS, which only covers methods a
+// curated tool implements in place of generating one) are ALSO called, as
+// a secondary step, by an unrelated curated tool: e.g. sheets_copy_sheet_to
+// also calls sheets.spreadsheets.sheets.copyTo, the same method its own
+// generated twin sheets_spreadsheets_sheets_copy_to wraps. Listed here so a
+// deny/allow written against that curated tool's name reaches the escape
+// hatch for this method too, not just its generated twin's name.
+const EXTRA_METHOD_TOOLS: Record<string, string[]> = {
+  'sheets.spreadsheets.sheets.copyTo': ['sheets_copy_sheet_to'],
+};
+
+export interface EscapeHatchNames {
+  /** Every name a deny glob is checked against: every curated tool name
+   * sharing this method, its generated twin, the full method-path name,
+   * the legacy last-segment name. Denying any one of them can only narrow
+   * what gets through, never widen it, so listing every curated tool here
+   * (even when several share one raw method) is always safe. */
+  deny: string[];
+  /** Names an ALLOW glob may grant through: the generated twin, the
+   * full-path name and the legacy last-segment name always; a curated
+   * tool's own name only when it is the ONE AND ONLY curated tool mapped
+   * to this method. An allow naming one narrow operation on a shared
+   * method (e.g. "drive:trash") must not also open every OTHER operation
+   * reachable through the same raw drive.files.update (a plain rename, a
+   * move, drive_transfer's internals): those have no real tool name in
+   * common to allow narrowly, so only the method-wide names can grant them. */
+  allow: string[];
+  /** The real tool name when exactly one exists (curated or generated),
+   * else the full-path name: what the profile decides on when neither an
+   * explicit deny nor an explicit allow matched (see isAllowedByAnyName
+   * for why this must be a single real name, not "any name"). */
+  primary: string;
+}
+
 /**
- * Every name write-control might reasonably know this operation by, most
- * specific first:
- *  1. the REAL tool name(s). CURATED_METHOD_TOOLS is derived from every
- *     curated registration's own Discovery call (scripts/gen-config.ts),
- *     so a method several curated tools happen to share (e.g. every
- *     `docs.documents.batchUpdate` helper) lists all of them, not one
- *     picked example; GENERATED_METHOD_TOOLS adds its one twin when the
- *     method has no curated implementation. A deny pattern written
- *     against any one real tool's name, e.g. "drive:share" or
- *     "gmail:send_draft", applies here too;
- *  2. the full method-path name ("drive_permissions_create",
- *     "gmail_users_settings_filters_create"), for methods an operator can
- *     name precisely even when no tool implements them yet;
- *  3. the old last-segment name ("drive_create", "gmail_create"), kept for
- *     backward compatibility with configs written against the pre-fix shape.
- * The first entry is the "primary" name: write-control.ts's
- * isAllowedByAnyName uses it, not "any name", when the profile (rather
- * than an explicit allow/deny) decides, since a profile exception keyed to
- * a specific real tool name (TRASH_MOVE_TOOLS) must be judged against that
- * real name, not a synthetic one that never carried the exception.
- * Deny-on-any-name wins, allow-on-any-name wins over the profile (checked
- * by the caller via isAllowedByAnyName): adding names can only let an
- * operator's policy reach further, never accidentally narrow what the
- * profile alone would already permit.
+ * Every name write-control might reasonably know this operation by. See
+ * EscapeHatchNames for which names are deny-only vs allow-eligible.
  */
-export function escapeHatchNames(policyService: string, methodId: string): string[] {
-  const names: string[] = [];
-  const seen = new Set<string>();
-  const add = (name: string) => {
-    if (!seen.has(name)) {
-      seen.add(name);
-      names.push(name);
-    }
-  };
-  for (const name of CURATED_METHOD_TOOLS[methodId] ?? []) add(name);
+export function escapeHatchNames(policyService: string, methodId: string): EscapeHatchNames {
+  const curatedNames = CURATED_METHOD_TOOLS[methodId] ?? EXTRA_METHOD_TOOLS[methodId] ?? [];
   const generatedName = GENERATED_METHOD_TOOLS[methodId];
-  if (generatedName) add(generatedName);
   const tail = methodId.split('.').slice(1);
-  if (tail.length > 0) add(`${policyService}_${tail.map(snakeSegment).join('_')}`);
+  const fullPathName = tail.length > 0 ? `${policyService}_${tail.map(snakeSegment).join('_')}` : undefined;
   const lastSegment = methodId.split('.').pop() ?? methodId;
-  add(`${policyService}_${snakeSegment(lastSegment)}`);
-  return names;
+  const lastSegmentName = `${policyService}_${snakeSegment(lastSegment)}`;
+
+  const dedupe = (list: string[]): string[] => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const n of list) {
+      if (!seen.has(n)) {
+        seen.add(n);
+        out.push(n);
+      }
+    }
+    return out;
+  };
+
+  const deny = dedupe([
+    ...curatedNames,
+    ...(generatedName ? [generatedName] : []),
+    ...(fullPathName ? [fullPathName] : []),
+    lastSegmentName,
+  ]);
+  const allow = dedupe([
+    ...(curatedNames.length === 1 ? curatedNames : []),
+    ...(generatedName ? [generatedName] : []),
+    ...(fullPathName ? [fullPathName] : []),
+    lastSegmentName,
+  ]);
+  const primary = curatedNames.length === 1 ? curatedNames[0] : generatedName ?? fullPathName ?? lastSegmentName;
+  return { deny, allow, primary };
 }
 
 function describeMethod(m: DiscoveryMethod) {
@@ -308,13 +338,14 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       // gmail.users.settings.filters.create, would otherwise lose its
       // resource and collapse onto a generic drive_create / gmail_create
       // that neither the profile nor an operator's resource-scoped
-      // GOOGLE_WRITE_DENY can tell apart from an ordinary write. Deny on any
-      // name wins, allow on any name wins over the profile; the profile
-      // itself decides on the primary (first) name alone — see
-      // isAllowedByAnyName for why "any name" would be wrong there.
+      // GOOGLE_WRITE_DENY can tell apart from an ordinary write. Deny on
+      // any name wins; allow only on a method-wide name (never a narrow
+      // curated tool's name shared with other operations on the same raw
+      // method; see EscapeHatchNames); the profile itself decides on the
+      // primary (real) name alone when neither matched.
       if (cud !== 'read') {
         const names = escapeHatchNames(policyService, method.id);
-        const verdict = isAllowedByAnyName(names, { service: policyService, cud, scopes: method.scopes }, names[0], policy);
+        const verdict = isAllowedByAnyName(names.deny, names.allow, { service: policyService, cud, scopes: method.scopes }, names.primary, policy);
         if (!verdict.allowed) {
           return writeDisabledResult(verdict.ref, policy, account as string);
         }
