@@ -24,6 +24,19 @@ function getHeader(
   return headers?.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? '';
 }
 
+// RFC 5322 permits a header field to repeat; most generators comma-join
+// recipients into a single To/Cc/Bcc line, but a raw, hand-built message
+// (e.g. one substituted in via gmail.users.drafts.update, which the
+// outbound allowlist cannot otherwise inspect) could carry a SECOND To/Cc/
+// Bcc line instead. getHeader's .find only ever sees the first match, so a
+// recipient check built on it alone would miss every repeat.
+function getHeaderAll(
+  headers: { name?: string | null; value?: string | null }[] | undefined,
+  name: string,
+): string[] {
+  return (headers ?? []).filter((h) => h.name?.toLowerCase() === name.toLowerCase()).map((h) => h.value ?? '');
+}
+
 function pickHeaders(
   headers: { name?: string | null; value?: string | null }[] | undefined,
   names: string[],
@@ -1222,7 +1235,8 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           });
           const headers = draft.data.message?.payload?.headers ?? [];
           const recipients = ['To', 'Cc', 'Bcc']
-            .flatMap((name) => parseAddresses(getHeader(headers, name)))
+            .flatMap((name) => getHeaderAll(headers, name))
+            .flatMap((value) => parseAddresses(value))
             .map((a) => a.address);
           const outbound = checkOutbound('gmail_send_draft recipient', recipients, account as Account);
           if (outbound) return outbound;

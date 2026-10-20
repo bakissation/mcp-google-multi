@@ -88,6 +88,37 @@ describe('H2: gmail_send_draft re-checks recipients while the outbound allowlist
     expect(res.isError).toBe(true);
     expect(h.requests().some((r) => r.url.includes('/drafts/send'))).toBe(false);
   });
+
+  // LOW (item 8): RFC 5322 permits a header to repeat; a raw message
+  // substituted in via gmail.users.drafts.update (the allowlist cannot
+  // inspect that raw content, so it refuses the call outright, but this
+  // re-check must still catch the result of any OTHER way the draft's
+  // content changed) could carry a SECOND To line instead of a comma-
+  // joined one. getHeader's .find only ever sees the first.
+  it('gmail_send_draft refuses on an unlisted recipient hiding in a SECOND, repeated To header', async () => {
+    const h = toolHarness({
+      respond: (req: GoogleRequest) => {
+        if (req.method === 'GET' && req.url.includes('/drafts/')) {
+          return {
+            id: 'd1',
+            message: {
+              payload: {
+                headers: [
+                  { name: 'To', value: 'a@corp.com' },
+                  { name: 'To', value: 'evil@evil.example' },
+                ],
+              },
+            },
+          };
+        }
+        return { id: 'sent-1', threadId: 't1' };
+      },
+    });
+    const res = await h.call('gmail_send_draft', { account: 'test', draftId: 'd1' });
+    expect(res.isError).toBe(true);
+    expect(parseResult(res).error).toBe('recipient_not_allowed');
+    expect(h.requests().some((r) => r.url.includes('/drafts/send'))).toBe(false);
+  });
 });
 
 describe('gmail_send_draft when the outbound allowlist is off (default)', () => {
