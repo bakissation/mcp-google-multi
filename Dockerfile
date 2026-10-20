@@ -16,6 +16,9 @@ RUN npm ci
 COPY . .
 RUN npm run build
 RUN npm run bundle
+# The runtime stage is distroless (no shell, so no RUN mkdir there): create
+# the GOOGLE_LOCAL_FILES_DIR mount point here and COPY --chown it across.
+RUN mkdir -p /data/files
 
 # --- runtime stage ---------------------------------------------------------
 FROM gcr.io/distroless/nodejs22-debian13:nonroot
@@ -28,9 +31,14 @@ ENV NODE_ENV=production
 # OAuth AS (Bearer auth + Host/Origin guard) fronts every request. Never
 # publish the port itself on a routable host interface.
 ENV MCP_TRANSPORT=http
+# Local files stay enabled in the image (GOOGLE_LOCAL_FILES is NOT set to
+# off here, that is an operator choice, not a shipped default), confined
+# to this dedicated volume, separate from the config/token volume above.
+ENV GOOGLE_LOCAL_FILES_DIR=/data/files
 COPY --from=build /app/bundle/index.js ./dist/index.js
 COPY --from=build /app/node_modules/@napi-rs ./node_modules/@napi-rs
 COPY --from=build /app/package.json ./package.json
+COPY --from=build --chown=nonroot:nonroot /data/files /data/files
 EXPOSE 4243
 # The distroless nodejs image's ENTRYPOINT is ["/nodejs/bin/node"]; pass only
 # the entry script.

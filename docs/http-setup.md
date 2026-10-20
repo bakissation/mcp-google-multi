@@ -53,6 +53,7 @@ Caddy obtains and renews the certificate automatically; nothing else to configur
 - **Image tags**: the compose file tracks the stable major (`:6`). Set `MCP_IMAGE_TAG` in `.env` to pin an exact version (`:6.0.0`) or to follow a prerelease channel (`beta`, `dev`).
 - **Upgrade**: `docker compose pull && docker compose up -d`.
 - **State**: tokens + the auto-provisioned `MASTER_KEY` file live in the `mcp-config` volume — keep it. Recreating the volume invalidates every stored token.
+- **Host files**: `drive_upload`/`drive_update`/`drive_download`/`drive_export`/`gmail_download_attachment` and Gmail attachments are confined to `GOOGLE_LOCAL_FILES_DIR` (`/data/files` in the image), the separate `mcp-files` volume. Uploading from, or saving to, anywhere else is refused; move the file into the volume first, or set `GOOGLE_LOCAL_FILES=off` to remove these tools entirely.
 - The Google **redirect URI** and Claude connection steps below apply to this option too.
 
 ---
@@ -147,6 +148,7 @@ services:
     init: true
     volumes:
       - mcp-config:/home/nonroot/.config/mcp-google-multi   # persist tokens + master.key
+      - mcp-files:/data/files                               # GOOGLE_LOCAL_FILES_DIR: uploads/downloads/attachments
   cloudflared:
     image: cloudflare/cloudflared:latest
     command: tunnel run
@@ -155,6 +157,7 @@ services:
       - ~/.cloudflared:/home/nonroot/.cloudflared:ro
 volumes:
   mcp-config:
+  mcp-files:
 ```
 
 > **Persist the config volume.** Distroless has no OS keychain, so `MASTER_KEY` provisioning falls back to a `0600` file under the config dir. If that volume is ephemeral, `MASTER_KEY` regenerates on restart and **bricks every stored token**. Either mount a durable volume (above) or pass a fixed `MASTER_KEY` in `secrets.env`.
