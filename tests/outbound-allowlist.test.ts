@@ -7,6 +7,8 @@ import {
   resolveOutboundAllowlist,
 } from '../src/outbound-allowlist.js';
 import { setHintProvider } from '../src/hint-provider.js';
+import { GENERATED_METHOD_TOOLS } from '../src/tools/generated/method-map.js';
+import { inferCud } from '../src/registry.js';
 
 const ENV = { GOOGLE_OUTBOUND_ALLOWLIST: 'a@corp.com, @corp.com , Boss@Partner.io' };
 
@@ -164,5 +166,185 @@ describe('checkOutboundForMethod grantee-aware rules (GHSA-9vg8 part A)', () => 
     } else {
       expect(r).toBeNull();
     }
+  });
+});
+
+// M1: a write to ANY method whose resource segment looks grantee-shaped
+// (acl, permissions, members, memberships, delegates, forwardingAddresses,
+// sendAs, invitations, accessBindings, students, teachers) fails closed
+// while the allowlist is active, unless a specific shape rule exists —
+// not just the 9 ids the previous version of this check happened to name.
+describe('checkOutboundForMethod: fail closed on grantee-pattern writes with no rule (M1)', () => {
+  const EXPLICIT_RULE_METHODS = new Set([
+    'drive.permissions.create',
+    'drive.permissions.update',
+    'gmail.users.settings.delegates.create',
+    'gmail.users.settings.forwardingAddresses.create',
+    'gmail.users.settings.sendAs.create',
+    'gmail.users.settings.filters.create',
+    'calendar.acl.insert',
+    'calendar.acl.update',
+    'calendar.acl.patch',
+  ]);
+
+  // The reviewer's named probe cases: each previously passed through the
+  // generic emailAddress/email key walk untouched (none of these fields are
+  // named "email"/"emailAddress"), so GOOGLE_OUTBOUND_ALLOWLIST gated nothing.
+  const probes: Array<[string, unknown]> = [
+    ['chat.spaces.members.create', { member: { name: 'users/x@evil.com' } }],
+    ['cloudidentity.groups.memberships.create', { preferredMemberKey: { id: 'x@evil.example' } }],
+    ['classroom.invitations.create', { userId: 'x@evil.example', role: 'STUDENT' }],
+    // illustrative id: accessBindings is not in this build's generated surface
+    // (older GA4 Admin Discovery snapshot), but the pattern match is on the
+    // method id's own resource segment, not on whether a tool exists for it.
+    ['analyticsadmin.properties.accessBindings.create', { user: 'x@evil.example' }],
+    ['gmail.users.settings.sendAs.patch', { replyToAddress: 'x@evil.example' }],
+    ['gmail.users.settings.sendAs.update', { replyToAddress: 'x@evil.example' }],
+  ];
+
+  it.each(probes)('%s now fails closed (was previously allowed through unexamined)', (methodId, body) => {
+    const r = checkOutboundForMethod(methodId, body, 'a', ENV, { httpMethod: 'POST' });
+    expect(r).not.toBeNull();
+    expect(JSON.parse(r!.content[0].text).error).toBe('recipient_not_allowed');
+  });
+
+  // A read on the same kind of resource is never fail-closed: only a write
+  // can grant anything, and reads need to keep working with the allowlist on.
+  it('a read on a grantee-pattern resource is not gated', () => {
+    expect(checkOutboundForMethod('calendar.acl.list', {}, 'a', ENV, { httpMethod: 'GET' })).toBeNull();
+    expect(checkOutboundForMethod('gmail.users.settings.delegates.list', {}, 'a', ENV, { httpMethod: 'GET' })).toBeNull();
+  });
+
+  // Table sweep over every generated method id whose resource segment
+  // matches the pattern: each one without its own shape rule must fail
+  // closed as a write and pass through untouched as a read.
+  const GRANTEE_SEGMENTS = new Set([
+    'acl', 'permissions', 'members', 'memberships', 'delegates',
+    'forwardingAddresses', 'sendAs', 'invitations', 'accessBindings',
+    'students', 'teachers',
+  ]);
+  const patternMatchedGenerated = Object.entries(GENERATED_METHOD_TOOLS).filter(
+    ([id]) => id.split('.').some((segment) => GRANTEE_SEGMENTS.has(segment)),
+  );
+
+  it('sanity: the generated surface has more than a handful of grantee-pattern methods to sweep', () => {
+    expect(patternMatchedGenerated.length).toBeGreaterThan(20);
+  });
+
+  it.each(patternMatchedGenerated)('generated %s (tool %s)', (methodId, toolName) => {
+    if (EXPLICIT_RULE_METHODS.has(methodId)) return; // has its own shape rule; covered above
+    if (inferCud(toolName) === 'read') {
+      expect(checkOutboundForMethod(methodId, {}, 'a', ENV, { httpMethod: 'GET' }), methodId).toBeNull();
+    } else {
+      const r = checkOutboundForMethod(methodId, {}, 'a', ENV, { httpMethod: 'POST' });
+      expect(r, methodId).not.toBeNull();
+      expect(JSON.parse(r!.content[0].text).error, methodId).toBe('recipient_not_allowed');
+    }
+  });
+});
+
+// LOW: the generic key walk and the method-aware rule both run for the 9
+// GRANTEE_METHODS (docs say both are covered), not either/or.
+describe('checkOutboundForMethod: generic walk AND method rule both apply', () => {
+  it('a Drive permission body with an extra, differently-shaped email field is still caught by the generic walk', () => {
+    // type:"user" is understood by the rule (and allowed, since emailAddress
+    // is listed), but an unrelated nested email the rule does not look at
+    // must still be caught by the generic key walk running alongside it.
+    const r = checkOutboundForMethod(
+      'drive.permissions.create',
+      { type: 'user', emailAddress: 'a@corp.com', role: 'reader', notificationTarget: { email: 'bad@evil.io' } },
+      'a',
+      ENV,
+    );
+    expect(r).not.toBeNull();
+    expect(JSON.parse(r!.content[0].text).error).toBe('recipient_not_allowed');
+  });
+});
+
+// LOW: for calendar.acl update/patch, the grantee can be named only in the
+// path (aclId, e.g. "user:x@evil.example"), independently of whatever the
+// body's own `scope` says.
+describe('checkOutboundForMethod: calendar.acl update/patch pathParams.ruleId', () => {
+  // Bodies below are deliberately shaped to be ALLOWED on their own, so only
+  // the ruleId-sourced grantee (unioned with the body's) can explain a block
+  // — otherwise a body-level fail-closed/deny would make these vacuous.
+  it('a ruleId naming an unlisted user blocks the call even when the body names an allowed one', () => {
+    const r = checkOutboundForMethod('calendar.acl.update', { scope: { type: 'user', value: 'a@corp.com' } }, 'a', ENV, {
+      httpMethod: 'PATCH',
+      pathParams: { ruleId: 'user:x@evil.example' },
+    });
+    expect(r).not.toBeNull();
+    expect(JSON.parse(r!.content[0].text).error).toBe('recipient_not_allowed');
+  });
+
+  it('a ruleId naming a listed domain is allowed', () => {
+    const r = checkOutboundForMethod('calendar.acl.patch', { scope: { type: 'domain', value: 'corp.com' } }, 'a', ENV, {
+      httpMethod: 'PATCH',
+      pathParams: { ruleId: 'domain:corp.com' },
+    });
+    expect(r).toBeNull();
+  });
+
+  it('ruleId "default" alone carries no grantee; an otherwise-allowed body still passes', () => {
+    const r = checkOutboundForMethod('calendar.acl.update', { scope: { type: 'user', value: 'a@corp.com' } }, 'a', ENV, {
+      httpMethod: 'PATCH',
+      pathParams: { ruleId: 'default' },
+    });
+    expect(r).toBeNull();
+  });
+
+  it('calendar.acl.insert (no ruleId yet) is unaffected by pathParams', () => {
+    const r = checkOutboundForMethod('calendar.acl.insert', { scope: { type: 'user', value: 'a@corp.com' } }, 'a', ENV, {
+      httpMethod: 'POST',
+      pathParams: {},
+    });
+    expect(r).toBeNull();
+  });
+});
+
+// LOW: allows() must validate a SINGLE address, not a comma/semicolon-joined
+// string that happens to end with an allowed @domain suffix.
+describe('resolveOutboundAllowlist: allows() rejects multi-address smuggling', () => {
+  it('rejects a comma-joined pair even when the second address is allowed', () => {
+    const l = resolveOutboundAllowlist(ENV)!;
+    expect(l.allows('evil@evil.io,a@corp.com')).toBe(false);
+  });
+
+  it('rejects a semicolon- or whitespace-joined pair', () => {
+    const l = resolveOutboundAllowlist(ENV)!;
+    expect(l.allows('evil@evil.io;a@corp.com')).toBe(false);
+    expect(l.allows('evil@evil.io a@corp.com')).toBe(false);
+  });
+
+  it('rejects a string with more than one "@"', () => {
+    const l = resolveOutboundAllowlist(ENV)!;
+    expect(l.allows('a@corp.com@evil.io')).toBe(false);
+  });
+
+  it('still allows a genuine single address', () => {
+    const l = resolveOutboundAllowlist(ENV)!;
+    expect(l.allows('a@corp.com')).toBe(true);
+  });
+});
+
+// LOW: a filter forward action that isn't a plain string is an unrecognised
+// shape (fail closed), not silently treated as "no forward".
+describe('checkOutboundForMethod: gmail filter action.forward must be a string', () => {
+  it.each([
+    ['a number', 1],
+    ['an array', ['x@evil.example']],
+    ['an object', { address: 'x@evil.example' }],
+    ['an empty string', ''],
+  ])('%s forward value fails closed', (_label, forward) => {
+    const r = checkOutboundForMethod('gmail.users.settings.filters.create', { action: { forward } }, 'a', ENV);
+    expect(r).not.toBeNull();
+    expect(JSON.parse(r!.content[0].text).error).toBe('recipient_not_allowed');
+  });
+
+  it('a genuine string forward is still checked normally', () => {
+    const blocked = checkOutboundForMethod('gmail.users.settings.filters.create', { action: { forward: 'x@evil.example' } }, 'a', ENV);
+    expect(blocked).not.toBeNull();
+    const allowed = checkOutboundForMethod('gmail.users.settings.filters.create', { action: { forward: 'a@corp.com' } }, 'a', ENV);
+    expect(allowed).toBeNull();
   });
 });

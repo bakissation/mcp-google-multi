@@ -63,7 +63,10 @@ export function resolveRequestBody(httpMethod: string, body: unknown): unknown {
 export async function executeApiMethod(method: ApiMethodRef, args: ExecuteArgs, deps: ExecuteDeps = {}) {
   // Outbound allowlist: no-op when off; with it active, structured bodies are
   // inspected for recipient fields and raw-compose methods are refused.
-  const outbound = checkOutboundForMethod(method.id, args.body, args.account);
+  const outbound = checkOutboundForMethod(method.id, args.body, args.account, undefined, {
+    httpMethod: method.httpMethod,
+    pathParams: args.pathParams as Record<string, unknown> | undefined,
+  });
   if (outbound) return outbound;
   if (args.queryParams?.alt === 'media') {
     return jsonResult(

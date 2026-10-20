@@ -8,7 +8,7 @@ import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
 import { hostFilesRefused, prepareLocalDest, assertLocalPathAllowed, localFileErrorResult, LocalFileError } from './_local-files.js';
-import { checkOutbound } from '../outbound-allowlist.js';
+import { checkOutbound, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import addressparser from 'nodemailer/lib/addressparser/index.js';
 import { lookup as lookupMime } from 'mime-types';
 import { sliceClean } from '../trim.js';
@@ -272,11 +272,8 @@ export async function readAttachments(
     try {
       real = await assertLocalPathAllowed(a.path, 'read');
     } catch (err) {
-      if (err instanceof LocalFileError && err.reason === 'not_absolute') {
-        throw new GmailComposeError('validation_error', `attachment path must be absolute: ${path.basename(a.path)}`);
-      }
-      if (err instanceof LocalFileError && err.reason === 'forbidden') {
-        throw new GmailComposeError('E_ATTACHMENT_FORBIDDEN', `refusing to attach a file inside the server's config/token directory: ${path.basename(a.path)}`);
+      if (err instanceof LocalFileError) {
+        throw new GmailComposeError('E_ATTACHMENT_FORBIDDEN', `refusing to attach this file (outside the allowed local-files root, or inside the server's config/token directory): ${path.basename(a.path)}`);
       }
       throw new GmailComposeError('E_ATTACHMENT_NOT_FOUND', `attachment not found or unreadable: ${path.basename(a.path)}`);
     }
@@ -870,9 +867,16 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
 
         const buffer = Buffer.from(data, 'base64url');
         const fullPath = await prepareLocalDest(savePath, filename);
-        // wx: never silently clobber; prepareLocalDest already checked
-        // existence, this is the belt-and-suspenders race guard.
-        await fs.promises.writeFile(fullPath, buffer, { mode: 0o600, flag: 'wx' });
+        try {
+          // wx: never silently clobber; prepareLocalDest already checked
+          // existence, this is the belt-and-suspenders race guard.
+          await fs.promises.writeFile(fullPath, buffer, { mode: 0o600, flag: 'wx' });
+        } catch (err) {
+          // A failed download must not leave a partial file behind blocking
+          // a retry with local_path_exists; best-effort, original error wins.
+          await fs.promises.unlink(fullPath).catch(() => {});
+          throw err;
+        }
 
         return {
           content: [{ type: 'text' as const, text: `Saved to ${fullPath} (${buffer.length} bytes)` }],
@@ -1198,6 +1202,28 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
       try {
         const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
+        // A draft is only ever recipient-checked when it is composed
+        // (gmail_create_draft). Its raw content can be replaced afterward
+        // through google_api_call (gmail.users.drafts.update), which the
+        // allowlist cannot inspect (raw base64 RFC 822) and so refuses
+        // outright; this re-checks the draft's actual To/Cc/Bcc right
+        // before send so that chain, or any other way a draft's content
+        // changed after creation, cannot slip an unlisted recipient through.
+        if (resolveOutboundAllowlist()) {
+          // drafts.get has no metadataHeaders param (unlike messages.get);
+          // format: 'full' is the only format guaranteed to include headers.
+          const draft = await gmail.users.drafts.get({
+            userId: 'me',
+            id: draftId,
+            format: 'full',
+          });
+          const headers = draft.data.message?.payload?.headers ?? [];
+          const recipients = ['To', 'Cc', 'Bcc']
+            .flatMap((name) => parseAddresses(getHeader(headers, name)))
+            .map((a) => a.address);
+          const outbound = checkOutbound('gmail_send_draft recipient', recipients, account as Account);
+          if (outbound) return outbound;
+        }
         const res = await gmail.users.drafts.send({
           userId: 'me',
           requestBody: { id: draftId },
