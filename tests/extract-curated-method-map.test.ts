@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
-import { extractFromSource } from '../scripts/extract-curated-method-map.js';
+import { extractFromSource, disambiguate, looksLikeWrite } from '../scripts/extract-curated-method-map.js';
 
 // LOW (round 4): the extractor only followed a `function foo(...) {}`
 // declaration whose parameters carried a recognised client TYPE
@@ -47,5 +47,46 @@ describe('extractFromSource: arrow-function helpers and untyped client params', 
     expect(bySource('gmail_send')).toBe(true);
     expect(bySource('gmail_create_draft')).toBe(true);
     expect(bySource('gmail_read_batch')).toBe(true);
+  });
+});
+
+// LOW (round 5, item 4): a suffix shared by more than one method id
+// (e.g. chat.spaces.create and meet.spaces.create both have the suffix
+// "spaces.create") was silently dropped: neither the length===1 branch
+// nor the undefined branch fired for it, so it never reached
+// resolved/extraSeen/unexplainedWrites at all. disambiguate narrows by
+// the call's own resolved client prefix first, and only returns a result
+// when that leaves exactly one candidate.
+describe('disambiguate: ambiguous method-id suffixes are resolved by prefix, or reported, never silently dropped', () => {
+  it('narrows to the one candidate whose own id prefix matches the call\'s resolved client', () => {
+    expect(disambiguate(['chat.spaces.create', 'meet.spaces.create'], 'chat')).toBe('chat.spaces.create');
+    expect(disambiguate(['chat.spaces.create', 'meet.spaces.create'], 'meet')).toBe('meet.spaces.create');
+  });
+
+  it('returns null (ambiguous, must be reported, not resolved) when the prefix does not narrow it to exactly one', () => {
+    // admin.ts's one adminClient factory resolves every call's prefix to
+    // "admin", which matches NEITHER directory nor reseller's own id
+    // prefix: exactly the real-world case that motivated this.
+    expect(disambiguate(['directory.customers.get', 'reseller.customers.get'], 'admin')).toBeNull();
+    expect(disambiguate(['drive.channels.stop', 'calendar.channels.stop'], 'unrelated')).toBeNull();
+  });
+
+  it('a single candidate resolves regardless of prefix (the common, unambiguous case)', () => {
+    expect(disambiguate(['drive.files.copy'], 'anything')).toBe('drive.files.copy');
+  });
+});
+
+// LOW (round 5, item 4): *.watch registers a push channel (a privileged
+// write by write-control's own PUSH_REGISTRATION_RE), not a read, even
+// though the word sounds passive.
+describe('looksLikeWrite: *.watch is a write, not a read', () => {
+  it('drive.files.watch and gmail.users.watch are writes', () => {
+    expect(looksLikeWrite('drive.files.watch')).toBe(true);
+    expect(looksLikeWrite('gmail.users.watch')).toBe(true);
+  });
+
+  it('an actual read verb is still read', () => {
+    expect(looksLikeWrite('drive.files.get')).toBe(false);
+    expect(looksLikeWrite('drive.files.list')).toBe(false);
   });
 });

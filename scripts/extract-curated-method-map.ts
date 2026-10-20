@@ -42,14 +42,34 @@
 // one `adminClient` factory across the directory/reports/datatransfer
 // sub-APIs, whose Discovery ids use their own prefixes).
 //
-// A call that still does not resolve to exactly one method id, or that
-// resolves but is not a curated method (a curated tool calling a
-// generated-only method as a secondary step, the EXTRA_METHOD_TOOLS
-// case), is only acceptable when it is a READ (by the resolved tool
-// name's inferCud) or already listed in EXTRA_METHOD_TOOLS; an
-// unresolved or extra WRITE call that is neither is a drift-check
-// failure, since a silently-dropped write call is exactly the gap that
-// let drive_transfer's own helper calls go unattributed before.
+// A call whose suffix matches more than one method id (the SAME suffix
+// shared by unrelated services, e.g. "spaces.create" is both
+// chat.spaces.create and meet.spaces.create) is narrowed by the call's
+// own resolved client prefix first; if that still does not leave exactly
+// one candidate (the prefix itself is ambiguous across sub-APIs, as
+// admin.ts's one adminClient factory is across directory/reports/
+// datatransfer), it is reported rather than silently resolved to a guess
+// or silently dropped. A call that still does not resolve to exactly one
+// method id, or that resolves but is not a curated method (a curated
+// tool calling a generated-only method as a secondary step, the
+// EXTRA_METHOD_TOOLS case), is only acceptable when it is a READ (by
+// looksLikeWrite, the method id's own last-segment verb) or already
+// listed in EXTRA_METHOD_TOOLS; an unresolved, ambiguous, or extra WRITE
+// call that is neither is a drift-check failure, since a silently-dropped
+// write call is exactly the gap that let drive_transfer's own helper
+// calls go unattributed before.
+//
+// This check is best-effort, not exhaustive: it follows a direct call,
+// a call inside a top-level helper (function declaration or arrow-
+// function const) the handler invokes BY NAME, and a parameter resolved
+// either by its type annotation or by propagating the caller's own
+// binding at the call site. It does NOT follow a client re-exported
+// under an alias, a destructured method reference
+// (`const { create } = drive.files; create(...)`), bracket-notation
+// access (`drive.files['create'](...)`), or a helper defined in or
+// imported from another file. A curated tool using any of those shapes
+// needs its own review, the same as a genuinely new Discovery method
+// call would.
 import ts from 'typescript';
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -68,8 +88,12 @@ import { EXTRA_METHOD_TOOLS } from '../src/tools/google-api.js';
 // narrower, offline-only proxy for cudFromMethod's real httpMethod check
 // (src/discovery-client.ts), good enough to tell a read from a write
 // without needing the Discovery doc at script-run time.
-const READ_VERB_PREFIX = /^(get|list|search|query|lookup|count|batchGet|generateIds|export|download|inspect|check|suggest|watch)/i;
-function looksLikeWrite(methodId: string): boolean {
+// "watch" is deliberately NOT a read verb here even though it sounds
+// passive: *.watch registers a push channel (write-control's
+// PUSH_REGISTRATION_RE), a privileged write by Google's own httpMethod
+// (POST), not something safe to let through unreviewed.
+const READ_VERB_PREFIX = /^(get|list|search|query|lookup|count|batchGet|generateIds|export|download|inspect|check|suggest)/i;
+export function looksLikeWrite(methodId: string): boolean {
   const lastSegment = methodId.split('.').pop() ?? '';
   return !READ_VERB_PREFIX.test(lastSegment);
 }
@@ -260,6 +284,23 @@ function extractFromFile(file: string): RawCall[] {
   return extractFromSource(file, fs.readFileSync(file, 'utf8'));
 }
 
+/**
+ * Narrows a suffix's candidate ids using the call's own resolved client
+ * prefix (the first segment of methodPath): a suffix shared by unrelated
+ * services (e.g. "spaces.create" is both chat.spaces.create and
+ * meet.spaces.create) resolves cleanly once only one candidate's own id
+ * prefix matches the client that actually made the call. Returns the
+ * single resolved id, or null when zero or more than one candidate
+ * remains (a genuinely ambiguous prefix, e.g. admin.ts's one adminClient
+ * factory shared across directory/reports/datatransfer, whose Discovery
+ * ids use their own prefixes the client prefix cannot match at all).
+ */
+export function disambiguate(candidates: string[], callPrefix: string): string | null {
+  if (candidates.length === 1) return candidates[0];
+  const narrowed = candidates.filter((id) => id.split('.')[0] === callPrefix);
+  return narrowed.length === 1 ? narrowed[0] : null;
+}
+
 function main() {
   const curatedSuffixToId = new Map<string, string[]>();
   for (const id of CURATED_METHOD_IDS) {
@@ -283,18 +324,28 @@ function main() {
   for (const f of CURATED_FILES) {
     for (const call of extractFromFile(`src/tools/${f}.ts`)) {
       const suffix = call.methodPath.split('.').slice(1).join('.');
+      const callPrefix = call.methodPath.split('.')[0];
       const curatedCandidates = curatedSuffixToId.get(suffix);
-      if (curatedCandidates && curatedCandidates.length === 1) {
-        const id = curatedCandidates[0];
-        if (!resolved.has(id)) resolved.set(id, new Set());
-        resolved.get(id)!.add(call.tool);
+      const resolvedCuratedId = curatedCandidates ? disambiguate(curatedCandidates, callPrefix) : null;
+      if (resolvedCuratedId) {
+        if (!resolved.has(resolvedCuratedId)) resolved.set(resolvedCuratedId, new Set());
+        resolved.get(resolvedCuratedId)!.add(call.tool);
         continue;
       }
       unresolved.push(call);
 
+      if (curatedCandidates && curatedCandidates.length > 1) {
+        // The suffix resolved to more than one curated id and the
+        // client prefix did not narrow it to exactly one: a genuine
+        // ambiguity, not something to guess at silently.
+        unexplainedWrites.push(`${call.tool} -> ${call.methodPath} (ambiguous: suffix "${suffix}" matches several curated ids: ${curatedCandidates.join(', ')})`);
+        continue;
+      }
+
       const generatedCandidates = generatedSuffixToId.get(suffix);
-      if (generatedCandidates && generatedCandidates.length === 1) {
-        const id = generatedCandidates[0];
+      const resolvedGeneratedId = generatedCandidates ? disambiguate(generatedCandidates, callPrefix) : null;
+      if (resolvedGeneratedId) {
+        const id = resolvedGeneratedId;
         if (!extraSeen.has(id)) extraSeen.set(id, new Set());
         extraSeen.get(id)!.add(call.tool);
         const listedTools = EXTRA_METHOD_TOOLS[id] ?? [];
@@ -304,13 +355,15 @@ function main() {
         unexplainedWrites.push(
           `${call.tool} -> ${id} (resolves to generated ${toolName}, a write, but is not in EXTRA_METHOD_TOOLS and is not curated)`,
         );
+      } else if (generatedCandidates && generatedCandidates.length > 1) {
+        unexplainedWrites.push(`${call.tool} -> ${call.methodPath} (ambiguous: suffix "${suffix}" matches several generated ids: ${generatedCandidates.join(', ')})`);
       } else if (curatedCandidates === undefined && generatedCandidates === undefined && looksLikeWrite(call.methodPath)) {
-        // Does not resolve to ANY known method id at all (ambiguous
-        // suffix, or genuinely not found), and looks like a write by its
-        // own last segment: report conservatively rather than guess at a
-        // cud it can't actually verify; a read that fails to resolve is
-        // left to the existing unresolved/INFO log instead, since there
-        // is nothing security-relevant to review there.
+        // Does not resolve to ANY known method id at all (genuinely not
+        // found), and looks like a write by its own last segment: report
+        // conservatively rather than guess at a cud it can't actually
+        // verify; a read that fails to resolve is left to the existing
+        // unresolved/INFO log instead, since there is nothing security-
+        // relevant to review there.
         unexplainedWrites.push(`${call.tool} -> ${call.methodPath} (does not resolve to any known curated or generated method id)`);
       }
     }
