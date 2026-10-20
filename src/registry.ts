@@ -358,8 +358,24 @@ export class ToolRegistry {
    * push-style request, a timeout, a closed connection, ...) uniformly,
    * since the caller's only correct response to any of them is the same:
    * refuse rather than silently proceed without an answer.
+   *
+   * The capability check up front (same pattern account-wizard.ts's form
+   * elicitation already uses) matters most on the HTTP (EE) transport: a
+   * stateless, single-response dispatch (see docs/internals.md) cannot
+   * actually deliver a mid-call server-to-client request once the one
+   * JSON response for this call has been claimed, so a client that never
+   * declared the capability would otherwise hang until elicitInput's own
+   * request timeout, not fail fast. A client that DOES declare the
+   * capability but is still talking over that same transport shape can
+   * still hang until the timeout; that gap is a known limitation of
+   * stateless HTTP dispatch, not something this check can close, and is
+   * documented in docs/configuration.md.
    */
   async elicitConfirmation(message: string): Promise<{ action: 'accept' | 'decline' | 'cancel' } | { action: 'unsupported'; reason: string }> {
+    const caps = this.server.server.getClientCapabilities?.() as { elicitation?: { form?: unknown } } | undefined;
+    if (caps?.elicitation?.form === undefined) {
+      return { action: 'unsupported', reason: 'the connected client has not declared elicitation support' };
+    }
     try {
       const result = await (this.server.server as { elicitInput: (params: unknown) => Promise<{ action: string }> }).elicitInput({
         message,

@@ -6,8 +6,11 @@ import { toolHarness, parseResult, type GoogleRequest } from './_tool-harness.js
 // which the allowlist cannot inspect (raw base64 RFC 822). gmail_send_draft
 // must not trust that history: it re-checks the draft's ACTUAL To/Cc/Bcc
 // right before send. Two independent layers, each tested on its own:
-//  1. drafts.update is refused outright while the allowlist is active
-//     (added to RAW_SEND_METHODS), so the mutation itself cannot happen.
+//  1. ROUND 6: drafts.update no longer has its own content rule (the escape
+//     hatch does not reason about body content any more); with the outbound
+//     allowlist active, full-writes falls into the ask bucket instead of its
+//     usual auto-allow (see escapeHatchVerdict), so the mutation still cannot
+//     happen without a human to ask, uninspectable raw content or not.
 //  2. gmail_send_draft fetches the draft and checks its real headers before
 //     sending, so even if a draft's content became unlisted some other way,
 //     send still refuses.
@@ -30,18 +33,18 @@ describe('H2: gmail_send_draft re-checks recipients while the outbound allowlist
     expect(parseResult(res).draftId).toBe('d1');
   });
 
-  it('step 2: google_api_call refuses gmail.users.drafts.update outright (raw content is uninspectable)', async () => {
+  it('step 2: google_api_call refuses gmail.users.drafts.update (the outbound allowlist puts full-writes in the ask bucket; no client to ask fails closed)', async () => {
     const h = toolHarness({ respond: () => ({}) });
     const res = await h.call('google_api_call', {
       account: 'test',
       api: 'gmail',
       methodId: 'gmail.users.drafts.update',
       pathParams: { userId: 'me', id: 'd1' },
-      body: { message: { raw: 'ZXZpbC1yYXctbWltZQ==' } }, // the allowlist cannot read inside this
+      body: { message: { raw: 'ZXZpbC1yYXctbWltZQ==' } }, // uninspectable either way: the escape hatch no longer looks
     });
     expect(res.isError).toBe(true);
     const payload = parseResult(res);
-    expect(payload.error).toBe('recipient_not_allowed');
+    expect(payload.error).toBe('elicitation_unsupported');
     expect(h.request).not.toHaveBeenCalled();
   });
 

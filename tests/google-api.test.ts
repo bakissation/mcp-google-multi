@@ -241,13 +241,20 @@ function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string>; elicit?: 
     if (action === 'unsupported') throw new Error('elicitation not supported by this client (test harness default)');
     return { action };
   });
+  // registry.elicitConfirmation checks this BEFORE calling elicitInput; see
+  // the matching comment on fakeServer() in tests/_tool-harness.ts.
+  const elicitationCapable = (opts.elicit ?? 'unsupported') !== 'unsupported';
   const server = {
     registerTool: (name: string, _config: never, handler: never) => {
       registered.push({ name, handler });
       return 'ok';
     },
     sendToolListChanged: vi.fn(),
-    server: { setRequestHandler: () => {}, elicitInput },
+    server: {
+      setRequestHandler: () => {},
+      getClientCapabilities: () => (elicitationCapable ? { elicitation: { form: {} } } : undefined),
+      elicitInput,
+    },
   };
   const registry = new ToolRegistry(server as never, policy);
   const request = vi.fn(async () => ({ data: { ok: true } }));
@@ -388,7 +395,9 @@ describe('google_api_call', () => {
   // hatch is no longer an immediate write_disabled; it asks a human (the
   // GOOGLE_READ_ONLY hard flag, not the profile, is what refuses without
   // asking; see the round-6 ask-model describe block below). A client that
-  // cannot answer still ends up refused, just via elicitation_unsupported.
+  // never declared elicitation support still ends up refused, just via
+  // elicitation_unsupported, and fails fast: the capability check in
+  // registry.elicitConfirmation means elicitInput is never even attempted.
   it('a CUD method under the default read-only profile asks rather than refusing outright, and still refuses when nothing can answer', async () => {
     const { call, request, dir, elicitInput } = setup(READ_ONLY);
     cleanupDirs.push(dir);
@@ -400,7 +409,7 @@ describe('google_api_call', () => {
     });
     expect(res.isError).toBe(true);
     expect(JSON.parse(res.content[0].text).error).toBe('elicitation_unsupported');
-    expect(elicitInput).toHaveBeenCalledTimes(1);
+    expect(elicitInput).not.toHaveBeenCalled();
     expect(request).not.toHaveBeenCalled();
   });
 

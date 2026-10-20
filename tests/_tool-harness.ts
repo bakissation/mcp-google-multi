@@ -61,6 +61,11 @@ export function fakeServer(opts: { elicit?: ElicitMode } = {}) {
     }
     return { action };
   });
+  // registry.elicitConfirmation checks this BEFORE ever calling elicitInput
+  // (same fast-fail pattern account-wizard.ts's form elicitation uses), so
+  // the capability must be advertised whenever the harness is told to
+  // simulate a client that can actually answer.
+  const elicitationCapable = (opts.elicit ?? 'unsupported') !== 'unsupported';
   const server = {
     registerTool: (name: string, config: { inputSchema?: z.ZodRawShape }, handler: Handler) => {
       handlers[name] = handler;
@@ -68,7 +73,11 @@ export function fakeServer(opts: { elicit?: ElicitMode } = {}) {
       return 'ok';
     },
     sendToolListChanged: vi.fn(),
-    server: { setRequestHandler: () => {}, getClientCapabilities: () => undefined, elicitInput },
+    server: {
+      setRequestHandler: () => {},
+      getClientCapabilities: () => (elicitationCapable ? { elicitation: { form: {} } } : undefined),
+      elicitInput,
+    },
   };
   return { server, handlers, schemas, elicitInput };
 }
