@@ -293,6 +293,27 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         );
       }
 
+      // ROUND 7 (MEDIUM 3): an undeclared pathParams key has no effect on
+      // the actual call (expandPath only substitutes {placeholders} the
+      // method's own path template names), but it was still echoed into
+      // the confirmation prompt verbatim, letting a caller stuff fake
+      // prompt text into a key the method never asked for. Rejected
+      // outright rather than silently ignored.
+      const declaredPathParams = new Set(Object.entries(method.params).filter(([, p]) => p.location === 'path').map(([n]) => n));
+      const unknownPathParams = Object.keys((pathParams as Record<string, unknown> | undefined) ?? {}).filter((k) => !declaredPathParams.has(k));
+      if (unknownPathParams.length > 0) {
+        return jsonResult(
+          {
+            error: 'invalid_params',
+            message: `${method.id} does not declare path param(s): ${unknownPathParams.join(', ')}.`,
+            hint: `Declared path params for ${method.id}: ${[...declaredPathParams].join(', ') || '(none)'}.`,
+            retriable: false,
+            account,
+          },
+          true,
+        );
+      }
+
       // The RESOLVED index id only, never the caller's methodId argument.
       registry.usageMetrics?.recordEscapeMethod(method.id);
       // CUD_OVERRIDES corrects the handful of methods HTTP-verb inference
@@ -316,9 +337,11 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
         const names = escapeHatchNames(policyService, method.id);
         const gate = await escapeHatchGate(registry, names.deny, names.primary, { service: policyService, cud, scopes: method.scopes }, policy, {
           account: account as string,
+          accountEmail: registry.accountSet().configs[account as string]?.email,
           methodId: method.id,
           httpMethod: method.httpMethod,
           pathParams: pathParams as Record<string, unknown> | undefined,
+          queryParams: queryParams as Record<string, unknown> | undefined,
           body,
         });
         if (gate) return gate;

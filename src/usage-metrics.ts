@@ -46,7 +46,7 @@ export const KNOWN_ERROR_SLUGS: ReadonlySet<string> = new Set([
   'invalid_scope', 'network_error', 'not_found', 'rate_limited',
   'reauth_required', 'recipient_not_allowed', 'temporarily_unavailable', 'tenant_not_found', 'too_large', 'toolset_disabled', 'unknown_api',
   'unknown_argument', 'unknown_method', 'unsupported_grant_type', 'unsupported_type',
-  'untrusted_host', 'upstream_error', 'validation_error', 'write_declined', 'write_disabled',
+  'untrusted_host', 'upstream_error', 'validation_error', 'write_declined', 'write_disabled', 'write_unsummarizable',
 ]);
 
 const RPC_CODES = new Set([-32700, -32600, -32601, -32603]);

@@ -10,7 +10,10 @@ import { toolHarness, parseResult, type GoogleRequest } from './_tool-harness.js
 //     hatch does not reason about body content any more); with the outbound
 //     allowlist active, full-writes falls into the ask bucket instead of its
 //     usual auto-allow (see escapeHatchVerdict), so the mutation still cannot
-//     happen without a human to ask, uninspectable raw content or not.
+//     happen without a human to ask. ROUND 7 (HIGH 2): if the raw content is
+//     not even decodable to a real MIME message (as below), the escape hatch
+//     refuses outright before ever reaching the ask step, rather than ask a
+//     human to confirm a prompt that cannot show the real destination.
 //  2. gmail_send_draft fetches the draft and checks its real headers before
 //     sending, so even if a draft's content became unlisted some other way,
 //     send still refuses.
@@ -33,18 +36,18 @@ describe('H2: gmail_send_draft re-checks recipients while the outbound allowlist
     expect(parseResult(res).draftId).toBe('d1');
   });
 
-  it('step 2: google_api_call refuses gmail.users.drafts.update (the outbound allowlist puts full-writes in the ask bucket; no client to ask fails closed)', async () => {
+  it('step 2: google_api_call refuses gmail.users.drafts.update outright (the raw content does not decode to a real MIME message)', async () => {
     const h = toolHarness({ respond: () => ({}) });
     const res = await h.call('google_api_call', {
       account: 'test',
       api: 'gmail',
       methodId: 'gmail.users.drafts.update',
       pathParams: { userId: 'me', id: 'd1' },
-      body: { message: { raw: 'ZXZpbC1yYXctbWltZQ==' } }, // uninspectable either way: the escape hatch no longer looks
+      body: { message: { raw: 'ZXZpbC1yYXctbWltZQ==' } }, // decodes to "evil-raw-mime", no real header block
     });
     expect(res.isError).toBe(true);
     const payload = parseResult(res);
-    expect(payload.error).toBe('elicitation_unsupported');
+    expect(payload.error).toBe('write_unsummarizable');
     expect(h.request).not.toHaveBeenCalled();
   });
 

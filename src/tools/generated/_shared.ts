@@ -90,9 +90,11 @@ export function registerGeneratedTool(registry: ToolRegistry, def: GeneratedTool
         const names = escapeHatchNames(service, def.method.id);
         const gate = await escapeHatchGate(registry, names.deny, names.primary, { service, cud: def.cud, scopes: def.method.scopes }, registry.policy, {
           account: args.account as string,
+          accountEmail: registry.accountSet().configs[args.account as string]?.email,
           methodId: def.method.id,
           httpMethod: def.method.httpMethod,
           pathParams,
+          queryParams,
           body,
         });
         if (gate) return gate;

