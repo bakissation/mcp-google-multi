@@ -53,7 +53,7 @@ Caddy obtains and renews the certificate automatically; nothing else to configur
 - **Image tags**: the compose file tracks the stable major (`:6`). Set `MCP_IMAGE_TAG` in `.env` to pin an exact version (`:6.0.0`) or to follow a prerelease channel (`beta`, `dev`).
 - **Upgrade**: `docker compose pull && docker compose up -d`.
 - **State**: tokens + the auto-provisioned `MASTER_KEY` file live in the `mcp-config` volume — keep it. Recreating the volume invalidates every stored token.
-- **Host files**: `drive_upload`/`drive_update`/`drive_download`/`drive_export`/`gmail_download_attachment` and Gmail attachments are confined to `GOOGLE_LOCAL_FILES_DIR` (`/data/files` in the image), the separate `mcp-files` volume. Uploading from, or saving to, anywhere else is refused; move the file into the volume first, or set `GOOGLE_LOCAL_FILES=off` to remove these tools entirely.
+- **Host files**: `drive_upload`/`drive_update`/`drive_download`/`drive_export`/`gmail_download_attachment` and Gmail attachments are confined to `GOOGLE_LOCAL_FILES_DIR` (`/data/files` in the image), the separate `mcp-files` volume. Uploading from, or saving to, anywhere else is refused; move the file into the volume first, or set `GOOGLE_LOCAL_FILES=off` to remove these tools entirely. The named `mcp-files` volume above already has the right ownership (it is seeded from the image). If a bind mount is used instead (`-v /host/path:/data/files`), that host directory must be owned by uid `65532` (the image's nonroot user), or the container cannot create files under it: `sudo chown 65532:65532 /host/path` before first use.
 - The Google **redirect URI** and Claude connection steps below apply to this option too.
 
 ---
