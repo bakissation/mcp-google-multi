@@ -19,6 +19,7 @@ import { resolveScopesForAccount } from './auth.js';
 import type { CuratedToolDeps } from './client.js';
 import type { ExecuteDeps } from './executor.js';
 import type { Metrics } from './usage-metrics.js';
+import { localFilesDisabledByEnv } from './tools/_local-files.js';
 
 export interface McpServerOptions {
   /** Sent in the initialize result; omitted entirely when absent or blank. */
@@ -38,7 +39,9 @@ export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Di
   const registry = new ToolRegistry(server, policy, mode, metrics, () => ctx.accounts);
   // ctx.accounts is read per call, never snapshotted here, so a live getter stays live.
   const owner = isOwnerContext(ctx);
-  const clientDeps: CuratedToolDeps = { getClientFn: ctx.getClient, localFiles: owner };
+  // GOOGLE_LOCAL_FILES=off removes every host-file tool/param for every
+  // context, including the owner, regardless of the transport.
+  const clientDeps: CuratedToolDeps = { getClientFn: ctx.getClient, localFiles: owner && !localFilesDisabledByEnv() };
   const execDeps: ExecuteDeps = {
     getClientFn: ctx.getClient,
     scopeDeps: {

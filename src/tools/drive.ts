@@ -6,7 +6,7 @@ import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } from './_errors.js';
-import { hostFilesRefused, openLocalReadStream, prepareLocalDest } from './_local-files.js';
+import { hostFilesRefused, openLocalReadStream, prepareLocalDest, localFileErrorResult, LocalFileError } from './_local-files.js';
 import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
 import { capText, listResult } from '../trim.js';
@@ -468,6 +468,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        if (error instanceof LocalFileError) return localFileErrorResult(error, account as string);
         return handleDriveError(error, account as Account);
       }
     },
@@ -492,20 +493,23 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         const name = filename
           ?? (await drive.files.get({ fileId, fields: 'name', supportsAllDrives: true })).data.name
           ?? fileId;
-        const dest = prepareLocalDest(savePath, name);
+        const dest = await prepareLocalDest(savePath, name);
         const res = await drive.files.get(
           { fileId, alt: 'media', supportsAllDrives: true },
           { responseType: 'stream' },
         );
 
-        // pipeline destroys both streams on source/sink error; raw .pipe leaks the partial file.
-        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600 }));
+        // pipeline destroys both streams on source/sink error; raw .pipe leaks the
+        // partial file. wx: prepareLocalDest already checked existence, this is
+        // the belt-and-suspenders race guard, never silently clobber.
+        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600, flags: 'wx' }));
 
         const { size } = fs.statSync(dest);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ savedPath: dest, bytes: size }, null, 2) }],
         };
       } catch (error: any) {
+        if (error instanceof LocalFileError) return localFileErrorResult(error, account as string);
         return handleDriveError(error, account as Account);
       }
     },
@@ -534,20 +538,23 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           const ext = mime.extension(exportMime);
           name = `${meta.data.name ?? fileId}${ext ? `.${ext}` : ''}`;
         }
-        const dest = prepareLocalDest(savePath, name);
+        const dest = await prepareLocalDest(savePath, name);
         const res = await drive.files.export(
           { fileId, mimeType: exportMime },
           { responseType: 'stream' },
         );
 
-        // pipeline destroys both streams on source/sink error; raw .pipe leaks the partial file.
-        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600 }));
+        // pipeline destroys both streams on source/sink error; raw .pipe leaks the
+        // partial file. wx: prepareLocalDest already checked existence, this is
+        // the belt-and-suspenders race guard, never silently clobber.
+        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600, flags: 'wx' }));
 
         const { size } = fs.statSync(dest);
         return {
           content: [{ type: 'text' as const, text: JSON.stringify({ savedPath: dest, bytes: size }, null, 2) }],
         };
       } catch (error: any) {
+        if (error instanceof LocalFileError) return localFileErrorResult(error, account as string);
         return handleDriveError(error, account as Account);
       }
     },
@@ -645,6 +652,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        if (error instanceof LocalFileError) return localFileErrorResult(error, account as string);
         return handleDriveError(error, account as Account);
       }
     },

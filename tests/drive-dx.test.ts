@@ -12,24 +12,24 @@ describe('prepareLocalDest', () => {
     for (const p of created.splice(0)) fs.rmSync(p, { recursive: true, force: true });
   });
 
-  it('creates a missing destination directory (recursively)', () => {
+  it('creates a missing destination directory (recursively)', async () => {
     const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-dx-'));
     created.push(parent);
     const savePath = path.join(parent, 'a', 'b', 'c');
     expect(fs.existsSync(savePath)).toBe(false);
 
-    const dest = prepareLocalDest(savePath, 'report.pdf');
+    const dest = await prepareLocalDest(savePath, 'report.pdf');
 
     expect(fs.existsSync(savePath)).toBe(true);
     expect(dest).toBe(path.join(savePath, 'report.pdf'));
   });
 
-  it('tolerates a savePath that already ends with the filename (no double join)', () => {
+  it('tolerates a savePath that already ends with the filename (no double join)', async () => {
     const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-dx-'));
     created.push(parent);
     const intended = path.join(parent, 'out', 'report.pdf');
 
-    const dest = prepareLocalDest(intended, 'report.pdf');
+    const dest = await prepareLocalDest(intended, 'report.pdf');
 
     expect(dest).toBe(intended);
     // and no directory named like the file was created
@@ -37,13 +37,13 @@ describe('prepareLocalDest', () => {
     expect(fs.statSync(path.join(parent, 'out')).isDirectory()).toBe(true);
   });
 
-  it('basename-sanitizes the filename so it never escapes savePath', () => {
+  it('basename-sanitizes the filename so it never escapes savePath', async () => {
     const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-dx-'));
     created.push(parent);
     const savePath = path.join(parent, 'out');
 
     for (const malicious of ['../../etc/passwd', '/tmp/evil.sh', 'a/b/c.txt']) {
-      const dest = prepareLocalDest(savePath, malicious);
+      const dest = await prepareLocalDest(savePath, malicious);
       expect(path.resolve(dest).startsWith(path.resolve(savePath) + path.sep)).toBe(true);
     }
   });
