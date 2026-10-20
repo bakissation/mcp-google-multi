@@ -89,7 +89,7 @@ function snakeSegment(segment: string): string {
 // generated twin sheets_spreadsheets_sheets_copy_to wraps. Listed here so a
 // deny/allow written against that curated tool's name reaches the escape
 // hatch for this method too, not just its generated twin's name.
-const EXTRA_METHOD_TOOLS: Record<string, string[]> = {
+export const EXTRA_METHOD_TOOLS: Record<string, string[]> = {
   'sheets.spreadsheets.sheets.copyTo': ['sheets_copy_sheet_to'],
 };
 

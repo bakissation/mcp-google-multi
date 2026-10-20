@@ -974,7 +974,7 @@ export const CURATED_METHOD_TOOLS: Record<string, string[]> = {
   "gmail.users.messages.batchDelete": ["gmail_batch_delete"],
   "gmail.users.messages.batchModify": ["gmail_batch_modify"],
   "gmail.users.messages.delete": ["gmail_delete"],
-  "gmail.users.messages.get": ["gmail_read","gmail_search"],
+  "gmail.users.messages.get": ["gmail_create_draft","gmail_read","gmail_read_batch","gmail_search","gmail_send"],
   "gmail.users.messages.list": ["gmail_search"],
   "gmail.users.messages.modify": ["gmail_modify_labels"],
   "gmail.users.messages.send": ["gmail_send"],
