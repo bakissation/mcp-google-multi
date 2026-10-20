@@ -7,6 +7,7 @@ import {
   localFilesRoot,
   ensureLocalFilesRoot,
   openLocalReadStream,
+  openInternalReadStream,
   prepareLocalDest,
 } from '../src/tools/_local-files.js';
 import { configDir } from '../src/config-file.js';
@@ -127,5 +128,35 @@ describe('GOOGLE_LOCAL_FILES_DIR allow-list root', () => {
     const secret = path.join(dir, 'master.key');
     fs.writeFileSync(secret, 'SECRETKEY');
     await expect(assertLocalPathAllowed(secret, 'read')).rejects.toMatchObject({ reason: 'forbidden' });
+  });
+
+  // HIGH (item 1): drive_transfer's download-then-upload fallback reads its
+  // own staging file (under os.tmpdir(), never a caller argument) back for
+  // the upload. The rest of this suite pins GOOGLE_LOCAL_FILES_DIR to
+  // os.tmpdir() (tests/setup.ts), so a regression here would pass silently
+  // everywhere else; these two tests deliberately point the root somewhere
+  // else so "outside the configured root" is real, the way it is in
+  // production whenever an operator sets GOOGLE_LOCAL_FILES_DIR at all.
+  it('openInternalReadStream (the server\'s own temp-file read) bypasses the root entirely and never creates it', async () => {
+    const unusedRoot = path.join(os.tmpdir(), `mcp-gm-unused-root-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    process.env.GOOGLE_LOCAL_FILES_DIR = unusedRoot;
+    const outside = outsideDir();
+    const tmp = path.join(outside, 'server-staged-file.bin');
+    fs.writeFileSync(tmp, 'payload');
+    // Before the fix this was openLocalReadStream(tmp): refused with
+    // 'forbidden' (root != os.tmpdir()), and ensureLocalFilesRoot's
+    // mkdirSync had already created unusedRoot as a side effect of the
+    // containment check, even on the refused call.
+    await expect(openInternalReadStream(tmp)).resolves.toBeDefined();
+    expect(fs.existsSync(unusedRoot)).toBe(false);
+  });
+
+  it('contrast: the guarded openLocalReadStream still refuses a caller-supplied path outside that same root', async () => {
+    const unusedRoot = path.join(os.tmpdir(), `mcp-gm-unused-root-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    process.env.GOOGLE_LOCAL_FILES_DIR = unusedRoot;
+    const outside = outsideDir();
+    const tmp = path.join(outside, 'caller-supplied.bin');
+    fs.writeFileSync(tmp, 'payload');
+    await expect(openLocalReadStream(tmp)).rejects.toMatchObject({ reason: 'forbidden' });
   });
 });
