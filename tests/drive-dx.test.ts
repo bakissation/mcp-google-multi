@@ -6,6 +6,10 @@ import { resolveConvertTarget, resolveShareNotification } from '../src/tools/dri
 import { prepareLocalDest } from '../src/tools/_local-files.js';
 import { executeApiMethod, type ApiMethodRef } from '../src/executor.js';
 
+// The real path, not os.tmpdir(): on Windows tmpdir() can be an 8.3 short
+// name (RUNNER~1) while the guard returns the resolved long path.
+const TMP = fs.realpathSync.native(os.tmpdir());
+
 describe('prepareLocalDest', () => {
   const created: string[] = [];
   afterEach(() => {
@@ -13,7 +17,7 @@ describe('prepareLocalDest', () => {
   });
 
   it('creates a missing destination directory (recursively)', async () => {
-    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-dx-'));
+    const parent = fs.mkdtempSync(path.join(TMP, 'mcp-gm-dx-'));
     created.push(parent);
     const savePath = path.join(parent, 'a', 'b', 'c');
     expect(fs.existsSync(savePath)).toBe(false);
@@ -25,7 +29,7 @@ describe('prepareLocalDest', () => {
   });
 
   it('tolerates a savePath that already ends with the filename (no double join)', async () => {
-    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-dx-'));
+    const parent = fs.mkdtempSync(path.join(TMP, 'mcp-gm-dx-'));
     created.push(parent);
     const intended = path.join(parent, 'out', 'report.pdf');
 
@@ -38,7 +42,7 @@ describe('prepareLocalDest', () => {
   });
 
   it('basename-sanitizes the filename so it never escapes savePath', async () => {
-    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-dx-'));
+    const parent = fs.mkdtempSync(path.join(TMP, 'mcp-gm-dx-'));
     created.push(parent);
     const savePath = path.join(parent, 'out');
 

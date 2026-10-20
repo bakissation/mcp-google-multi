@@ -7,11 +7,14 @@ import {
   prepareLocalDest,
   assertLocalPathAllowed,
   localFilesDisabledByEnv,
-  LocalFileError,
 } from '../src/tools/_local-files.js';
 import { configDir } from '../src/config-file.js';
 import { getTokenDir } from '../src/accounts.js';
 import { loadEnvFiles } from '../src/env-load.js';
+
+// The real path, not os.tmpdir(): on Windows tmpdir() can be an 8.3 short
+// name (RUNNER~1) while the guard returns the resolved long path.
+const TMP = fs.realpathSync.native(os.tmpdir());
 
 describe('openLocalReadStream', () => {
   const created: string[] = [];
@@ -20,7 +23,7 @@ describe('openLocalReadStream', () => {
   });
 
   function tmpDir(): string {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-lf-'));
+    const dir = fs.mkdtempSync(path.join(TMP, 'mcp-gm-lf-'));
     created.push(dir);
     return dir;
   }
@@ -114,7 +117,7 @@ describe('assertLocalPathAllowed', () => {
     for (const p of created.splice(0)) fs.rmSync(p, { recursive: true, force: true });
   });
   function tmpDir(): string {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-lf-assert-'));
+    const dir = fs.mkdtempSync(path.join(TMP, 'mcp-gm-lf-assert-'));
     created.push(dir);
     return dir;
   }
@@ -163,7 +166,7 @@ describe('prepareLocalDest overwrite protection', () => {
     for (const p of created.splice(0)) fs.rmSync(p, { recursive: true, force: true });
   });
   function tmpDir(): string {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-lf-dest-'));
+    const dir = fs.mkdtempSync(path.join(TMP, 'mcp-gm-lf-dest-'));
     created.push(dir);
     return dir;
   }
@@ -248,7 +251,7 @@ describe('assertLocalPathAllowed: additional denied sources (M3)', () => {
   });
 
   it('refuses a read inside DISCOVERY_CACHE_PATH, wherever an operator points it', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-disco-'));
+    const dir = fs.mkdtempSync(path.join(TMP, 'mcp-gm-disco-'));
     const prior = process.env.DISCOVERY_CACHE_PATH;
     process.env.DISCOVERY_CACHE_PATH = dir;
     try {
@@ -263,7 +266,7 @@ describe('assertLocalPathAllowed: additional denied sources (M3)', () => {
   });
 
   it('refuses a .env file this server actually loaded a secret from', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-envfile-'));
+    const dir = fs.mkdtempSync(path.join(TMP, 'mcp-gm-envfile-'));
     const envFile = path.join(dir, '.env');
     fs.writeFileSync(envFile, 'MCP_GM_TEST_PROBE_VAR=abc\n');
     try {
@@ -278,7 +281,7 @@ describe('assertLocalPathAllowed: additional denied sources (M3)', () => {
   });
 
   it('does not refuse an ordinary .env-named file the server never loaded', async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-envfile-other-'));
+    const dir = fs.mkdtempSync(path.join(TMP, 'mcp-gm-envfile-other-'));
     const other = path.join(dir, '.env');
     fs.writeFileSync(other, 'UNRELATED=1\n');
     try {

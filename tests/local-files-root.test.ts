@@ -12,6 +12,10 @@ import {
 } from '../src/tools/_local-files.js';
 import { configDir } from '../src/config-file.js';
 
+// The real path, not os.tmpdir(): on Windows tmpdir() can be an 8.3 short
+// name (RUNNER~1) while the guard returns the resolved long path.
+const TMP = fs.realpathSync.native(os.tmpdir());
+
 // GOOGLE_LOCAL_FILES_DIR: an allow-list root for every host-file read and
 // write. tests/setup.ts pins it to os.tmpdir() for the rest of the suite;
 // these tests override it locally to a narrow, disposable root so "outside
@@ -26,14 +30,14 @@ describe('GOOGLE_LOCAL_FILES_DIR allow-list root', () => {
   });
 
   function freshRoot(): string {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-root-'));
+    const dir = fs.mkdtempSync(path.join(TMP, 'mcp-gm-root-'));
     created.push(dir);
     process.env.GOOGLE_LOCAL_FILES_DIR = dir;
     return dir;
   }
 
   function outsideDir(): string {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-outside-'));
+    const dir = fs.mkdtempSync(path.join(TMP, 'mcp-gm-outside-'));
     created.push(dir);
     return dir;
   }
@@ -107,7 +111,7 @@ describe('GOOGLE_LOCAL_FILES_DIR allow-list root', () => {
   });
 
   it('ensureLocalFilesRoot creates the default root (mode 0700) when it does not exist yet', async () => {
-    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-fakehome-'));
+    const fakeHome = fs.mkdtempSync(path.join(TMP, 'mcp-gm-fakehome-'));
     created.push(fakeHome);
     delete process.env.GOOGLE_LOCAL_FILES_DIR;
     const root = ensureLocalFilesRoot(process.env, () => fakeHome);
@@ -122,7 +126,7 @@ describe('GOOGLE_LOCAL_FILES_DIR allow-list root', () => {
     // configDir() is itself under os.tmpdir() in tests (tests/setup.ts); a
     // root at os.tmpdir() is deliberately "too wide" the way the review
     // describes ($HOME would have the same property in production.
-    process.env.GOOGLE_LOCAL_FILES_DIR = os.tmpdir();
+    process.env.GOOGLE_LOCAL_FILES_DIR = TMP;
     const dir = configDir();
     fs.mkdirSync(dir, { recursive: true });
     const secret = path.join(dir, 'master.key');
@@ -138,7 +142,7 @@ describe('GOOGLE_LOCAL_FILES_DIR allow-list root', () => {
   // else so "outside the configured root" is real, the way it is in
   // production whenever an operator sets GOOGLE_LOCAL_FILES_DIR at all.
   it('openInternalReadStream (the server\'s own temp-file read) bypasses the root entirely and never creates it', async () => {
-    const unusedRoot = path.join(os.tmpdir(), `mcp-gm-unused-root-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    const unusedRoot = path.join(TMP, `mcp-gm-unused-root-${Date.now()}-${Math.random().toString(16).slice(2)}`);
     process.env.GOOGLE_LOCAL_FILES_DIR = unusedRoot;
     const outside = outsideDir();
     const tmp = path.join(outside, 'server-staged-file.bin');
@@ -152,7 +156,7 @@ describe('GOOGLE_LOCAL_FILES_DIR allow-list root', () => {
   });
 
   it('contrast: the guarded openLocalReadStream still refuses a caller-supplied path outside that same root', async () => {
-    const unusedRoot = path.join(os.tmpdir(), `mcp-gm-unused-root-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    const unusedRoot = path.join(TMP, `mcp-gm-unused-root-${Date.now()}-${Math.random().toString(16).slice(2)}`);
     process.env.GOOGLE_LOCAL_FILES_DIR = unusedRoot;
     const outside = outsideDir();
     const tmp = path.join(outside, 'caller-supplied.bin');
