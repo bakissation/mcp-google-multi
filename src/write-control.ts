@@ -112,8 +112,11 @@ const PRIVILEGED_SCOPE_RE =
   /\/auth\/(admin\.directory|admin\.datatransfer|cloud-identity|apps\.licensing|apps\.order|apps\.groups\.settings|apps\.groups\.migration|ediscovery|script\.projects|script\.deployments)/;
 
 /** Registering a push channel hands this account's activity to an external URL.
- * It is shaped like a create and behaves like an export, so the verb hides it. */
-const PUSH_REGISTRATION_RE = /(_watch|_subscriptions_create|_subscriptions_reactivate)$/;
+ * It is shaped like a create and behaves like an export, so the verb hides it.
+ * forms.forms.watches.create/renew generate as _watches_create/_watches_renew
+ * (plural "watches", unlike every other API's singular *.watch), so they
+ * need their own branch alongside the common _watch suffix. */
+const PUSH_REGISTRATION_RE = /(_watch|_watches_create|_watches_renew|_subscriptions_create|_subscriptions_reactivate)$/;
 
 export type PrivilegeKind = 'push_registration' | 'privileged_scope';
 
