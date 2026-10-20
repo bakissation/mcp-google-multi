@@ -3,10 +3,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ToolRegistry } from '../src/registry.js';
-import { nearestMethodIds, registerEscapeTools } from '../src/tools/google-api.js';
+import { nearestMethodIds, registerEscapeTools, escapeHatchNames } from '../src/tools/google-api.js';
 import { clearDiscoveryMemoryCache, searchMethods } from '../src/discovery-client.js';
 import { setHintProvider, type HintCase } from '../src/hint-provider.js';
-import type { Policy } from '../src/write-control.js';
+import { isAllowed, type Policy } from '../src/write-control.js';
+import { CURATED_METHOD_TOOLS, GENERATED_METHOD_TOOLS } from '../src/tools/generated/method-map.js';
 
 const FIXTURE = {
   baseUrl: 'https://gmail.googleapis.com/',
@@ -40,6 +41,73 @@ const FIXTURE = {
               parameters: { userId: { location: 'path', required: true, type: 'string' } },
             },
           },
+        },
+        drafts: {
+          methods: {
+            send: {
+              id: 'gmail.users.drafts.send',
+              httpMethod: 'POST',
+              path: 'gmail/v1/users/{userId}/drafts/send',
+              description: 'Sends an existing draft.',
+              parameters: { userId: { location: 'path', required: true, type: 'string' } },
+            },
+          },
+        },
+        settings: {
+          resources: {
+            filters: {
+              methods: {
+                create: {
+                  id: 'gmail.users.settings.filters.create',
+                  httpMethod: 'POST',
+                  path: 'gmail/v1/users/{userId}/settings/filters',
+                  description: 'Creates a filter.',
+                  parameters: { userId: { location: 'path', required: true, type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+// Only the two resources write-control parity cares about: a curated id whose
+// real tool name collapses under the old last-segment scheme (permissions
+// create/update), and a generated-only id with the same shape (drives.update).
+const DRIVE_FIXTURE = {
+  baseUrl: 'https://www.googleapis.com/',
+  resources: {
+    permissions: {
+      methods: {
+        create: {
+          id: 'drive.permissions.create',
+          httpMethod: 'POST',
+          path: 'drive/v3/files/{fileId}/permissions',
+          description: 'Creates a permission for a file.',
+          parameters: { fileId: { location: 'path', required: true, type: 'string' } },
+        },
+        update: {
+          id: 'drive.permissions.update',
+          httpMethod: 'PATCH',
+          path: 'drive/v3/files/{fileId}/permissions/{permissionId}',
+          description: 'Updates a permission.',
+          parameters: {
+            fileId: { location: 'path', required: true, type: 'string' },
+            permissionId: { location: 'path', required: true, type: 'string' },
+          },
+        },
+      },
+    },
+    drives: {
+      methods: {
+        update: {
+          id: 'drive.drives.update',
+          httpMethod: 'PUT',
+          path: 'drive/v3/drives/{driveId}',
+          description: 'Updates a shared drive.',
+          parameters: { driveId: { location: 'path', required: true, type: 'string' } },
         },
       },
     },
@@ -121,6 +189,7 @@ function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string> } = {}) {
         url.includes('/people/') ? PEOPLE_FIXTURE
         : url.includes('/slides/') ? POISONED_FIXTURE
         : url.includes('/searchconsole/') ? SEARCHCONSOLE_FIXTURE
+        : url.includes('/drive/') ? DRIVE_FIXTURE
         : FIXTURE,
     }),
     getClientFn: (async () => ({ request })) as never,
@@ -454,6 +523,123 @@ describe('google_api_call', () => {
       expect(payload.error).toBe('untrusted_host');
       expect(payload.hint).toBe('kind:untrusted_host');
       expect(seen).toEqual([{ kind: 'untrusted_host' }]);
+    });
+  });
+});
+
+// GHSA-8hxf-q445-9cjj / GHSA-9vg8-7mjp-68v5 (part B): write-control on the
+// escape hatch collapsed a method id to its last dot-segment, so a
+// resource-scoped method (drive.permissions.create, gmail.users.drafts.send,
+// gmail.users.settings.filters.create) lost its resource and evaluated as a
+// generic drive_create / gmail_send / gmail_create, unmatchable by a
+// resource-scoped GOOGLE_WRITE_DENY, and inconsistent with the deny the
+// corresponding named tool would have applied.
+describe('google_api_call write-control name resolution', () => {
+  const SAFE: Policy = { profile: 'safe-writes', readOnly: false, allow: [], deny: [] };
+
+  it('reporter repro: GOOGLE_WRITE_DENY="drive:permissions_*" now blocks drive.permissions.create', async () => {
+    const policy: Policy = { ...SAFE, deny: ['drive:permissions_*'] };
+    const { call, request, dir } = setup(policy);
+    cleanupDirs.push(dir);
+    const res = await call({
+      account: 'test',
+      api: 'drive',
+      methodId: 'drive.permissions.create',
+      pathParams: { fileId: 'f1' },
+      body: { role: 'reader', type: 'anyone' },
+    });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('write_disabled');
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('reporter repro: GOOGLE_WRITE_DENY="gmail:users_settings_*" now blocks gmail.users.settings.filters.create', async () => {
+    const policy: Policy = { ...SAFE, deny: ['gmail:users_settings_*'] };
+    const { call, request, dir } = setup(policy);
+    cleanupDirs.push(dir);
+    const res = await call({
+      account: 'test',
+      api: 'gmail',
+      methodId: 'gmail.users.settings.filters.create',
+      pathParams: { userId: 'me' },
+      body: { action: { forward: 'x@evil.example' } },
+    });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('write_disabled');
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('reporter repro (2B): an op-level deny written against the named tool ("gmail:send_draft") now applies to gmail.users.drafts.send', async () => {
+    const policy: Policy = { ...SAFE, deny: ['gmail:send_draft'] };
+    const { call, request, dir } = setup(policy);
+    cleanupDirs.push(dir);
+    const res = await call({ account: 'test', api: 'gmail', methodId: 'gmail.users.drafts.send', pathParams: { userId: 'me' }, body: { id: 'd1' } });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('write_disabled');
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('without a matching deny, the same resource-scoped methods still execute (not a blanket new refusal)', async () => {
+    const { call, request, dir } = setup(SAFE);
+    cleanupDirs.push(dir);
+    const res = await call({
+      account: 'test',
+      api: 'drive',
+      methodId: 'drive.permissions.create',
+      pathParams: { fileId: 'f1' },
+      body: { role: 'reader', type: 'user', emailAddress: 'a@corp.example' },
+    });
+    expect(res.isError).toBeUndefined();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('a coarse pre-fix deny ("drive:create") still blocks the escape hatch (backward compatible)', async () => {
+    const policy: Policy = { ...SAFE, deny: ['drive:create'] };
+    const { call, request, dir } = setup(policy);
+    cleanupDirs.push(dir);
+    const res = await call({
+      account: 'test',
+      api: 'drive',
+      methodId: 'drive.permissions.create',
+      pathParams: { fileId: 'f1' },
+      body: { role: 'reader', type: 'anyone' },
+    });
+    expect(res.isError).toBe(true);
+    expect(JSON.parse(res.content[0].text).error).toBe('write_disabled');
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  // Parity: for every method id this suite knows a real tool name for (the
+  // new curated map, plus a sample of generated ones), an op-level deny
+  // pattern written against that real name gives the SAME verdict through
+  // isAllowed directly (as the named tool would see) and through the escape
+  // hatch's full candidate-name loop.
+  describe('parity with the named-tool verdict', () => {
+    const cases: Array<{ methodId: string; realName: string; service: string; cud: 'create' | 'update' }> = [
+      { methodId: 'drive.permissions.create', realName: 'drive_share', service: 'drive', cud: 'create' },
+      { methodId: 'drive.permissions.update', realName: 'drive_permission_update', service: 'drive', cud: 'update' },
+      { methodId: 'drive.drives.update', realName: 'drive_drives_update', service: 'drive', cud: 'update' },
+      { methodId: 'gmail.users.drafts.send', realName: 'gmail_send_draft', service: 'gmail', cud: 'create' },
+      { methodId: 'gmail.users.settings.filters.create', realName: 'gmail_users_settings_filters_create', service: 'gmail', cud: 'create' },
+    ];
+
+    it('escapeHatchNames resolves the real tool name for every case', () => {
+      for (const c of cases) {
+        expect(CURATED_METHOD_TOOLS[c.methodId] ?? GENERATED_METHOD_TOOLS[c.methodId]).toBe(c.realName);
+        expect(escapeHatchNames(c.service, c.methodId)).toContain(c.realName);
+      }
+    });
+
+    it.each(cases)('$methodId: op-level deny on "$realName" denies identically via isAllowed and the escape-hatch loop', (c) => {
+      const op = c.realName.slice(c.realName.indexOf('_') + 1);
+      for (const deny of [[`${c.service}:${op}`], [`${c.service}:nope`], []]) {
+        const policy: Policy = { profile: 'safe-writes', readOnly: false, allow: [], deny };
+        const direct = isAllowed({ name: c.realName, service: c.service, cud: c.cud, scopes: [] }, policy);
+        const viaEscapeHatch = escapeHatchNames(c.service, c.methodId).every((name) =>
+          isAllowed({ name, service: c.service, cud: c.cud, scopes: [] }, policy),
+        );
+        expect(viaEscapeHatch).toBe(direct);
+      }
     });
   });
 });

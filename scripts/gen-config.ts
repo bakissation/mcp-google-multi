@@ -185,6 +185,22 @@ export const CURATED_METHOD_IDS: string[] = [
   'webmasters.sites.list',
 ];
 
+// Curated ids whose tool name write-control needs to resolve exactly (resource-
+// scoped methods where the curated tool name does not match the method's own
+// last segment, so the escape hatch's write-control check must be told the real
+// name). Not every curated id needs an entry: ids implemented by several curated
+// tools sharing one generic Discovery method (e.g. every sheets formatting tool
+// calling spreadsheets.batchUpdate) have no single "real name" to pick and stay
+// on the generic (service, cud) check instead; they carry no resource-specific
+// privilege the way Drive permissions or Gmail filters/forwarding/delegates do.
+export const CURATED_METHOD_TOOLS: Record<string, string> = {
+  'drive.permissions.create': 'drive_share',
+  'drive.permissions.update': 'drive_permission_update',
+  'drive.permissions.delete': 'drive_remove_permission',
+  'drive.permissions.list': 'drive_list_permissions',
+  'gmail.users.drafts.send': 'gmail_send_draft',
+};
+
 // 'opaque' forces the single coerceJson body even when flat; 'typed' lifts the
 // prop-count cap, but the generator still throws if the method has nested/$ref props.
 export const BODY_OVERRIDES: Record<string, 'typed' | 'opaque'> = {

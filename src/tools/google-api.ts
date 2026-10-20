@@ -18,6 +18,7 @@ import {
   MAX_SEARCH_QUERY,
 } from '../discovery-client.js';
 import { hints } from '../hint-provider.js';
+import { CURATED_METHOD_TOOLS, GENERATED_METHOD_TOOLS } from './generated/method-map.js';
 
 
 // Policy/toolset namespace for each API alias must match the NAMED tools' service
@@ -68,6 +69,41 @@ export function nearestMethodIds(methodId: string, index: DiscoveryMethod[]): st
     .sort((a, b) => a.d - b.d)
     .slice(0, 3)
     .map((x) => x.id);
+}
+
+// Mirrors scripts/gen-tools.ts's snakeCase: src/ and scripts/ are separate
+// compilation roots (see tsconfig.scripts.json), so the convention is
+// duplicated rather than imported. A drift between the two would only widen
+// the escape hatch's own full-path name, never narrow it: escapeHatchNames
+// below also carries the last-segment and real-tool names, so write-control
+// degrades gracefully, and the parity test below would catch a drift anyway.
+function snakeSegment(segment: string): string {
+  return segment.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+/**
+ * Every name write-control might reasonably know this operation by, most
+ * specific first:
+ *  1. the REAL tool name, when the Discovery method has a curated or
+ *     generated twin (so a deny pattern written against that tool's name,
+ *     e.g. "drive:share" or "gmail:send_draft", applies here too);
+ *  2. the full method-path name ("drive_permissions_create",
+ *     "gmail_users_settings_filters_create"), for methods an operator can
+ *     name precisely even when no tool implements them yet;
+ *  3. the old last-segment name ("drive_create", "gmail_create"), kept for
+ *     backward compatibility with configs written against the pre-fix shape.
+ * Deny-on-any-name wins (checked by the caller): adding names can only make
+ * the escape hatch stricter, never looser, than it was before this fix.
+ */
+export function escapeHatchNames(policyService: string, methodId: string): string[] {
+  const names = new Set<string>();
+  const realName = CURATED_METHOD_TOOLS[methodId] ?? GENERATED_METHOD_TOOLS[methodId];
+  if (realName) names.add(realName);
+  const tail = methodId.split('.').slice(1);
+  if (tail.length > 0) names.add(`${policyService}_${tail.map(snakeSegment).join('_')}`);
+  const lastSegment = methodId.split('.').pop() ?? methodId;
+  names.add(`${policyService}_${snakeSegment(lastSegment)}`);
+  return [...names];
 }
 
 function describeMethod(m: DiscoveryMethod) {
@@ -244,12 +280,21 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       registry.usageMetrics?.recordEscapeMethod(method.id);
       const cud = cudFromMethod(method);
       const policyService = serviceForAlias(apiKey);
-      const lastSegment = method.id.split('.').pop() ?? method.id;
       // The escape hatch self-gates, so it needs the same scope signal as the registry
       // wrapper, or a privileged method would slip past safe-writes here while its generated twin is refused.
-      const toolRef = { name: `${policyService}_${lastSegment}`, service: policyService, cud, scopes: method.scopes };
-      if (cud !== 'read' && !isAllowed(toolRef, policy)) {
-        return writeDisabledResult(toolRef, policy, account as string);
+      // Checked under every name the operation can have (real tool, full method
+      // path, legacy last-segment) because a method whose id ends in a generic
+      // verb, such as drive.permissions.create or gmail.users.settings.filters.create,
+      // would otherwise lose its resource and collapse onto a generic
+      // drive_create / gmail_create that neither the profile nor an operator's
+      // resource-scoped GOOGLE_WRITE_DENY can tell apart from an ordinary write.
+      if (cud !== 'read') {
+        for (const name of escapeHatchNames(policyService, method.id)) {
+          const toolRef = { name, service: policyService, cud, scopes: method.scopes };
+          if (!isAllowed(toolRef, policy)) {
+            return writeDisabledResult(toolRef, policy, account as string);
+          }
+        }
       }
 
       return executeApiMethod(

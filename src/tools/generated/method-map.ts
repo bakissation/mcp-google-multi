@@ -893,3 +893,13 @@ export const CURATED_METHOD_IDS: readonly string[] = [
   "webmasters.sites.get",
   "webmasters.sites.list",
 ];
+
+// Resource-scoped curated ids whose real tool name write-control needs (see
+// gen-config.ts for why not every curated id gets an entry).
+export const CURATED_METHOD_TOOLS: Record<string, string> = {
+  "drive.permissions.create": "drive_share",
+  "drive.permissions.delete": "drive_remove_permission",
+  "drive.permissions.list": "drive_list_permissions",
+  "drive.permissions.update": "drive_permission_update",
+  "gmail.users.drafts.send": "gmail_send_draft",
+};

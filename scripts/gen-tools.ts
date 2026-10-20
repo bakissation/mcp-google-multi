@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { buildMethodIndex, cudFromMethod, type DiscoveryMethod, type DiscoveryParam } from '../src/discovery-client.js';
 import type { Cud } from '../src/registry.js';
-import { BODY_OVERRIDES, CURATED_METHOD_IDS, CUD_OVERRIDES, DESCRIPTION_OVERRIDES, GEN_APIS, NAME_OVERRIDES, type GenApi } from './gen-config.js';
+import { BODY_OVERRIDES, CURATED_METHOD_IDS, CURATED_METHOD_TOOLS, CUD_OVERRIDES, DESCRIPTION_OVERRIDES, GEN_APIS, NAME_OVERRIDES, type GenApi } from './gen-config.js';
 
 // npm run gen:tools [service ...] — emits deterministic src/tools/generated/<service>.ts from the discovery/ snapshot; never hand-edit output.
 
@@ -389,6 +389,14 @@ export function emitMethodMap(pairs: [string, string][]): string {
     'export const CURATED_METHOD_IDS: readonly string[] = [',
     ...CURATED_METHOD_IDS.map((id) => `  ${JSON.stringify(id)},`),
     '];',
+    '',
+    // Resource-scoped curated ids whose real tool name write-control needs (see
+    // gen-config.ts for why not every curated id gets an entry).
+    'export const CURATED_METHOD_TOOLS: Record<string, string> = {',
+    ...Object.entries(CURATED_METHOD_TOOLS)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([id, name]) => `  ${JSON.stringify(id)}: ${JSON.stringify(name)},`),
+    '};',
     '',
   ].join('\n');
 }
