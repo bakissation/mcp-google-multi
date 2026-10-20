@@ -896,6 +896,29 @@ describe('google_api_call write-control name resolution', () => {
       expect(collisions, collisions.join('\n')).toEqual([]);
     });
 
+    // Same sweep, the GENERATED-name branch: no escape-hatch allow name
+    // may be the generated tool name GENERATED_METHOD_TOOLS assigns to a
+    // DIFFERENT method id either (allCuratedNames and allGeneratedNames
+    // are two separate collections in the fix; a regression could drop
+    // or break either one independently of the other). No such collision
+    // actually exists in the current generated surface (gencol.ts-style
+    // sweep: 0), so this sweep stays green on its own; it exists to catch
+    // one appearing in a future Discovery update.
+    it('M3: no escape-hatch allow name is a real generated tool name of some OTHER method', () => {
+      const generatedOwner = new Map(Object.entries(GENERATED_METHOD_TOOLS).map(([id, name]) => [name, id]));
+      const ids = new Set([...Object.keys(CURATED_METHOD_TOOLS), ...Object.keys(GENERATED_METHOD_TOOLS)]);
+      const collisions: string[] = [];
+      for (const id of ids) {
+        const service = id.split('.')[0];
+        const names = escapeHatchNames(service, id);
+        for (const name of names.allow) {
+          const genOwnerId = generatedOwner.get(name);
+          if (genOwnerId && genOwnerId !== id) collisions.push(`${id} -> allow also via generated ${name} (owned by ${genOwnerId})`);
+        }
+      }
+      expect(collisions, collisions.join('\n')).toEqual([]);
+    });
+
     // A clean (non-cud-ambiguous) instance of M3, verified end to end
     // through isAllowedByAnyName, not just the name-level sweep above:
     // "trash" is not a CUD value, so GOOGLE_WRITE_ALLOW="gmail:trash" only
