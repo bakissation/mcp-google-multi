@@ -5,19 +5,29 @@
 // into `npm run gen:tools` (a curated tool's own registration is read by a
 // person before it ships; this is the check that the hand-maintained map
 // still agrees with what curated tools actually call, not a build step).
+// Run it in CI as a drift check too (fail if the generated map differs
+// from what is committed), since a curated tool that starts calling a new
+// Discovery method would otherwise silently drift the map it feeds.
 //
 // Run: npx tsx scripts/extract-curated-method-map.ts
 //
 // Method: for each server.registerTool(...) / registerHostFileTool(...)
-// call in a curated tools file, find every local `const x = fooClient({...})`
-// binding inside that handler (the googleapis client instance), then every
-// call of the shape `x.a.b(...)` (two or more property accesses) on that
-// binding. The (client-factory prefix).a.b path is then resolved to the
-// real Discovery method id by matching its own method-path suffix against
-// CURATED_METHOD_IDS, since a client factory's own prefix does not always
-// equal the Discovery doc's id prefix (e.g. the admin.ts curated tools
-// share one `adminClient` factory across the directory/reports/datatransfer
-// sub-APIs, whose Discovery ids use their own prefixes).
+// call in a curated tools file, find every local client binding reachable
+// from that handler: a `const x = fooClient({...})` call, OR a function
+// parameter typed as a known googleapis client class (e.g.
+// `sourceDrive: drive_v3.Drive`), which is how a curated tool's own helper
+// functions (shareAndCopy, downloadAndUpload in drive.ts) receive their
+// client instead of calling the factory directly. When the handler (or a
+// helper it calls) invokes a LOCALLY DEFINED function by name, that
+// function's own body is walked too (with its own bindings), recursively,
+// so a call several helper functions deep still attributes back to the
+// curated tool that started the chain. Every call of the shape `x.a.b(...)`
+// (two or more property accesses) on a resolved binding is then resolved
+// to the real Discovery method id by matching its own method-path suffix
+// against CURATED_METHOD_IDS, since a client factory's own prefix does not
+// always equal the Discovery doc's id prefix (e.g. the admin.ts curated
+// tools share one `adminClient` factory across the directory/reports/
+// datatransfer sub-APIs, whose Discovery ids use their own prefixes).
 import ts from 'typescript';
 import fs from 'node:fs';
 import { CURATED_METHOD_IDS } from './gen-config.js';
@@ -41,6 +51,27 @@ const FACTORY_TO_PREFIX: Record<string, string> = {
   adminClient: 'admin',
 };
 
+// googleapis client TYPE names (drive_v3.Drive, gmail_v1.Gmail, ...) are
+// conventionally the capitalized service name; this maps the lowercased
+// class name to the same prefix a factory-call binding would resolve to,
+// for a parameter typed that way instead of initialized from a factory call.
+const TYPE_CLASS_TO_PREFIX: Record<string, string> = {
+  drive: 'drive',
+  gmail: 'gmail',
+  calendar: 'calendar',
+  sheets: 'sheets',
+  docs: 'docs',
+  slides: 'slides',
+  forms: 'forms',
+  people: 'people',
+  chat: 'chat',
+  meet: 'meet',
+  searchconsole: 'searchconsole',
+  webmasters: 'webmasters',
+  tasks: 'tasks',
+  admin: 'admin',
+};
+
 const CURATED_FILES = [
   'drive', 'gmail', 'calendar', 'sheets', 'docs', 'slides', 'forms',
   'contacts', 'chat', 'meet', 'searchconsole', 'tasks', 'analytics', 'admin',
@@ -57,6 +88,15 @@ function factoryPrefixOf(node: ts.Node): string | undefined {
   return ts.isIdentifier(callee) ? FACTORY_TO_PREFIX[callee.text] : undefined;
 }
 
+// The rightmost identifier of a type reference, e.g. "Drive" from
+// `drive_v3.Drive` (a QualifiedName) or plain `Drive`.
+function typePrefixOf(typeNode: ts.TypeNode | undefined): string | undefined {
+  if (!typeNode || !ts.isTypeReferenceNode(typeNode)) return undefined;
+  let name: ts.EntityName = typeNode.typeName;
+  while (ts.isQualifiedName(name)) name = name.right;
+  return TYPE_CLASS_TO_PREFIX[name.text.toLowerCase()];
+}
+
 function isRegisterCall(node: ts.Node): node is ts.CallExpression {
   if (!ts.isCallExpression(node)) return false;
   const expr = node.expression;
@@ -71,37 +111,75 @@ function extractFromFile(file: string): RawCall[] {
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const out: RawCall[] = [];
 
+  // Top-level `async function helper(...) { ... }` declarations in this
+  // file, so a call to one from a handler (or from another helper) can be
+  // followed into its own body.
+  const topLevelFns = new Map<string, ts.FunctionDeclaration>();
+  for (const stmt of sf.statements) {
+    if (ts.isFunctionDeclaration(stmt) && stmt.name && stmt.body) {
+      topLevelFns.set(stmt.name.text, stmt);
+    }
+  }
+
+  function bindingsOf(fnLike: ts.FunctionLikeDeclarationBase | ts.FunctionDeclaration): Record<string, string> {
+    const bindings: Record<string, string> = {};
+    for (const p of fnLike.parameters) {
+      if (ts.isIdentifier(p.name)) {
+        const prefix = typePrefixOf(p.type);
+        if (prefix) bindings[p.name.text] = prefix;
+      }
+    }
+    const body = (fnLike as { body?: ts.Node }).body;
+    if (body) {
+      const collect = (n: ts.Node) => {
+        if (ts.isVariableDeclaration(n) && n.initializer && ts.isIdentifier(n.name)) {
+          const prefix = factoryPrefixOf(n.initializer);
+          if (prefix) bindings[n.name.text] = prefix;
+        }
+        ts.forEachChild(n, collect);
+      };
+      collect(body);
+    }
+    return bindings;
+  }
+
+  function walkBodyForCalls(body: ts.Node, bindings: Record<string, string>, tool: string, visiting: Set<string>) {
+    const visit = (n: ts.Node) => {
+      if (ts.isCallExpression(n)) {
+        const parts: string[] = [];
+        let cur: ts.Expression = n.expression;
+        while (ts.isPropertyAccessExpression(cur)) {
+          parts.unshift(cur.name.text);
+          cur = cur.expression;
+        }
+        if (ts.isIdentifier(cur)) {
+          if (bindings[cur.text] && parts.length >= 2) {
+            out.push({ tool, methodPath: `${bindings[cur.text]}.${parts.join('.')}` });
+          } else if (parts.length === 0 && topLevelFns.has(cur.text) && !visiting.has(cur.text)) {
+            // A call to a locally-defined helper (shareAndCopy,
+            // downloadAndUpload, ...): follow it with ITS OWN bindings
+            // (its typed parameters, its own local factory calls), still
+            // attributing whatever it calls back to this curated tool.
+            const helper = topLevelFns.get(cur.text)!;
+            const nextVisiting = new Set(visiting);
+            nextVisiting.add(cur.text);
+            walkBodyForCalls(helper.body!, bindingsOf(helper), tool, nextVisiting);
+          }
+        }
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(body);
+  }
+
   function walkForRegisterCalls(node: ts.Node) {
     if (isRegisterCall(node)) {
       const call = node as ts.CallExpression;
       const [nameArg, , handler] = call.arguments;
-      if (nameArg && ts.isStringLiteral(nameArg) && handler) {
+      if (nameArg && ts.isStringLiteral(nameArg) && handler && 'body' in handler && (handler as ts.FunctionLikeDeclarationBase).body) {
         const toolName = nameArg.text;
-        const localBindings: Record<string, string> = {};
-        const collectBindings = (n: ts.Node) => {
-          if (ts.isVariableDeclaration(n) && n.initializer && ts.isIdentifier(n.name)) {
-            const prefix = factoryPrefixOf(n.initializer);
-            if (prefix) localBindings[n.name.text] = prefix;
-          }
-          ts.forEachChild(n, collectBindings);
-        };
-        collectBindings(handler);
-
-        const collectMethodCalls = (n: ts.Node) => {
-          if (ts.isCallExpression(n)) {
-            const parts: string[] = [];
-            let cur: ts.Expression = n.expression;
-            while (ts.isPropertyAccessExpression(cur)) {
-              parts.unshift(cur.name.text);
-              cur = cur.expression;
-            }
-            if (ts.isIdentifier(cur) && localBindings[cur.text] && parts.length >= 2) {
-              out.push({ tool: toolName, methodPath: `${localBindings[cur.text]}.${parts.join('.')}` });
-            }
-          }
-          ts.forEachChild(n, collectMethodCalls);
-        };
-        collectMethodCalls(handler);
+        const fnLike = handler as unknown as ts.FunctionLikeDeclarationBase;
+        walkBodyForCalls(fnLike.body!, bindingsOf(fnLike), toolName, new Set());
       }
     }
     ts.forEachChild(node, walkForRegisterCalls);
