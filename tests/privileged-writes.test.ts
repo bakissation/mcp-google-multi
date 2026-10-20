@@ -13,6 +13,13 @@ const RUN_SCRIPT = { name: 'script_scripts_run', service: 'script', cud: 'create
 const GMAIL_WATCH = { name: 'gmail_users_watch', service: 'gmail', cud: 'create' as const, scopes: [S('gmail.modify')] };
 const GMAIL_SEND = { name: 'gmail_send', service: 'gmail', cud: 'create' as const, scopes: [S('gmail.send')] };
 const SHEETS_WRITE = { name: 'sheets_write_range', service: 'sheets', cud: 'update' as const, scopes: [S('spreadsheets')] };
+// forms.forms.watches.create/renew generate as _watches_create/_watches_renew
+// (plural "watches"), unlike every other API's singular *.watch -> _watch.
+const FORMS_WATCHES_CREATE = { name: 'forms_forms_watches_create', service: 'forms', cud: 'create' as const, scopes: [S('forms.body')] };
+const FORMS_WATCHES_RENEW = { name: 'forms_forms_watches_renew', service: 'forms', cud: 'update' as const, scopes: [S('forms.body')] };
+// .delete only cancels an existing registration (no new external URL
+// gains anything); it is not, and should not be, flagged.
+const FORMS_WATCHES_DELETE = { name: 'forms_forms_watches_delete', service: 'forms', cud: 'delete' as const, scopes: [S('forms.body')] };
 
 describe('safe-writes refuses privileged writes whatever the verb', () => {
   it('blocks an org-wide update that looks like an ordinary update', () => {
@@ -30,6 +37,40 @@ describe('safe-writes refuses privileged writes whatever the verb', () => {
   it('blocks push registration, which no scope marks as privileged', () => {
     expect(isAllowed(GMAIL_WATCH, safe())).toBe(false);
     expect(privilegeOf(GMAIL_WATCH)).toBe('push_registration');
+  });
+
+  // LOW (item 12): forms' plural "watches" resource generates a different
+  // name shape than every other API's *.watch, so it needs its own branch
+  // in PUSH_REGISTRATION_RE alongside the common _watch suffix.
+  it('blocks forms_forms_watches_create and _renew too, despite the non-standard name shape', () => {
+    expect(isAllowed(FORMS_WATCHES_CREATE, safe())).toBe(false);
+    expect(privilegeOf(FORMS_WATCHES_CREATE)).toBe('push_registration');
+    expect(isAllowed(FORMS_WATCHES_RENEW, safe())).toBe(false);
+    expect(privilegeOf(FORMS_WATCHES_RENEW)).toBe('push_registration');
+  });
+
+  // ROUND 6: forms_forms_watches_create is a GENERATED tool, so in the real
+  // registry it never reaches isAllowed() at all any more (it is the escape
+  // hatch now: see tests/google-api.test.ts and tests/safe-writes-trash.test.ts
+  // for its deny/ask behavior; there is no dedicated _escape-hatch.test.ts,
+  // src/tools/_escape-hatch.ts is covered through those two plus
+  // tests/outbound-allowlist.test.ts and tests/privileged-writes.test.ts
+  // itself). isAllowed() itself is back to its plain pre-round-5 form; this
+  // push-registration-vs-allow-glob interaction is no longer something
+  // isAllowed() is responsible for.
+
+  it('an ordinary create tool (not a push registration) is unaffected: forms:create still allows it', () => {
+    const ordinary = { name: 'forms_create', service: 'forms', cud: 'create' as const, scopes: [S('forms.body')] };
+    expect(privilegeOf(ordinary)).toBeUndefined();
+    expect(isAllowed(ordinary, safe({ allow: ['forms:create'] }))).toBe(true);
+  });
+
+  it('does not flag forms_forms_watches_delete as a push registration: cancelling one grants nothing', () => {
+    // Unrelated to this: safe-writes refuses deletes generically, so this
+    // is not expected to be allowed either; only that it is refused as an
+    // ordinary delete, not specifically as a privileged push registration.
+    expect(privilegeOf(FORMS_WATCHES_DELETE)).toBeUndefined();
+    expect(denyReason(FORMS_WATCHES_DELETE, safe())?.rule).not.toBe('privileged');
   });
 
   it('still permits ordinary user-data writes', () => {

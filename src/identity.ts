@@ -46,8 +46,10 @@ export function buildIdentityContext(
     get accounts() {
       return getAccountSet();
     },
-    // The dispatch transport rides into the resolved policy as a reserved seam;
-    // it does not change any write-control verdict.
+    // The dispatch transport rides into the resolved policy: it never changes
+    // isAllowed's verdict or the profile, but over HTTP it does turn an
+    // escape-hatch "ask" into a refusal (see Policy.transport in
+    // write-control.ts and docs/internals.md).
     policy: resolvePolicy(env, { transport: opts.transport }),
     getClient: makeGetClient('owner', {
       accounts: getAccountSet,
