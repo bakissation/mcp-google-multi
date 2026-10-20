@@ -115,10 +115,12 @@ function decodeGmailRaw(raw: string): Record<string, string> | null {
   const headers: Record<string, string> = {};
   let current: string | null = null;
   for (const line of headerBlock.split(/\r?\n/)) {
-    const m = /^([A-Za-z-]+):\s*(.*)$/.exec(line);
+    // Space before the colon is legal older RFC syntax, and a repeated header
+    // must append: overwriting would hide one recipient from the confirmation.
+    const m = /^([A-Za-z-]+)[ \t]*:\s*(.*)$/.exec(line);
     if (m && WANTED_HEADERS.includes(m[1].toLowerCase())) {
       current = m[1].toLowerCase();
-      headers[current] = m[2];
+      headers[current] = headers[current] ? `${headers[current]}, ${m[2]}` : m[2];
     } else if (current && /^[ \t]/.test(line)) {
       headers[current] += ` ${line.trim()}`;
     } else {

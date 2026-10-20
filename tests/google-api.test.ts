@@ -1187,6 +1187,17 @@ describe('escape hatch: round 7 prompt integrity', () => {
     expect(prompt).toContain('subject: hi');
   });
 
+  it('HIGH 2: repeated or space-before-colon recipient headers in Gmail raw all reach Destinations', async () => {
+    const { call, dir, elicitInput } = setup(SAFE, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    const raw = Buffer.from('To: attacker@evil.example\r\nTo: boss@corp.example\r\nBcc : hidden@evil.example\r\nSubject: hi\r\n\r\nbody').toString('base64url');
+    await call({ account: 'test', api: 'gmail', methodId: 'gmail.users.messages.send', pathParams: { userId: 'me' }, body: { raw } });
+    const prompt = (elicitInput.mock.calls[0][0] as { message: string }).message;
+    expect(prompt).toContain('attacker@evil.example');
+    expect(prompt).toContain('boss@corp.example');
+    expect(prompt).toContain('hidden@evil.example');
+  });
+
   it('HIGH 2: a raw field that does not decode to a real MIME message refuses outright, never asking', async () => {
     const { call, dir, elicitInput, request } = setup(SAFE, { elicit: 'accept' });
     cleanupDirs.push(dir);
