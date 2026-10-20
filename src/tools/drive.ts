@@ -502,7 +502,14 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         // pipeline destroys both streams on source/sink error; raw .pipe leaks the
         // partial file. wx: prepareLocalDest already checked existence, this is
         // the belt-and-suspenders race guard, never silently clobber.
-        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600, flags: 'wx' }));
+        try {
+          await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600, flags: 'wx' }));
+        } catch (err) {
+          // A failed download must not leave a partial file behind blocking
+          // a retry with local_path_exists; best-effort, original error wins.
+          await fs.promises.unlink(dest).catch(() => {});
+          throw err;
+        }
 
         const { size } = fs.statSync(dest);
         return {
@@ -547,7 +554,14 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         // pipeline destroys both streams on source/sink error; raw .pipe leaks the
         // partial file. wx: prepareLocalDest already checked existence, this is
         // the belt-and-suspenders race guard, never silently clobber.
-        await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600, flags: 'wx' }));
+        try {
+          await pipeline(res.data as NodeJS.ReadableStream, fs.createWriteStream(dest, { mode: 0o600, flags: 'wx' }));
+        } catch (err) {
+          // A failed download must not leave a partial file behind blocking
+          // a retry with local_path_exists; best-effort, original error wins.
+          await fs.promises.unlink(dest).catch(() => {});
+          throw err;
+        }
 
         const { size } = fs.statSync(dest);
         return {

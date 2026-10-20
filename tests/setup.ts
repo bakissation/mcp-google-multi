@@ -25,3 +25,9 @@ process.env.GOOGLE_TRIM = '';
 // ToolRegistry also reads GOOGLE_DISCOVERY at construction — pin to the lazy
 // default so an ambient mode in a dev shell can't redden visibility tests.
 process.env.GOOGLE_DISCOVERY = '';
+// GOOGLE_LOCAL_FILES_DIR confines every host-file read/write to a root.
+// Existing tests build their fixture files under os.tmpdir() (the universal
+// convention across this suite); pin the root to tmpdir itself so those
+// paths stay inside it without every test needing to know about the root.
+// Tests of the root/default itself override this locally.
+process.env.GOOGLE_LOCAL_FILES_DIR = tmpdir();

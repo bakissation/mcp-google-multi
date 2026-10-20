@@ -1,0 +1,131 @@
+import { describe, it, expect, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import {
+  assertLocalPathAllowed,
+  localFilesRoot,
+  ensureLocalFilesRoot,
+  openLocalReadStream,
+  prepareLocalDest,
+} from '../src/tools/_local-files.js';
+import { configDir } from '../src/config-file.js';
+
+// GOOGLE_LOCAL_FILES_DIR: an allow-list root for every host-file read and
+// write. tests/setup.ts pins it to os.tmpdir() for the rest of the suite;
+// these tests override it locally to a narrow, disposable root so "outside
+// the root" has somewhere real to point to.
+describe('GOOGLE_LOCAL_FILES_DIR allow-list root', () => {
+  const created: string[] = [];
+  const priorRoot = process.env.GOOGLE_LOCAL_FILES_DIR;
+  afterEach(() => {
+    if (priorRoot === undefined) delete process.env.GOOGLE_LOCAL_FILES_DIR;
+    else process.env.GOOGLE_LOCAL_FILES_DIR = priorRoot;
+    for (const p of created.splice(0)) fs.rmSync(p, { recursive: true, force: true });
+  });
+
+  function freshRoot(): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-root-'));
+    created.push(dir);
+    process.env.GOOGLE_LOCAL_FILES_DIR = dir;
+    return dir;
+  }
+
+  function outsideDir(): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-outside-'));
+    created.push(dir);
+    return dir;
+  }
+
+  it('a read path outside the root is refused', async () => {
+    freshRoot();
+    const outside = outsideDir();
+    const secret = path.join(outside, 'not-yours.txt');
+    fs.writeFileSync(secret, 'x');
+    await expect(assertLocalPathAllowed(secret, 'read')).rejects.toMatchObject({ reason: 'forbidden' });
+  });
+
+  it('a write path outside the root is refused, even when none of it exists yet', async () => {
+    freshRoot();
+    const outside = outsideDir();
+    const target = path.join(outside, 'a', 'b', 'new.bin');
+    await expect(assertLocalPathAllowed(target, 'write')).rejects.toMatchObject({ reason: 'forbidden' });
+  });
+
+  it('drive_upload-style read and gmail-attachment-style read both honour the root (via openLocalReadStream)', async () => {
+    freshRoot();
+    const outside = outsideDir();
+    const secret = path.join(outside, 'exfil.bin');
+    fs.writeFileSync(secret, 'x');
+    await expect(openLocalReadStream(secret)).rejects.toMatchObject({ reason: 'forbidden' });
+  });
+
+  it('drive_download-style write both honours the root (via prepareLocalDest)', async () => {
+    freshRoot();
+    const outside = outsideDir();
+    await expect(prepareLocalDest(outside, 'report.pdf')).rejects.toMatchObject({ reason: 'forbidden' });
+  });
+
+  it.skipIf(process.platform === 'win32')('a symlink inside the root pointing outside it is refused (realpath before the containment check)', async () => {
+    const root = freshRoot();
+    const outside = outsideDir();
+    const secret = path.join(outside, 'secret.txt');
+    fs.writeFileSync(secret, 'x');
+    const link = path.join(root, 'looks-local.txt');
+    fs.symlinkSync(secret, link);
+    await expect(assertLocalPathAllowed(link, 'read')).rejects.toMatchObject({ reason: 'forbidden' });
+  });
+
+  it.skipIf(process.platform === 'win32')('a symlinked ancestor directory inside the root pointing outside it is refused for a write target', async () => {
+    const root = freshRoot();
+    const outside = outsideDir();
+    const link = path.join(root, 'alias');
+    fs.symlinkSync(outside, link);
+    const target = path.join(link, 'subdir', 'new.bin');
+    await expect(assertLocalPathAllowed(target, 'write')).rejects.toMatchObject({ reason: 'forbidden' });
+  });
+
+  it('a relative path resolves inside the configured root', async () => {
+    const root = freshRoot();
+    fs.writeFileSync(path.join(root, 'rel.txt'), 'hi');
+    const real = await assertLocalPathAllowed('rel.txt', 'read');
+    expect(real).toBe(path.join(root, 'rel.txt'));
+  });
+
+  it('an absolute path inside the root is allowed', async () => {
+    const root = freshRoot();
+    const inside = path.join(root, 'ok.txt');
+    fs.writeFileSync(inside, 'hi');
+    await expect(assertLocalPathAllowed(inside, 'read')).resolves.toBe(inside);
+  });
+
+  it('the default root (unset GOOGLE_LOCAL_FILES_DIR) is <home>/Downloads/mcp-google-multi', () => {
+    delete process.env.GOOGLE_LOCAL_FILES_DIR;
+    const fakeHome = () => '/fake/home';
+    expect(localFilesRoot(process.env, fakeHome)).toBe(path.join('/fake/home', 'Downloads', 'mcp-google-multi'));
+  });
+
+  it('ensureLocalFilesRoot creates the default root (mode 0700) when it does not exist yet', async () => {
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-fakehome-'));
+    created.push(fakeHome);
+    delete process.env.GOOGLE_LOCAL_FILES_DIR;
+    const root = ensureLocalFilesRoot(process.env, () => fakeHome);
+    expect(root).toBe(path.join(fakeHome, 'Downloads', 'mcp-google-multi'));
+    expect(fs.existsSync(root)).toBe(true);
+    if (process.platform !== 'win32') {
+      expect(fs.statSync(root).mode & 0o777).toBe(0o700);
+    }
+  });
+
+  it('a root wide enough to contain the config dir still refuses the config dir (defense in depth)', async () => {
+    // configDir() is itself under os.tmpdir() in tests (tests/setup.ts); a
+    // root at os.tmpdir() is deliberately "too wide" the way the review
+    // describes ($HOME would have the same property in production.
+    process.env.GOOGLE_LOCAL_FILES_DIR = os.tmpdir();
+    const dir = configDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const secret = path.join(dir, 'master.key');
+    fs.writeFileSync(secret, 'SECRETKEY');
+    await expect(assertLocalPathAllowed(secret, 'read')).rejects.toMatchObject({ reason: 'forbidden' });
+  });
+});

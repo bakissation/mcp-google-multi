@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -11,6 +11,7 @@ import {
 } from '../src/tools/_local-files.js';
 import { configDir } from '../src/config-file.js';
 import { getTokenDir } from '../src/accounts.js';
+import { loadEnvFiles } from '../src/env-load.js';
 
 describe('openLocalReadStream', () => {
   const created: string[] = [];
@@ -89,8 +90,21 @@ describe('openLocalReadStream', () => {
     await expect(openLocalReadStream(link)).rejects.toMatchObject({ reason: 'forbidden' });
   });
 
-  it('rejects a relative path outright', async () => {
-    await expect(openLocalReadStream('relative/file.txt')).rejects.toMatchObject({ reason: 'not_absolute' });
+  // GOOGLE_LOCAL_FILES_DIR confines paths to a root; a relative path now
+  // resolves inside that root (pinned to os.tmpdir() for tests) rather than
+  // being rejected for not being absolute.
+  it('a relative path resolves inside the configured root, not process.cwd()', async () => {
+    const dir = tmpDir();
+    const name = path.basename(dir) + path.sep + 'payload.txt';
+    fs.writeFileSync(path.join(dir, 'payload.txt'), 'hello relative');
+    const stream = await openLocalReadStream(name);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(chunk as Buffer);
+    expect(Buffer.concat(chunks).toString()).toBe('hello relative');
+  });
+
+  it('a relative path to a missing file still rejects with ENOENT, not a security refusal', async () => {
+    await expect(openLocalReadStream('relative/does-not-exist.txt')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 });
 
@@ -105,9 +119,12 @@ describe('assertLocalPathAllowed', () => {
     return dir;
   }
 
-  it('rejects a relative path for both read and write', async () => {
-    await expect(assertLocalPathAllowed('rel/path.txt', 'read')).rejects.toMatchObject({ reason: 'not_absolute' });
-    await expect(assertLocalPathAllowed('rel/path.txt', 'write')).rejects.toMatchObject({ reason: 'not_absolute' });
+  it('a relative path resolves inside the configured root for both read and write', async () => {
+    const dir = tmpDir();
+    const leaf = path.basename(dir);
+    fs.writeFileSync(path.join(dir, 'exists.txt'), 'x');
+    await expect(assertLocalPathAllowed(`${leaf}/exists.txt`, 'read')).resolves.toBe(path.join(dir, 'exists.txt'));
+    await expect(assertLocalPathAllowed(`${leaf}/new-file.txt`, 'write')).resolves.toBe(path.join(dir, 'new-file.txt'));
   });
 
   it('a write target resolves even when none of its directories exist yet', async () => {
@@ -177,11 +194,95 @@ describe('prepareLocalDest overwrite protection', () => {
   });
 });
 
-describe('localFilesDisabledByEnv (GOOGLE_LOCAL_FILES=off)', () => {
-  it('is only true for the literal value "off"', () => {
+// M4: same off|0|false|no / on|1|true|yes switch parsing as GOOGLE_USAGE_METRICS,
+// case-insensitive, with a stderr warning (not a silent fallback) on an
+// unrecognised non-empty value.
+describe('localFilesDisabledByEnv (GOOGLE_LOCAL_FILES switch parsing)', () => {
+  it('unset or empty leaves host files enabled', () => {
     expect(localFilesDisabledByEnv({})).toBe(false);
-    expect(localFilesDisabledByEnv({ GOOGLE_LOCAL_FILES: 'true' })).toBe(false);
-    expect(localFilesDisabledByEnv({ GOOGLE_LOCAL_FILES: 'Off' })).toBe(false);
-    expect(localFilesDisabledByEnv({ GOOGLE_LOCAL_FILES: 'off' })).toBe(true);
+    expect(localFilesDisabledByEnv({ GOOGLE_LOCAL_FILES: '' })).toBe(false);
+    expect(localFilesDisabledByEnv({ GOOGLE_LOCAL_FILES: '  ' })).toBe(false);
+  });
+
+  it('every off-synonym disables, case-insensitively', () => {
+    for (const v of ['off', 'Off', 'OFF', '0', 'false', 'FALSE', 'no', 'No']) {
+      expect(localFilesDisabledByEnv({ GOOGLE_LOCAL_FILES: v }), v).toBe(true);
+    }
+  });
+
+  it('every on-synonym explicitly re-enables, case-insensitively', () => {
+    for (const v of ['on', 'On', '1', 'true', 'TRUE', 'yes', 'Yes']) {
+      expect(localFilesDisabledByEnv({ GOOGLE_LOCAL_FILES: v }), v).toBe(false);
+    }
+  });
+
+  it('an unrecognised value warns to stderr and leaves host files enabled (the default)', () => {
+    const spy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      expect(localFilesDisabledByEnv({ GOOGLE_LOCAL_FILES: 'maybe' })).toBe(false);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][0]).toContain('GOOGLE_LOCAL_FILES="maybe"');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+// M3: the guard also refuses /proc (/proc/self/environ holds the same
+// secrets a .env file does, on any Linux host), the .env files this server
+// actually loaded a secret from (wherever they live, not just the config
+// dir), and DISCOVERY_CACHE_PATH (an operator can point it anywhere).
+describe('assertLocalPathAllowed: additional denied sources (M3)', () => {
+  it.skipIf(process.platform !== 'linux')('refuses a read of /proc/self/environ', async () => {
+    await expect(openLocalReadStream('/proc/self/environ')).rejects.toMatchObject({ reason: 'forbidden' });
+  });
+
+  it.skipIf(process.platform !== 'linux')('refuses any path under /proc, not just environ', async () => {
+    // /proc/self/status is a real file under /proc, unlike /proc/self/cwd
+    // (a symlink that realpath legitimately resolves to a normal directory
+    // elsewhere, so it is not itself a sensitive /proc path once resolved).
+    await expect(assertLocalPathAllowed('/proc/self/status', 'read')).rejects.toMatchObject({ reason: 'forbidden' });
+  });
+
+  it('refuses a read inside DISCOVERY_CACHE_PATH, wherever an operator points it', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-disco-'));
+    const prior = process.env.DISCOVERY_CACHE_PATH;
+    process.env.DISCOVERY_CACHE_PATH = dir;
+    try {
+      const cached = path.join(dir, 'drive-v3.json');
+      fs.writeFileSync(cached, '{}');
+      await expect(openLocalReadStream(cached)).rejects.toMatchObject({ reason: 'forbidden' });
+    } finally {
+      if (prior === undefined) delete process.env.DISCOVERY_CACHE_PATH;
+      else process.env.DISCOVERY_CACHE_PATH = prior;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a .env file this server actually loaded a secret from', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-envfile-'));
+    const envFile = path.join(dir, '.env');
+    fs.writeFileSync(envFile, 'MCP_GM_TEST_PROBE_VAR=abc\n');
+    try {
+      // Test-only path overrides (see env-load.ts): loads ONLY from `dir`,
+      // under a variable name picked to be inert outside this test.
+      loadEnvFiles({ cwd: dir, packageRoot: dir, configDir: dir });
+      await expect(openLocalReadStream(envFile)).rejects.toMatchObject({ reason: 'forbidden' });
+    } finally {
+      delete process.env.MCP_GM_TEST_PROBE_VAR;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not refuse an ordinary .env-named file the server never loaded', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-gm-envfile-other-'));
+    const other = path.join(dir, '.env');
+    fs.writeFileSync(other, 'UNRELATED=1\n');
+    try {
+      const real = await assertLocalPathAllowed(other, 'read');
+      expect(real).toBe(path.resolve(other));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

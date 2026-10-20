@@ -19,7 +19,7 @@ import { resolveScopesForAccount } from './auth.js';
 import type { CuratedToolDeps } from './client.js';
 import type { ExecuteDeps } from './executor.js';
 import type { Metrics } from './usage-metrics.js';
-import { localFilesDisabledByEnv } from './tools/_local-files.js';
+import { localFilesDisabledByEnv, ensureLocalFilesRoot } from './tools/_local-files.js';
 
 export interface McpServerOptions {
   /** Sent in the initialize result; omitted entirely when absent or blank. */
@@ -41,7 +41,12 @@ export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Di
   const owner = isOwnerContext(ctx);
   // GOOGLE_LOCAL_FILES=off removes every host-file tool/param for every
   // context, including the owner, regardless of the transport.
-  const clientDeps: CuratedToolDeps = { getClientFn: ctx.getClient, localFiles: owner && !localFilesDisabledByEnv() };
+  const localFilesEnabled = owner && !localFilesDisabledByEnv();
+  // Create (on first use) and log the effective GOOGLE_LOCAL_FILES_DIR root
+  // once at startup, so an operator sees where uploads/downloads/attachments
+  // are confined without having to trigger a tool call first.
+  if (localFilesEnabled) ensureLocalFilesRoot();
+  const clientDeps: CuratedToolDeps = { getClientFn: ctx.getClient, localFiles: localFilesEnabled };
   const execDeps: ExecuteDeps = {
     getClientFn: ctx.getClient,
     scopeDeps: {
