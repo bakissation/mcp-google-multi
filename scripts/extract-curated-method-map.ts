@@ -10,6 +10,10 @@
 // Discovery method would otherwise silently drift the map it feeds.
 //
 // Run: npx tsx scripts/extract-curated-method-map.ts
+// Check (CI): npx tsx scripts/extract-curated-method-map.ts --check
+// (compares the freshly extracted map against the committed
+// CURATED_METHOD_TOOLS structurally, ids and name sets, not as text, so
+// formatting style is not part of the check; exits non-zero on drift)
 //
 // Method: for each server.registerTool(...) / registerHostFileTool(...)
 // call in a curated tools file, find every local client binding reachable
@@ -30,7 +34,7 @@
 // datatransfer sub-APIs, whose Discovery ids use their own prefixes).
 import ts from 'typescript';
 import fs from 'node:fs';
-import { CURATED_METHOD_IDS } from './gen-config.js';
+import { CURATED_METHOD_IDS, CURATED_METHOD_TOOLS } from './gen-config.js';
 
 const FACTORY_TO_PREFIX: Record<string, string> = {
   driveClient: 'drive',
@@ -176,10 +180,9 @@ function extractFromFile(file: string): RawCall[] {
     if (isRegisterCall(node)) {
       const call = node as ts.CallExpression;
       const [nameArg, , handler] = call.arguments;
-      if (nameArg && ts.isStringLiteral(nameArg) && handler && 'body' in handler && (handler as ts.FunctionLikeDeclarationBase).body) {
+      if (nameArg && ts.isStringLiteral(nameArg) && handler && ts.isFunctionLike(handler) && handler.body) {
         const toolName = nameArg.text;
-        const fnLike = handler as unknown as ts.FunctionLikeDeclarationBase;
-        walkBodyForCalls(fnLike.body!, bindingsOf(fnLike), toolName, new Set());
+        walkBodyForCalls(handler.body, bindingsOf(handler), toolName, new Set());
       }
     }
     ts.forEachChild(node, walkForRegisterCalls);
@@ -223,6 +226,11 @@ function main() {
     );
   }
 
+  if (process.argv.includes('--check')) {
+    checkDrift(resolved);
+    return;
+  }
+
   const lines = ['export const CURATED_METHOD_TOOLS: Record<string, string[]> = {'];
   for (const id of [...resolved.keys()].sort()) {
     const names = [...resolved.get(id)!].sort();
@@ -230,6 +238,42 @@ function main() {
   }
   lines.push('};');
   process.stdout.write(lines.join('\n') + '\n');
+}
+
+// Structural comparison (ids and name sets) against the committed map, not
+// a text diff: gen-config.ts and method-map.ts intentionally differ in
+// quote style and spacing, so a text diff would always "drift".
+function checkDrift(resolved: Map<string, Set<string>>): void {
+  const extractedIds = new Set(resolved.keys());
+  const committedIds = new Set(Object.keys(CURATED_METHOD_TOOLS));
+  const problems: string[] = [];
+
+  for (const id of extractedIds) {
+    if (!committedIds.has(id)) problems.push(`+ ${id}: ${[...resolved.get(id)!].sort().join(', ')} (missing from the committed map)`);
+  }
+  for (const id of committedIds) {
+    if (!extractedIds.has(id)) problems.push(`- ${id}: ${CURATED_METHOD_TOOLS[id].join(', ')} (no longer called by any curated tool, per the extractor)`);
+  }
+  for (const id of extractedIds) {
+    if (!committedIds.has(id)) continue;
+    const extractedNames = [...resolved.get(id)!].sort();
+    const committedNames = [...CURATED_METHOD_TOOLS[id]].sort();
+    if (JSON.stringify(extractedNames) !== JSON.stringify(committedNames)) {
+      problems.push(`~ ${id}: committed [${committedNames.join(', ')}] but extractor found [${extractedNames.join(', ')}]`);
+    }
+  }
+
+  if (problems.length > 0) {
+    process.stderr.write(
+      'CURATED_METHOD_TOOLS has drifted from what the curated tool source actually calls:\n' +
+        problems.map((p) => `  ${p}\n`).join('') +
+        'Run `npx tsx scripts/extract-curated-method-map.ts`, review the output, and update ' +
+        'CURATED_METHOD_TOOLS in both scripts/gen-config.ts and src/tools/generated/method-map.ts.\n',
+    );
+    process.exitCode = 1;
+    return;
+  }
+  process.stdout.write('CURATED_METHOD_TOOLS matches what the curated tool source calls: no drift.\n');
 }
 
 main();
