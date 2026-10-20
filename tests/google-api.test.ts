@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ToolRegistry } from '../src/registry.js';
+import { ToolRegistry, inferCud } from '../src/registry.js';
 import { nearestMethodIds, registerEscapeTools, escapeHatchNames } from '../src/tools/google-api.js';
 import { clearDiscoveryMemoryCache, searchMethods } from '../src/discovery-client.js';
 import { setHintProvider, type HintCase } from '../src/hint-provider.js';
-import { isAllowed, type Policy } from '../src/write-control.js';
+import { isAllowed, isAllowedByAnyName, type Policy } from '../src/write-control.js';
 import { CURATED_METHOD_TOOLS, GENERATED_METHOD_TOOLS } from '../src/tools/generated/method-map.js';
 
 const FIXTURE = {
@@ -40,6 +40,23 @@ const FIXTURE = {
               description: 'Permanently deletes many messages.',
               parameters: { userId: { location: 'path', required: true, type: 'string' } },
             },
+            send: {
+              id: 'gmail.users.messages.send',
+              httpMethod: 'POST',
+              path: 'gmail/v1/users/{userId}/messages/send',
+              description: 'Sends a message.',
+              parameters: { userId: { location: 'path', required: true, type: 'string' } },
+            },
+            trash: {
+              id: 'gmail.users.messages.trash',
+              httpMethod: 'POST',
+              path: 'gmail/v1/users/{userId}/messages/{id}/trash',
+              description: 'Moves a message to Trash.',
+              parameters: {
+                userId: { location: 'path', required: true, type: 'string' },
+                id: { location: 'path', required: true, type: 'string' },
+              },
+            },
           },
         },
         drafts: {
@@ -67,11 +84,41 @@ const FIXTURE = {
               },
             },
           },
+          methods: {
+            updateVacation: {
+              id: 'gmail.users.settings.updateVacation',
+              httpMethod: 'PUT',
+              path: 'gmail/v1/users/{userId}/settings/vacation',
+              description: 'Updates vacation responder settings.',
+              parameters: { userId: { location: 'path', required: true, type: 'string' } },
+            },
+          },
         },
       },
     },
   },
 };
+
+const CALENDAR_FIXTURE = {
+  baseUrl: 'https://www.googleapis.com/',
+  resources: {
+    events: {
+      methods: {
+        delete: {
+          id: 'calendar.events.delete',
+          httpMethod: 'DELETE',
+          path: 'calendar/v3/calendars/{calendarId}/events/{eventId}',
+          description: 'Deletes an event.',
+          parameters: {
+            calendarId: { location: 'path', required: true, type: 'string' },
+            eventId: { location: 'path', required: true, type: 'string' },
+          },
+        },
+      },
+    },
+  },
+};
+
 
 // Only the two resources write-control parity cares about: a curated id whose
 // real tool name collapses under the old last-segment scheme (permissions
@@ -111,6 +158,17 @@ const DRIVE_FIXTURE = {
         },
       },
     },
+    files: {
+      methods: {
+        update: {
+          id: 'drive.files.update',
+          httpMethod: 'PATCH',
+          path: 'drive/v3/files/{fileId}',
+          description: 'Updates a file (move, rename, trash, replace content).',
+          parameters: { fileId: { location: 'path', required: true, type: 'string' } },
+        },
+      },
+    },
   },
 };
 
@@ -142,6 +200,13 @@ const PEOPLE_FIXTURE = {
           path: 'v1/{+resourceName}:deleteContact',
           description: 'Deletes a contact.',
           parameters: { resourceName: { location: 'path', required: true, type: 'string' } },
+        },
+        createContact: {
+          id: 'people.people.createContact',
+          httpMethod: 'POST',
+          path: 'v1/people:createContact',
+          description: 'Creates a contact.',
+          parameters: {},
         },
       },
     },
@@ -190,6 +255,7 @@ function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string> } = {}) {
         : url.includes('/slides/') ? POISONED_FIXTURE
         : url.includes('/searchconsole/') ? SEARCHCONSOLE_FIXTURE
         : url.includes('/drive/') ? DRIVE_FIXTURE
+        : url.includes('/calendar/') ? CALENDAR_FIXTURE
         : FIXTURE,
     }),
     getClientFn: (async () => ({ request })) as never,
@@ -609,36 +675,134 @@ describe('google_api_call write-control name resolution', () => {
     expect(request).not.toHaveBeenCalled();
   });
 
-  // Parity: for every method id this suite knows a real tool name for (the
-  // new curated map, plus a sample of generated ones), an op-level deny
-  // pattern written against that real name gives the SAME verdict through
-  // isAllowed directly (as the named tool would see) and through the escape
-  // hatch's full candidate-name loop.
-  describe('parity with the named-tool verdict', () => {
-    const cases: Array<{ methodId: string; realName: string; service: string; cud: 'create' | 'update' }> = [
-      { methodId: 'drive.permissions.create', realName: 'drive_share', service: 'drive', cud: 'create' },
-      { methodId: 'drive.permissions.update', realName: 'drive_permission_update', service: 'drive', cud: 'update' },
-      { methodId: 'drive.drives.update', realName: 'drive_drives_update', service: 'drive', cud: 'update' },
-      { methodId: 'gmail.users.drafts.send', realName: 'gmail_send_draft', service: 'gmail', cud: 'create' },
-      { methodId: 'gmail.users.settings.filters.create', realName: 'gmail_users_settings_filters_create', service: 'gmail', cud: 'create' },
-    ];
+  // M2: deny on the explicit example from the review ("gmail:set_vacation",
+  // "drive:move", "calendar:delete_event", "contacts:create") blocks the
+  // same operation via google_api_call, not just the ids the first version
+  // of this map happened to hand-pick.
+  describe.each([
+    { methodId: 'gmail.users.settings.updateVacation', api: 'gmail', deny: 'gmail:set_vacation', pathParams: { userId: 'me' } },
+    { methodId: 'drive.files.update', api: 'drive', deny: 'drive:move', pathParams: { fileId: 'f1' } },
+    { methodId: 'calendar.events.delete', api: 'calendar', deny: 'calendar:delete_event', pathParams: { calendarId: 'c1', eventId: 'e1' } },
+    { methodId: 'people.people.createContact', api: 'people', deny: 'contacts:create', pathParams: {} },
+  ])('reporter example: $deny blocks $methodId via google_api_call', ({ methodId, api, deny, pathParams }) => {
+    it('blocked', async () => {
+      const policy: Policy = { ...SAFE, deny: [deny] };
+      const { call, request, dir } = setup(policy);
+      cleanupDirs.push(dir);
+      const res = await call({ account: 'test', api, methodId, pathParams, body: {} });
+      expect(res.isError).toBe(true);
+      expect(JSON.parse(res.content[0].text).error).toBe('write_disabled');
+      expect(request).not.toHaveBeenCalled();
+    });
+  });
 
-    it('escapeHatchNames resolves the real tool name for every case', () => {
-      for (const c of cases) {
-        expect(CURATED_METHOD_TOOLS[c.methodId] ?? GENERATED_METHOD_TOOLS[c.methodId]).toBe(c.realName);
-        expect(escapeHatchNames(c.service, c.methodId)).toContain(c.realName);
+  // LOW (allow semantics): deny on any candidate name wins, ALLOW on any
+  // candidate name must also win (over the profile) — the previous
+  // implementation treated "every name must pass" as if allow needed
+  // unanimous consent too, so an explicit GOOGLE_WRITE_ALLOW stopped
+  // working through the escape hatch the moment the full-path or
+  // last-segment synthetic name did not separately match the same glob.
+  it('GOOGLE_WRITE_ALLOW="gmail:send" grants gmail.users.messages.send via the escape hatch under read-only', async () => {
+    const policy: Policy = { profile: 'read-only', readOnly: false, allow: ['gmail:send'], deny: [] };
+    const { call, request, dir } = setup(policy);
+    cleanupDirs.push(dir);
+    const res = await call({ account: 'test', api: 'gmail', methodId: 'gmail.users.messages.send', pathParams: { userId: 'me' }, body: { raw: 'x' } });
+    expect(res.isError).toBeUndefined();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  // LOW (allow semantics): the profile's own exceptions (TRASH_MOVE_TOOLS)
+  // are keyed to the REAL tool name. gmail.users.messages.trash's curated
+  // name is gmail_trash (in TRASH_MOVE_TOOLS), but its full-path synthetic
+  // name gmail_users_messages_trash is not; safe-writes must decide on the
+  // real name, not refuse because a synthetic name does not carry the
+  // exception.
+  it('safe-writes allows gmail.users.messages.trash via the escape hatch like curated gmail_trash', async () => {
+    const { call, request, dir } = setup(SAFE);
+    cleanupDirs.push(dir);
+    const res = await call({ account: 'test', api: 'gmail', methodId: 'gmail.users.messages.trash', pathParams: { userId: 'me', id: 'm1' } });
+    expect(res.isError).toBeUndefined();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  // M2 sweep: EVERY method id this server knows a real tool name for (the
+  // full CURATED_METHOD_TOOLS map derived from the curated registrations
+  // themselves — not a hand-picked sample — plus every GENERATED_METHOD_TOOLS
+  // entry) gives the same write-control verdict through isAllowed directly
+  // (as the named tool would see) and through the escape hatch's
+  // candidate-name resolution, under both a matching deny and a matching
+  // allow. inferCud(name) stands in for the method's real cud throughout
+  // (both sides of each comparison use it), so this isolates the NAME
+  // resolution this fix is about from cud computation, which is covered
+  // elsewhere.
+  describe('M2: parity sweep over every curated and generated method id', () => {
+    function serviceOf(toolName: string): string {
+      const i = toolName.indexOf('_');
+      return i === -1 ? toolName : toolName.slice(0, i);
+    }
+    function opOf(toolName: string): string {
+      const i = toolName.indexOf('_');
+      return i === -1 ? toolName : toolName.slice(i + 1);
+    }
+
+    const curatedEntries = Object.entries(CURATED_METHOD_TOOLS).flatMap(([methodId, names]) =>
+      names.map((toolName) => ({ methodId, toolName })),
+    );
+    const generatedEntries = Object.entries(GENERATED_METHOD_TOOLS).map(([methodId, toolName]) => ({ methodId, toolName }));
+    const allEntries = [...curatedEntries, ...generatedEntries];
+    const writeEntries = allEntries.filter((e) => inferCud(e.toolName) !== 'read');
+
+    it('sanity: this sweep is not vacuous (hundreds of write entries from both maps)', () => {
+      expect(curatedEntries.length).toBeGreaterThan(130);
+      expect(generatedEntries.length).toBeGreaterThan(500);
+      expect(writeEntries.length).toBeGreaterThan(300);
+    });
+
+    it('a deny on the real tool op denies the same call via the escape hatch', () => {
+      for (const { methodId, toolName } of writeEntries) {
+        const service = serviceOf(toolName);
+        const cud = inferCud(toolName);
+        const policy: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: [`${service}:${opOf(toolName)}`] };
+        const direct = isAllowed({ name: toolName, service, cud, scopes: [] }, policy);
+        expect(direct, `${methodId} via ${toolName}: the named tool itself should be denied`).toBe(false);
+        const names = escapeHatchNames(service, methodId);
+        expect(names, `${methodId} via ${toolName}`).toContain(toolName);
+        const verdict = isAllowedByAnyName(names, { service, cud, scopes: [] }, names[0], policy);
+        expect(verdict.allowed, `${methodId} via ${toolName}: the escape hatch should be denied too`).toBe(false);
       }
     });
 
-    it.each(cases)('$methodId: op-level deny on "$realName" denies identically via isAllowed and the escape-hatch loop', (c) => {
-      const op = c.realName.slice(c.realName.indexOf('_') + 1);
-      for (const deny of [[`${c.service}:${op}`], [`${c.service}:nope`], []]) {
-        const policy: Policy = { profile: 'safe-writes', readOnly: false, allow: [], deny };
-        const direct = isAllowed({ name: c.realName, service: c.service, cud: c.cud, scopes: [] }, policy);
-        const viaEscapeHatch = escapeHatchNames(c.service, c.methodId).every((name) =>
-          isAllowed({ name, service: c.service, cud: c.cud, scopes: [] }, policy),
-        );
-        expect(viaEscapeHatch).toBe(direct);
+    it('an allow on the real tool op grants the call under read-only, via the escape hatch', () => {
+      for (const { methodId, toolName } of writeEntries) {
+        const service = serviceOf(toolName);
+        const cud = inferCud(toolName);
+        const policy: Policy = { profile: 'read-only', readOnly: false, allow: [`${service}:${opOf(toolName)}`], deny: [] };
+        const direct = isAllowed({ name: toolName, service, cud, scopes: [] }, policy);
+        expect(direct, `${methodId} via ${toolName}: allow should grant the named tool`).toBe(true);
+        const names = escapeHatchNames(service, methodId);
+        const verdict = isAllowedByAnyName(names, { service, cud, scopes: [] }, names[0], policy);
+        expect(verdict.allowed, `${methodId} via ${toolName}: allow should grant the escape hatch too`).toBe(true);
+      }
+    });
+
+    it('with no matching allow or deny, the profile verdict on the primary name matches the named tool', () => {
+      for (const policy of [
+        { profile: 'read-only', readOnly: false, allow: [], deny: [] } as Policy,
+        { profile: 'safe-writes', readOnly: false, allow: [], deny: [] } as Policy,
+        { profile: 'full-writes', readOnly: false, allow: [], deny: [] } as Policy,
+      ]) {
+        for (const { methodId, toolName } of writeEntries) {
+          const service = serviceOf(toolName);
+          const cud = inferCud(toolName);
+          const direct = isAllowed({ name: toolName, service, cud, scopes: [] }, policy);
+          const names = escapeHatchNames(service, methodId);
+          // Use the SAME real tool name as the primary so a method shared by
+          // several curated tools (docs/sheets batchUpdate) is compared
+          // against the one it's actually naming here, not an arbitrary pick.
+          const primary = names.includes(toolName) ? toolName : names[0];
+          const verdict = isAllowedByAnyName(names, { service, cud, scopes: [] }, primary, policy);
+          expect(verdict.allowed, `${methodId} via ${toolName} under profile ${policy.profile}`).toBe(direct);
+        }
       }
     });
   });

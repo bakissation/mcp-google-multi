@@ -390,12 +390,12 @@ export function emitMethodMap(pairs: [string, string][]): string {
     ...CURATED_METHOD_IDS.map((id) => `  ${JSON.stringify(id)},`),
     '];',
     '',
-    // Resource-scoped curated ids whose real tool name write-control needs (see
-    // gen-config.ts for why not every curated id gets an entry).
-    'export const CURATED_METHOD_TOOLS: Record<string, string> = {',
+    // Every curated tool name registered on each curated method id (see
+    // gen-config.ts: derived from the curated registrations themselves).
+    'export const CURATED_METHOD_TOOLS: Record<string, string[]> = {',
     ...Object.entries(CURATED_METHOD_TOOLS)
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([id, name]) => `  ${JSON.stringify(id)}: ${JSON.stringify(name)},`),
+      .map(([id, names]) => `  ${JSON.stringify(id)}: ${JSON.stringify([...names].sort())},`),
     '};',
     '',
   ].join('\n');

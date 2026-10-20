@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../registry.js';
-import { isAllowed, writeDisabledResult, type Policy } from '../write-control.js';
+import { isAllowedByAnyName, writeDisabledResult, type Policy } from '../write-control.js';
 import { accountArgLive } from '../accounts.js';
 import { getClient } from '../client.js';
 import { coerceJson } from './_coerce.js';
@@ -84,26 +84,46 @@ function snakeSegment(segment: string): string {
 /**
  * Every name write-control might reasonably know this operation by, most
  * specific first:
- *  1. the REAL tool name, when the Discovery method has a curated or
- *     generated twin (so a deny pattern written against that tool's name,
- *     e.g. "drive:share" or "gmail:send_draft", applies here too);
+ *  1. the REAL tool name(s). CURATED_METHOD_TOOLS is derived from every
+ *     curated registration's own Discovery call (scripts/gen-config.ts),
+ *     so a method several curated tools happen to share (e.g. every
+ *     `docs.documents.batchUpdate` helper) lists all of them, not one
+ *     picked example; GENERATED_METHOD_TOOLS adds its one twin when the
+ *     method has no curated implementation. A deny pattern written
+ *     against any one real tool's name, e.g. "drive:share" or
+ *     "gmail:send_draft", applies here too;
  *  2. the full method-path name ("drive_permissions_create",
  *     "gmail_users_settings_filters_create"), for methods an operator can
  *     name precisely even when no tool implements them yet;
  *  3. the old last-segment name ("drive_create", "gmail_create"), kept for
  *     backward compatibility with configs written against the pre-fix shape.
- * Deny-on-any-name wins (checked by the caller): adding names can only make
- * the escape hatch stricter, never looser, than it was before this fix.
+ * The first entry is the "primary" name: write-control.ts's
+ * isAllowedByAnyName uses it, not "any name", when the profile (rather
+ * than an explicit allow/deny) decides, since a profile exception keyed to
+ * a specific real tool name (TRASH_MOVE_TOOLS) must be judged against that
+ * real name, not a synthetic one that never carried the exception.
+ * Deny-on-any-name wins, allow-on-any-name wins over the profile (checked
+ * by the caller via isAllowedByAnyName): adding names can only let an
+ * operator's policy reach further, never accidentally narrow what the
+ * profile alone would already permit.
  */
 export function escapeHatchNames(policyService: string, methodId: string): string[] {
-  const names = new Set<string>();
-  const realName = CURATED_METHOD_TOOLS[methodId] ?? GENERATED_METHOD_TOOLS[methodId];
-  if (realName) names.add(realName);
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const add = (name: string) => {
+    if (!seen.has(name)) {
+      seen.add(name);
+      names.push(name);
+    }
+  };
+  for (const name of CURATED_METHOD_TOOLS[methodId] ?? []) add(name);
+  const generatedName = GENERATED_METHOD_TOOLS[methodId];
+  if (generatedName) add(generatedName);
   const tail = methodId.split('.').slice(1);
-  if (tail.length > 0) names.add(`${policyService}_${tail.map(snakeSegment).join('_')}`);
+  if (tail.length > 0) add(`${policyService}_${tail.map(snakeSegment).join('_')}`);
   const lastSegment = methodId.split('.').pop() ?? methodId;
-  names.add(`${policyService}_${snakeSegment(lastSegment)}`);
-  return [...names];
+  add(`${policyService}_${snakeSegment(lastSegment)}`);
+  return names;
 }
 
 function describeMethod(m: DiscoveryMethod) {
@@ -282,18 +302,21 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       const policyService = serviceForAlias(apiKey);
       // The escape hatch self-gates, so it needs the same scope signal as the registry
       // wrapper, or a privileged method would slip past safe-writes here while its generated twin is refused.
-      // Checked under every name the operation can have (real tool, full method
-      // path, legacy last-segment) because a method whose id ends in a generic
-      // verb, such as drive.permissions.create or gmail.users.settings.filters.create,
-      // would otherwise lose its resource and collapse onto a generic
-      // drive_create / gmail_create that neither the profile nor an operator's
-      // resource-scoped GOOGLE_WRITE_DENY can tell apart from an ordinary write.
+      // Checked under every name the operation can have (real tool(s), full
+      // method path, legacy last-segment) because a method whose id ends in
+      // a generic verb, such as drive.permissions.create or
+      // gmail.users.settings.filters.create, would otherwise lose its
+      // resource and collapse onto a generic drive_create / gmail_create
+      // that neither the profile nor an operator's resource-scoped
+      // GOOGLE_WRITE_DENY can tell apart from an ordinary write. Deny on any
+      // name wins, allow on any name wins over the profile; the profile
+      // itself decides on the primary (first) name alone — see
+      // isAllowedByAnyName for why "any name" would be wrong there.
       if (cud !== 'read') {
-        for (const name of escapeHatchNames(policyService, method.id)) {
-          const toolRef = { name, service: policyService, cud, scopes: method.scopes };
-          if (!isAllowed(toolRef, policy)) {
-            return writeDisabledResult(toolRef, policy, account as string);
-          }
+        const names = escapeHatchNames(policyService, method.id);
+        const verdict = isAllowedByAnyName(names, { service: policyService, cud, scopes: method.scopes }, names[0], policy);
+        if (!verdict.allowed) {
+          return writeDisabledResult(verdict.ref, policy, account as string);
         }
       }
 

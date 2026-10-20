@@ -21,7 +21,7 @@ export interface Policy {
   transport?: Transport;
 }
 
-interface ToolRef {
+export interface ToolRef {
   name: string;
   service: string;
   cud: Cud;
@@ -156,6 +156,42 @@ export function isAllowed(tool: ToolRef, policy: Policy): boolean {
   if (matchesAny(tool, policy.deny)) return false;
   if (matchesAny(tool, policy.allow)) return true;
   return profileAllows(policy.profile, tool);
+}
+
+export interface AnyNameVerdict {
+  allowed: boolean;
+  /** The ref whose name explains the verdict: the specific name a deny glob
+   * matched, or `primaryName` when nothing matched and the profile decided. */
+  ref: ToolRef;
+}
+
+/**
+ * Multi-name variant for the escape hatch, which has no single fixed tool
+ * name for a Discovery method: `names` lists every name the operation can
+ * be known by (one or more real tool names when the method has curated or
+ * generated twins, the full method-path name, the legacy last-segment
+ * name). Deny on any name wins; allow on any name wins over the profile;
+ * otherwise the profile decides using `primaryName` alone, never "any
+ * name" — the profile's own exceptions (TRASH_MOVE_TOOLS) are keyed to the
+ * real tool's name, and judging them against a synthetic name that was
+ * never meant to carry that exception would wrongly refuse (e.g.
+ * `gmail.users.messages.trash`'s full-path name `gmail_users_messages_trash`
+ * is not in TRASH_MOVE_TOOLS even though its real name `gmail_trash` is).
+ */
+export function isAllowedByAnyName(
+  names: readonly string[],
+  base: { service: string; cud: Cud; scopes?: readonly string[] },
+  primaryName: string,
+  policy: Policy,
+): AnyNameVerdict {
+  const primaryRef: ToolRef = { name: primaryName, service: base.service, cud: base.cud, scopes: base.scopes };
+  if (base.cud === 'read') return { allowed: true, ref: primaryRef };
+  if (policy.readOnly) return { allowed: false, ref: primaryRef };
+  const refs = names.map((name): ToolRef => ({ name, service: base.service, cud: base.cud, scopes: base.scopes }));
+  const deniedRef = refs.find((ref) => matchesAny(ref, policy.deny));
+  if (deniedRef) return { allowed: false, ref: deniedRef };
+  if (refs.some((ref) => matchesAny(ref, policy.allow))) return { allowed: true, ref: primaryRef };
+  return { allowed: profileAllows(policy.profile, primaryRef), ref: primaryRef };
 }
 
 /** Which profiles would permit this tool at all. */
