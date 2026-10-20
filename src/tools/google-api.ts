@@ -218,9 +218,11 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
     {
       description:
         'Invoke any Google Workspace REST method by Discovery id (escape hatch for operations without a ' +
-        'dedicated tool). Find methods with google_api_search first. Subject to the same write-control ' +
-        'policy as named tools. On reads, pass a `fields` query param (Google partial response) to keep ' +
-        'the payload small. Returns JSON only — for binary/file content (media downloads, ' +
+        'dedicated tool). Find methods with google_api_search first. A write asks the connected human to ' +
+        'confirm the real call (account, verb, params, a destinations-first body summary) unless ' +
+        'GOOGLE_PROFILE=full-writes with no outbound allowlist; GOOGLE_READ_ONLY or a matching ' +
+        'GOOGLE_WRITE_DENY still refuse outright. On reads, pass a `fields` query param (Google partial ' +
+        'response) to keep the payload small. Returns JSON only; for binary/file content (media downloads, ' +
         'drive.files.export) use drive_download / drive_export instead.',
       inputSchema: {
         account: accountEnum.describe('Google account alias (omit for the default account)'),
