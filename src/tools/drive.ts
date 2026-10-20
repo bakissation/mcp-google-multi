@@ -6,7 +6,7 @@ import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } from './_errors.js';
-import { hostFilesRefused, openLocalReadStream, openInternalReadStream, prepareLocalDest, localFileErrorResult, LocalFileError } from './_local-files.js';
+import { hostFilesRefused, openLocalReadStream, openInternalReadStream, prepareLocalDest, cleanupPartialWrite, localFileErrorResult, LocalFileError } from './_local-files.js';
 import { checkOutbound, checkOutboundGrantee, driveGranteeFromAccessProposal, driveGranteeFromPermission, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
 import { capText, listResult } from '../trim.js';
@@ -507,7 +507,10 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         } catch (err) {
           // A failed download must not leave a partial file behind blocking
           // a retry with local_path_exists; best-effort, original error wins.
-          await fs.promises.unlink(dest).catch(() => {});
+          // EEXIST means wx itself refused to open: the TOCTOU race lost to
+          // another call that already owns dest, so this call never wrote
+          // anything there and must not delete that other call's file.
+          await cleanupPartialWrite(dest, err);
           throw err;
         }
 
@@ -559,7 +562,10 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         } catch (err) {
           // A failed download must not leave a partial file behind blocking
           // a retry with local_path_exists; best-effort, original error wins.
-          await fs.promises.unlink(dest).catch(() => {});
+          // EEXIST means wx itself refused to open: the TOCTOU race lost to
+          // another call that already owns dest, so this call never wrote
+          // anything there and must not delete that other call's file.
+          await cleanupPartialWrite(dest, err);
           throw err;
         }
 

@@ -270,6 +270,21 @@ export async function prepareLocalDest(savePath: string, filename: string): Prom
   return dest;
 }
 
+/**
+ * Cleans up after a failed exclusive (wx) write to destPath, but only when
+ * this call's own write actually started. EEXIST means the exclusive open
+ * was refused outright: this call lost a TOCTOU race (the existence check
+ * above and the real open are not atomic together) to some other call
+ * that already owns destPath, so there is nothing here that belongs to
+ * this call to delete. Any other error means this call's own fd opened
+ * and then failed partway, so the partial file it made is cleaned up as
+ * before (best-effort; the original error still wins over a failed unlink).
+ */
+export async function cleanupPartialWrite(destPath: string, err: unknown): Promise<void> {
+  if ((err as NodeJS.ErrnoException | undefined)?.code === 'EEXIST') return;
+  await fs.promises.unlink(destPath).catch(() => {});
+}
+
 // createReadStream's open failure surfaces as an unhandled 'error' event that
 // kills the process; opening the fd first turns it into a normal rejection.
 async function openFdReadStream(absolutePath: string): Promise<fs.ReadStream> {

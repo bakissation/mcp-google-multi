@@ -7,7 +7,7 @@ import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
-import { hostFilesRefused, prepareLocalDest, assertLocalPathAllowed, localFileErrorResult, LocalFileError } from './_local-files.js';
+import { hostFilesRefused, prepareLocalDest, cleanupPartialWrite, assertLocalPathAllowed, localFileErrorResult, LocalFileError } from './_local-files.js';
 import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import addressparser from 'nodemailer/lib/addressparser/index.js';
 import { lookup as lookupMime } from 'mime-types';
@@ -874,7 +874,10 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
         } catch (err) {
           // A failed download must not leave a partial file behind blocking
           // a retry with local_path_exists; best-effort, original error wins.
-          await fs.promises.unlink(fullPath).catch(() => {});
+          // EEXIST means wx itself refused to open: the TOCTOU race lost to
+          // another call that already owns fullPath, so this call never
+          // wrote anything there and must not delete that other call's file.
+          await cleanupPartialWrite(fullPath, err);
           throw err;
         }
 
