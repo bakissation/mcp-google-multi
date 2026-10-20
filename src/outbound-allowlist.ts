@@ -142,6 +142,40 @@ function asNonEmptyString(v: unknown): string | undefined {
   return typeof v === 'string' && v.length > 0 ? v : undefined;
 }
 
+// Google's JSON parser follows the proto3 JSON mapping, which also accepts
+// a field's original (snake_case) proto name alongside its canonical
+// lowerCamelCase JSON name, and coerces a "boxed" scalar (a string for a
+// bool/number field) leniently. Every rule below, and the generic key
+// scan, reads a literal camelCase key and compares against a literal
+// `true`, so a body using snake_case keys or string "true" passed
+// unexamined. Both are normalised once, up front, before any check runs.
+function snakeToCamel(key: string): string {
+  return key.replace(/_([a-z0-9])/gi, (_, c: string) => c.toUpperCase());
+}
+
+function normalizeBodyKeys(v: unknown, depth = 0): unknown {
+  if (depth > 12) return v; // pathological nesting: stop rewriting, not throwing
+  if (Array.isArray(v)) return v.map((x) => normalizeBodyKeys(x, depth + 1));
+  if (v && typeof v === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      out[snakeToCamel(k)] = normalizeBodyKeys(val, depth + 1);
+    }
+    return out;
+  }
+  return v;
+}
+
+// A boolean gate (enableAutoReply, published, ...) must treat anything
+// other than absent/null/false/"false" as true: proto3 JSON accepts a
+// bool field written as a string ("true"), and this check must not be the
+// more permissive reader between the two.
+function isTruthyGate(v: unknown): boolean {
+  if (v === undefined || v === null || v === false) return false;
+  if (typeof v === 'string' && v.trim().toLowerCase() === 'false') return false;
+  return true;
+}
+
 const UNRECOGNIZED: GranteeCheck = { emails: [], domains: [], public: false, understood: false };
 
 /** Shared by drive.permissions.create's body (type/domain/emailAddress) and
@@ -211,9 +245,18 @@ function granteeCheck(methodId: string, body: unknown): GranteeCheck | null {
       const emails: string[] = [];
       for (const m of memberships) {
         const mem = asRecord(m);
-        const member = mem ? asRecord(mem.member) : undefined;
+        // groupMember names a Group (groups/<id>), never a checkable email;
+        // a member whose name is not users/<email> (e.g. a numeric Chat
+        // user id, which is the common real-world form) cannot be checked
+        // either. Both are unrecognised shapes, not zero grantees: silently
+        // skipping either let a membership through unexamined.
+        if (!mem || 'groupMember' in mem) return UNRECOGNIZED;
+        const member = asRecord(mem.member);
         const name = member ? asNonEmptyString(member.name) : undefined;
-        if (name?.startsWith('users/') && name.slice('users/'.length).includes('@')) emails.push(name.slice('users/'.length));
+        if (!name || !name.startsWith('users/')) return UNRECOGNIZED;
+        const id = name.slice('users/'.length);
+        if (!id.includes('@')) return UNRECOGNIZED;
+        emails.push(id);
       }
       return { emails, domains: [], public: false, understood: true };
     }
@@ -343,17 +386,17 @@ function pathParamGrantee(methodId: string, pathParams: Record<string, unknown> 
  * the link, or by the whole domain, not by an addressable recipient; an
  * unrestricted Gmail vacation auto-reply answers every incoming sender,
  * not just allowlisted ones. */
-function dangerousDefaultRefusal(methodId: string, body: unknown): string | null {
-  const b = asRecord(body) ?? {};
+function dangerousDefaultRefusal(methodId: string, normalizedBody: unknown): string | null {
+  const b = asRecord(normalizedBody) ?? {};
   if (methodId === 'drive.revisions.update') {
-    if (b.published === true || b.publishedOutsideDomain === true) {
+    if (isTruthyGate(b.published) || isTruthyGate(b.publishedOutsideDomain)) {
       return 'publishing a revision makes it reachable without an invite, which the allowlist cannot scope to specific recipients';
     }
     return null;
   }
   if (methodId === 'gmail.users.settings.updateVacation') {
-    const enabling = b.enableAutoReply === true;
-    const restricted = b.restrictToContacts === true || b.restrictToDomain === true;
+    const enabling = isTruthyGate(b.enableAutoReply);
+    const restricted = isTruthyGate(b.restrictToContacts) || isTruthyGate(b.restrictToDomain);
     if (enabling && !restricted) {
       return 'an unrestricted auto-reply answers every sender, including ones outside the allowlist; set restrictToContacts or restrictToDomain';
     }
@@ -460,14 +503,25 @@ export function checkOutboundForMethod(
   const list = resolveOutboundAllowlist(env);
   if (!list) return null;
 
-  const dangerous = dangerousDefaultRefusal(methodId, body);
+  // Google's JSON parser accepts a body keyed by proto field name
+  // (snake_case) as readily as its canonical lowerCamelCase JSON name; a
+  // rule or scan that only ever reads the camelCase key would otherwise
+  // miss the exact same field spelled the other way. Normalise once, and
+  // use normalizedBody (never the original body) in every check below.
+  const normalizedBody = normalizeBodyKeys(body);
+
+  const dangerous = dangerousDefaultRefusal(methodId, normalizedBody);
   if (dangerous) return dangerousDefaultEnvelope(methodId, dangerous, account);
 
-  // drive.accessproposals.resolve only grants anything on ACCEPT (DENY/
-  // CANCEL are harmless); drive.permissions.update's body never carries
-  // the grantee at all. See BODY_UNTRUSTED_METHODS.
+  // drive.accessproposals.resolve only grants nothing on a LITERAL DENY;
+  // anything else (a non-string, an unrecognised string, a differently
+  // cased "accept") is treated as potentially granting access, not
+  // whitelisted just for not being the exact string "ACCEPT" (action is
+  // Google's to interpret leniently; this check is not). drive.
+  // permissions.update's body never carries the grantee at all either way.
+  // See BODY_UNTRUSTED_METHODS.
   if (BODY_UNTRUSTED_METHODS.has(methodId)) {
-    const isHarmlessProposalAction = methodId === 'drive.accessproposals.resolve' && asRecord(body)?.action !== 'ACCEPT';
+    const isHarmlessProposalAction = methodId === 'drive.accessproposals.resolve' && asRecord(normalizedBody)?.action === 'DENY';
     if (!isHarmlessProposalAction) return unrecognizedShapeEnvelope(methodId, account);
   }
 
@@ -489,7 +543,7 @@ export function checkOutboundForMethod(
     };
   }
 
-  const bodyGrantee = GRANTEE_METHODS.has(methodId) ? granteeCheck(methodId, body) : null;
+  const bodyGrantee = GRANTEE_METHODS.has(methodId) ? granteeCheck(methodId, normalizedBody) : null;
   const fromPath = pathParamGrantee(methodId, opts.pathParams);
   if (bodyGrantee || fromPath) {
     const grantee = mergeGrantee(bodyGrantee, fromPath);
@@ -500,7 +554,7 @@ export function checkOutboundForMethod(
     // The method-aware rule above and the generic emailAddress/email key walk
     // both run (not either/or): the rule catches shapes the walk cannot see,
     // the walk catches a plain email field the rule does not know to look for.
-    const emails = [...grantee.emails, ...collectBodyRecipients(body)];
+    const emails = [...grantee.emails, ...collectBodyRecipients(normalizedBody)];
     if (emails.length > 0) {
       const envelope = checkOutbound(`${methodId} grantee`, emails, account, env);
       if (envelope) return envelope;
@@ -525,11 +579,11 @@ export function checkOutboundForMethod(
     !isRead &&
     !isRemoval &&
     !ALWAYS_SAFE_GRANTEE_PATTERN_METHODS.has(methodId) &&
-    !isHarmlessSendAsPatch(methodId, body) &&
+    !isHarmlessSendAsPatch(methodId, normalizedBody) &&
     matchesGranteePattern(methodId)
   ) {
     return noRuleForGranteePatternEnvelope(methodId, account);
   }
 
-  return checkOutbound(`${methodId} recipient`, collectBodyRecipients(body), account, env);
+  return checkOutbound(`${methodId} recipient`, collectBodyRecipients(normalizedBody), account, env);
 }

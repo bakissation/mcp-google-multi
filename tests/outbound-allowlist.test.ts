@@ -294,6 +294,28 @@ describe('checkOutboundForMethod: M1 per-method rules (item 3)', () => {
     expect(allowed).toBeNull();
   });
 
+  // MEDIUM (round 4, M1): a membership whose member is NOT users/<email>
+  // (a numeric Chat user id, the common real-world form) or that uses
+  // groupMember instead of member counted as zero grantees, not as an
+  // unrecognised shape, letting it through unexamined.
+  it('chat.spaces.setup: a numeric users/<id> membership or a groupMember is an unrecognised shape, not zero grantees', () => {
+    const numericId = checkOutboundForMethod(
+      'chat.spaces.setup',
+      { space: { spaceType: 'SPACE' }, memberships: [{ member: { name: 'users/112233445566778899', type: 'HUMAN' } }] },
+      'a', ENV, { httpMethod: 'POST' },
+    );
+    expect(numericId).not.toBeNull();
+    expect(JSON.parse(numericId!.content[0].text).error).toBe('recipient_not_allowed');
+
+    const groupMember = checkOutboundForMethod(
+      'chat.spaces.setup',
+      { space: { spaceType: 'SPACE' }, memberships: [{ groupMember: { name: 'groups/abc' } }] },
+      'a', ENV, { httpMethod: 'POST' },
+    );
+    expect(groupMember).not.toBeNull();
+    expect(JSON.parse(groupMember!.content[0].text).error).toBe('recipient_not_allowed');
+  });
+
   it('directory.users.patch/insert/update: an unlisted recoveryEmail is gated; absence is not', () => {
     for (const methodId of ['directory.users.patch', 'directory.users.insert', 'directory.users.update']) {
       const blocked = checkOutboundForMethod(methodId, { recoveryEmail: 'evil@evil.example' }, 'a', ENV, { httpMethod: 'PATCH' });
@@ -344,6 +366,18 @@ describe('checkOutboundForMethod: M1 per-method rules (item 3)', () => {
     expect(deny).toBeNull();
   });
 
+  // MEDIUM (round 4, M2): the old check whitelisted "anything that is not
+  // the exact string ACCEPT" as harmless, so a non-string, a differently
+  // cased string, or any other unrecognised action value passed
+  // unexamined. Only a literal "DENY" may be treated as harmless now.
+  it('drive.accessproposals.resolve: a non-"DENY" action (wrong type, wrong case, anything else) still fails closed', () => {
+    for (const action of [1, 'accept', 'Accept', 'CANCEL', {}]) {
+      const r = checkOutboundForMethod('drive.accessproposals.resolve', { action, role: ['writer'] }, 'a', ENV, { httpMethod: 'POST' });
+      expect(r, JSON.stringify(action)).not.toBeNull();
+      expect(JSON.parse(r!.content[0].text).error, JSON.stringify(action)).toBe('recipient_not_allowed');
+    }
+  });
+
   it('drive.permissions.update: fails closed regardless of the body, even one claiming an allowlisted grantee (the real grantee is the permissionId path param, not the body)', () => {
     const r = checkOutboundForMethod(
       'drive.permissions.update',
@@ -352,6 +386,46 @@ describe('checkOutboundForMethod: M1 per-method rules (item 3)', () => {
     );
     expect(r).not.toBeNull();
     expect(JSON.parse(r!.content[0].text).error).toBe('recipient_not_allowed');
+  });
+
+  // MEDIUM (round 4, M4): Google's JSON parser accepts a body keyed by the
+  // proto field's snake_case name as readily as its camelCase JSON name,
+  // and coerces a string onto a bool field. Every rule above read only
+  // the literal camelCase key and compared against literal `true`, so the
+  // exact same dangerous value spelled either of those other ways passed
+  // unexamined.
+  it('snake_case body keys are recognised exactly like their camelCase form', () => {
+    const cases: Array<[string, unknown, string]> = [
+      ['gmail.users.settings.updateVacation', { enable_auto_reply: true }, 'PUT'],
+      ['drive.revisions.update', { published_outside_domain: true }, 'PATCH'],
+      ['directory.users.update', { recovery_email: 'evil@evil.example' }, 'PUT'],
+      ['drive.permissions.create', { type: 'user', role: 'writer', email_address: 'evil@evil.example' }, 'POST'],
+      ['classroom.userProfiles.guardianInvitations.create', { invited_email_address: 'evil@evil.example' }, 'POST'],
+      ['gmail.users.settings.updateAutoForwarding', { enabled: true, email_address: 'evil@evil.example' }, 'PUT'],
+    ];
+    for (const [methodId, body, httpMethod] of cases) {
+      const r = checkOutboundForMethod(methodId, body, 'a', ENV, { httpMethod });
+      expect(r, `${methodId}: ${JSON.stringify(body)}`).not.toBeNull();
+      expect(JSON.parse(r!.content[0].text).error, methodId).toBe('recipient_not_allowed');
+    }
+  });
+
+  it('a boolean gate treats a string "true" the same as the literal true, and "false" the same as absent', () => {
+    const trueAsString = checkOutboundForMethod('drive.revisions.update', { published: 'true' }, 'a', ENV, { httpMethod: 'PATCH' });
+    expect(trueAsString).not.toBeNull();
+
+    const falseAsString = checkOutboundForMethod('drive.revisions.update', { published: 'false' }, 'a', ENV, { httpMethod: 'PATCH' });
+    expect(falseAsString).toBeNull();
+
+    const vacationStringTrue = checkOutboundForMethod('gmail.users.settings.updateVacation', { enableAutoReply: 'true' }, 'a', ENV, { httpMethod: 'PUT' });
+    expect(vacationStringTrue).not.toBeNull();
+  });
+
+  // Normalisation must not accidentally defeat item 5's harmless-sendAs-patch
+  // allowance: display_name is as harmless as displayName.
+  it('a sendAs patch touching only signature/display_name (snake_case) is still allowed', () => {
+    const r = checkOutboundForMethod('gmail.users.settings.sendAs.patch', { signature: 'x', display_name: 'y' }, 'a', ENV, { httpMethod: 'PATCH' });
+    expect(r).toBeNull();
   });
 });
 
