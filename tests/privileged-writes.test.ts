@@ -51,10 +51,13 @@ describe('safe-writes refuses privileged writes whatever the verb', () => {
 
   // ROUND 6: forms_forms_watches_create is a GENERATED tool, so in the real
   // registry it never reaches isAllowed() at all any more (it is the escape
-  // hatch now: see tests/google-api.test.ts and tests/_escape-hatch.test.ts
-  // for its deny/ask/allow behavior). isAllowed() itself is back to its
-  // plain pre-round-5 form; this push-registration-vs-allow-glob interaction
-  // is no longer something isAllowed() is responsible for.
+  // hatch now: see tests/google-api.test.ts and tests/safe-writes-trash.test.ts
+  // for its deny/ask behavior; there is no dedicated _escape-hatch.test.ts,
+  // src/tools/_escape-hatch.ts is covered through those two plus
+  // tests/outbound-allowlist.test.ts and tests/privileged-writes.test.ts
+  // itself). isAllowed() itself is back to its plain pre-round-5 form; this
+  // push-registration-vs-allow-glob interaction is no longer something
+  // isAllowed() is responsible for.
 
   it('an ordinary create tool (not a push registration) is unaffected: forms:create still allows it', () => {
     const ordinary = { name: 'forms_create', service: 'forms', cud: 'create' as const, scopes: [S('forms.body')] };

@@ -19,6 +19,11 @@ const EMPTY_SCOPES: ReadonlySet<string> = new Set<string>();
 // readers do; see trim.ts); stays well inside a default client context limit.
 const DEFAULT_MAX_RESULT_CHARS = 50_000;
 
+// A human reading a real write's confirmation prompt and deciding takes far
+// longer than a typical tool round trip; the SDK's 60s request default would
+// otherwise time the ask out mid-read on a slow or distracted reviewer.
+const ELICIT_TIMEOUT_MS = 5 * 60_000;
+
 export type Cud = 'read' | 'create' | 'update' | 'delete';
 
 export type DiscoveryMode = 'lazy' | 'curated' | 'eager';
@@ -358,7 +363,13 @@ export class ToolRegistry {
    * request, the negotiated protocol era replaced the push-style
    * request, a timeout, a closed connection, ...) uniformly, since the
    * caller's only correct response to any of them is the same: refuse
-   * rather than silently proceed without an answer.
+   * rather than silently proceed without an answer. `cause` lets the
+   * caller phrase the refusal correctly: `http_transport` covers BOTH a
+   * self-hosted HTTP deployment and an EE hosted tenant, which this
+   * server cannot tell apart, so the caller must not suggest
+   * GOOGLE_PROFILE there (a hosted tenant cannot set it); the other
+   * causes are stdio-only, where the caller IS the operator and that
+   * suggestion is safe.
    *
    * `policy.transport === 'http'` refuses before ever touching
    * elicitInput, regardless of what the client declared. This server's
@@ -375,31 +386,42 @@ export class ToolRegistry {
    * elicitation already uses) covers the remaining case on stdio: a
    * client that never declared the capability is refused immediately
    * too, instead of attempting the call and only finding out once
-   * elicitInput's own request timeout elapses.
+   * elicitInput's own request timeout elapses. A bare `elicitation: {}`
+   * (no nested `form` key) still counts as form support: some clients on
+   * the 2025-06-18 protocol revision declare the capability this way,
+   * before the form/url sub-modes existed to declare.
+   *
+   * The confirmation itself gets several minutes, not the SDK's 60s
+   * request default: reading a real call and deciding is slower than a
+   * typical tool round trip (documented in docs/configuration.md).
    */
-  async elicitConfirmation(message: string): Promise<{ action: 'accept' | 'decline' | 'cancel' } | { action: 'unsupported'; reason: string }> {
+  async elicitConfirmation(
+    message: string,
+  ): Promise<{ action: 'accept' | 'decline' | 'cancel' } | { action: 'unsupported'; reason: string; cause: 'http_transport' | 'no_capability' | 'error' }> {
     if (this.policy.transport === 'http') {
       return {
         action: 'unsupported',
-        reason:
-          'elicitation is not available over this server\'s HTTP transport; escape-hatch writes here need GOOGLE_PROFILE=full-writes (with GOOGLE_OUTBOUND_ALLOWLIST unset), or a curated tool',
+        reason: 'elicitation is not available over this server\'s HTTP transport',
+        cause: 'http_transport',
       };
     }
-    const caps = this.server.server.getClientCapabilities?.() as { elicitation?: { form?: unknown } } | undefined;
-    if (caps?.elicitation?.form === undefined) {
-      return { action: 'unsupported', reason: 'the connected client has not declared elicitation support' };
+    const caps = this.server.server.getClientCapabilities?.() as { elicitation?: unknown } | undefined;
+    if (!caps?.elicitation || typeof caps.elicitation !== 'object') {
+      return { action: 'unsupported', reason: 'the connected client has not declared elicitation support', cause: 'no_capability' };
     }
     try {
-      const result = await (this.server.server as { elicitInput: (params: unknown) => Promise<{ action: string }> }).elicitInput({
-        message,
-        requestedSchema: { type: 'object', properties: {} },
-      });
+      const result = await (
+        this.server.server as { elicitInput: (params: unknown, options?: { timeout: number }) => Promise<{ action: string }> }
+      ).elicitInput(
+        { message, requestedSchema: { type: 'object', properties: {} } },
+        { timeout: ELICIT_TIMEOUT_MS },
+      );
       if (result.action === 'accept' || result.action === 'decline' || result.action === 'cancel') {
         return { action: result.action };
       }
-      return { action: 'unsupported', reason: `unexpected elicitation result action "${result.action}"` };
+      return { action: 'unsupported', reason: `unexpected elicitation result action "${result.action}"`, cause: 'error' };
     } catch (err) {
-      return { action: 'unsupported', reason: err instanceof Error ? err.message : String(err) };
+      return { action: 'unsupported', reason: err instanceof Error ? err.message : String(err), cause: 'error' };
     }
   }
 

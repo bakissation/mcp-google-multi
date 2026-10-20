@@ -7,8 +7,9 @@ import { nearestMethodIds, registerEscapeTools, escapeHatchNames } from '../src/
 import { clearDiscoveryMemoryCache, searchMethods } from '../src/discovery-client.js';
 import { setHintProvider, type HintCase } from '../src/hint-provider.js';
 import { isAllowed, escapeHatchVerdict, type Policy } from '../src/write-control.js';
-import { CURATED_METHOD_TOOLS, GENERATED_METHOD_TOOLS } from '../src/tools/generated/method-map.js';
-import type { ElicitMode } from './_tool-harness.js';
+import { CURATED_METHOD_TOOLS, GENERATED_METHOD_TOOLS, CUD_OVERRIDES } from '../src/tools/generated/method-map.js';
+import { cudFromMethod } from '../src/discovery-client.js';
+import { toolHarness, accountSet, type ElicitMode } from './_tool-harness.js';
 
 const FIXTURE = {
   baseUrl: 'https://gmail.googleapis.com/',
@@ -798,7 +799,38 @@ describe('google_api_call write-control name resolution', () => {
     );
     const generatedEntries = Object.entries(GENERATED_METHOD_TOOLS).map(([methodId, toolName]) => ({ methodId, toolName }));
     const allEntries = [...curatedEntries, ...generatedEntries];
+
+    // ROUND 7 (MEDIUM 4): the REAL registry, not a name-text heuristic, is
+    // the ground truth for each tool's cud. inferCud(toolName) on both
+    // sides of a comparison can never catch a divergence between the two
+    // paths' real classification, because both sides would be wrong (or
+    // right) together; a generated tool's baked cud (CUD_OVERRIDES-
+    // corrected at gen time) is the real one google_api_call must match.
+    const ALL_BUNDLES = [
+      'slides', 'forms', 'chat', 'analytics', 'analytics_write', 'classroom', 'cloudidentity',
+      'cloudsearch', 'vault', 'keep', 'driveactivity', 'drivelabels', 'script', 'postmaster',
+      'groupssettings', 'groupsmigration', 'licensing', 'reseller', 'appsmarket',
+    ];
+    const fullAccounts = accountSet(
+      { test: { email: 'test@harness.example', admin: true, scopeProfile: 'full' } },
+      { defaultAccount: 'test', scopeProfiles: { full: { bundles: ALL_BUNDLES } } },
+    );
+    const fullRegistry = toolHarness({ accounts: fullAccounts }).registry;
+    // A handful of curated tools (drive_download/drive_export and the like)
+    // are owner-only host-file tools and never register for this harness's
+    // non-owner context; skipped here as out of scope for a write-class
+    // sweep, not silently treated as any particular cud.
+    const realCudMap = new Map(fullRegistry.tools.map((t) => [t.name, t.cud] as const));
+    function realCud(toolName: string) {
+      const cud = realCudMap.get(toolName);
+      if (cud === undefined) throw new Error(`tool not in the real registry: ${toolName}`);
+      return cud;
+    }
     const writeEntries = allEntries.filter((e) => inferCud(e.toolName) !== 'read');
+    // Scoped to the one test below that needs real (not name-heuristic)
+    // ground truth on both sides; the other sweeps in this block are
+    // unaffected and keep using writeEntries/inferCud as before.
+    const realWriteEntries = allEntries.filter((e) => realCudMap.has(e.toolName) && realCudMap.get(e.toolName) !== 'read');
 
     it('sanity: this sweep is not vacuous (hundreds of write entries from both maps)', () => {
       expect(curatedEntries.length).toBeGreaterThan(130);
@@ -807,9 +839,9 @@ describe('google_api_call write-control name resolution', () => {
     });
 
     it('a deny on the real tool op denies the same call via isAllowed AND via the escape hatch (every entry, ambiguous or not)', () => {
-      for (const { methodId, toolName } of writeEntries) {
+      for (const { methodId, toolName } of realWriteEntries) {
         const service = serviceOf(toolName);
-        const cud = inferCud(toolName);
+        const cud = realCud(toolName);
         const policy: Policy = { profile: 'full-writes', readOnly: false, allow: [], deny: [`${service}:${opOf(toolName)}`] };
         const direct = isAllowed({ name: toolName, service, cud, scopes: [] }, policy);
         expect(direct, `${methodId} via ${toolName}: the named tool itself should be denied`).toBe(false);
@@ -819,6 +851,38 @@ describe('google_api_call write-control name resolution', () => {
         // must still win over that, same requirement as before round 6.
         const verdict = escapeHatchVerdict(names.deny, { service, cud, scopes: [] }, names.primary, policy, false);
         expect(verdict.decision, `${methodId} via ${toolName}: the escape hatch should be denied too`).toBe('deny');
+      }
+    });
+
+    // ROUND 7 (MEDIUM 4) regression: the reporter's exact PoC (cud.mts).
+    // google_api_call used to compute a different cud than the generated
+    // twin for methods whose write class is an ARGUMENT, not the method
+    // name, so a deny glob keyed on the real class ("admin:delete") missed
+    // these through the escape hatch while still catching them by name.
+    it('CUD_OVERRIDES methods compute the same cud via google_api_call as their generated twin, and that cud actually differs from naive verb inference', () => {
+      let checked = 0;
+      for (const [methodId, overriddenCud] of Object.entries(CUD_OVERRIDES)) {
+        const toolName = GENERATED_METHOD_TOOLS[methodId];
+        if (!toolName) continue; // no generated twin to cross-check for this override
+        // google-api.ts computes CUD_OVERRIDES[method.id] ?? cudFromMethod(method)
+        // (an override always wins, so this is exactly its result); the
+        // generated twin's own baked cud must agree.
+        expect(realCud(toolName), `${methodId}: generated twin should match what google_api_call computes`).toBe(overriddenCud);
+        checked += 1;
+      }
+      expect(checked, 'sanity: at least the 4 action-shaped overrides have a generated twin to check').toBeGreaterThanOrEqual(4);
+      // The override has teeth: for the 3 action-shaped methods, naive verb
+      // inference (what google_api_call computed BEFORE this fix) actually
+      // disagrees with the override, proving this is not a no-op correction.
+      const naivelyMisread: Array<[string, string]> = [
+        ['directory.chromeosdevices.action', 'POST'],
+        ['directory.mobiledevices.action', 'POST'],
+        ['admin.customer.devices.chromeos.issueCommand', 'POST'],
+        ['admin.customer.devices.chromeos.batchChangeStatus', 'POST'],
+      ];
+      for (const [id, httpMethod] of naivelyMisread) {
+        expect(cudFromMethod({ id, httpMethod }), `${id}: naive inference`).not.toBe('delete');
+        expect(CUD_OVERRIDES[id], `${id}: override`).toBe('delete');
       }
     });
 

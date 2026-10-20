@@ -10,11 +10,13 @@ export interface Policy {
   allow: string[];
   deny: string[];
   /**
-   * Reserved seam (HTTP posture is "annotations only"): the dispatch
-   * transport is threaded into the resolved policy for a future seam, but in v6 alpha it does NOT stiffen the
-   * profile or alter any `isAllowed` verdict. "Stricter on HTTP" is achieved
-   * entirely by the `anthropic/requiresUserInteraction` annotation on the
-   * irreversible set, emitted identically on both transports.
+   * The dispatch transport, threaded into the resolved policy. Never
+   * alters `isAllowed`'s verdict or the profile itself: a curated tool's
+   * allow/deny/profile gate is identical on both transports. It DOES
+   * alter the escape hatch's ask step (`ToolRegistry.elicitConfirmation`,
+   * `src/registry.ts`): over HTTP, a write that would otherwise ask a
+   * human is refused instead, since the stateless HTTP transport cannot
+   * deliver the mid-call confirmation request (see docs/internals.md).
    * Optional so existing Policy literals (codegen/tests) need no change;
    * resolvePolicy always populates it.
    */

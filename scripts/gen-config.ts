@@ -190,7 +190,7 @@ export const CURATED_METHOD_IDS: string[] = [
 // write-control sees the method the way every one of its curated callers
 // is actually named. A method several curated tools share (e.g. every
 // sheets formatting tool calling spreadsheets.batchUpdate) lists all of
-// them: deny-any-name wins (see escapeHatchNames / isAllowedByAnyName), so
+// them: deny-any-name wins (see escapeHatchNames / escapeHatchVerdict), so
 // an operator's deny on ANY one of those tools' names also covers the
 // shared raw method. Derived by reading each curated registration's own
 // Discovery call; re-derive with `npx tsx scripts/extract-curated-method-map.ts`
@@ -350,11 +350,21 @@ export const CUD_OVERRIDES: Record<string, Cud> = {
   // One-time consent flag on the property: a state write, not a creation.
   'analyticsadmin.properties.acknowledgeUserDataCollection': 'update',
   // The effect is an ARGUMENT, not the method name, so verb inference can't
-  // reach these; all three can deprovision or wipe a device remotely.
+  // reach these; all four can deprovision or wipe a device remotely.
+  // ROUND 7 (MEDIUM 4): the customer.devices.chromeos.* keys previously
+  // carried a stale "directory.v1." infix that never matched the real
+  // method id (admin.customer.devices.chromeos.*, no "directory.v1."
+  // segment: see src/tools/generated/admin.ts), so the override silently
+  // never applied; both generated tools fell back to verb inference
+  // (issueCommand -> create, batchChangeStatus -> update) instead of the
+  // intended delete. google_api_call independently computed delete for
+  // neither id either (see src/tools/google-api.ts's CUD_OVERRIDES
+  // lookup), so GOOGLE_WRITE_DENY="*:delete*" missed both of these remote
+  // device actions on every path. Fixed to the real ids.
   'directory.chromeosdevices.action': 'delete',
   'directory.mobiledevices.action': 'delete',
-  'admin.directory.v1.customer.devices.chromeos.issueCommand': 'delete',
-  'admin.directory.v1.customer.devices.chromeos.batchChangeStatus': 'delete',
+  'admin.customer.devices.chromeos.issueCommand': 'delete',
+  'admin.customer.devices.chromeos.batchChangeStatus': 'delete',
   // POST only because of the body; this tests and reports without changing
   // state. `run` isn't a blanket read verb; script.scripts.run executes code.
   'searchconsole.urlTestingTools.mobileFriendlyTest.run': 'read',

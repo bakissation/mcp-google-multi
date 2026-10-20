@@ -129,7 +129,7 @@ export function toolHarness(opts: HarnessOptions = {}) {
     tokenStore,
   } as unknown as IdentityContext;
   const { server, handlers, schemas, elicitInput } = fakeServer({ elicit: opts.elicit });
-  buildRegistry(server as never, ctx, opts.mode ?? 'eager');
+  const registry = buildRegistry(server as never, ctx, opts.mode ?? 'eager');
 
   /** Validates args against the tool's registered schema, as the SDK does, then calls it. */
   async function call(name: string, args: Record<string, unknown> = {}): Promise<ToolResult> {
@@ -160,7 +160,7 @@ export function toolHarness(opts: HarnessOptions = {}) {
 
   const requests = (): GoogleRequest[] => request.mock.calls.map(([r]) => r as GoogleRequest);
 
-  return { ctx, call, requests, request, getClient, tokenStore, handlers, schemas, elicitInput };
+  return { ctx, call, requests, request, getClient, tokenStore, handlers, schemas, elicitInput, registry };
 }
 
 export const parseResult = (r: ToolResult) => JSON.parse(r.content[0].text);

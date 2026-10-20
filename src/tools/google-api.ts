@@ -19,7 +19,7 @@ import {
   MAX_SEARCH_QUERY,
 } from '../discovery-client.js';
 import { hints } from '../hint-provider.js';
-import { CURATED_METHOD_TOOLS, GENERATED_METHOD_TOOLS } from './generated/method-map.js';
+import { CURATED_METHOD_TOOLS, GENERATED_METHOD_TOOLS, CUD_OVERRIDES } from './generated/method-map.js';
 
 
 // Policy/toolset namespace for each API alias must match the NAMED tools' service
@@ -131,7 +131,7 @@ function describeMethod(m: DiscoveryMethod) {
     path: m.path,
     description: m.description,
     requiredParams: m.requiredParams,
-    cud: cudFromMethod(m),
+    cud: CUD_OVERRIDES[m.id] ?? cudFromMethod(m),
   };
 }
 
@@ -295,7 +295,13 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
 
       // The RESOLVED index id only, never the caller's methodId argument.
       registry.usageMetrics?.recordEscapeMethod(method.id);
-      const cud = cudFromMethod(method);
+      // CUD_OVERRIDES corrects the handful of methods HTTP-verb inference
+      // misreads (MEDIUM 4: the effect is an argument, not the method name,
+      // e.g. a ChromeOS device "action" that can remote-wipe it); a
+      // generated method's own twin applies the identical override at gen
+      // time (scripts/gen-tools.ts), so a GOOGLE_WRITE_DENY glob keyed on
+      // the real write class matches here exactly as it would there.
+      const cud = CUD_OVERRIDES[method.id] ?? cudFromMethod(method);
       const policyService = serviceForAlias(apiKey);
       // Checked under every name the operation can have (real tool(s), full
       // method path, legacy last-segment) because a method whose id ends in
