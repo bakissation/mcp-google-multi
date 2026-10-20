@@ -172,7 +172,7 @@ describe('checkOutboundForMethod grantee-aware rules (GHSA-9vg8 part A)', () => 
 // M1: a write to ANY method whose resource segment looks grantee-shaped
 // (acl, permissions, members, memberships, delegates, forwardingAddresses,
 // sendAs, invitations, accessBindings, students, teachers) fails closed
-// while the allowlist is active, unless a specific shape rule exists —
+// while the allowlist is active, unless a specific shape rule exists,
 // not just the 9 ids the previous version of this check happened to name.
 describe('checkOutboundForMethod: fail closed on grantee-pattern writes with no rule (M1)', () => {
   const EXPLICIT_RULE_METHODS = new Set([
@@ -267,7 +267,7 @@ describe('checkOutboundForMethod: generic walk AND method rule both apply', () =
 describe('checkOutboundForMethod: calendar.acl update/patch pathParams.ruleId', () => {
   // Bodies below are deliberately shaped to be ALLOWED on their own, so only
   // the ruleId-sourced grantee (unioned with the body's) can explain a block
-  // — otherwise a body-level fail-closed/deny would make these vacuous.
+  // otherwise a body-level fail-closed/deny would make these vacuous.
   it('a ruleId naming an unlisted user blocks the call even when the body names an allowed one', () => {
     const r = checkOutboundForMethod('calendar.acl.update', { scope: { type: 'user', value: 'a@corp.com' } }, 'a', ENV, {
       httpMethod: 'PATCH',

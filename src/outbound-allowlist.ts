@@ -228,7 +228,7 @@ function mergeGrantee(a: GranteeCheck | null, b: GranteeCheck | null): GranteeCh
 
 // Calendar's ACL rule id itself encodes the grantee ("user:x@evil.example",
 // "group:...", "domain:...", or the bare string "default") for update/patch,
-// independently of whatever the body's `scope` says — so a body that omits
+// independently of whatever the body's `scope` says, so a body that omits
 // or disagrees with `scope` cannot hide the real target named in the path.
 function pathParamGrantee(methodId: string, pathParams: Record<string, unknown> | undefined): GranteeCheck | null {
   if (methodId !== 'calendar.acl.update' && methodId !== 'calendar.acl.patch') return null;
