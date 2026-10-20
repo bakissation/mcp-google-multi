@@ -112,3 +112,57 @@ describe('checkOutboundForMethod (escape hatch / generated)', () => {
     expect(ok).toBeNull();
   });
 });
+
+// GHSA-9vg8-7mjp-68v5 part A: the generic emailAddress/email key walk missed
+// every grantee spelled another way (a Drive permission's type/domain, a
+// Gmail delegate/forwarding/send-as email, a filter's forward action, a
+// Calendar ACL scope). Each is now checked by its own shape.
+describe('checkOutboundForMethod grantee-aware rules (GHSA-9vg8 part A)', () => {
+  it('is a no-op for grantee methods when the allowlist is off', () => {
+    expect(checkOutboundForMethod('drive.permissions.create', { type: 'anyone', role: 'reader' }, 'a', {})).toBeNull();
+    expect(checkOutboundForMethod('calendar.acl.insert', { scope: { type: 'default' } }, 'a', {})).toBeNull();
+  });
+
+  const BLOCKED = 'blocked';
+  const OK = 'ok';
+  const cases: Array<[string, unknown, 'blocked' | 'ok']> = [
+    // --- reporter's exact reproduction cases ---
+    ['drive.permissions.create', { type: 'anyone', role: 'reader' }, BLOCKED],
+    ['drive.permissions.create', { type: 'domain', domain: 'evil.example', role: 'reader' }, BLOCKED],
+    ['gmail.users.settings.delegates.create', { delegateEmail: 'x@evil.example' }, BLOCKED],
+    ['calendar.acl.insert', { role: 'reader', scope: { type: 'user', value: 'x@evil.example' } }, BLOCKED],
+    // --- Drive permissions: the rest of the type matrix ---
+    ['drive.permissions.create', { type: 'domain', domain: 'corp.com', role: 'reader' }, OK],
+    ['drive.permissions.create', { type: 'user', emailAddress: 'a@corp.com', role: 'reader' }, OK],
+    ['drive.permissions.create', { type: 'user', emailAddress: 'bad@evil.io', role: 'reader' }, BLOCKED],
+    ['drive.permissions.update', { type: 'anyone', role: 'writer' }, BLOCKED],
+    ['drive.permissions.create', { role: 'reader' }, BLOCKED], // no `type` at all: unknown shape, fail closed
+    // --- Gmail settings: forwarding / send-as / filters ---
+    ['gmail.users.settings.forwardingAddresses.create', { forwardingEmail: 'x@evil.example' }, BLOCKED],
+    ['gmail.users.settings.forwardingAddresses.create', { forwardingEmail: 'a@corp.com' }, OK],
+    ['gmail.users.settings.sendAs.create', { sendAsEmail: 'x@evil.example' }, BLOCKED],
+    ['gmail.users.settings.sendAs.create', { sendAsEmail: 'boss@partner.io' }, OK],
+    ['gmail.users.settings.filters.create', { action: { forward: 'x@evil.example' } }, BLOCKED],
+    ['gmail.users.settings.filters.create', { action: { addLabelIds: ['INBOX'] } }, OK], // no forward: ungated label/archive filter
+    ['gmail.users.settings.filters.create', { criteria: { from: 'x@evil.example' } }, OK], // inbound match condition, not a destination
+    ['gmail.users.settings.filters.create', {}, OK],
+    // --- Calendar ACL: user/group/domain/default ---
+    ['calendar.acl.insert', { role: 'reader', scope: { type: 'domain', value: 'evil.example' } }, BLOCKED],
+    ['calendar.acl.insert', { role: 'reader', scope: { type: 'domain', value: 'corp.com' } }, OK],
+    ['calendar.acl.insert', { role: 'reader', scope: { type: 'default' } }, BLOCKED], // public, same as Drive "anyone"
+    ['calendar.acl.update', { scope: { type: 'group', value: 'bad@evil.io' } }, BLOCKED],
+    ['calendar.acl.patch', { scope: { type: 'group', value: 'a@corp.com' } }, OK],
+    ['calendar.acl.patch', {}, BLOCKED], // missing scope entirely: unknown shape, fail closed
+    ['calendar.acl.insert', { scope: { type: 'roomResource' } }, BLOCKED], // unrecognised scope type: fail closed
+  ];
+
+  it.each(cases)('%s %j -> %s', (methodId, body, expected) => {
+    const r = checkOutboundForMethod(methodId, body, 'a', ENV);
+    if (expected === 'blocked') {
+      expect(r).not.toBeNull();
+      expect(JSON.parse(r!.content[0].text).error).toBe('recipient_not_allowed');
+    } else {
+      expect(r).toBeNull();
+    }
+  });
+});
