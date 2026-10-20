@@ -4,7 +4,6 @@ import { sliceEncoded } from './trim.js';
 import { expandPath, isGoogleApiUrl } from './discovery-client.js';
 import { handleGoogleApiError } from './tools/_errors.js';
 import { scopeHintForMethod, type ScopeSetDeps } from './scope-observability.js';
-import { checkOutboundForMethod } from './outbound-allowlist.js';
 import { hints } from './hint-provider.js';
 
 export const MAX_RESPONSE_CHARS = 100_000;
@@ -60,14 +59,11 @@ export function resolveRequestBody(httpMethod: string, body: unknown): unknown {
   return body ?? undefined;
 }
 
+// Write-control for a write call (deny-check, full-writes auto-allow, or an
+// elicitation round-trip asking a human) runs in the caller, BEFORE this is
+// invoked (src/tools/_escape-hatch.ts): by the time a write reaches here it
+// has already been cleared.
 export async function executeApiMethod(method: ApiMethodRef, args: ExecuteArgs, deps: ExecuteDeps = {}) {
-  // Outbound allowlist: no-op when off; with it active, structured bodies are
-  // inspected for recipient fields and raw-compose methods are refused.
-  const outbound = checkOutboundForMethod(method.id, args.body, args.account, undefined, {
-    httpMethod: method.httpMethod,
-    pathParams: args.pathParams as Record<string, unknown> | undefined,
-  });
-  if (outbound) return outbound;
   if (args.queryParams?.alt === 'media') {
     return jsonResult(
       {

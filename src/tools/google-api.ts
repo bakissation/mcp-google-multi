@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ToolRegistry } from '../registry.js';
-import { isAllowedByAnyName, writeDisabledResult, type Policy } from '../write-control.js';
+import type { Policy } from '../write-control.js';
+import { escapeHatchGate } from './_escape-hatch.js';
 import { accountArgLive } from '../accounts.js';
 import { getClient } from '../client.js';
 import { coerceJson } from './_coerce.js';
@@ -87,60 +88,28 @@ function snakeSegment(segment: string): string {
 // a secondary step, by an unrelated curated tool: e.g. sheets_copy_sheet_to
 // also calls sheets.spreadsheets.sheets.copyTo, the same method its own
 // generated twin sheets_spreadsheets_sheets_copy_to wraps. Listed here so a
-// deny/allow written against that curated tool's name reaches the escape
-// hatch for this method too, not just its generated twin's name.
+// deny written against that curated tool's name reaches the escape hatch
+// for this method too, not just its generated twin's name.
 export const EXTRA_METHOD_TOOLS: Record<string, string[]> = {
   'sheets.spreadsheets.sheets.copyTo': ['sheets_copy_sheet_to'],
 };
-
-// Every curated tool name (including EXTRA_METHOD_TOOLS), and every
-// generated tool name, across the WHOLE surface, not just this method:
-// used to detect when the generic lastSegmentName fallback below happens
-// to spell some OTHER method's real tool name exactly (e.g. "drive_update"
-// is the actual curated tool for drive.files.update, but is ALSO the
-// generic lastSegmentName for drive.permissions.update and
-// drive.revisions.update, which share none of its semantics). Computed
-// once and cached: both maps are static for the life of the process.
-let allCuratedNamesCache: Set<string> | undefined;
-function allCuratedNames(): Set<string> {
-  if (!allCuratedNamesCache) {
-    allCuratedNamesCache = new Set([...Object.values(CURATED_METHOD_TOOLS).flat(), ...Object.values(EXTRA_METHOD_TOOLS).flat()]);
-  }
-  return allCuratedNamesCache;
-}
-let allGeneratedNamesCache: Set<string> | undefined;
-function allGeneratedNames(): Set<string> {
-  if (!allGeneratedNamesCache) allGeneratedNamesCache = new Set(Object.values(GENERATED_METHOD_TOOLS));
-  return allGeneratedNamesCache;
-}
 
 export interface EscapeHatchNames {
   /** Every name a deny glob is checked against: every curated tool name
    * sharing this method, its generated twin, the full method-path name,
    * the legacy last-segment name. Denying any one of them can only narrow
    * what gets through, never widen it, so listing every curated tool here
-   * (even when several share one raw method) is always safe. */
+   * (even when several share one raw method) is always safe. The escape
+   * hatch has no allow-list of its own anymore (write-control.ts); only
+   * full-writes auto-allows, everything else asks a human. */
   deny: string[];
-  /** Names an ALLOW glob may grant through: the generated twin, the
-   * full-path name and the legacy last-segment name always; a curated
-   * tool's own name only when it is the ONE AND ONLY curated tool mapped
-   * to this method. An allow naming one narrow operation on a shared
-   * method (e.g. "drive:trash") must not also open every OTHER operation
-   * reachable through the same raw drive.files.update (a plain rename, a
-   * move, drive_transfer's internals): those have no real tool name in
-   * common to allow narrowly, so only the method-wide names can grant them. */
-  allow: string[];
   /** The real tool name when exactly one exists (curated or generated),
-   * else the full-path name: what the profile decides on when neither an
-   * explicit deny nor an explicit allow matched (see isAllowedByAnyName
-   * for why this must be a single real name, not "any name"). */
+   * else the full-path name: shown in the human confirmation prompt and
+   * used to build a sensible message when this call is denied outright. */
   primary: string;
 }
 
-/**
- * Every name write-control might reasonably know this operation by. See
- * EscapeHatchNames for which names are deny-only vs allow-eligible.
- */
+/** Every name write-control might reasonably know this operation by. */
 export function escapeHatchNames(policyService: string, methodId: string): EscapeHatchNames {
   const curatedNames = CURATED_METHOD_TOOLS[methodId] ?? EXTRA_METHOD_TOOLS[methodId] ?? [];
   const generatedName = GENERATED_METHOD_TOOLS[methodId];
@@ -149,43 +118,9 @@ export function escapeHatchNames(policyService: string, methodId: string): Escap
   const lastSegment = methodId.split('.').pop() ?? methodId;
   const lastSegmentName = `${policyService}_${snakeSegment(lastSegment)}`;
 
-  const dedupe = (list: string[]): string[] => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const n of list) {
-      if (!seen.has(n)) {
-        seen.add(n);
-        out.push(n);
-      }
-    }
-    return out;
-  };
-
-  // lastSegmentName is a GENERIC pattern (service + the method's last dot
-  // segment), not derived from any real registration, so it can collide
-  // with an unrelated method's actual tool name by coincidence. Deny
-  // always includes it regardless (a deny can only narrow what gets
-  // through); allow drops it whenever it spells some OTHER curated or
-  // generated tool's real name, since letting it through there would
-  // widen a narrow allow on that OTHER tool into this, unrelated, method.
-  const lastSegmentIsForeignToolName =
-    (allCuratedNames().has(lastSegmentName) && !curatedNames.includes(lastSegmentName)) ||
-    (allGeneratedNames().has(lastSegmentName) && lastSegmentName !== generatedName);
-
-  const deny = dedupe([
-    ...curatedNames,
-    ...(generatedName ? [generatedName] : []),
-    ...(fullPathName ? [fullPathName] : []),
-    lastSegmentName,
-  ]);
-  const allow = dedupe([
-    ...(curatedNames.length === 1 ? curatedNames : []),
-    ...(generatedName ? [generatedName] : []),
-    ...(fullPathName ? [fullPathName] : []),
-    ...(lastSegmentIsForeignToolName ? [] : [lastSegmentName]),
-  ]);
+  const deny = [...new Set([...curatedNames, ...(generatedName ? [generatedName] : []), ...(fullPathName ? [fullPathName] : []), lastSegmentName])];
   const primary = curatedNames.length === 1 ? curatedNames[0] : generatedName ?? fullPathName ?? lastSegmentName;
-  return { deny, allow, primary };
+  return { deny, primary };
 }
 
 function describeMethod(m: DiscoveryMethod) {
@@ -362,25 +297,25 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       registry.usageMetrics?.recordEscapeMethod(method.id);
       const cud = cudFromMethod(method);
       const policyService = serviceForAlias(apiKey);
-      // The escape hatch self-gates, so it needs the same scope signal as the registry
-      // wrapper, or a privileged method would slip past safe-writes here while its generated twin is refused.
       // Checked under every name the operation can have (real tool(s), full
       // method path, legacy last-segment) because a method whose id ends in
       // a generic verb, such as drive.permissions.create or
       // gmail.users.settings.filters.create, would otherwise lose its
       // resource and collapse onto a generic drive_create / gmail_create
-      // that neither the profile nor an operator's resource-scoped
-      // GOOGLE_WRITE_DENY can tell apart from an ordinary write. Deny on
-      // any name wins; allow only on a method-wide name (never a narrow
-      // curated tool's name shared with other operations on the same raw
-      // method; see EscapeHatchNames); the profile itself decides on the
-      // primary (real) name alone when neither matched.
+      // that an operator's resource-scoped GOOGLE_WRITE_DENY could not tell
+      // apart from an ordinary write. Deny on any name wins outright;
+      // everything else that reaches here either auto-allows under
+      // full-writes or asks a human (see escapeHatchGate).
       if (cud !== 'read') {
         const names = escapeHatchNames(policyService, method.id);
-        const verdict = isAllowedByAnyName(names.deny, names.allow, { service: policyService, cud, scopes: method.scopes }, names.primary, policy);
-        if (!verdict.allowed) {
-          return writeDisabledResult(verdict.ref, policy, account as string);
-        }
+        const gate = await escapeHatchGate(registry, names.deny, names.primary, { service: policyService, cud, scopes: method.scopes }, policy, {
+          account: account as string,
+          methodId: method.id,
+          httpMethod: method.httpMethod,
+          pathParams: pathParams as Record<string, unknown> | undefined,
+          body,
+        });
+        if (gate) return gate;
       }
 
       return executeApiMethod(

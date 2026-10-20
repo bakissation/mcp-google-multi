@@ -111,6 +111,11 @@ interface ToolConfig {
   cud?: Cud;
   requiredScopes?: readonly string[];
   _meta?: Record<string, unknown>;
+  /** The escape hatch (google_api_call and every generated per-method
+   * tool): write-control for these runs INSIDE the handler itself
+   * (deny-check, then an elicitation round-trip), not this gate, since
+   * the gate here is synchronous and has no multi-name deny list. */
+  escapeHatch?: boolean;
 }
 
 const CUD_OVERRIDES: Record<string, Cud> = {
@@ -270,7 +275,7 @@ export class ToolRegistry {
         requiredScopes: config.requiredScopes,
       });
       const guarded =
-        cud === 'read'
+        cud === 'read' || config.escapeHatch
           ? baseHandler
           : (...args: unknown[]) =>
               isAllowed({ name, service, cud, scopes: config.requiredScopes }, policy)
@@ -345,6 +350,29 @@ export class ToolRegistry {
       this.registeringMeta = false;
     }
   }) as McpServer['registerTool'];
+
+  /**
+   * Server-side MCP elicitation: asks the connected human to confirm an
+   * escape-hatch write. `unsupported` covers every way asking can fail
+   * (no elicitation capability, the negotiated protocol era replaced the
+   * push-style request, a timeout, a closed connection, ...) uniformly,
+   * since the caller's only correct response to any of them is the same:
+   * refuse rather than silently proceed without an answer.
+   */
+  async elicitConfirmation(message: string): Promise<{ action: 'accept' | 'decline' | 'cancel' } | { action: 'unsupported'; reason: string }> {
+    try {
+      const result = await (this.server.server as { elicitInput: (params: unknown) => Promise<{ action: string }> }).elicitInput({
+        message,
+        requestedSchema: { type: 'object', properties: {} },
+      });
+      if (result.action === 'accept' || result.action === 'decline' || result.action === 'cancel') {
+        return { action: result.action };
+      }
+      return { action: 'unsupported', reason: `unexpected elicitation result action "${result.action}"` };
+    } catch (err) {
+      return { action: 'unsupported', reason: err instanceof Error ? err.message : String(err) };
+    }
+  }
 
   services(): string[] {
     return [...new Set(this.tools.filter((t) => !t.meta).map((t) => t.service))];

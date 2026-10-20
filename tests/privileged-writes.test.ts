@@ -49,17 +49,12 @@ describe('safe-writes refuses privileged writes whatever the verb', () => {
     expect(privilegeOf(FORMS_WATCHES_RENEW)).toBe('push_registration');
   });
 
-  // OWNER DECISION (round 5, item 6): a service:cud wildcard (forms:create)
-  // must not open a push registration; naming it explicitly, or a true
-  // wildcard (forms:*), still does. Deny is unaffected either way.
-  it('a bare service:cud allow (forms:create) does not open forms_forms_watches_create; naming it, or forms:*, does', () => {
-    expect(isAllowed(FORMS_WATCHES_CREATE, safe({ allow: ['forms:create'] }))).toBe(false);
-    expect(isAllowed(FORMS_WATCHES_CREATE, safe({ allow: ['forms:forms_watches_create'] }))).toBe(true);
-    expect(isAllowed(FORMS_WATCHES_CREATE, safe({ allow: ['forms:*'] }))).toBe(true);
-    // Deny keeps the full candidate set regardless: forms:create still
-    // blocks the push registration too, same as before this fix.
-    expect(isAllowed(FORMS_WATCHES_CREATE, { profile: 'full-writes', readOnly: false, allow: [], deny: ['forms:create'] })).toBe(false);
-  });
+  // ROUND 6: forms_forms_watches_create is a GENERATED tool, so in the real
+  // registry it never reaches isAllowed() at all any more (it is the escape
+  // hatch now: see tests/google-api.test.ts and tests/_escape-hatch.test.ts
+  // for its deny/ask/allow behavior). isAllowed() itself is back to its
+  // plain pre-round-5 form; this push-registration-vs-allow-glob interaction
+  // is no longer something isAllowed() is responsible for.
 
   it('an ordinary create tool (not a push registration) is unaffected: forms:create still allows it', () => {
     const ordinary = { name: 'forms_create', service: 'forms', cud: 'create' as const, scopes: [S('forms.body')] };

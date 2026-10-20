@@ -43,9 +43,24 @@ export function accountSet(
   };
 }
 
-export function fakeServer() {
+/** Simulated client response to a server-side elicitation request
+ * (registry.elicitConfirmation -> server.server.elicitInput). 'unsupported'
+ * (the default) throws, as a client with no elicitation capability would;
+ * 'accept' | 'decline' | 'cancel' resolve with that action; a function gets
+ * the raw prompt message and decides per call. */
+export type ElicitMode = 'accept' | 'decline' | 'cancel' | 'unsupported' | ((message: string) => 'accept' | 'decline' | 'cancel');
+
+export function fakeServer(opts: { elicit?: ElicitMode } = {}) {
   const handlers: Record<string, Handler> = {};
   const schemas: Record<string, z.ZodRawShape> = {};
+  const elicitInput = vi.fn(async (params: { message: string }) => {
+    const mode = opts.elicit ?? 'unsupported';
+    const action = typeof mode === 'function' ? mode(params.message) : mode;
+    if (action === 'unsupported') {
+      throw new Error('elicitation not supported by this client (test harness default)');
+    }
+    return { action };
+  });
   const server = {
     registerTool: (name: string, config: { inputSchema?: z.ZodRawShape }, handler: Handler) => {
       handlers[name] = handler;
@@ -53,9 +68,9 @@ export function fakeServer() {
       return 'ok';
     },
     sendToolListChanged: vi.fn(),
-    server: { setRequestHandler: () => {}, getClientCapabilities: () => undefined },
+    server: { setRequestHandler: () => {}, getClientCapabilities: () => undefined, elicitInput },
   };
-  return { server, handlers, schemas };
+  return { server, handlers, schemas, elicitInput };
 }
 
 export interface HarnessOptions {
@@ -70,6 +85,8 @@ export interface HarnessOptions {
   /** Full control over the raw client response, when respond is not enough. */
   requestImpl?: (req: GoogleRequest) => Promise<unknown>;
   mode?: 'eager' | 'lazy';
+  /** Simulated response to a server-side elicitation (escape hatch ask). */
+  elicit?: ElicitMode;
 }
 
 export const DEFAULT_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
@@ -102,7 +119,7 @@ export function toolHarness(opts: HarnessOptions = {}) {
     getClient,
     tokenStore,
   } as unknown as IdentityContext;
-  const { server, handlers, schemas } = fakeServer();
+  const { server, handlers, schemas, elicitInput } = fakeServer({ elicit: opts.elicit });
   buildRegistry(server as never, ctx, opts.mode ?? 'eager');
 
   /** Validates args against the tool's registered schema, as the SDK does, then calls it. */
@@ -134,7 +151,7 @@ export function toolHarness(opts: HarnessOptions = {}) {
 
   const requests = (): GoogleRequest[] => request.mock.calls.map(([r]) => r as GoogleRequest);
 
-  return { ctx, call, requests, request, getClient, tokenStore, handlers, schemas };
+  return { ctx, call, requests, request, getClient, tokenStore, handlers, schemas, elicitInput };
 }
 
 export const parseResult = (r: ToolResult) => JSON.parse(r.content[0].text);

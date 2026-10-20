@@ -93,47 +93,17 @@ function candidates(tool: ToolRef): string[] {
   return [`${tool.service}:${tool.cud}`, `${tool.service}:${opOf(tool)}`];
 }
 
-const CUD_WORDS = new Set(['create', 'read', 'update', 'delete']);
-
-/**
- * ALLOW-only candidate set: a push-registration tool (`isPushRegistration`,
- * caller-supplied since a single ref's own name does not always self-
- * identify, see isAllowedByAnyName below) drops the bare `service:cud`
- * candidate entirely, so a generic allow meant for ordinary creates/
- * updates (`forms:create`) cannot also open a push-channel registration.
- * When the op itself is nothing but that bare cud word (a legacy,
- * pre-collision-fix last-segment name with no real tool identity to
- * narrow to, e.g. "workspaceevents_create" for
- * workspaceevents.subscriptions.create), there is no candidate narrower
- * than the one just dropped either, so none is returned at all. DENY is
- * unaffected: `candidates` above still returns both forms there, since a
- * deny can only narrow what gets through, never widen it, so there is no
- * safety reason to ever restrict what it can match.
- */
-function allowCandidates(tool: ToolRef, isPushRegistration: boolean): string[] {
-  if (!isPushRegistration) return candidates(tool);
-  const op = opOf(tool);
-  return CUD_WORDS.has(op) ? [] : [`${tool.service}:${op}`];
-}
-
-function matchCandidates(cands: string[], globs: string[]): string | undefined {
-  if (globs.length === 0 || cands.length === 0) return undefined;
+function firstMatch(tool: ToolRef, globs: string[]): string | undefined {
+  if (globs.length === 0) return undefined;
+  const cands = candidates(tool);
   return globs.find((g) => {
     const re = globToRegExp(g);
     return cands.some((c) => re.test(c));
   });
 }
 
-function firstMatch(tool: ToolRef, globs: string[]): string | undefined {
-  return matchCandidates(candidates(tool), globs);
-}
-
 function matchesAny(tool: ToolRef, globs: string[]): boolean {
   return firstMatch(tool, globs) !== undefined;
-}
-
-function matchesAnyAllow(tool: ToolRef, globs: string[], isPushRegistration: boolean): boolean {
-  return matchCandidates(allowCandidates(tool, isPushRegistration), globs) !== undefined;
 }
 
 // Scopes that authorize acting on the whole organization, legal holds,
@@ -187,66 +157,45 @@ export function isAllowed(tool: ToolRef, policy: Policy): boolean {
   if (tool.cud === 'read') return true;
   if (policy.readOnly) return false;
   if (matchesAny(tool, policy.deny)) return false;
-  if (matchesAnyAllow(tool, policy.allow, privilegeOf(tool) === 'push_registration')) return true;
+  if (matchesAny(tool, policy.allow)) return true;
   return profileAllows(policy.profile, tool);
 }
 
-export interface AnyNameVerdict {
-  allowed: boolean;
-  /** The ref whose name explains the verdict: the specific name a deny glob
-   * matched, or `primaryName` when nothing matched and the profile decided. */
+export type EscapeHatchDecision = 'allow' | 'deny' | 'ask';
+
+export interface EscapeHatchVerdict {
+  decision: EscapeHatchDecision;
+  /** The ref that explains the verdict: the specific name a deny glob
+   * matched, or `primaryName` for every other case. */
   ref: ToolRef;
 }
 
 /**
- * Multi-name variant for the escape hatch, which has no single fixed tool
- * name for a Discovery method. `denyNames` lists every name the operation
- * can be known by (every curated tool name sharing this method, its
- * generated twin, the full method-path name, the legacy last-segment
- * name): deny on any one of them wins, which can only narrow what the
- * profile/allow-list would otherwise permit, never widen it, so including
- * every curated tool's name here is always safe.
- *
- * `allowNames` is deliberately a SMALLER set: the generated twin, the
- * full-path name, and the legacy last-segment name always, but a curated
- * tool's own name only when `denyNames` names exactly one (the caller
- * decides this; see escapeHatchNames). A raw Discovery method several
- * curated tools share (e.g. every drive.files.update caller: move, trash,
- * untrash, transfer, a plain rename) has no single tool whose narrow allow
- * glob (`drive:trash`) it would be safe to let open the WHOLE method: an
- * allow naming one of those operations must not also grant every other one
- * reachable through the same raw call.
- *
- * Otherwise (neither an explicit deny nor an explicit allow matched) the
- * profile decides using `primaryName` alone, never "any name": the
- * profile's own exceptions (TRASH_MOVE_TOOLS) are keyed to the real tool's
- * name, and judging them against a synthetic name that was never meant to
- * carry that exception would wrongly refuse (e.g.
- * `gmail.users.messages.trash`'s full-path name `gmail_users_messages_trash`
- * is not in TRASH_MOVE_TOOLS even though its real name `gmail_trash` is).
+ * The escape hatch (google_api_call and every generated per-method tool)
+ * has no allow-list or privileged-write special case of its own anymore:
+ * an explicit deny on any name the operation is known by still wins
+ * (narrows what gets through, never widens it, so listing every curated
+ * tool sharing a raw method here is always safe); full-writes with the
+ * outbound allowlist off is the only automatic allow; everything else
+ * (the default profile, safe-writes, any allow list set, or full-writes
+ * with the allowlist on) asks a human via elicitation instead of
+ * resolving the question itself.
  */
-export function isAllowedByAnyName(
+export function escapeHatchVerdict(
   denyNames: readonly string[],
-  allowNames: readonly string[],
   base: { service: string; cud: Cud; scopes?: readonly string[] },
   primaryName: string,
   policy: Policy,
-): AnyNameVerdict {
+  outboundAllowlistActive: boolean,
+): EscapeHatchVerdict {
   const primaryRef: ToolRef = { name: primaryName, service: base.service, cud: base.cud, scopes: base.scopes };
-  if (base.cud === 'read') return { allowed: true, ref: primaryRef };
-  if (policy.readOnly) return { allowed: false, ref: primaryRef };
+  if (base.cud === 'read') return { decision: 'allow', ref: primaryRef };
+  if (policy.readOnly) return { decision: 'deny', ref: primaryRef };
   const denyRefs = denyNames.map((name): ToolRef => ({ name, service: base.service, cud: base.cud, scopes: base.scopes }));
   const deniedRef = denyRefs.find((ref) => matchesAny(ref, policy.deny));
-  if (deniedRef) return { allowed: false, ref: deniedRef };
-  // Detected from the DENY names, not a single allow ref's own name: the
-  // real curated/generated name always self-identifies via
-  // PUSH_REGISTRATION_RE and is always present there, even when a legacy
-  // synthetic name sharing the same method (e.g. "workspaceevents_create")
-  // does not match the pattern on its own.
-  const isPushRegistration = denyNames.some((name) => PUSH_REGISTRATION_RE.test(name));
-  const allowRefs = allowNames.map((name): ToolRef => ({ name, service: base.service, cud: base.cud, scopes: base.scopes }));
-  if (allowRefs.some((ref) => matchesAnyAllow(ref, policy.allow, isPushRegistration))) return { allowed: true, ref: primaryRef };
-  return { allowed: profileAllows(policy.profile, primaryRef), ref: primaryRef };
+  if (deniedRef) return { decision: 'deny', ref: deniedRef };
+  if (policy.profile === 'full-writes' && !outboundAllowlistActive) return { decision: 'allow', ref: primaryRef };
+  return { decision: 'ask', ref: primaryRef };
 }
 
 /** Which profiles would permit this tool at all. */
@@ -268,7 +217,7 @@ export function denyReason(tool: ToolRef, policy: Policy): DenyReason | undefine
   if (policy.readOnly) return { rule: 'read_only' };
   const pattern = firstMatch(tool, policy.deny);
   if (pattern !== undefined) return { rule: 'deny_glob', pattern };
-  if (matchesAnyAllow(tool, policy.allow, privilegeOf(tool) === 'push_registration')) return undefined;
+  if (matchesAny(tool, policy.allow)) return undefined;
   if (profileAllows(policy.profile, tool)) return undefined;
   const kind = privilegeOf(tool);
   // Distinguished from a plain profile refusal: "delete is not a safe write"
