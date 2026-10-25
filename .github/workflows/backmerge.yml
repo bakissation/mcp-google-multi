@@ -17,13 +17,6 @@ jobs:
        github.event.workflow_run.head_branch == 'staging')
     runs-on: ubuntu-latest
     steps:
-      # Pinned SHA (branch may have moved); no persisted token since the resync step
-      # authenticates only via BACKMERGE_TOKEN and nothing from checkout executes.
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 0
-          persist-credentials: false
       - name: Open + merge the post-release resync PRs
         env:
           GH_TOKEN: ${{ secrets.BACKMERGE_TOKEN }}
@@ -34,7 +27,9 @@ jobs:
           set +e
           # The release tag sits on the released commit; `gh release view` resolves
           # "latest" and ignores prereleases, so derive it from the SHA instead.
-          TAG=$(git tag --points-at "$HEAD_SHA" | head -n 1)
+          # Read through the API: no checkout, so nothing from the triggering
+          # run's commit lands on this privileged runner.
+          TAG=$(gh api --paginate "repos/$REPO/git/matching-refs/tags/v" --jq ".[] | select(.object.sha == \"$HEAD_SHA\") | .ref | ltrimstr(\"refs/tags/\")" | head -n 1)
           case "$SRC" in
             main) targets="staging dev" ;;
             *)    targets="dev" ;;
