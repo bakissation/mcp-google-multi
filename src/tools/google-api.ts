@@ -10,6 +10,7 @@ import { editDistance, SUGGEST_MAX_INPUT } from '../scope-catalog.js';
 import { executeApiMethod, jsonResult, type ExecuteDeps, type QueryParams } from '../executor.js';
 import {
   SUPPORTED_APIS,
+  API_VERSION_SIBLINGS,
   resolveApiAliases,
   type DiscoveryDeps,
   type DiscoveryMethod,
@@ -44,6 +45,7 @@ const SERVICE_FOR_ALIAS: Record<string, string> = {
   admin_datatransfer: 'admin',
   groupssettings: 'groupssettings',
   analyticsadmin: 'analytics',
+  analyticsadmin_v1alpha: 'analytics',
   analyticsdata: 'analytics',
 };
 
@@ -145,6 +147,18 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
     return toolsetEnabled(toolsets, serviceForAlias(alias));
   };
   const enabledApis = Object.keys(SUPPORTED_APIS).filter(apiEnabled);
+  /** The sibling version that carries this exact method id, if any. */
+  const findInOtherVersion = async (apiKey: string, methodId: string): Promise<string | undefined> => {
+    for (const other of API_VERSION_SIBLINGS[apiKey] ?? []) {
+      if (!apiEnabled(other)) continue;
+      try {
+        if ((await loadMethodIndex(other, deps)).some((m) => m.id === methodId)) return other;
+      } catch {
+        // an unreachable second version must not change the miss in this one
+      }
+    }
+    return undefined;
+  };
   const apiList = enabledApis.join(', ');
   const toolsetDisabled = (alias: string) => {
     const rendered = hints()?.render({ kind: 'toolset_disabled', api: alias, service: serviceForAlias(alias) });
@@ -280,6 +294,19 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       }
       if (!method) {
         registry.usageMetrics?.recordEscapeMethod(null);
+        const otherVersion = await findInOtherVersion(apiKey, String(methodId));
+        if (otherVersion) {
+          return jsonResult(
+            {
+              error: 'unknown_method',
+              message: `No method "${methodId}" in ${apiKey}.`,
+              hint: `${methodId} exists in another version of this API. Retry with api: "${otherVersion}".`,
+              retriable: false,
+              account,
+            },
+            true,
+          );
+        }
         const near = nearestMethodIds(String(methodId), index);
         return jsonResult(
           {
