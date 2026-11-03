@@ -477,7 +477,7 @@ Upload a file to Google Drive, from inline base64 content or (when this server e
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `account` | string | optional | Google account alias |
-| `filename` | string | required | Name as it appears in Drive |
+| `filename` | string | optional | Name as it appears in Drive. Optional with localPath (defaults to the file's own name); required with contentBase64. |
 | `contentBase64` | string | optional | Base64-encoded file content. Exactly one of contentBase64 or localPath is required. Decoded size is capped at 10 MB. |
 | `localPath` | string | optional | Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64 or localPath is required. |
 | `mimeType` | string | optional | Source MIME type of the content (inferred from filename if omitted). With `convertTo`, this is the format Drive imports from. |
