@@ -68,10 +68,10 @@ Optional scope bundles: `analytics`, `analytics_write`, `appsmarket`, `chat`, `c
 | `admin_chromeosdevices_move_devices_to_ou` | generated | update | Moves or inserts multiple Chrome OS devices to an organizational unit. You can move up to 50 devices at once. |
 | `admin_chromeosdevices_patch` | generated | update | Updates a device's updatable properties, such as `annotatedUser`, `annotatedLocation`, `notes`, `orgUnitPath`, or `annot |
 | `admin_chromeosdevices_update` | generated | update | Updates a device's updatable properties, such as `annotatedUser`, `annotatedLocation`, `notes`, `orgUnitPath`, or `annot |
-| `admin_customer_devices_chromeos_batch_change_status` | generated | update | Changes the status of a batch of ChromeOS devices. For more information about changing a ChromeOS device state [Repair,  |
+| `admin_customer_devices_chromeos_batch_change_status` | generated | delete | Changes the status of a batch of ChromeOS devices. For more information about changing a ChromeOS device state [Repair,  |
 | `admin_customer_devices_chromeos_commands_get` | generated | read | Gets command data a specific command issued to the device. |
 | `admin_customer_devices_chromeos_count_chrome_os_devices` | generated | read | Counts ChromeOS devices matching the request. |
-| `admin_customer_devices_chromeos_issue_command` | generated | create | Issues a command for the device to execute. |
+| `admin_customer_devices_chromeos_issue_command` | generated | delete | Issues a command for the device to execute. |
 | `admin_customer_usage_reports_get` | generated | read | Retrieves a report which is a collection of properties and statistics for a specific customer's account. For more inform |
 | `admin_customers_chrome_print_servers_batch_create_print_servers` | generated | create | Creates multiple print servers. |
 | `admin_customers_chrome_print_servers_batch_delete_print_servers` | generated | delete | Deletes multiple print servers. |
