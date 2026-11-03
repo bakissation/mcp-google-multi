@@ -50,6 +50,30 @@ describe('maskEmails via renderReport (linear scan)', () => {
   });
 });
 
+describe('default account note', () => {
+  const config = (r: Awaited<ReturnType<typeof runDiagnostics>>) => r.sections.find((x) => x.title === 'Config')!;
+
+  it('notes a missing default when several accounts are configured, without failing the check', async () => {
+    const r = await runDiagnostics(deps({ accountSet: () => ({ aliases: ['a', 'b'], configs: {}, defaultAccount: undefined } as any) }));
+    const c = config(r);
+    expect(c.lines.some((l) => l.startsWith('No default account'))).toBe(true);
+    expect(c.hint).toContain('GOOGLE_DEFAULT_ACCOUNT');
+    expect(c.verdict).toBe('ok');
+  });
+
+  it('stays quiet with one account or with a default set', async () => {
+    const one = await runDiagnostics(deps());
+    expect(config(one).lines.some((l) => l.startsWith('No default account'))).toBe(false);
+    const set = await runDiagnostics(deps({ accountSet: () => ({ aliases: ['a', 'b'], configs: {}, defaultAccount: 'a' } as any) }));
+    expect(config(set).lines.some((l) => l.startsWith('No default account'))).toBe(false);
+  });
+
+  it('is not shown in the tenant-scoped report', async () => {
+    const t = await runDiagnostics(deps({ accountSet: () => ({ aliases: ['a', 'b'], configs: {}, defaultAccount: undefined } as any) }), { scope: 'tenant' });
+    expect(config(t).lines.some((l) => l.startsWith('No default account'))).toBe(false);
+  });
+});
+
 describe('tenant-scoped diagnose', () => {
   const httpEnv = { MCP_TRANSPORT: 'http', MCP_PUBLIC_URL: 'https://mcp.example.com', MCP_OWNER_EMAILS: 'operator-private@x.example' };
 

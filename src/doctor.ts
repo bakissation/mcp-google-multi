@@ -211,6 +211,13 @@ function sectionConfig(deps: DiagnosticsDeps, set: ReturnType<typeof getAccountS
     }
   }
 
+  // Informational only, no verdict change: with several accounts and no
+  // default, a call that omits `account` fails and costs a round trip.
+  if (set.aliases.length > 1 && !set.defaultAccount) {
+    lines.push(`No default account: with ${set.aliases.length} accounts, a call that omits "account" is refused.`);
+    hint = (hint ? `${hint} ` : '') + 'To allow omitting it, set GOOGLE_DEFAULT_ACCOUNT or "defaultAccount" in config.json to one alias.';
+  }
+
   lines.push(usageMetricsStatusLine(deps.env));
 
   return { id: 2, title: 'Config', verdict, lines, ...(hint ? { hint } : {}), ...(slug ? { slug } : {}) };
