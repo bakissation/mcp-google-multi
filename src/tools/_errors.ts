@@ -40,7 +40,7 @@ function statusOf(error: any): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** gaxios 7 is fetch-based, so response.headers is a Headers instance with no
+/** gaxios 7 and 8 are fetch-based, so response.headers is a Headers instance with no
  * index signature; the plain-object form still appears in tests and in mocks. */
 function headerOf(error: any, name: string): string | undefined {
   const h = error?.response?.headers;
