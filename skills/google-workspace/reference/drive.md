@@ -211,12 +211,13 @@ List all people and groups who have access to a Drive file or folder
 
 Class: update
 
-Move a file between folders by replacing its parents. To move to multiple parents, list all of them.
+Move files between folders by replacing their parents. Pass fileId for one file (returns that file) or fileIds for up to 50 files into the same folder in one call (returns a per-file result, so one failure does not undo the rest).
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `account` | string | optional | Google account alias |
-| `fileId` | string | required | Google Drive file ID |
+| `fileId` | string | optional | Google Drive file ID (one file; use fileIds for several) |
+| `fileIds` | array | optional | Google Drive file IDs to move together, up to 50 |
 | `newParentFolderId` | string | required | Destination folder ID, named newParentFolderId here, not parentFolderId |
 
 ## `drive_permission_update`
@@ -239,14 +240,14 @@ Change the role and/or expirationTime of an existing permission without removing
 
 Class: read
 
-Read the content of a Google Drive file: Workspace docs and textual types (text/*, JSON/XML/SVG and similar) inline; other binaries return error:binary (returns up to maxChars characters per call; non-Google-native files over 2MB return too_large)
+Read the content of a Google Drive file: Workspace docs, textual types (text/*, JSON/XML/SVG and similar) and the text of PDF, Word, Excel and PowerPoint files inline; other binaries return error:binary (returns up to maxChars characters per call; text files over 2MB and PDF/Office files over 10MB return too_large)
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `account` | string | optional | Google account alias; "*" = all accounts; omit for the default account |
 | `fileId` | string | required | Google Drive file ID |
 | `maxChars` | number | optional | Max characters of content to return (default: 100000) |
-| `offset` | number | optional | Character offset to continue a truncated read (Google Docs/Sheets/Slides exports page fine; plain files >2MB are rejected, not paged) |
+| `offset` | number | optional | Character offset to continue a truncated read (Google Docs/Sheets/Slides exports and PDF/Office text page fine; plain files >2MB are rejected, not paged) |
 
 ## `drive_remove_permission`
 
@@ -472,14 +473,15 @@ Rename, move, or replace content of a Drive file. Any combination in one call. F
 
 Class: create
 
-Upload a file to Google Drive, from inline base64 content or (when this server exposes the host filesystem) a local path. Pass `convertTo` to import it as a native, editable Google Doc/Sheet/Slides/Drawing instead of storing the raw bytes.
+Upload a file to Google Drive, from inline base64 content or (when this server exposes the host filesystem) a local path. Pass `convertTo` to import it as a native, editable Google Doc/Sheet/Slides/Drawing instead of storing the raw bytes. Pass `localDir` instead to upload a whole local folder, keeping its subfolders, in one call (up to 200 files).
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `account` | string | optional | Google account alias |
-| `filename` | string | required | Name as it appears in Drive |
+| `filename` | string | optional | Name as it appears in Drive. Optional with localPath (defaults to the file's own name); required with contentBase64. |
 | `contentBase64` | string | optional | Base64-encoded file content. Exactly one of contentBase64 or localPath is required. Decoded size is capped at 10 MB. |
-| `localPath` | string | optional | Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64 or localPath is required. |
+| `localPath` | string | optional | Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64, localPath or localDir is required. |
+| `localDir` | string | optional | Path of a SOURCE folder to upload with its whole tree, on the machine running the server, confined like localPath. It becomes a new Drive folder (named by `filename` or the folder's own name) under parentFolderId, with subfolders recreated. Hidden entries and symlinks are skipped and reported, at most 200 files per call, and a file that fails does not stop the others. Not combinable with contentBase64, localPath, mimeType or convertTo. Running it twice uploads a second copy. |
 | `mimeType` | string | optional | Source MIME type of the content (inferred from filename if omitted). With `convertTo`, this is the format Drive imports from. |
 | `convertTo` | enum | optional | Convert the upload into this native Google Workspace type on import: "document" \| "spreadsheet" \| "presentation" \| "drawing" (full application/vnd.google-apps.* ids also accepted). E.g. upload .md/.html/.docx/.txt with convertTo=document to get a real Google Doc. Source must be an importable format. Omit to store the file as-is. |
 | `parentFolderId` | string | optional | Parent folder ID, not parentId. Defaults to My Drive root |

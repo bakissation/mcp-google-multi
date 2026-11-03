@@ -6,7 +6,7 @@ import { analyticsadmin as analyticsadminClient } from '@googleapis/analyticsadm
 import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
-import { handleGoogleApiError, invalidParams } from './_errors.js';
+import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } from './_errors.js';
 
 
 /** Accepts "213025502" or "properties/213025502"; rejects the identifiers
@@ -323,6 +323,24 @@ function invalidProperty(hint: string, account: unknown) {
 }
 
 export function handleAnalyticsError(error: any, account: Account) {
+  const raw = error?.code ?? error?.status ?? error?.response?.status;
+  const status = typeof raw === 'string' ? Number(raw) : raw;
+  const text = String(error?.response?.data?.error?.message ?? error?.message ?? '');
+  if (status === 400 && /cannot be queried together|incompatible/i.test(text)) {
+    return {
+      content: [{
+        type: 'text' as const,
+        text: stringifyEnvelope({
+          error: 'bad_request',
+          message: safeMessage(error),
+          hint: 'GA4 only allows some dimensions and metrics in the same report (realtime reports allow fewer). Drop one of the named fields and retry. analytics_get_metadata lists the valid names, and the checkCompatibility method (find it with google_api_search) tests a combination before running it.',
+          retriable: false,
+          account,
+        }),
+      }],
+      isError: true as const,
+    };
+  }
   return handleGoogleApiError(
     error,
     account,

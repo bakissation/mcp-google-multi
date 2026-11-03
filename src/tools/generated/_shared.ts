@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { ServerContext } from '@modelcontextprotocol/server';
 import { accountAliasSchema, accountAliasSchemaFor, accountArgLive } from '../../accounts.js';
 import { executeApiMethod, type ApiMethodRef, type ExecuteDeps, type QueryParams } from '../../executor.js';
 import type { Cud, ToolRegistry } from '../../registry.js';
@@ -52,7 +53,7 @@ export function registerGeneratedTool(registry: ToolRegistry, def: GeneratedTool
   const register = registry.registerTool as (
     name: string,
     config: GeneratedToolConfig & { escapeHatch?: boolean },
-    handler: (args: Record<string, unknown>) => unknown,
+    handler: (args: Record<string, unknown>, ctx?: ServerContext) => unknown,
   ) => void;
   const service = serviceOf(def.name);
   register(
@@ -68,7 +69,7 @@ export function registerGeneratedTool(registry: ToolRegistry, def: GeneratedTool
       // handler below, not the registry's own name-based gate.
       escapeHatch: true,
     },
-    async (args: Record<string, unknown>) => {
+    async (args: Record<string, unknown>, ctx?: ServerContext) => {
       const pathParams: Record<string, string | number> = {};
       const queryParams: QueryParams = {};
       for (const p of def.params) {
@@ -96,7 +97,7 @@ export function registerGeneratedTool(registry: ToolRegistry, def: GeneratedTool
           pathParams,
           queryParams,
           body,
-        });
+        }, ctx);
         if (gate) return gate;
       }
       return executeApiMethod(

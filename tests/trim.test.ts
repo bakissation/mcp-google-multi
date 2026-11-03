@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { capText, compactResult, logSafe, sliceClean, trimEnabled } from '../src/trim.js';
-import { formatEvent } from '../src/tools/calendar.js';
+import { formatEvent, inEventZone } from '../src/tools/calendar.js';
 import { parseMessage } from '../src/tools/gmail.js';
 
 describe('trimEnabled', () => {
@@ -203,5 +203,49 @@ describe('formatEvent trimming', () => {
   it('never truncates when the marker would make the output longer', () => {
     const e = formatEvent({ ...FAT_EVENT, description: 'x'.repeat(320) }, { full: false }) as Record<string, unknown>;
     expect(e.description).toBe('x'.repeat(320));
+  });
+});
+
+describe('event time zones', () => {
+  // Google renders dateTime in the calendar's zone (-06:00 here) even though
+  // the event was entered in America/Panama.
+  const ZONED = {
+    id: 'e2',
+    summary: 'Dive',
+    start: { dateTime: '2026-11-18T07:30:00-06:00', timeZone: 'America/Panama' },
+    end: { dateTime: '2026-11-18T11:30:00-06:00', timeZone: 'America/Panama' },
+  };
+
+  it('renders start/end in the event zone and reports it', () => {
+    for (const full of [true, false]) {
+      const e = formatEvent(ZONED, { full }) as Record<string, unknown>;
+      expect(e.start).toBe('2026-11-18T08:30:00-05:00');
+      expect(e.end).toBe('2026-11-18T12:30:00-05:00');
+      expect(e.startTimeZone).toBe('America/Panama');
+      expect(e.endTimeZone).toBe('America/Panama');
+    }
+  });
+
+  it('keeps the same instant', () => {
+    const e = formatEvent(ZONED) as Record<string, string>;
+    expect(Date.parse(e.start)).toBe(Date.parse(ZONED.start.dateTime));
+  });
+
+  it('leaves events without a zone, and all-day events, alone', () => {
+    const plain = formatEvent({ id: 'p', start: { dateTime: '2026-06-11T09:00:00Z' },
+      end: { dateTime: '2026-06-11T09:15:00Z' } }, { full: false }) as Record<string, unknown>;
+    expect(plain.start).toBe('2026-06-11T09:00:00Z');
+    expect(plain).not.toHaveProperty('startTimeZone');
+    const allDay = formatEvent({ id: 'a', start: { date: '2026-11-18', timeZone: 'America/Panama' },
+      end: { date: '2026-11-19' } }, { full: false }) as Record<string, unknown>;
+    expect(allDay.start).toBe('2026-11-18');
+    expect(allDay).not.toHaveProperty('startTimeZone');
+  });
+
+  it('handles DST, half-hour offsets, UTC zones and bad names', () => {
+    expect(inEventZone('2026-03-29T01:30:00Z', 'Europe/London')).toBe('2026-03-29T02:30:00+01:00');
+    expect(inEventZone('2026-03-29T00:30:00Z', 'Europe/London')).toBe('2026-03-29T00:30:00+00:00');
+    expect(inEventZone('2026-06-11T09:00:00Z', 'Asia/Kolkata')).toBe('2026-06-11T14:30:00+05:30');
+    expect(inEventZone('2026-06-11T09:00:00Z', 'Not/AZone')).toBe('2026-06-11T09:00:00Z');
   });
 });

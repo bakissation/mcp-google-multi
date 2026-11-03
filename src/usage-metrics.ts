@@ -39,7 +39,7 @@ export const KNOWN_ERROR_SLUGS: ReadonlySet<string> = new Set([
   'E_ALIAS_EXISTS', 'E_CIMD_INVALID', 'E_CIMD_SSRF_BLOCKED', 'E_ENV_ACCOUNTS_MODE', 'E_MCP_TOKEN_INVALID',
   'E_NO_DEFAULT_ACCOUNT', 'E_UNKNOWN_BUNDLE', 'E_VALIDATION', 'ambiguous',
   'api_not_enabled', 'auth_required', 'bad_request', 'binary', 'binary_unsupported',
-  'confirmation_declined', 'diagnose_failed', 'discovery_unavailable', 'dispatch_timeout',
+  'confirmation_declined', 'confirmation_invalid', 'confirmation_required', 'diagnose_failed', 'discovery_unavailable', 'dispatch_timeout',
   'elicitation_unsupported', 'fanout_failed', 'forbidden',
   'insufficient_scope', 'internal', 'invalid_client', 'invalid_client_metadata',
   'invalid_grant', 'invalid_params', 'invalid_query', 'invalid_request',
@@ -50,6 +50,14 @@ export const KNOWN_ERROR_SLUGS: ReadonlySet<string> = new Set([
 ]);
 
 const RPC_CODES = new Set([-32700, -32600, -32601, -32603]);
+
+// Both come off the wire, so each key is shape-gated and the maps are capped:
+// a key that fails its shape counts under `other` and carries no caller text.
+const PROTO_RE = /^\d{4}-\d{2}-\d{2}$/;
+const CLIENT_NAME_RE = /^[a-z0-9][a-z0-9._-]{0,31}$/;
+const CLIENT_VERSION_RE = /^v?(\d{1,4})\.(\d{1,4})(?:[.+-]|$)/;
+const PROTO_CAP = 16;
+const CLIENT_CAP = 50;
 
 export function stateDir(env: NodeJS.ProcessEnv = process.env): string {
   return path.join(
@@ -159,6 +167,10 @@ export interface DayAgg {
   validation: Record<string, number>;
   rpc: Record<string, number>;
   bigrams: Record<string, number>;
+  /** Frames that announced a protocol version, by version (YYYY-MM-DD). */
+  proto?: Record<string, number>;
+  /** Frames that announced a client, by `name@major.minor`. No ids, no sessions, no callers. */
+  clients?: Record<string, number>;
 }
 
 export interface InitOptions {
@@ -253,6 +265,8 @@ export function mergeDay(a: DayAgg, b: DayAgg): DayAgg {
   out.validation = map(a.validation, b.validation);
   out.rpc = map(a.rpc, b.rpc);
   out.bigrams = map(a.bigrams, b.bigrams);
+  if (a.proto || b.proto) out.proto = map(a.proto, b.proto);
+  if (a.clients || b.clients) out.clients = map(a.clients, b.clients);
   return out;
 }
 
@@ -277,6 +291,8 @@ function applyCaps(day: DayAgg): DayAgg {
   day.validation = cap(day.validation, VALIDATION_CAP);
   day.escape.methods = cap(day.escape.methods, ESCAPE_CAP, (n) => { day.escape._overflow += n; });
   day.bigrams = cap(day.bigrams, BIGRAM_CAP, (n) => { day.bigrams._overflow = (day.bigrams._overflow ?? 0) + n; });
+  if (day.proto) day.proto = cap(day.proto, PROTO_CAP);
+  if (day.clients) day.clients = cap(day.clients, CLIENT_CAP);
   return day;
 }
 
@@ -552,6 +568,26 @@ export class Metrics {
           tool: tool && TOOL_NAME_RE.test(tool) ? tool : 'other',
           ok: false, ms: 0, chars: 'le64', src: 'rpc',
         }));
+      }
+      this.dirty = true;
+    } catch { /* never throws outward */ }
+  }
+
+  /** Which protocol revision and client a frame announced (an `initialize`
+   * request, or any modern-era request, which carries both). Counts only; the
+   * client's name is cut to a shape-checked slug and its version to major.minor. */
+  recordClient(protocolVersion: unknown, clientInfo: unknown): void {
+    try {
+      this.rolloverIfNeeded();
+      if (typeof protocolVersion === 'string') {
+        addInto((this.deltas.proto ??= {}), PROTO_RE.test(protocolVersion) ? protocolVersion : 'other');
+      }
+      const ci = clientInfo as { name?: unknown; version?: unknown } | undefined;
+      if (ci && typeof ci === 'object') {
+        const name = typeof ci.name === 'string' ? ci.name.trim().toLowerCase() : '';
+        const ver = typeof ci.version === 'string' ? CLIENT_VERSION_RE.exec(ci.version.trim()) : null;
+        const key = CLIENT_NAME_RE.test(name) ? `${name}@${ver ? `${ver[1]}.${ver[2]}` : 'other'}` : 'other';
+        addInto((this.deltas.clients ??= {}), key);
       }
       this.dirty = true;
     } catch { /* never throws outward */ }

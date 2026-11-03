@@ -1,4 +1,4 @@
-import type { Transport, JSONRPCMessage, MessageExtraInfo } from "@modelcontextprotocol/server";
+import { PROTOCOL_VERSION_META_KEY, CLIENT_INFO_META_KEY, type Transport, type JSONRPCMessage, type MessageExtraInfo } from "@modelcontextprotocol/server";
 import type { Metrics } from './usage-metrics.js';
 import { isSchemaValidationText } from './arg-normalize.js';
 
@@ -65,7 +65,13 @@ export function tapUsageMetrics(transport: Transport, metrics: Metrics, isKnownT
       transport.onmessage = handler
         ? (message, extra) => {
             try {
-              const m = message as { id?: string | number; method?: unknown; params?: { name?: unknown } };
+              const m = message as { id?: string | number; method?: unknown; params?: { name?: unknown; protocolVersion?: unknown; clientInfo?: unknown; _meta?: Record<string, unknown> } };
+              // 2025-era clients announce themselves once, in `initialize`; 2026-07-28
+              // clients repeat the same in every request's _meta envelope.
+              if (m.method === 'initialize') metrics.recordClient(m.params?.protocolVersion, m.params?.clientInfo);
+              else if (m.id !== undefined && m.params?._meta?.[PROTOCOL_VERSION_META_KEY] !== undefined) {
+                metrics.recordClient(m.params._meta[PROTOCOL_VERSION_META_KEY], m.params._meta[CLIENT_INFO_META_KEY]);
+              }
               if (m.id !== undefined && m.method === 'tools/call' && typeof m.params?.name === 'string') {
                 if (pending.size >= PENDING_CAP) pending.clear();
                 pending.set(m.id, m.params.name);

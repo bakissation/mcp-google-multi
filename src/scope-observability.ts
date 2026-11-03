@@ -138,7 +138,7 @@ export function scopeHint(scope: string, c: ScopeClassification, alias: string):
       {
         const rendered = hints()?.render({ kind: 'scope_unknown_scope', scope });
         return {
-          hint: rendered?.hint ?? `Scope ${scope} is not offered by this server (no bundle grants it). Not requestable. Do not retry.`,
+          hint: rendered?.hint ?? `Do not retry: scope ${scope} is not offered by this server (no bundle grants it), so no account can be granted it.`,
           retriable: false,
         };
       }
@@ -254,6 +254,65 @@ export function buildScopesReport(
     notRequestable: { addBundle, accountType, unknown },
     missing: [...requestable, ...addBundle.map((e) => e.scope), ...accountType, ...unknown],
   };
+}
+
+export interface ToolScopeSummary {
+  /** Tools whose scope requirements are known (curated tools without baked scopes are skipped). */
+  total: number;
+  /** Tools the account can call right now. */
+  callable: number;
+  /** In the account's profile but not granted: a re-auth fixes them. */
+  requestableNotGranted: number;
+  /** Not in the profile; each entry names the bundle that would grant them. */
+  byBundle: { bundle: string; tools: number }[];
+  /** No bundle grants them (account-type or unknown scopes): no config change helps. */
+  neverRequestable: number;
+}
+
+/**
+ * How many registered tools one account can actually call. Tools stay
+ * registered when their scope is missing (so the real scope error is reachable),
+ * which makes "tool listed" and "tool callable" differ: this counts the gap.
+ */
+export function summarizeToolScopes(
+  tools: Iterable<{ requiredScopes?: readonly string[] }>,
+  granted: ReadonlySet<string>,
+  profile: ReadonlySet<string>,
+): ToolScopeSummary {
+  const out: ToolScopeSummary = { total: 0, callable: 0, requestableNotGranted: 0, byBundle: [], neverRequestable: 0 };
+  const perBundle = new Map<string, number>();
+  for (const tool of tools) {
+    if (!tool.requiredScopes || tool.requiredScopes.length === 0) continue;
+    const best = classifyMethodScopes(tool.requiredScopes, granted, profile);
+    if (!best) continue;
+    out.total++;
+    if (best.state === 'callable') out.callable++;
+    else if (best.state === 'requestable_not_granted') out.requestableNotGranted++;
+    else if (best.classification.reason === 'add_bundle' && best.classification.bundle) {
+      perBundle.set(best.classification.bundle, (perBundle.get(best.classification.bundle) ?? 0) + 1);
+    } else out.neverRequestable++;
+  }
+  out.byBundle = [...perBundle.entries()]
+    .map(([bundle, n]) => ({ bundle, tools: n }))
+    .sort((a, b) => b.tools - a.tools || a.bundle.localeCompare(b.bundle));
+  return out;
+}
+
+const BUNDLE_LINE_LIMIT = 4;
+
+/** One doctor / config-check line for a summary; null when there is nothing to report. */
+export function formatToolScopeLine(alias: string, sum: ToolScopeSummary): string | null {
+  if (sum.total === 0) return null;
+  const parts = [`${sum.callable} of ${sum.total} tools callable`];
+  if (sum.requestableNotGranted > 0) parts.push(`${sum.requestableNotGranted} need re-auth to grant a scope already in the profile`);
+  const missing = sum.byBundle.reduce((n, b) => n + b.tools, 0);
+  if (missing > 0) {
+    const shown = sum.byBundle.slice(0, BUNDLE_LINE_LIMIT).map((b) => `${b.bundle} ${b.tools}`).join(', ');
+    const more = sum.byBundle.length > BUNDLE_LINE_LIMIT ? `, +${sum.byBundle.length - BUNDLE_LINE_LIMIT} more bundles` : '';
+    parts.push(`${missing} need a bundle not in the profile (${shown}${more})`);
+  }
+  if (sum.neverRequestable > 0) parts.push(`${sum.neverRequestable} cannot be granted by any bundle`);
+  return `${alias}: ${parts.join('; ')}`;
 }
 
 export function clearScopeIndexForTest(): void {

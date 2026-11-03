@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toolHarness, type GoogleRequest } from './_tool-harness.js';
 
-// E1: a reply sent with replyToMessageId must carry the source message's Gmail
+// A reply sent with replyToMessageId must carry the source message's Gmail
 // threadId, or it lands in a new thread on the sender's side.
 const source = (req: GoogleRequest): unknown | undefined => {
   if (req.method === 'GET' && req.url.includes('/messages/SRC1')) {

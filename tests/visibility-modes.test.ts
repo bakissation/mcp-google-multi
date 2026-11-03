@@ -68,6 +68,47 @@ describe('visibility modes (layer x mode)', () => {
   });
 });
 
+describe('hideServices (per-identity trimming)', () => {
+  it('hides a service from the list in every mode, keeps meta tools and keeps the tools registered', () => {
+    for (const mode of ['lazy', 'curated', 'eager'] as const) {
+      const { registry, visible } = setup(mode);
+      registry.registerTool('drive_search', { description: 'curated', inputSchema: { account: z.string() } }, () => {});
+      registry.reveal('gmail');
+      registry.reveal('drive');
+      registry.hideServices(['gmail']);
+      expect(visible()).toContain('account_list');
+      expect(visible().filter((n) => n.startsWith('gmail_'))).toEqual([]);
+      expect(registry.toolNames()).toContain('gmail_search');
+    }
+  });
+
+  it('drive stays listed while gmail is hidden, and a later call replaces the set', () => {
+    const { registry, visible } = setup('curated');
+    registry.registerTool('drive_search', { description: 'curated', inputSchema: { account: z.string() } }, () => {});
+    registry.hideServices(['gmail']);
+    expect(visible().sort()).toEqual(['account_list', 'drive_search']);
+    registry.hideServices([]);
+    expect(visible().sort()).toEqual(['account_list', 'drive_search', 'gmail_search']);
+  });
+
+  it('the list handler omits hidden tools', async () => {
+    let handler: (() => Promise<{ tools: { name: string }[] }>) | undefined;
+    const server = {
+      registerTool: () => 'ok',
+      sendToolListChanged: vi.fn(),
+      server: { setRequestHandler: (_m: string, h: never) => { handler = h; } },
+    };
+    const registry = new ToolRegistry(server as never, POLICY, 'curated');
+    registry.registerTool('gmail_search', { description: 'curated', inputSchema: { account: z.string() } }, () => {});
+    registry.registerTool('drive_search', { description: 'curated', inputSchema: { account: z.string() } }, () => {});
+    registry.registerMeta('google_api_call', { description: 'meta', inputSchema: {} }, () => {});
+    registry.hideServices(['gmail']);
+    registry.installListHandler();
+    const names = (await handler!()).tools.map((t) => t.name).sort();
+    expect(names).toEqual(['drive_search', 'google_api_call']);
+  });
+});
+
 describe('anthropic/* keys ride _meta, never annotations (SDK strips unknown annotation keys)', () => {
   it('toToolJson emits _meta for client extension keys and keeps annotations spec-only', () => {
     const server = { registerTool: () => 'ok', sendToolListChanged: vi.fn(), server: { setRequestHandler: () => {} } };

@@ -99,6 +99,9 @@ interface ToolResult {
 export interface FanoutEntry {
   account: string;
   ok: boolean;
+  /** The account's token does not carry the scope this tool needs, so it was
+   * left out rather than counted as a failure; `error` keeps the detail. */
+  skipped?: boolean;
   data?: unknown;
   error?: unknown;
 }
@@ -127,7 +130,10 @@ export async function runFanout(
       try {
         const res = (await handler({ ...(args[0] as object), account }, ...args.slice(1))) as ToolResult;
         const payload = parsePayload(res);
-        results[i] = res?.isError ? { account, ok: false, error: payload } : { account, ok: true, data: payload };
+        const missingScope = res?.isError && (payload as { error?: string } | null)?.error === 'insufficient_scope';
+        results[i] = res?.isError
+          ? { account, ok: false, ...(missingScope ? { skipped: true } : {}), error: payload }
+          : { account, ok: true, data: payload };
       } catch (err) {
         const rendered = hints()?.render({ kind: 'internal', account });
         results[i] = {
@@ -146,6 +152,10 @@ export async function runFanout(
   };
   await Promise.all(Array.from({ length: Math.min(FANOUT_CONCURRENCY, aliases.length) }, () => worker()));
   const failed = results.filter((r) => !r.ok).length;
+  // An account that lacks the scope is not a failure of the call when another
+  // account answered: it is listed as skipped and does not mark the result partial.
+  const skipped = results.filter((r) => r.skipped).map((r) => r.account);
+  const failedForReal = results.filter((r) => !r.ok && !r.skipped).length;
   if (failed === results.length && results.length > 0) {
     // Every account failed, so this IS an error result: hoist a real
     // top-level envelope (error/hint/retriable), keeping the per-account detail.
@@ -165,6 +175,6 @@ export async function runFanout(
       isError: true as const,
     };
   }
-  const body = { results, partial: failed > 0 };
+  const body = { results, partial: failedForReal > 0, ...(skipped.length > 0 ? { skipped } : {}) };
   return { content: [{ type: 'text' as const, text: JSON.stringify(body) }] };
 }

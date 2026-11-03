@@ -4,10 +4,10 @@ name: docker
 # `ci` gates merges.
 on:
   push:
-    branches: [main, staging, dev]
+    branches: [main, staging, dev, feat/6.2]
     paths: [Dockerfile, .dockerignore, .github/workflows/docker.yml, 'deploy/**']
   pull_request:
-    branches: [main, staging, dev]
+    branches: [main, staging, dev, feat/6.2]
     paths: [Dockerfile, .dockerignore, .github/workflows/docker.yml, 'deploy/**']
 
 permissions:

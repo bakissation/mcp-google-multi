@@ -8,6 +8,7 @@ import { getClient, type CuratedToolDeps } from '../client.js';
 import { checkOutbound } from '../outbound-allowlist.js';
 import { handleGoogleApiError, invalidParams } from './_errors.js';
 import { listResult, sliceClean } from '../trim.js';
+import { isValidTimeZone, isoWithOffset, parseClock, suggestSlots, type BusyBlock } from './_suggest-times.js';
 
 
 export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
@@ -153,9 +154,18 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
           .describe('Calendar ID (default: primary)'),
         allDay: coerceBoolean.default(false).optional()
           .describe('If true, start/end are dates (YYYY-MM-DD) not datetimes'),
+        startTimeZone: z.string().optional()
+          .describe('IANA zone the event starts in, e.g. "America/Cayman"; start may then omit its offset (wall-clock time in that zone). Timed events only'),
+        endTimeZone: z.string().optional()
+          .describe('IANA zone the event ends in; may differ from startTimeZone (e.g. a flight). Timed events only'),
       },
     },
-    async ({ account, summary, start, end, description, location, attendees, calendarId, allDay }) => {
+    async ({ account, summary, start, end, description, location, attendees, calendarId, allDay,
+      startTimeZone, endTimeZone }) => {
+      const startTime = eventTime('start', start, startTimeZone, !!allDay);
+      if ('error' in startTime) return invalidParams(account as Account, startTime.error, EVENT_TIME_HINT);
+      const endTime = eventTime('end', end, endTimeZone, !!allDay);
+      if ('error' in endTime) return invalidParams(account as Account, endTime.error, EVENT_TIME_HINT);
       try {
         if (attendees) {
           const outbound = checkOutbound('calendar attendee', attendees.split(','), String(account));
@@ -164,15 +174,7 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
         const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 
-        const event: any = { summary };
-
-        if (allDay) {
-          event.start = { date: start };
-          event.end = { date: end };
-        } else {
-          event.start = { dateTime: start };
-          event.end = { dateTime: end };
-        }
+        const event: any = { summary, start: startTime.value, end: endTime.value };
 
         if (description) event.description = description;
         if (location) event.location = location;
@@ -207,6 +209,10 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
         summary: z.string().optional().describe('New event title'),
         start: z.string().optional().describe('New start time (ISO 8601)'),
         end: z.string().optional().describe('New end time (ISO 8601)'),
+        startTimeZone: z.string().optional()
+          .describe('IANA zone the event starts in. Alone (no start): moves the start to this zone at the same instant. With an offset-less start: wall-clock time in this zone. Omitted: the event keeps its current start zone'),
+        endTimeZone: z.string().optional()
+          .describe('IANA zone the event ends in; may differ from startTimeZone. Same rules as startTimeZone'),
         description: z.string().optional().describe('New event description'),
         location: z.string().optional().describe('New event location'),
         attendees: z.string().optional()
@@ -215,7 +221,8 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
           .describe('Calendar ID (default: primary)'),
       },
     },
-    async ({ account, eventId, summary, start, end, description, location, attendees, calendarId }) => {
+    async ({ account, eventId, summary, start, end, startTimeZone, endTimeZone, description, location, attendees,
+      calendarId }) => {
       try {
         if (attendees) {
           const outbound = checkOutbound('calendar attendee', attendees.split(','), String(account));
@@ -224,26 +231,24 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
         const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 
-        // Fetch the event first so a 404 surfaces before we attempt the patch.
-        await cal.events.get({
+        // Fetch first: a 404 surfaces before the patch, and the current start/end
+        // let a time change keep (or a zone-only change re-label) the event's zone.
+        const current = await cal.events.get({
           calendarId: calendarId ?? 'primary',
           eventId,
         });
+
+        const startPatch = patchEventTime('start', start, startTimeZone, current.data.start);
+        if ('error' in startPatch) return invalidParams(account as Account, startPatch.error, EVENT_TIME_HINT);
+        const endPatch = patchEventTime('end', end, endTimeZone, current.data.end);
+        if ('error' in endPatch) return invalidParams(account as Account, endPatch.error, EVENT_TIME_HINT);
 
         const patch: any = {};
         if (summary !== undefined) patch.summary = summary;
         if (description !== undefined) patch.description = description;
         if (location !== undefined) patch.location = location;
-        if (start !== undefined) {
-          patch.start = start.length === 10
-            ? { date: start }
-            : { dateTime: start };
-        }
-        if (end !== undefined) {
-          patch.end = end.length === 10
-            ? { date: end }
-            : { dateTime: end };
-        }
+        if (startPatch.value) patch.start = startPatch.value;
+        if (endPatch.value) patch.end = endPatch.value;
         if (attendees !== undefined) {
           patch.attendees = attendees.split(',').map((e: string) => ({ email: e.trim() }));
         }
@@ -500,6 +505,146 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
   );
 
   server.registerTool(
+    'calendar_suggest_times',
+    {
+      description:
+        'Find meeting times when you and the other people are all free. Checks free/busy for your primary calendar and each attendee ' +
+        'calendar, then returns the earliest open slots inside working hours (default 09:00-17:00 Monday to Friday, in timeZone). ' +
+        'Read-only: it proposes times and creates nothing; use calendar_create_event to book one.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        durationMinutes: z.number().int().min(5).max(480).default(30).optional().describe('Meeting length in minutes (default 30)'),
+        attendees: coerceArray(z.string()).optional()
+          .describe('Calendar IDs or email addresses of the other people (up to 20). Omit to find free time on your own calendar'),
+        timeMin: z.string().optional().describe('ISO 8601 start of the search window, with a Z or UTC offset (default: now)'),
+        timeMax: z.string().optional().describe('ISO 8601 end of the search window, with a Z or UTC offset (default: 7 days after the start; at most 31 days)'),
+        timeZone: z.string().optional().describe('IANA zone the working hours are in, e.g. "Europe/Paris" (default: the time zone of your primary calendar)'),
+        workStart: z.string().optional().describe('Earliest start of day as HH:MM (default "09:00")'),
+        workEnd: z.string().optional().describe('Latest end of day as HH:MM (default "17:00")'),
+        includeWeekends: coerceBoolean.optional().describe('Also search Saturdays and Sundays (default false)'),
+        bufferMinutes: z.number().int().min(0).max(120).default(0).optional()
+          .describe('Free minutes to keep before and after every existing meeting (default 0)'),
+        maxSuggestions: z.number().int().min(1).max(20).default(5).optional().describe('How many slots to return (default 5)'),
+      },
+    },
+    async ({ account, durationMinutes, attendees, timeMin, timeMax, timeZone, workStart, workEnd, includeWeekends, bufferMinutes, maxSuggestions }) => {
+      try {
+        const people = [...new Set((attendees ?? []).map((a: string) => a.trim()).filter(Boolean))].filter((a) => a.toLowerCase() !== 'primary');
+        if (people.length > 20) {
+          return invalidParams(account as Account, `${people.length} attendees is over the limit of 20.`, 'Split the group, or check the largest calendars first.');
+        }
+        const tzError = missingTimeZoneError('timeMin', timeMin) ?? missingTimeZoneError('timeMax', timeMax);
+        if (tzError) return invalidParams(account as Account, tzError, MISSING_TIME_ZONE_HINT);
+        const rangeError = timeRangeError(timeMin, timeMax);
+        if (rangeError) return invalidParams(account as Account, rangeError, TIME_RANGE_HINT);
+
+        const startMin = parseClock(workStart ?? '09:00');
+        const endMin = parseClock(workEnd ?? '17:00');
+        if (startMin === undefined || endMin === undefined || endMin <= startMin) {
+          return invalidParams(
+            account as Account,
+            `Working hours ${workStart ?? '09:00'} to ${workEnd ?? '17:00'} are not a valid range.`,
+            'Pass workStart and workEnd as HH:MM on a 24-hour clock, with workEnd after workStart, e.g. "09:00" and "17:00".',
+          );
+        }
+        if (timeZone !== undefined && !isValidTimeZone(timeZone)) {
+          return invalidParams(account as Account, `timeZone ("${timeZone}") is not an IANA time zone name.`, 'Use a name like "Europe/Paris" or "America/New_York".');
+        }
+
+        const now = Date.now();
+        const from = timeMin !== undefined ? Date.parse(timeMin) : now;
+        const to = timeMax !== undefined ? Date.parse(timeMax) : from + 7 * 86_400_000;
+        if (Number.isNaN(from) || Number.isNaN(to)) {
+          return invalidParams(account as Account, 'timeMin or timeMax is not a valid ISO 8601 date-time.', MISSING_TIME_ZONE_HINT);
+        }
+        if (to - from > 31 * 86_400_000) {
+          return invalidParams(account as Account, 'The search window is longer than 31 days.', 'Search a month at a time: pass a narrower timeMin and timeMax.');
+        }
+
+        const auth = await getClientFn(account as Account);
+        const cal = calendarClient({ version: 'v3', auth });
+
+        let zone = timeZone;
+        if (!zone) {
+          try {
+            const primary = await cal.calendars.get({ calendarId: 'primary' });
+            if (primary.data.timeZone && isValidTimeZone(primary.data.timeZone)) zone = primary.data.timeZone;
+          } catch { /* fall back to UTC below */ }
+        }
+        zone = zone ?? 'UTC';
+
+        const ids = ['primary', ...people];
+        const res = await cal.freebusy.query({
+          requestBody: {
+            timeMin: new Date(from).toISOString(),
+            timeMax: new Date(to).toISOString(),
+            timeZone: 'UTC',
+            items: ids.map((id) => ({ id })),
+          },
+        });
+        const calendars = res.data.calendars ?? {};
+
+        const busy: BusyBlock[] = [];
+        const unavailable: { calendar: string; reason: string }[] = [];
+        for (const id of ids) {
+          const entry = calendars[id];
+          if (!entry || (entry.errors && entry.errors.length > 0)) {
+            unavailable.push({ calendar: id, reason: entry?.errors?.[0]?.reason ?? 'no data returned' });
+            continue;
+          }
+          for (const b of entry.busy ?? []) {
+            busy.push({ start: Date.parse(b.start ?? ''), end: Date.parse(b.end ?? '') });
+          }
+        }
+        if (unavailable.some((u) => u.calendar === 'primary')) {
+          return invalidParams(
+            account as Account,
+            'Free/busy for your own calendar could not be read.',
+            'Check the account alias and that the account has calendar access (diagnose lists missing scopes).',
+          );
+        }
+
+        const slots = suggestSlots(busy, {
+          from,
+          to,
+          durationMin: durationMinutes ?? 30,
+          workStartMin: startMin,
+          workEndMin: endMin,
+          timeZone: zone,
+          stepMin: 30,
+          bufferMin: bufferMinutes ?? 0,
+          includeWeekends: includeWeekends ?? false,
+          maxSlots: maxSuggestions ?? 5,
+          maxPerDay: 3,
+        });
+
+        const out: Record<string, unknown> = {
+          timeZone: zone,
+          durationMinutes: durationMinutes ?? 30,
+          workingHours: { start: workStart ?? '09:00', end: workEnd ?? '17:00', weekends: includeWeekends ?? false },
+          checked: ids.filter((id) => !unavailable.some((u) => u.calendar === id)),
+          slots: slots.map((s) => ({
+            start: isoWithOffset(s.start, zone!),
+            end: isoWithOffset(s.end, zone!),
+            startUtc: new Date(s.start).toISOString(),
+            endUtc: new Date(s.end).toISOString(),
+          })),
+        };
+        if (unavailable.length > 0) {
+          out.unavailable = unavailable;
+          out.warning = 'These calendars could not be read, so their owners were NOT taken into account. Ask them, or share the calendars with this account.';
+        }
+        if (slots.length === 0) {
+          out.hint = 'No common free slot in this window. Widen timeMin/timeMax, shorten durationMinutes, include weekends, or widen workStart/workEnd.';
+        }
+        return { content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }] };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
+
+  server.registerTool(
     'calendar_create_calendar',
     {
       description: 'Create a new calendar under the account',
@@ -524,6 +669,110 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
         return {
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
+
+  // The account's own calendar LIST (which calendars it shows, with what colour
+  // and name), as opposed to the calendars themselves.
+  const listEntryShape = {
+    summaryOverride: z.string().optional().describe('Name to show for this calendar in this account\'s list (does not rename the calendar for anyone else)'),
+    colorId: z.string().optional().describe('Colour from the Google palette, e.g. "9" (see the colors API); ignored when backgroundColor is given'),
+    backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Hex background colour such as "#16a765"; use together with foregroundColor'),
+    foregroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Hex text colour such as "#000000"'),
+    hidden: coerceBoolean.optional().describe('Hide the calendar from the list without unsubscribing'),
+    selected: coerceBoolean.optional().describe('Show the calendar\'s events in this account\'s calendar view'),
+  };
+  const listEntryBody = (a: Record<string, unknown>) => {
+    const body: Record<string, unknown> = {};
+    for (const k of Object.keys(listEntryShape)) if (a[k] !== undefined) body[k] = a[k];
+    return body;
+  };
+  const usesRgb = (body: Record<string, unknown>) => body.backgroundColor !== undefined || body.foregroundColor !== undefined;
+
+  server.registerTool(
+    'calendar_add_subscription',
+    {
+      description:
+        'Add an existing calendar (one shared with the account, a public one, a colleague\'s) to the account\'s calendar list, so it shows up in calendar_list_calendars. ' +
+        'To create a new calendar use calendar_create_calendar.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        calendarId: z.string().min(1).describe('ID of the calendar to add, usually its email address'),
+        ...listEntryShape,
+      },
+    },
+    async ({ account, calendarId, ...rest }) => {
+      try {
+        const auth = await getClientFn(account as Account);
+        const cal = calendarClient({ version: 'v3', auth });
+        const body = listEntryBody(rest);
+        const res = await cal.calendarList.insert({
+          requestBody: { id: calendarId, ...body },
+          ...(usesRgb(body) ? { colorRgbFormat: true } : {}),
+        });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }] };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
+
+  server.registerTool(
+    'calendar_update_subscription',
+    {
+      description:
+        'Change how a calendar appears in the account\'s calendar list: its display name, colour, whether it is hidden or selected. ' +
+        'Only the fields you pass change. To change the calendar itself (title, time zone) it must be edited by its owner.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        calendarId: z.string().min(1).describe('ID of a calendar already in the account\'s list'),
+        ...listEntryShape,
+      },
+    },
+    async ({ account, calendarId, ...rest }) => {
+      const body = listEntryBody(rest);
+      if (Object.keys(body).length === 0) {
+        return invalidParams(
+          account as Account,
+          'Nothing to change: none of summaryOverride, colorId, backgroundColor, foregroundColor, hidden or selected was given.',
+          'Pass at least one of those fields.',
+        );
+      }
+      try {
+        const auth = await getClientFn(account as Account);
+        const cal = calendarClient({ version: 'v3', auth });
+        const res = await cal.calendarList.patch({
+          calendarId,
+          requestBody: body,
+          ...(usesRgb(body) ? { colorRgbFormat: true } : {}),
+        });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }] };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
+
+  server.registerTool(
+    'calendar_remove_subscription',
+    {
+      description:
+        'Remove a calendar from the account\'s calendar list (unsubscribe). The calendar and its events are not deleted and stay available to everyone else; ' +
+        'the account can add it back with calendar_add_subscription if it still has access.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        calendarId: z.string().min(1).describe('ID of the calendar to remove from the list'),
+      },
+    },
+    async ({ account, calendarId }) => {
+      try {
+        const auth = await getClientFn(account as Account);
+        const cal = calendarClient({ version: 'v3', auth });
+        await cal.calendarList.delete({ calendarId });
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ removed: true, calendarId }, null, 2) }] };
       } catch (error: any) {
         return handleCalendarError(error, account as Account);
       }
@@ -567,6 +816,128 @@ export function missingTimeZoneError(field: 'timeMin' | 'timeMax', value: string
 export const MISSING_TIME_ZONE_HINT =
   'Add "Z" for UTC or an explicit offset, e.g. "2026-04-04T00:00:00Z" or "2026-04-04T00:00:00+01:00".';
 
+type EventTime = { date: string } | { dateTime: string; timeZone?: string };
+
+export const EVENT_TIME_HINT =
+  'Timed events: an ISO 8601 date-time with an offset ("2026-11-18T08:30:00-05:00"), or without one plus ' +
+  'startTimeZone/endTimeZone ("2026-11-18T08:30:00" + "America/Cayman"). All-day events: a date ' +
+  '("2026-11-18") and no time zone. Zones are IANA names.';
+
+/** IANA name check via Intl (accepts canonical names and aliases like America/Cayman). */
+export function timeZoneError(field: string, timeZone: string): string | null {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    return null;
+  } catch {
+    return `${field}TimeZone ("${timeZone}") is not an IANA time zone name.`;
+  }
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const WALL_CLOCK_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
+function isRealDate(value: string): boolean {
+  if (!DATE_RE.test(value)) return false;
+  const t = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(t.getTime()) && t.toISOString().startsWith(value);
+}
+
+/** Models often pass Google's own JSON shape as the string, {"date":"2027-10-26"}
+ * or {"dateTime":"...","timeZone":"..."}. Unwrap it instead of failing on it. */
+function unwrapEventTimeShape(
+  value: string, timeZone: string | undefined,
+): { value: string; timeZone: string | undefined; date: boolean } | null {
+  const text = value.trim();
+  if (!text.startsWith('{')) return null;
+  let parsed: unknown;
+  try { parsed = JSON.parse(text); } catch { return null; }
+  if (!parsed || typeof parsed !== 'object') return null;
+  const o = parsed as Record<string, unknown>;
+  if (typeof o.date === 'string') return { value: o.date, timeZone, date: true };
+  if (typeof o.dateTime === 'string') {
+    return { value: o.dateTime, timeZone: timeZone ?? (typeof o.timeZone === 'string' ? o.timeZone : undefined), date: false };
+  }
+  return null;
+}
+
+/** Build a create-time start/end. An offset-less dateTime is only unambiguous with a zone. */
+export function eventTime(
+  field: 'start' | 'end', rawValue: string, rawTimeZone: string | undefined, allDay: boolean,
+): { value: EventTime } | { error: string } {
+  let value = rawValue.trim();
+  let timeZone = rawTimeZone;
+  const unwrapped = unwrapEventTimeShape(value, timeZone);
+  if (unwrapped) {
+    value = unwrapped.value.trim();
+    timeZone = unwrapped.timeZone;
+    if (unwrapped.date) allDay = true;
+  }
+  if (allDay || value.length === 10) {
+    if (timeZone !== undefined) return { error: `${field}TimeZone was given for an all-day ${field}; all-day events have no time zone.` };
+    if (!isRealDate(value)) return { error: `${field} ("${rawValue}") is not a date in YYYY-MM-DD form.` };
+    return { value: { date: value } };
+  }
+  if (timeZone !== undefined) {
+    const bad = timeZoneError(field, timeZone);
+    if (bad) return { error: bad };
+    if (!WALL_CLOCK_RE.test(value) && !(TZ_SUFFIX_RE.test(value) && !Number.isNaN(Date.parse(value)))) {
+      return { error: `${field} ("${rawValue}") is not an ISO 8601 date-time such as "2026-11-18T08:30:00".` };
+    }
+    return { value: { dateTime: value, timeZone } };
+  }
+  if (!TZ_SUFFIX_RE.test(value)) {
+    if (WALL_CLOCK_RE.test(value)) {
+      return { error: `${field} ("${rawValue}") has no UTC offset and no ${field}TimeZone, so its time is ambiguous.` };
+    }
+    return { error: `${field} ("${rawValue}") is not an ISO 8601 date or date-time.` };
+  }
+  if (Number.isNaN(Date.parse(value))) return { error: `${field} ("${rawValue}") is not a valid ISO 8601 date-time.` };
+  return { value: { dateTime: value } };
+}
+
+/** Build an update-time start/end against the event as it stands. `value: undefined`
+ * means "leave unchanged"; a zone without a value re-labels the same instant; a new
+ * timed value keeps the event's current zone unless one is given. */
+export function patchEventTime(
+  field: 'start' | 'end', value: string | undefined, timeZone: string | undefined,
+  current: { date?: string | null; dateTime?: string | null; timeZone?: string | null } | undefined,
+): { value?: EventTime } | { error: string } {
+  if (value === undefined && timeZone === undefined) return {};
+  if (value === undefined) {
+    if (!current?.dateTime) return { error: `${field}TimeZone was given but the event's ${field} is all-day, which has no time zone.` };
+    const bad = timeZoneError(field, timeZone!);
+    if (bad) return { error: bad };
+    return { value: { dateTime: current.dateTime, timeZone: timeZone! } };
+  }
+  if (value.length === 10) return eventTime(field, value, timeZone, true);
+  const keep = timeZone ?? (current?.dateTime ? current.timeZone ?? undefined : undefined);
+  return eventTime(field, value, keep, false);
+}
+
+/** Google renders `dateTime` in the CALENDAR's zone, not the event's own
+ * `timeZone` (see docs/features.md). Re-render the same instant in the event's
+ * zone so the wall-clock time matches what the organizer entered. Returns the
+ * input unchanged when there is no zone or it is not a valid IANA name. */
+export function inEventZone(dateTime: string | undefined, timeZone: string | undefined): string | undefined {
+  if (!dateTime || !timeZone) return dateTime;
+  const instant = new Date(dateTime);
+  if (Number.isNaN(instant.getTime())) return dateTime;
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat('en-US', {
+      timeZone, hourCycle: 'h23', timeZoneName: 'longOffset',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(instant);
+  } catch {
+    return dateTime;
+  }
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+  const off = (p.timeZoneName ?? '').replace(/^GMT/, '');
+  const offset = off === '' ? '+00:00' : /^[+-]\d{2}:\d{2}$/.test(off) ? off : null;
+  if (offset === null) return dateTime;
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}${offset}`;
+}
+
 export function formatEvent(event: any, opts: { full?: boolean } = {}) {
   const full = opts.full ?? true;
   const description: string = event.description ?? '';
@@ -580,8 +951,10 @@ export function formatEvent(event: any, opts: { full?: boolean } = {}) {
     summary: event.summary ?? '',
     description: cappedDescription,
     location: event.location ?? '',
-    start: event.start?.dateTime ?? event.start?.date ?? '',
-    end: event.end?.dateTime ?? event.end?.date ?? '',
+    start: inEventZone(event.start?.dateTime, event.start?.timeZone) ?? event.start?.date ?? '',
+    end: inEventZone(event.end?.dateTime, event.end?.timeZone) ?? event.end?.date ?? '',
+    startTimeZone: event.start?.dateTime ? event.start?.timeZone : undefined,
+    endTimeZone: event.end?.dateTime ? event.end?.timeZone : undefined,
     status: event.status,
     htmlLink: event.htmlLink,
     organizer: event.organizer?.email ?? '',
