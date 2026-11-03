@@ -153,6 +153,21 @@ const TOOL_ALIASES: Record<string, Record<string, string[]>> = {
   drive_export: { format: ['mimeType'] },
   gmail_read_batch: { messageids: ['ids'], messages: ['ids'], id: ['ids'] },
   gmail_read: { id: ['messageId'] },
+  gmail_search: { after: ['since'], before: ['until'], startdate: ['since'], enddate: ['until'], from: ['query'], subject: ['query'], label: ['query'] },
+  google_api_call: {
+    params: ['queryParams'],
+    parameters: ['queryParams'],
+    query: ['queryParams'],
+    requestbody: ['body'],
+    data: ['body'],
+    json: ['body'],
+    payload: ['body'],
+    method: ['methodId'],
+    methodname: ['methodId'],
+    path: ['pathParams'],
+    service: ['api'],
+    apiname: ['api'],
+  },
   sheets_find_replace: { findtext: ['find'], replacetext: ['replacement'], replace: ['replacement'] },
 };
 

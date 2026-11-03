@@ -137,6 +137,14 @@ describe('first-guess aliases feed the suggestion, never the call', () => {
     expect(sug('drive_search', { limit: 5 }, ['account', 'query', 'maxResults'])).toEqual([['limit', ['maxResults']]]);
   });
 
+  it('covers the escape hatch and the date bounds of gmail_search', () => {
+    const decl = ['account', 'api', 'methodId', 'pathParams', 'queryParams', 'body'];
+    const call = sug('google_api_call', { params: {}, requestBody: {} }, decl);
+    expect(call[0][1]).toContain('queryParams');
+    expect(call[1]).toEqual(['requestBody', ['body']]);
+    expect(sug('gmail_search', { after: '2026-01-01' }, ['account', 'query', 'since', 'until'])).toEqual([['after', ['since']]]);
+  });
+
   it('offers only a key the tool really declares', () => {
     expect(sug('drive_get_about', { limit: 5 }, ['account'])).toEqual([['limit', []]]);
   });
