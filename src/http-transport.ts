@@ -169,6 +169,24 @@ function stopReading(socket: Socket): void {
   socket.resume = () => socket;
 }
 
+/** How long a refused oversized request may keep its socket open so the client
+ * can read the refusal before the connection is cut. */
+const REFUSAL_LINGER_MS = 5000;
+
+// Refuses a request whose body is not going to be read. Closing the socket
+// with unread input makes the kernel reset the connection, and on Windows the
+// reset also drops the answer still in flight, so the client sees ECONNRESET
+// instead of the 413. Stop reading (TCP flow control then stops the client),
+// end the socket once the answer is flushed, and cut it after a short grace.
+function lingerAfterRefusal(socket: Socket): void {
+  if (socket.destroyed) return;
+  stopReading(socket);
+  socket.destroySoon = () => endAfterFlush(socket);
+  const timer = setTimeout(() => socket.destroy(), REFUSAL_LINGER_MS);
+  timer.unref();
+  socket.once('close', () => clearTimeout(timer));
+}
+
 // For a log line: the pathname only (a query can carry a code or a state),
 // and never a throw, since the caller is the catch-all.
 function pathOf(req: IncomingMessage): string {
@@ -498,9 +516,9 @@ export class HttpTransportHost {
     const declared = Number(req.headers['content-length']);
     if (Number.isFinite(declared) && declared > (this.opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES)) {
       this.log('413 payload_too_large path=/mcp');
-      // Answer first, drop the socket once the answer is flushed: destroying
-      // it up front would reset the client before it can read the 413.
-      res.once('finish', () => req.destroy());
+      // Answer first and let the client read it: destroying the socket with
+      // the body unread would reset the client before it can see the 413.
+      lingerAfterRefusal(req.socket);
       res.setHeader('Connection', 'close');
       this.fail(res, 413, 'payload_too_large', 'request body too large');
       return;
