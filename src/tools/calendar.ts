@@ -588,22 +588,65 @@ export function timeZoneError(field: string, timeZone: string): string | null {
   }
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const WALL_CLOCK_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
+function isRealDate(value: string): boolean {
+  if (!DATE_RE.test(value)) return false;
+  const t = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(t.getTime()) && t.toISOString().startsWith(value);
+}
+
+/** Models often pass Google's own JSON shape as the string, {"date":"2027-10-26"}
+ * or {"dateTime":"...","timeZone":"..."}. Unwrap it instead of failing on it. */
+function unwrapEventTimeShape(
+  value: string, timeZone: string | undefined,
+): { value: string; timeZone: string | undefined; date: boolean } | null {
+  const text = value.trim();
+  if (!text.startsWith('{')) return null;
+  let parsed: unknown;
+  try { parsed = JSON.parse(text); } catch { return null; }
+  if (!parsed || typeof parsed !== 'object') return null;
+  const o = parsed as Record<string, unknown>;
+  if (typeof o.date === 'string') return { value: o.date, timeZone, date: true };
+  if (typeof o.dateTime === 'string') {
+    return { value: o.dateTime, timeZone: timeZone ?? (typeof o.timeZone === 'string' ? o.timeZone : undefined), date: false };
+  }
+  return null;
+}
+
 /** Build a create-time start/end. An offset-less dateTime is only unambiguous with a zone. */
 export function eventTime(
-  field: 'start' | 'end', value: string, timeZone: string | undefined, allDay: boolean,
+  field: 'start' | 'end', rawValue: string, rawTimeZone: string | undefined, allDay: boolean,
 ): { value: EventTime } | { error: string } {
+  let value = rawValue.trim();
+  let timeZone = rawTimeZone;
+  const unwrapped = unwrapEventTimeShape(value, timeZone);
+  if (unwrapped) {
+    value = unwrapped.value.trim();
+    timeZone = unwrapped.timeZone;
+    if (unwrapped.date) allDay = true;
+  }
   if (allDay || value.length === 10) {
     if (timeZone !== undefined) return { error: `${field}TimeZone was given for an all-day ${field}; all-day events have no time zone.` };
+    if (!isRealDate(value)) return { error: `${field} ("${rawValue}") is not a date in YYYY-MM-DD form.` };
     return { value: { date: value } };
   }
   if (timeZone !== undefined) {
     const bad = timeZoneError(field, timeZone);
     if (bad) return { error: bad };
+    if (!WALL_CLOCK_RE.test(value) && !(TZ_SUFFIX_RE.test(value) && !Number.isNaN(Date.parse(value)))) {
+      return { error: `${field} ("${rawValue}") is not an ISO 8601 date-time such as "2026-11-18T08:30:00".` };
+    }
     return { value: { dateTime: value, timeZone } };
   }
   if (!TZ_SUFFIX_RE.test(value)) {
-    return { error: `${field} ("${value}") has no UTC offset and no ${field}TimeZone, so its time is ambiguous.` };
+    if (WALL_CLOCK_RE.test(value)) {
+      return { error: `${field} ("${rawValue}") has no UTC offset and no ${field}TimeZone, so its time is ambiguous.` };
+    }
+    return { error: `${field} ("${rawValue}") is not an ISO 8601 date or date-time.` };
   }
+  if (Number.isNaN(Date.parse(value))) return { error: `${field} ("${rawValue}") is not a valid ISO 8601 date-time.` };
   return { value: { dateTime: value } };
 }
 

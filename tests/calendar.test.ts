@@ -218,3 +218,52 @@ describe('calendar event time zones on create/update', () => {
     expect(h.requests().some((r) => (r.method ?? 'GET').toUpperCase() === 'PATCH')).toBe(false);
   });
 });
+
+describe('calendar_create_event start/end shapes', () => {
+  const posted = (h: ReturnType<typeof toolHarness>) =>
+    (h.requests().find((r) => (r.method ?? 'GET').toUpperCase() === 'POST') as GoogleRequest | undefined)?.data as
+      { start?: unknown; end?: unknown } | undefined;
+
+  it('accepts Google\'s {"date": ...} shape passed as a string, as an all-day event', async () => {
+    const h = toolHarness({ respond: (req) => req.data ?? {} });
+    const res = await h.call('calendar_create_event', {
+      account: 'test', summary: 'Holiday', start: '{"date":"2027-10-26"}', end: '{"date":"2027-10-27"}',
+    });
+    expect(res.isError).toBeFalsy();
+    expect(posted(h)).toMatchObject({ start: { date: '2027-10-26' }, end: { date: '2027-10-27' } });
+  });
+
+  it('accepts the {"dateTime", "timeZone"} shape and keeps its zone', async () => {
+    const h = toolHarness({ respond: (req) => req.data ?? {} });
+    const res = await h.call('calendar_create_event', {
+      account: 'test', summary: 'Call',
+      start: '{"dateTime":"2027-10-26T09:00:00","timeZone":"Europe/Paris"}',
+      end: '{"dateTime":"2027-10-26T10:00:00+02:00"}',
+    });
+    expect(res.isError).toBeFalsy();
+    expect(posted(h)).toMatchObject({
+      start: { dateTime: '2027-10-26T09:00:00', timeZone: 'Europe/Paris' },
+      end: { dateTime: '2027-10-26T10:00:00+02:00' },
+    });
+  });
+
+  it('names the field and sends nothing for values that are not dates', async () => {
+    const bad: Array<[string, string, string]> = [
+      ['start', 'next tuesday', 'start'],
+      ['end', '2027-02-30', 'end'],
+      ['start', '{"date":"26/10/2027"}', 'start'],
+      ['end', '2027-10-26T25:99:00Z', 'end'],
+    ];
+    for (const [field, value, named] of bad) {
+      const h = toolHarness({ respond: () => ({}) });
+      const args: Record<string, unknown> = { account: 'test', summary: 'x', start: '2027-10-26T09:00:00Z', end: '2027-10-26T10:00:00Z' };
+      args[field] = value;
+      const res = await h.call('calendar_create_event', args);
+      const env = parseResult(res);
+      expect(res.isError, `${field}=${value}`).toBe(true);
+      expect(env.error).toBe('invalid_params');
+      expect(env.message).toContain(named);
+      expect(h.request).not.toHaveBeenCalled();
+    }
+  });
+});
