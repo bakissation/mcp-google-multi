@@ -211,6 +211,7 @@ export class ToolRegistry {
    * identity; unused on stdio. */
   httpConfirm: HttpConfirm = new HttpConfirm();
   private readonly revealed = new Set<string>();
+  private hiddenServices = new Set<string>();
   private readonly jsonSchemaCache = new Map<string, unknown>();
   private readonly argShapeCache = new Map<string, ArgShape>();
   // Memoized isUngrantable verdict: depends on the frozen bundle catalog only.
@@ -569,6 +570,15 @@ export class ToolRegistry {
     return { curated: [...new Set(curated)], generated: [...new Set(generated)] };
   }
 
+  /** Keep these services out of tools/list whatever the discovery mode or a
+   * later reveal says. Hidden, not unregistered: the tools stay callable by
+   * name and {service}_discover still lists them. Meta tools are never hidden.
+   * For a host that serves one registry per identity and knows which services
+   * that identity can reach; replaces any earlier set. */
+  hideServices(services: Iterable<string>): void {
+    this.hiddenServices = new Set(services);
+  }
+
   reveal(service: string): boolean {
     if (this.revealed.has(service)) return false;
     this.revealed.add(service);
@@ -628,6 +638,7 @@ export class ToolRegistry {
     // Hidden, not unregistered: calling an ungrantable tool by name still
     // produces the real scope error, and {service}_discover still lists it, marked.
     if (!tool.meta && this.isUngrantable(tool)) return false;
+    if (!tool.meta && this.hiddenServices.has(tool.service)) return false;
     return (
       tool.meta ||
       mode === 'eager' ||
