@@ -2,9 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [main, staging, dev]
+    branches: [main, staging, dev, feat/6.2]
   pull_request:
-    branches: [main, staging, dev]
+    branches: [main, staging, dev, feat/6.2]
 
 # Least privilege: CI only checks out code + runs npm. (CodeQL: actions/missing-workflow-permissions)
 permissions:
