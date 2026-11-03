@@ -567,6 +567,30 @@ export function missingTimeZoneError(field: 'timeMin' | 'timeMax', value: string
 export const MISSING_TIME_ZONE_HINT =
   'Add "Z" for UTC or an explicit offset, e.g. "2026-04-04T00:00:00Z" or "2026-04-04T00:00:00+01:00".';
 
+/** Google renders `dateTime` in the CALENDAR's zone, not the event's own
+ * `timeZone` (see docs/features.md). Re-render the same instant in the event's
+ * zone so the wall-clock time matches what the organizer entered. Returns the
+ * input unchanged when there is no zone or it is not a valid IANA name. */
+export function inEventZone(dateTime: string | undefined, timeZone: string | undefined): string | undefined {
+  if (!dateTime || !timeZone) return dateTime;
+  const instant = new Date(dateTime);
+  if (Number.isNaN(instant.getTime())) return dateTime;
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat('en-US', {
+      timeZone, hourCycle: 'h23', timeZoneName: 'longOffset',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(instant);
+  } catch {
+    return dateTime;
+  }
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+  const off = (p.timeZoneName ?? '').replace(/^GMT/, '');
+  const offset = off === '' ? '+00:00' : /^[+-]\d{2}:\d{2}$/.test(off) ? off : null;
+  if (offset === null) return dateTime;
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}${offset}`;
+}
+
 export function formatEvent(event: any, opts: { full?: boolean } = {}) {
   const full = opts.full ?? true;
   const description: string = event.description ?? '';
@@ -580,8 +604,10 @@ export function formatEvent(event: any, opts: { full?: boolean } = {}) {
     summary: event.summary ?? '',
     description: cappedDescription,
     location: event.location ?? '',
-    start: event.start?.dateTime ?? event.start?.date ?? '',
-    end: event.end?.dateTime ?? event.end?.date ?? '',
+    start: inEventZone(event.start?.dateTime, event.start?.timeZone) ?? event.start?.date ?? '',
+    end: inEventZone(event.end?.dateTime, event.end?.timeZone) ?? event.end?.date ?? '',
+    startTimeZone: event.start?.dateTime ? event.start?.timeZone : undefined,
+    endTimeZone: event.end?.dateTime ? event.end?.timeZone : undefined,
     status: event.status,
     htmlLink: event.htmlLink,
     organizer: event.organizer?.email ?? '',
