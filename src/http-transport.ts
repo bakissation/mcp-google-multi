@@ -84,6 +84,7 @@ const DISPATCH_TIMEOUT_DEFAULT = 120_000;
 // Without a cap, one body multiplies per-call work by however many
 // JSON-RPC frames the SDK's synchronous batch screening finds in it.
 const MAX_BATCH_FRAMES = 16;
+const DEFAULT_MAX_BODY_BYTES = 4_000_000;
 
 // A refusal's body reaches the wire verbatim, so it's validated: no new slug
 // literal enters core, and an overlong message can't leak an operator path/env var.
@@ -492,6 +493,19 @@ export class HttpTransportHost {
       extra: { sub },
     };
 
+    // A declared length over the cap is refused before a single byte is read;
+    // chunked bodies without a length are still bounded while streaming.
+    const declared = Number(req.headers['content-length']);
+    if (Number.isFinite(declared) && declared > (this.opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES)) {
+      this.log('413 payload_too_large path=/mcp');
+      // Answer first, drop the socket once the answer is flushed: destroying
+      // it up front would reset the client before it can read the 413.
+      res.once('finish', () => req.destroy());
+      res.setHeader('Connection', 'close');
+      this.fail(res, 413, 'payload_too_large', 'request body too large');
+      return;
+    }
+
     let body: unknown;
     try {
       body = await this.readJson(req);
@@ -581,7 +595,7 @@ export class HttpTransportHost {
   }
 
   private readJson(req: IncomingMessage): Promise<unknown> {
-    const max = this.opts.maxBodyBytes ?? 4_000_000;
+    const max = this.opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
     return new Promise((resolve, reject) => {
       // A client that left while the request was authenticated or resolved has
       // already destroyed it, and no 'end' or 'error' would ever follow.
