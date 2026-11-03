@@ -264,7 +264,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
       _meta: { 'anthropic/maxResultSizeChars': 100_000 },
     },
-    async ({ account, api, methodId, pathParams, queryParams, body }) => {
+    async ({ account, api, methodId, pathParams, queryParams, body }, ctx) => {
       const resolved = resolveApiAliases(api as string);
       if (!resolved) {
         return jsonResult({ error: 'unknown_api', message: `Unknown api "${api}".`, hint: `Known APIs: ${apiList}`, retriable: false, account }, true);
@@ -372,7 +372,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
           pathParams: pathParams as Record<string, unknown> | undefined,
           queryParams: queryParams as Record<string, unknown> | undefined,
           body,
-        });
+        }, ctx);
         if (gate) return gate;
       }
 

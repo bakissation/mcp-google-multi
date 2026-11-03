@@ -4,6 +4,7 @@
 // full-writes with GOOGLE_OUTBOUND_ALLOWLIST unset allows outright;
 // everything else asks a human via MCP elicitation, server-side, showing
 // the real call, and executes only on "accept".
+import type { InputRequiredResult, ServerContext } from '@modelcontextprotocol/server';
 import type { ToolRegistry, Cud } from '../registry.js';
 import { escapeHatchVerdict, writeDisabledResult, type Policy } from '../write-control.js';
 import { resolveOutboundAllowlist } from '../outbound-allowlist.js';
@@ -226,7 +227,8 @@ export async function escapeHatchGate(
   base: { service: string; cud: Cud; scopes?: readonly string[] },
   policy: Policy,
   info: EscapeHatchCallInfo,
-): Promise<ReturnType<typeof jsonResult> | null> {
+  ctx?: ServerContext,
+): Promise<ReturnType<typeof jsonResult> | InputRequiredResult | null> {
   const outboundActive = resolveOutboundAllowlist() !== null;
   const verdict = escapeHatchVerdict(denyNames, base, primaryName, policy, outboundActive);
   if (verdict.decision === 'allow') return null;
@@ -240,8 +242,13 @@ export async function escapeHatchGate(
     );
   }
 
-  const outcome = await registry.elicitConfirmation(buildPrompt(info, summary));
+  const outcome = await registry.elicitConfirmation(buildPrompt(info, summary), {
+    ctx,
+    call: { account: info.account, methodId: info.methodId, httpMethod: info.httpMethod, pathParams: info.pathParams, queryParams: info.queryParams, body: info.body },
+    account: info.account,
+  });
   if (outcome.action === 'accept') return null;
+  if (outcome.action === 'respond') return outcome.result as ReturnType<typeof jsonResult> | InputRequiredResult;
   if (outcome.action === 'unsupported') {
     // Owner decision: over HTTP this covers BOTH a self-hosted HTTP
     // deployment and an EE hosted tenant, which this server cannot tell

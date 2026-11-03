@@ -1,4 +1,4 @@
-import type { ListToolsResult, McpServer } from "@modelcontextprotocol/server";
+import type { ListToolsResult, McpServer, ServerContext } from "@modelcontextprotocol/server";
 import { z } from 'zod';
 import { type Policy, isAllowed, writeDisabledResult, IRREVERSIBLE_TOOLS } from './write-control.js';
 import { getAccountSet, isLiveAccountField, refreshAccountSetIfStale, type AccountSet } from './accounts.js';
@@ -10,6 +10,7 @@ import type { Metrics } from './usage-metrics.js';
 import { MAX_SUGGESTED_KEYS, suggestKeys } from './arg-strict.js';
 import { classifyScope } from './scope-observability.js';
 import { hints } from './hint-provider.js';
+import { HttpConfirm } from './http-confirm.js';
 
 /** Nothing granted, no profile: asks the BUNDLE CATALOG whether a scope is
  * reachable at all, independently of any account. */
@@ -205,6 +206,10 @@ export class ToolRegistry {
   readonly tools: ToolEntry[] = [];
   readonly policy: Policy;
   readonly registerTool: McpServer['registerTool'];
+  /** How a write is confirmed over HTTP (modern input_required, optional
+   * two-step token). A host embedding this registry may replace it per
+   * identity; unused on stdio. */
+  httpConfirm: HttpConfirm = new HttpConfirm();
   private readonly revealed = new Set<string>();
   private readonly jsonSchemaCache = new Map<string, unknown>();
   private readonly argShapeCache = new Map<string, ArgShape>();
@@ -397,8 +402,17 @@ export class ToolRegistry {
    */
   async elicitConfirmation(
     message: string,
-  ): Promise<{ action: 'accept' | 'decline' | 'cancel' } | { action: 'unsupported'; reason: string; cause: 'http_transport' | 'no_capability' | 'error' }> {
+    http?: { ctx: ServerContext | undefined; call: unknown; account: string },
+  ): Promise<
+    | { action: 'accept' | 'decline' | 'cancel' }
+    | { action: 'respond'; result: unknown }
+    | { action: 'unsupported'; reason: string; cause: 'http_transport' | 'no_capability' | 'error' }
+  > {
     if (this.policy.transport === 'http') {
+      if (http) {
+        const outcome = await this.httpConfirm.confirm(http.ctx, message, http.call, http.account);
+        if (outcome.action !== 'unavailable') return outcome;
+      }
       return {
         action: 'unsupported',
         reason: 'elicitation is not available over this server\'s HTTP transport',
