@@ -6,7 +6,7 @@ import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, mapGoogleError, safeMessage, stringifyEnvelope } from './_errors.js';
-import { hostFilesRefused, openLocalReadStream, openInternalReadStream, prepareLocalDest, cleanupPartialWrite, localFileErrorResult, LocalFileError } from './_local-files.js';
+import { hostFilesRefused, assertLocalPathAllowed, openLocalReadStream, openInternalReadStream, prepareLocalDest, cleanupPartialWrite, localFileErrorResult, LocalFileError } from './_local-files.js';
 import { checkOutbound, checkOutboundGrantee, driveGranteeFromAccessProposal, driveGranteeFromPermission, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
 import { capText, listResult } from '../trim.js';
@@ -399,17 +399,96 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
 
   // ─── Write / upload / download ─────────────────────────────────────────
 
+  async function uploadLocalFolder(account: Account, localDir: string, folderName: string | undefined, parentFolderId: string | undefined) {
+    try {
+      const realRoot = await assertLocalPathAllowed(localDir, 'read');
+      if (!(await fs.promises.stat(realRoot)).isDirectory()) {
+        return invalidParams(account, `localDir is not a folder: ${localDir}`, 'Pass a folder, or use localPath to upload a single file.');
+      }
+      const plan = await planLocalFolder(realRoot);
+      if (!plan) {
+        return invalidParams(
+          account,
+          `That folder holds more than ${FOLDER_UPLOAD_MAX_FILES} files; one call uploads at most ${FOLDER_UPLOAD_MAX_FILES}.`,
+          'Upload its subfolders with separate calls, or archive the folder and upload the archive.',
+        );
+      }
+
+      const auth = await getClientFn(account);
+      const drive = driveClient({ version: 'v3', auth });
+      const createFolder = async (name: string, parent: string | undefined) => (await drive.files.create({
+        requestBody: { name, mimeType: 'application/vnd.google-apps.folder', parents: parent ? [parent] : undefined },
+        fields: 'id,name,webViewLink',
+        supportsAllDrives: true,
+      })).data;
+
+      // A failed top folder fails the call; a failed subfolder fails what is under it.
+      const top = await createFolder(folderName || path.basename(realRoot), parentFolderId);
+      const folderIds = new Map<string, string | FolderFailure>([['', top.id ?? '']]);
+      for (const dir of plan.dirs) { // parents come before their children
+        const parent = folderIds.get(posixDirname(dir));
+        if (typeof parent !== 'string') { folderIds.set(dir, parent ?? failureOf(new Error('missing parent'), account)); continue; }
+        try {
+          folderIds.set(dir, (await createFolder(path.posix.basename(dir), parent)).id ?? '');
+        } catch (e: any) {
+          folderIds.set(dir, failureOf(e, account));
+        }
+      }
+
+      const results = await mapLimited(plan.files, FOLDER_UPLOAD_CONCURRENCY, async (rel) => {
+        const parent = folderIds.get(posixDirname(rel));
+        if (typeof parent !== 'string') return { path: rel, ok: false as const, ...(parent ?? failureOf(new Error('missing parent'), account)) };
+        try {
+          const name = path.posix.basename(rel);
+          const res = await drive.files.create({
+            requestBody: { name, parents: [parent] },
+            media: {
+              mimeType: mime.lookup(name) || 'application/octet-stream',
+              body: await openLocalReadStream(path.join(realRoot, ...rel.split('/'))),
+            },
+            fields: 'id,name,mimeType,webViewLink,size',
+            supportsAllDrives: true,
+          });
+          return { path: rel, ok: true as const, id: res.data.id, webViewLink: res.data.webViewLink };
+        } catch (e: any) {
+          return { path: rel, ok: false as const, ...failureOf(e, account) };
+        }
+      });
+      const uploaded = results.filter((r) => r.ok).length;
+      const out = {
+        folder: top,
+        uploaded,
+        failed: results.length - uploaded,
+        skippedCount: plan.skippedCount,
+        ...(plan.skipped.length ? { skipped: plan.skipped } : {}),
+        results,
+      };
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }],
+        // The folder exists either way; only a call whose every file failed is an error.
+        ...(plan.files.length > 0 && uploaded === 0 ? { isError: true as const } : {}),
+      };
+    } catch (error: any) {
+      if (error instanceof LocalFileError) return localFileErrorResult(error, account);
+      if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') {
+        return invalidParams(account, `localDir not found: ${localDir}`, 'Pass a folder inside the local-files root; a relative path resolves inside it.');
+      }
+      return handleDriveError(error, account);
+    }
+  }
+
   server.registerTool(
     'drive_upload',
     {
-      description: 'Upload a file to Google Drive, from inline base64 content or (when this server exposes the host filesystem) a local path. Pass `convertTo` to import it as a native, editable Google Doc/Sheet/Slides/Drawing instead of storing the raw bytes.',
+      description: 'Upload a file to Google Drive, from inline base64 content or (when this server exposes the host filesystem) a local path. Pass `convertTo` to import it as a native, editable Google Doc/Sheet/Slides/Drawing instead of storing the raw bytes.' + (localFiles ? ` Pass \`localDir\` instead to upload a whole local folder, keeping its subfolders, in one call (up to ${FOLDER_UPLOAD_MAX_FILES} files).` : ''),
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         filename: z.string().optional().describe('Name as it appears in Drive. Optional with localPath (defaults to the file\'s own name); required with contentBase64.'),
         contentBase64: z.string().optional().describe(`Base64-encoded file content. Exactly one of contentBase64${localFiles ? ' or localPath' : ''} is required. Decoded size is capped at ${MAX_UPLOAD_BASE64_BYTES / (1024 * 1024)} MB.`),
         ...(localFiles
           ? {
-              localPath: z.string().min(1).optional().describe('Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64 or localPath is required.'),
+              localPath: z.string().min(1).optional().describe('Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64, localPath or localDir is required.'),
+              localDir: z.string().min(1).optional().describe(`Path of a SOURCE folder to upload with its whole tree, on the machine running the server, confined like localPath. It becomes a new Drive folder (named by \`filename\` or the folder's own name) under parentFolderId, with subfolders recreated. Hidden entries and symlinks are skipped and reported, at most ${FOLDER_UPLOAD_MAX_FILES} files per call, and a file that fails does not stop the others. Not combinable with contentBase64, localPath, mimeType or convertTo. Running it twice uploads a second copy.`),
             }
           : {}),
         mimeType: z.string().optional().describe('Source MIME type of the content (inferred from filename if omitted). With `convertTo`, this is the format Drive imports from.'),
@@ -420,16 +499,27 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
     async (args) => {
       const { account, contentBase64, mimeType: mimeTypeArg, convertTo, parentFolderId } = args;
       // Declared only when the context may read host files (see the shape).
-      const { localPath: localPathArg } = args as { localPath?: string };
+      const { localPath: localPathArg, localDir: localDirArg } = args as { localPath?: string; localDir?: string };
       if (localPathArg && !localFiles) return hostFilesRefused(account, 'localPath');
+      if (localDirArg && !localFiles) return hostFilesRefused(account, 'localDir');
+      if (localDirArg) {
+        if (contentBase64 !== undefined || localPathArg || mimeTypeArg || convertTo) {
+          return invalidParams(
+            account as Account,
+            'localDir cannot be combined with contentBase64, localPath, mimeType or convertTo.',
+            'Pass localDir alone (optionally with filename to name the new Drive folder and parentFolderId), or upload single files one at a time.',
+          );
+        }
+        return uploadLocalFolder(account as Account, localDirArg, args.filename?.trim() || undefined, parentFolderId);
+      }
       const hasBase64 = contentBase64 !== undefined;
       const hasLocalPath = !!localPathArg;
       if (hasBase64 === hasLocalPath) {
         return invalidParams(
           account as Account,
-          `Pass exactly one of contentBase64${localFiles ? ' or localPath' : ''}.`,
+          `Pass exactly one of contentBase64${localFiles ? ', localPath or localDir' : ''}.`,
           localFiles
-            ? 'Use contentBase64 for inline content, or localPath for a file already on the machine running the server.'
+            ? 'Use contentBase64 for inline content, localPath for a file, or localDir for a folder already on the machine running the server.'
             : 'Pass contentBase64 with the file\'s base64-encoded content.',
         );
       }
@@ -1808,6 +1898,72 @@ async function mapLimited<T, R>(items: readonly T[], limit: number, fn: (item: T
   });
   await Promise.all(workers);
   return out;
+}
+
+const FOLDER_UPLOAD_MAX_FILES = 200;
+const FOLDER_UPLOAD_MAX_DEPTH = 8;
+const FOLDER_UPLOAD_CONCURRENCY = 3;
+const FOLDER_SKIPPED_LISTED = 50;
+
+type FolderFailure = { error: string; message: string; hint?: string };
+
+function failureOf(e: any, account: Account): FolderFailure {
+  if (e instanceof LocalFileError) {
+    const env = localFileErrorBody(e);
+    return env;
+  }
+  const env = mapGoogleError(e, account);
+  return { error: env.error, message: env.message, ...(env.hint ? { hint: env.hint } : {}) };
+}
+
+function localFileErrorBody(e: LocalFileError): FolderFailure {
+  return {
+    error: e.reason === 'exists' ? 'local_path_exists' : 'local_path_forbidden',
+    message: e.message,
+  };
+}
+
+const posixDirname = (rel: string): string => {
+  const i = rel.lastIndexOf('/');
+  return i < 0 ? '' : rel.slice(0, i);
+};
+
+export interface FolderPlan {
+  /** Subfolders, relative with "/", every parent before its children. */
+  dirs: string[];
+  files: string[];
+  skipped: { path: string; reason: 'hidden' | 'symlink' | 'too_deep' | 'not_a_regular_file' }[];
+  skippedCount: number;
+}
+
+/** Lists what a folder upload would create. Hidden entries and symlinks are
+ * never followed or uploaded. Returns null when the folder holds more than
+ * the per-call file cap (checked before anything is created in Drive). */
+export async function planLocalFolder(realRoot: string): Promise<FolderPlan | null> {
+  const plan: FolderPlan = { dirs: [], files: [], skipped: [], skippedCount: 0 };
+  const skip = (p: string, reason: FolderPlan['skipped'][number]['reason']) => {
+    plan.skippedCount += 1;
+    if (plan.skipped.length < FOLDER_SKIPPED_LISTED) plan.skipped.push({ path: p, reason });
+  };
+  const walk = async (rel: string, depth: number): Promise<boolean> => {
+    const entries = (await fs.promises.readdir(path.join(realRoot, ...(rel ? rel.split('/') : [])), { withFileTypes: true }))
+      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    for (const e of entries) {
+      const childRel = rel ? `${rel}/${e.name}` : e.name;
+      if (e.name.startsWith('.')) skip(childRel, 'hidden');
+      else if (e.isSymbolicLink()) skip(childRel, 'symlink');
+      else if (e.isDirectory()) {
+        if (depth >= FOLDER_UPLOAD_MAX_DEPTH) { skip(childRel, 'too_deep'); continue; }
+        plan.dirs.push(childRel);
+        if (!(await walk(childRel, depth + 1))) return false;
+      } else if (e.isFile()) {
+        if (plan.files.length >= FOLDER_UPLOAD_MAX_FILES) return false;
+        plan.files.push(childRel);
+      } else skip(childRel, 'not_a_regular_file');
+    }
+    return true;
+  };
+  return (await walk('', 0)) ? plan : null;
 }
 
 function handleDriveError(error: any, account: Account) {
