@@ -53,6 +53,45 @@ describe('package exports map', () => {
     expect(typeof auth.resolveScopesForAccount).toBe('function');
   });
 
+  it('./http-confirm and ./scope-observability are declared: a host that builds its own servers can confirm writes and read per-account scope sets', async () => {
+    expect(pkg.exports['./http-confirm']).toBe('./dist/http-confirm.js');
+    expect(pkg.exports['./scope-observability']).toBe('./dist/scope-observability.js');
+    const confirm = await import('../src/http-confirm.js');
+    expect(typeof confirm.HttpConfirm).toBe('function');
+    expect(typeof confirm.confirmTokenEnabled).toBe('function');
+    const scopes = await import('../src/scope-observability.js');
+    expect(typeof scopes.accountScopeSets).toBe('function');
+    expect(typeof scopes.summarizeToolScopes).toBe('function');
+    expect(typeof scopes.classifyMethodScopes).toBe('function');
+  });
+
+  // The map points at dist, so only the built package proves a subpath
+  // resolves for a consumer. Every build-then-test job in CI exercises this;
+  // a local run without a build skips it.
+  const built = existsSync(path.join(repoRoot, 'dist', 'index.js'));
+  it.skipIf(!built && !process.env.CI)(
+    'every declared subpath imports from the built package by its public name',
+    { timeout: 60_000 },
+    () => {
+      const subs = Object.keys(pkg.exports).filter((k) => k !== '.' && k !== './package.json');
+      const script = `
+        const subs = ${JSON.stringify(subs)};
+        for (const s of subs) {
+          const m = await import('mcp-google-multi/' + s.slice(2));
+          if (!m || Object.keys(m).length === 0) { console.error('EMPTY ' + s); process.exit(1); }
+        }
+        console.log('ALL_OK ' + subs.length);
+      `;
+      const r = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        timeout: 45_000,
+      });
+      expect(`${r.stdout}${r.stderr}`).toContain(`ALL_OK ${subs.length}`);
+      expect(r.status).toBe(0);
+    },
+  );
+
   it('the 6 public entry points are all declared', () => {
     for (const key of ['./identity', './compose', './oauth-as', './accounts', './token-store', './http-transport']) {
       expect(pkg.exports[key], key).toBeTruthy();

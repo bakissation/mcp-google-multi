@@ -33,6 +33,8 @@
     "./usage-metrics": "./dist/usage-metrics.js",
     "./metrics-tap": "./dist/metrics-tap.js",
     "./hint-provider": "./dist/hint-provider.js",
+    "./http-confirm": "./dist/http-confirm.js",
+    "./scope-observability": "./dist/scope-observability.js",
     "./package.json": "./package.json"
   },
   "files": [
