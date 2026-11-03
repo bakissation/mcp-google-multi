@@ -533,6 +533,110 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
       }
     },
   );
+
+  // The account's own calendar LIST (which calendars it shows, with what colour
+  // and name), as opposed to the calendars themselves.
+  const listEntryShape = {
+    summaryOverride: z.string().optional().describe('Name to show for this calendar in this account\'s list (does not rename the calendar for anyone else)'),
+    colorId: z.string().optional().describe('Colour from the Google palette, e.g. "9" (see the colors API); ignored when backgroundColor is given'),
+    backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Hex background colour such as "#16a765"; use together with foregroundColor'),
+    foregroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('Hex text colour such as "#000000"'),
+    hidden: coerceBoolean.optional().describe('Hide the calendar from the list without unsubscribing'),
+    selected: coerceBoolean.optional().describe('Show the calendar\'s events in this account\'s calendar view'),
+  };
+  const listEntryBody = (a: Record<string, unknown>) => {
+    const body: Record<string, unknown> = {};
+    for (const k of Object.keys(listEntryShape)) if (a[k] !== undefined) body[k] = a[k];
+    return body;
+  };
+  const usesRgb = (body: Record<string, unknown>) => body.backgroundColor !== undefined || body.foregroundColor !== undefined;
+
+  server.registerTool(
+    'calendar_add_subscription',
+    {
+      description:
+        'Add an existing calendar (one shared with the account, a public one, a colleague\'s) to the account\'s calendar list, so it shows up in calendar_list_calendars. ' +
+        'To create a new calendar use calendar_create_calendar.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        calendarId: z.string().min(1).describe('ID of the calendar to add, usually its email address'),
+        ...listEntryShape,
+      },
+    },
+    async ({ account, calendarId, ...rest }) => {
+      try {
+        const auth = await getClientFn(account as Account);
+        const cal = calendarClient({ version: 'v3', auth });
+        const body = listEntryBody(rest);
+        const res = await cal.calendarList.insert({
+          requestBody: { id: calendarId, ...body },
+          ...(usesRgb(body) ? { colorRgbFormat: true } : {}),
+        });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }] };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
+
+  server.registerTool(
+    'calendar_update_subscription',
+    {
+      description:
+        'Change how a calendar appears in the account\'s calendar list: its display name, colour, whether it is hidden or selected. ' +
+        'Only the fields you pass change. To change the calendar itself (title, time zone) it must be edited by its owner.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        calendarId: z.string().min(1).describe('ID of a calendar already in the account\'s list'),
+        ...listEntryShape,
+      },
+    },
+    async ({ account, calendarId, ...rest }) => {
+      const body = listEntryBody(rest);
+      if (Object.keys(body).length === 0) {
+        return invalidParams(
+          account as Account,
+          'Nothing to change: none of summaryOverride, colorId, backgroundColor, foregroundColor, hidden or selected was given.',
+          'Pass at least one of those fields.',
+        );
+      }
+      try {
+        const auth = await getClientFn(account as Account);
+        const cal = calendarClient({ version: 'v3', auth });
+        const res = await cal.calendarList.patch({
+          calendarId,
+          requestBody: body,
+          ...(usesRgb(body) ? { colorRgbFormat: true } : {}),
+        });
+        return { content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }] };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
+
+  server.registerTool(
+    'calendar_remove_subscription',
+    {
+      description:
+        'Remove a calendar from the account\'s calendar list (unsubscribe). The calendar and its events are not deleted and stay available to everyone else; ' +
+        'the account can add it back with calendar_add_subscription if it still has access.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        calendarId: z.string().min(1).describe('ID of the calendar to remove from the list'),
+      },
+    },
+    async ({ account, calendarId }) => {
+      try {
+        const auth = await getClientFn(account as Account);
+        const cal = calendarClient({ version: 'v3', auth });
+        await cal.calendarList.delete({ calendarId });
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ removed: true, calendarId }, null, 2) }] };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
 }
 
 const LIST_DESCRIPTION_CAP = 300;

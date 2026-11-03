@@ -93,10 +93,7 @@ export const GENERATED_METHOD_TOOLS: Record<string, string> = {
   "calendar.acl.patch": "calendar_acl_patch",
   "calendar.acl.update": "calendar_acl_update",
   "calendar.acl.watch": "calendar_acl_watch",
-  "calendar.calendarList.delete": "calendar_calendar_list_delete",
   "calendar.calendarList.get": "calendar_calendar_list_get",
-  "calendar.calendarList.insert": "calendar_calendar_list_insert",
-  "calendar.calendarList.patch": "calendar_calendar_list_patch",
   "calendar.calendarList.update": "calendar_calendar_list_update",
   "calendar.calendarList.watch": "calendar_calendar_list_watch",
   "calendar.calendars.clear": "calendar_calendars_clear",
@@ -760,7 +757,10 @@ export const CURATED_METHOD_IDS: readonly string[] = [
   "analyticsdata.properties.getMetadata",
   "analyticsdata.properties.runRealtimeReport",
   "analyticsdata.properties.runReport",
+  "calendar.calendarList.delete",
+  "calendar.calendarList.insert",
   "calendar.calendarList.list",
+  "calendar.calendarList.patch",
   "calendar.calendars.insert",
   "calendar.events.delete",
   "calendar.events.get",
@@ -896,14 +896,15 @@ export const CURATED_METHOD_IDS: readonly string[] = [
   "webmasters.sites.list",
 ];
 
-// Every curated tool name registered on each curated method id (see
-// gen-config.ts: derived from the curated registrations themselves).
 export const CURATED_METHOD_TOOLS: Record<string, string[]> = {
   "analyticsadmin.accountSummaries.list": ["analytics_account_summaries"],
   "analyticsdata.properties.getMetadata": ["analytics_get_metadata"],
   "analyticsdata.properties.runRealtimeReport": ["analytics_run_realtime_report"],
   "analyticsdata.properties.runReport": ["analytics_run_report"],
+  "calendar.calendarList.delete": ["calendar_remove_subscription"],
+  "calendar.calendarList.insert": ["calendar_add_subscription"],
   "calendar.calendarList.list": ["calendar_list_calendars"],
+  "calendar.calendarList.patch": ["calendar_update_subscription"],
   "calendar.calendars.insert": ["calendar_create_calendar"],
   "calendar.events.delete": ["calendar_delete_event"],
   "calendar.events.get": ["calendar_get_event","calendar_respond_event","calendar_update_event"],
@@ -1039,12 +1040,6 @@ export const CURATED_METHOD_TOOLS: Record<string, string[]> = {
   "webmasters.sites.list": ["searchconsole_sites_list"],
 };
 
-// A runtime copy of scripts/gen-config.ts's own CUD_OVERRIDES (scripts/ and
-// src/ are separate compilation roots, so src/ code cannot import the build
-// script directly). google-api.ts applies this the same way gen-tools.ts
-// does when generating a method's twin (CUD_OVERRIDES[id] ?? cudFromMethod),
-// so the escape hatch and a method's generated twin always agree on its
-// write class, including for the methods HTTP-verb inference misreads.
 export const CUD_OVERRIDES: Record<string, Cud> = {
   "admin.customer.devices.chromeos.batchChangeStatus": "delete",
   "admin.customer.devices.chromeos.issueCommand": "delete",

@@ -5,7 +5,7 @@ import { drive as driveClient, type drive_v3 } from '@googleapis/drive';
 import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
-import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } from './_errors.js';
+import { handleGoogleApiError, invalidParams, mapGoogleError, safeMessage, stringifyEnvelope } from './_errors.js';
 import { hostFilesRefused, openLocalReadStream, openInternalReadStream, prepareLocalDest, cleanupPartialWrite, localFileErrorResult, LocalFileError } from './_local-files.js';
 import { checkOutbound, checkOutboundGrantee, driveGranteeFromAccessProposal, driveGranteeFromPermission, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
@@ -836,27 +836,48 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
   server.registerTool(
     'drive_move',
     {
-      description: 'Move a file between folders by replacing its parents. To move to multiple parents, list all of them.',
+      description:
+        'Move files between folders by replacing their parents. Pass fileId for one file (returns that file) or fileIds ' +
+        `for up to ${MOVE_BATCH_MAX} files into the same folder in one call (returns a per-file result, so one failure does not undo the rest).`,
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        fileId: z.string().min(1).describe('Google Drive file ID'),
+        fileId: z.string().min(1).optional().describe('Google Drive file ID (one file; use fileIds for several)'),
+        fileIds: coerceArray(z.string().min(1)).optional().describe(`Google Drive file IDs to move together, up to ${MOVE_BATCH_MAX}`),
         newParentFolderId: z.string().min(1).describe('Destination folder ID, named newParentFolderId here, not parentFolderId'),
       },
     },
-    async ({ account, fileId, newParentFolderId }) => {
+    async ({ account, fileId, fileIds, newParentFolderId }) => {
+      const ids = [...new Set([...(fileId ? [fileId] : []), ...(fileIds ?? [])])];
+      if (ids.length === 0) {
+        return invalidParams(account as Account, 'No file to move: neither fileId nor fileIds was supplied.', 'Pass fileId for one file, or fileIds for several.');
+      }
+      if (ids.length > MOVE_BATCH_MAX) {
+        return invalidParams(
+          account as Account,
+          `${ids.length} files given; one call moves at most ${MOVE_BATCH_MAX}.`,
+          `Split fileIds into calls of ${MOVE_BATCH_MAX} or fewer.`,
+        );
+      }
       try {
         const auth = await getClientFn(account as Account);
         const drive = driveClient({ version: 'v3', auth });
-        const current = await drive.files.get({ fileId, fields: 'parents', supportsAllDrives: true });
-        const res = await drive.files.update({
-          fileId,
-          addParents: newParentFolderId,
-          removeParents: (current.data.parents ?? []).join(','),
-          fields: 'id,name,parents,modifiedTime',
-          supportsAllDrives: true,
+        if (fileId && !fileIds) {
+          const moved = await moveOneFile(drive, fileId, newParentFolderId);
+          return { content: [{ type: 'text' as const, text: JSON.stringify(moved, null, 2) }] };
+        }
+        const results = await mapLimited(ids, MOVE_CONCURRENCY, async (id) => {
+          try {
+            return { fileId: id, ok: true as const, ...(await moveOneFile(drive, id, newParentFolderId)) };
+          } catch (e: any) {
+            const env = mapGoogleError(e, account as Account);
+            return { fileId: id, ok: false as const, error: env.error, message: env.message, ...(env.hint ? { hint: env.hint } : {}) };
+          }
         });
+        const moved = results.filter((r) => r.ok).length;
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ moved, failed: results.length - moved, results }, null, 2) }],
+          // Only a call that moved nothing is an error; a partial result is reported as data.
+          ...(moved === 0 ? { isError: true as const } : {}),
         };
       } catch (error: any) {
         return handleDriveError(error, account as Account);
@@ -1755,6 +1776,38 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       }
     },
   );
+}
+
+const MOVE_BATCH_MAX = 50;
+const MOVE_CONCURRENCY = 4;
+
+/** Replace a file's parents with one folder. The destination is never also
+ * listed as a parent to remove, so moving a file that is already there is a no-op
+ * instead of an add-and-remove of the same parent. */
+async function moveOneFile(drive: drive_v3.Drive, fileId: string, newParentFolderId: string) {
+  const current = await drive.files.get({ fileId, fields: 'parents', supportsAllDrives: true });
+  const res = await drive.files.update({
+    fileId,
+    addParents: newParentFolderId,
+    removeParents: (current.data.parents ?? []).filter((p) => p !== newParentFolderId).join(','),
+    fields: 'id,name,parents,modifiedTime',
+    supportsAllDrives: true,
+  });
+  return res.data;
+}
+
+/** Run `fn` over `items` with at most `limit` in flight, keeping input order. */
+async function mapLimited<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
 }
 
 function handleDriveError(error: any, account: Account) {

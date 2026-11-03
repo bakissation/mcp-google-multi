@@ -211,12 +211,13 @@ List all people and groups who have access to a Drive file or folder
 
 Class: update
 
-Move a file between folders by replacing its parents. To move to multiple parents, list all of them.
+Move files between folders by replacing their parents. Pass fileId for one file (returns that file) or fileIds for up to 50 files into the same folder in one call (returns a per-file result, so one failure does not undo the rest).
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `account` | string | optional | Google account alias |
-| `fileId` | string | required | Google Drive file ID |
+| `fileId` | string | optional | Google Drive file ID (one file; use fileIds for several) |
+| `fileIds` | array | optional | Google Drive file IDs to move together, up to 50 |
 | `newParentFolderId` | string | required | Destination folder ID, named newParentFolderId here, not parentFolderId |
 
 ## `drive_permission_update`
