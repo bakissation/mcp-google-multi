@@ -167,7 +167,10 @@ tool) to pause for that confirmation unless the deployment runs
 "elicitation_unsupported", ... }` instead, and a decline or cancel comes
 back as `{ error: "write_declined", ... }`; neither is worth retrying
 without changing the write-control configuration or using a curated tool
-instead. The escape hatch returns JSON only (binary media is refused with a
+instead. Over HTTP a write can instead come back as `{ error:
+"confirmation_required", summary, confirmToken }`: show the summary to the
+user and, only if they agree, repeat the identical call with `confirmToken`
+added (it works once and expires; an error of "confirmation_invalid" means start over). The escape hatch returns JSON only (binary media is refused with a
 pointer to `drive_download` / `drive_export`), and a response over about
 100k characters may be cut by the client, so narrow a large request. Prefer
 a named curated or generated tool when one exists: it is more token-lean
