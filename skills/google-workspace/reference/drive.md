@@ -240,14 +240,14 @@ Change the role and/or expirationTime of an existing permission without removing
 
 Class: read
 
-Read the content of a Google Drive file: Workspace docs and textual types (text/*, JSON/XML/SVG and similar) inline; other binaries return error:binary (returns up to maxChars characters per call; non-Google-native files over 2MB return too_large)
+Read the content of a Google Drive file: Workspace docs, textual types (text/*, JSON/XML/SVG and similar) and the text of PDF, Word, Excel and PowerPoint files inline; other binaries return error:binary (returns up to maxChars characters per call; text files over 2MB and PDF/Office files over 10MB return too_large)
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `account` | string | optional | Google account alias; "*" = all accounts; omit for the default account |
 | `fileId` | string | required | Google Drive file ID |
 | `maxChars` | number | optional | Max characters of content to return (default: 100000) |
-| `offset` | number | optional | Character offset to continue a truncated read (Google Docs/Sheets/Slides exports page fine; plain files >2MB are rejected, not paged) |
+| `offset` | number | optional | Character offset to continue a truncated read (Google Docs/Sheets/Slides exports and PDF/Office text page fine; plain files >2MB are rejected, not paged) |
 
 ## `drive_remove_permission`
 

@@ -737,7 +737,7 @@ Optional scope bundles: `analytics`, `analytics_write`, `appsmarket`, `chat`, `c
 | `drive_operations_get` | generated | read | Gets the latest state of a long-running operation. Clients can use this method to poll the operation result at intervals |
 | `drive_permission_update` | curated | update | Change the role and/or expirationTime of an existing permission without removing it. Use "removeExpiration=true" to clea |
 | `drive_permissions_get` | generated | read | Gets a permission by ID. For more information, see [Share files, folders, and drives](https://developers.google.com/work |
-| `drive_read` | curated | read | Read the content of a Google Drive file: Workspace docs and textual types (text/*, JSON/XML/SVG and similar) inline; oth |
+| `drive_read` | curated | read | Read the content of a Google Drive file: Workspace docs, textual types (text/*, JSON/XML/SVG and similar) and the text o |
 | `drive_remove_permission` | curated | delete | Revoke access to a Drive file for a specific permission |
 | `drive_replies_get` | generated | read | Gets a reply by ID. For more information, see [Manage comments and replies](https://developers.google.com/workspace/driv |
 | `drive_reply_create` | curated | create | Reply to a comment. Optionally close or reopen the thread by setting action to "resolve" or "reopen". |

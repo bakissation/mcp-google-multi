@@ -10,6 +10,7 @@ import { hostFilesRefused, assertLocalPathAllowed, openLocalReadStream, openInte
 import { checkOutbound, checkOutboundGrantee, driveGranteeFromAccessProposal, driveGranteeFromPermission, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
 import { capText, listResult } from '../trim.js';
+import { DOC_MAX_DOWNLOAD_BYTES, DocTextError, docKindForMime, extractDocumentText } from './_doc-text.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -235,14 +236,14 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
     'drive_read',
     {
       _meta: { 'anthropic/maxResultSizeChars': 100_000 },
-      description: 'Read the content of a Google Drive file: Workspace docs and textual types (text/*, JSON/XML/SVG and similar) inline; other binaries return error:binary (returns up to maxChars characters per call; non-Google-native files over 2MB return too_large)',
+      description: 'Read the content of a Google Drive file: Workspace docs, textual types (text/*, JSON/XML/SVG and similar) and the text of PDF, Word, Excel and PowerPoint files inline; other binaries return error:binary (returns up to maxChars characters per call; text files over 2MB and PDF/Office files over 10MB return too_large)',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().min(1).describe('Google Drive file ID'),
         maxChars: z.number().min(1).max(2_000_000).default(100_000).optional()
           .describe('Max characters of content to return (default: 100000)'),
         offset: z.number().min(0).default(0).optional()
-          .describe('Character offset to continue a truncated read (Google Docs/Sheets/Slides exports page fine; plain files >2MB are rejected, not paged)'),
+          .describe('Character offset to continue a truncated read (Google Docs/Sheets/Slides exports and PDF/Office text page fine; plain files >2MB are rejected, not paged)'),
       },
     },
     async ({ account, fileId, maxChars, offset }) => {
@@ -285,27 +286,49 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           return respond(String(exported.data));
         }
 
-        if (mimeType === 'application/pdf') {
-          return {
+        const fileSize = parseInt(size ?? '0', 10);
+
+        const docKind = docKindForMime(mimeType);
+        if (docKind) {
+          const fail = (error: 'binary' | 'too_large', message: string, hint: string) => ({
             content: [{
               type: 'text' as const,
               text: JSON.stringify({
-                id: fileId,
-                name,
-                mimeType,
-                error: 'binary',
-                message: `"${name}" is ${mimeType}, which has no text to inline.`,
-                hint: BINARY_READ_HINT,
-                retriable: false,
-                account: account as string,
-                webViewLink,
+                id: fileId, name, mimeType, error, message, hint,
+                retriable: false, account: account as string, webViewLink,
               }, null, 2),
             }],
             isError: true as const,
-          };
+          });
+          if (fileSize > DOC_MAX_DOWNLOAD_BYTES) {
+            return fail(
+              'too_large',
+              `"${name}" is ${fileSize} bytes, over the ${DOC_MAX_DOWNLOAD_BYTES}-byte limit for reading text out of a ${docKind.toUpperCase()} file.`,
+              'Use drive_download to save it to disk, or open webViewLink.',
+            );
+          }
+          const downloaded = await drive.files.get(
+            { fileId, alt: 'media', supportsAllDrives: true },
+            { responseType: 'arraybuffer' },
+          );
+          let text: string;
+          try {
+            text = await extractDocumentText(docKind, new Uint8Array(downloaded.data as ArrayBuffer));
+          } catch (e) {
+            const why = e instanceof DocTextError ? e.message : 'the text could not be extracted';
+            return fail('binary', `Could not read text from "${name}": ${why}.`, BINARY_READ_HINT);
+          }
+          if (!text) {
+            return fail(
+              'binary',
+              `"${name}" has no text to inline${docKind === 'pdf' ? ' (a scanned PDF has no text layer)' : ''}.`,
+              BINARY_READ_HINT,
+            );
+          }
+          return respond(text);
         }
 
-        const fileSize = parseInt(size ?? '0', 10);
+
         if (fileSize > MAX_FILE_SIZE) {
           return {
             content: [{

@@ -111,6 +111,7 @@
     "@googleapis/webmasters": "^9.0.1",
     "@modelcontextprotocol/node": "2.1.2",
     "@modelcontextprotocol/server": "2.4.0",
+    "fflate": "0.8.3",
     "googleapis-common": "^9.3.0",
     "jose": "^6.2.8",
     "markdown-it": "15.0.3",
@@ -118,6 +119,7 @@
     "nodemailer": "10.1.4",
     "turndown": "7.2.4",
     "turndown-plugin-gfm": "1.0.2",
+    "unpdf": "1.8.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
