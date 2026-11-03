@@ -395,7 +395,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       description: 'Upload a file to Google Drive, from inline base64 content or (when this server exposes the host filesystem) a local path. Pass `convertTo` to import it as a native, editable Google Doc/Sheet/Slides/Drawing instead of storing the raw bytes.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
-        filename: z.string().describe('Name as it appears in Drive'),
+        filename: z.string().optional().describe('Name as it appears in Drive. Optional with localPath (defaults to the file\'s own name); required with contentBase64.'),
         contentBase64: z.string().optional().describe(`Base64-encoded file content. Exactly one of contentBase64${localFiles ? ' or localPath' : ''} is required. Decoded size is capped at ${MAX_UPLOAD_BASE64_BYTES / (1024 * 1024)} MB.`),
         ...(localFiles
           ? {
@@ -408,7 +408,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       },
     },
     async (args) => {
-      const { account, filename, contentBase64, mimeType: mimeTypeArg, convertTo, parentFolderId } = args;
+      const { account, contentBase64, mimeType: mimeTypeArg, convertTo, parentFolderId } = args;
       // Declared only when the context may read host files (see the shape).
       const { localPath: localPathArg } = args as { localPath?: string };
       if (localPathArg && !localFiles) return hostFilesRefused(account, 'localPath');
@@ -421,6 +421,14 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           localFiles
             ? 'Use contentBase64 for inline content, or localPath for a file already on the machine running the server.'
             : 'Pass contentBase64 with the file\'s base64-encoded content.',
+        );
+      }
+      const filename = args.filename?.trim() || (hasLocalPath ? path.basename(localPathArg!) : '');
+      if (!filename) {
+        return invalidParams(
+          account as Account,
+          'filename is required when uploading contentBase64.',
+          'Pass filename (the name the file gets in Drive), or upload from localPath, which defaults to the file\'s own name.',
         );
       }
       try {

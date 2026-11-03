@@ -157,6 +157,26 @@ function getOwnAddresses(gmail: any, account: string, primaryEmail: string): Pro
   return cached;
 }
 
+/** The attachment's own file name, found by walking the message parts for the
+ * part carrying `attachmentId`. Undefined when the lookup fails or no part
+ * matches (the caller then falls back to a generated name). */
+export async function attachmentNameOf(gmail: any, messageId: string, attachmentId: string): Promise<string | undefined> {
+  try {
+    const msg = await gmail.users.messages.get({ userId: 'me', id: messageId, format: 'full' });
+    const stack: any[] = msg.data.payload ? [msg.data.payload] : [];
+    while (stack.length > 0) {
+      const part = stack.pop();
+      if (part?.body?.attachmentId === attachmentId && typeof part.filename === 'string' && part.filename !== '') {
+        return part.filename;
+      }
+      if (Array.isArray(part?.parts)) stack.push(...part.parts);
+    }
+  } catch {
+    // Name lookup is best effort; the download itself must not fail over it.
+  }
+  return undefined;
+}
+
 interface ReplyDerivation {
   inReplyTo: string;
   references: string;
@@ -867,7 +887,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
         account: accountEnum.describe('Google account alias'),
         messageId: z.string().min(1).describe('The Gmail message ID'),
         attachmentId: z.string().min(1).describe('The attachment ID from gmail_read response'),
-        filename: z.string().describe('Filename to save as (e.g. report.xlsx)'),
+        filename: z.string().optional().describe('Filename to save as (e.g. report.xlsx). Optional: defaults to the attachment\'s own name from the message.'),
         savePath: z.string().min(1).describe('Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`.'),
       },
     },
@@ -886,7 +906,8 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
         if (!data) throw new Error('No attachment data returned');
 
         const buffer = Buffer.from(data, 'base64url');
-        const fullPath = await prepareLocalDest(savePath, filename);
+        const name = filename?.trim() || (await attachmentNameOf(gmail, messageId, attachmentId)) || `attachment-${attachmentId.slice(0, 8)}`;
+        const fullPath = await prepareLocalDest(savePath, name);
         try {
           // wx: never silently clobber; prepareLocalDest already checked
           // existence, this is the belt-and-suspenders race guard.

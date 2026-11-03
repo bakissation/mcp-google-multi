@@ -429,7 +429,8 @@ export function mapGoogleError(
         hint:
           rendered?.hint ??
           ('The path must exist on the machine running this server and be accessible to it. ' +
-            'When the server runs remotely (HTTP transport), paths on your own machine are not visible to it.'),
+            'When the server runs remotely (HTTP transport), or in a different container than the caller, paths on your own machine are not visible to it. ' +
+            'A relative path resolves inside GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); an absolute path must already be inside it.'),
         retriable: false,
         account,
       };
