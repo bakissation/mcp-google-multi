@@ -138,7 +138,7 @@ export function scopeHint(scope: string, c: ScopeClassification, alias: string):
       {
         const rendered = hints()?.render({ kind: 'scope_unknown_scope', scope });
         return {
-          hint: rendered?.hint ?? `Scope ${scope} is not offered by this server (no bundle grants it). Not requestable. Do not retry.`,
+          hint: rendered?.hint ?? `Do not retry: scope ${scope} is not offered by this server (no bundle grants it), so no account can be granted it.`,
           retriable: false,
         };
       }

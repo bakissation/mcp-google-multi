@@ -140,6 +140,13 @@ describe('scopeHint provider routing', () => {
     expect(seen).toEqual([{ kind: 'scope_unknown_scope', scope: 'https://x/y' }]);
   });
 
+  it('the default unknown_scope hint opens with the instruction to stop', () => {
+    setHintProvider(null);
+    const h = scopeHint('https://x/y', { state: 'not_requestable', reason: 'unknown_scope' }, 'work');
+    expect(h.hint.startsWith('Do not retry')).toBe(true);
+    expect(h.retriable).toBe(false);
+  });
+
   it('a provider may flip retriable on scope_not_granted (Decision 3)', () => {
     setHintProvider({ render: () => ({ hint: 'go to the browser', retriable: false }) });
     const h = scopeHint(FORMS_BODY, { state: 'requestable_not_granted' }, 'work');
