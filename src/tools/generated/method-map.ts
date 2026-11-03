@@ -914,7 +914,7 @@ export const CURATED_METHOD_TOOLS: Record<string, string[]> = {
   "calendar.events.move": ["calendar_move_event"],
   "calendar.events.patch": ["calendar_respond_event","calendar_update_event"],
   "calendar.events.quickAdd": ["calendar_quick_add"],
-  "calendar.freebusy.query": ["calendar_get_freebusy"],
+  "calendar.freebusy.query": ["calendar_get_freebusy","calendar_suggest_times"],
   "chat.spaces.get": ["chat_spaces_get"],
   "chat.spaces.list": ["chat_spaces_list"],
   "chat.spaces.messages.create": ["chat_messages_create"],

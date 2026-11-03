@@ -8,6 +8,7 @@ import { getClient, type CuratedToolDeps } from '../client.js';
 import { checkOutbound } from '../outbound-allowlist.js';
 import { handleGoogleApiError, invalidParams } from './_errors.js';
 import { listResult, sliceClean } from '../trim.js';
+import { isValidTimeZone, isoWithOffset, parseClock, suggestSlots, type BusyBlock } from './_suggest-times.js';
 
 
 export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
@@ -497,6 +498,146 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
           // would make the SDK reject our own result, so fall back to {}.
           content: [{ type: 'text' as const, text: JSON.stringify(res.data.calendars ?? {}, null, 2) }],
         };
+      } catch (error: any) {
+        return handleCalendarError(error, account as Account);
+      }
+    },
+  );
+
+  server.registerTool(
+    'calendar_suggest_times',
+    {
+      description:
+        'Find meeting times when you and the other people are all free. Checks free/busy for your primary calendar and each attendee ' +
+        'calendar, then returns the earliest open slots inside working hours (default 09:00-17:00 Monday to Friday, in timeZone). ' +
+        'Read-only: it proposes times and creates nothing; use calendar_create_event to book one.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        durationMinutes: z.number().int().min(5).max(480).default(30).optional().describe('Meeting length in minutes (default 30)'),
+        attendees: coerceArray(z.string()).optional()
+          .describe('Calendar IDs or email addresses of the other people (up to 20). Omit to find free time on your own calendar'),
+        timeMin: z.string().optional().describe('ISO 8601 start of the search window, with a Z or UTC offset (default: now)'),
+        timeMax: z.string().optional().describe('ISO 8601 end of the search window, with a Z or UTC offset (default: 7 days after the start; at most 31 days)'),
+        timeZone: z.string().optional().describe('IANA zone the working hours are in, e.g. "Europe/Paris" (default: the time zone of your primary calendar)'),
+        workStart: z.string().optional().describe('Earliest start of day as HH:MM (default "09:00")'),
+        workEnd: z.string().optional().describe('Latest end of day as HH:MM (default "17:00")'),
+        includeWeekends: coerceBoolean.optional().describe('Also search Saturdays and Sundays (default false)'),
+        bufferMinutes: z.number().int().min(0).max(120).default(0).optional()
+          .describe('Free minutes to keep before and after every existing meeting (default 0)'),
+        maxSuggestions: z.number().int().min(1).max(20).default(5).optional().describe('How many slots to return (default 5)'),
+      },
+    },
+    async ({ account, durationMinutes, attendees, timeMin, timeMax, timeZone, workStart, workEnd, includeWeekends, bufferMinutes, maxSuggestions }) => {
+      try {
+        const people = [...new Set((attendees ?? []).map((a: string) => a.trim()).filter(Boolean))].filter((a) => a.toLowerCase() !== 'primary');
+        if (people.length > 20) {
+          return invalidParams(account as Account, `${people.length} attendees is over the limit of 20.`, 'Split the group, or check the largest calendars first.');
+        }
+        const tzError = missingTimeZoneError('timeMin', timeMin) ?? missingTimeZoneError('timeMax', timeMax);
+        if (tzError) return invalidParams(account as Account, tzError, MISSING_TIME_ZONE_HINT);
+        const rangeError = timeRangeError(timeMin, timeMax);
+        if (rangeError) return invalidParams(account as Account, rangeError, TIME_RANGE_HINT);
+
+        const startMin = parseClock(workStart ?? '09:00');
+        const endMin = parseClock(workEnd ?? '17:00');
+        if (startMin === undefined || endMin === undefined || endMin <= startMin) {
+          return invalidParams(
+            account as Account,
+            `Working hours ${workStart ?? '09:00'} to ${workEnd ?? '17:00'} are not a valid range.`,
+            'Pass workStart and workEnd as HH:MM on a 24-hour clock, with workEnd after workStart, e.g. "09:00" and "17:00".',
+          );
+        }
+        if (timeZone !== undefined && !isValidTimeZone(timeZone)) {
+          return invalidParams(account as Account, `timeZone ("${timeZone}") is not an IANA time zone name.`, 'Use a name like "Europe/Paris" or "America/New_York".');
+        }
+
+        const now = Date.now();
+        const from = timeMin !== undefined ? Date.parse(timeMin) : now;
+        const to = timeMax !== undefined ? Date.parse(timeMax) : from + 7 * 86_400_000;
+        if (Number.isNaN(from) || Number.isNaN(to)) {
+          return invalidParams(account as Account, 'timeMin or timeMax is not a valid ISO 8601 date-time.', MISSING_TIME_ZONE_HINT);
+        }
+        if (to - from > 31 * 86_400_000) {
+          return invalidParams(account as Account, 'The search window is longer than 31 days.', 'Search a month at a time: pass a narrower timeMin and timeMax.');
+        }
+
+        const auth = await getClientFn(account as Account);
+        const cal = calendarClient({ version: 'v3', auth });
+
+        let zone = timeZone;
+        if (!zone) {
+          try {
+            const primary = await cal.calendars.get({ calendarId: 'primary' });
+            if (primary.data.timeZone && isValidTimeZone(primary.data.timeZone)) zone = primary.data.timeZone;
+          } catch { /* fall back to UTC below */ }
+        }
+        zone = zone ?? 'UTC';
+
+        const ids = ['primary', ...people];
+        const res = await cal.freebusy.query({
+          requestBody: {
+            timeMin: new Date(from).toISOString(),
+            timeMax: new Date(to).toISOString(),
+            timeZone: 'UTC',
+            items: ids.map((id) => ({ id })),
+          },
+        });
+        const calendars = res.data.calendars ?? {};
+
+        const busy: BusyBlock[] = [];
+        const unavailable: { calendar: string; reason: string }[] = [];
+        for (const id of ids) {
+          const entry = calendars[id];
+          if (!entry || (entry.errors && entry.errors.length > 0)) {
+            unavailable.push({ calendar: id, reason: entry?.errors?.[0]?.reason ?? 'no data returned' });
+            continue;
+          }
+          for (const b of entry.busy ?? []) {
+            busy.push({ start: Date.parse(b.start ?? ''), end: Date.parse(b.end ?? '') });
+          }
+        }
+        if (unavailable.some((u) => u.calendar === 'primary')) {
+          return invalidParams(
+            account as Account,
+            'Free/busy for your own calendar could not be read.',
+            'Check the account alias and that the account has calendar access (diagnose lists missing scopes).',
+          );
+        }
+
+        const slots = suggestSlots(busy, {
+          from,
+          to,
+          durationMin: durationMinutes ?? 30,
+          workStartMin: startMin,
+          workEndMin: endMin,
+          timeZone: zone,
+          stepMin: 30,
+          bufferMin: bufferMinutes ?? 0,
+          includeWeekends: includeWeekends ?? false,
+          maxSlots: maxSuggestions ?? 5,
+          maxPerDay: 3,
+        });
+
+        const out: Record<string, unknown> = {
+          timeZone: zone,
+          durationMinutes: durationMinutes ?? 30,
+          workingHours: { start: workStart ?? '09:00', end: workEnd ?? '17:00', weekends: includeWeekends ?? false },
+          checked: ids.filter((id) => !unavailable.some((u) => u.calendar === id)),
+          slots: slots.map((s) => ({
+            start: isoWithOffset(s.start, zone!),
+            end: isoWithOffset(s.end, zone!),
+            startUtc: new Date(s.start).toISOString(),
+            endUtc: new Date(s.end).toISOString(),
+          })),
+        };
+        if (unavailable.length > 0) {
+          out.unavailable = unavailable;
+          out.warning = 'These calendars could not be read, so their owners were NOT taken into account. Ask them, or share the calendars with this account.';
+        }
+        if (slots.length === 0) {
+          out.hint = 'No common free slot in this window. Widen timeMin/timeMax, shorten durationMinutes, include weekends, or widen workStart/workEnd.';
+        }
+        return { content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }] };
       } catch (error: any) {
         return handleCalendarError(error, account as Account);
       }
