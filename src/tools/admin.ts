@@ -5,8 +5,44 @@ import { admin as adminClient } from '@googleapis/admin';
 import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
-import { handleGoogleApiError, invalidParams } from './_errors.js';
+import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } from './_errors.js';
 
+
+const GMAIL_REPORT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Gmail audit queries need both bounds, at most 30 days apart; other
+ * applications take either bound. With only startTime the end is "now". */
+export function resolveReportsWindow(
+  applicationName: string,
+  startTime: string | undefined,
+  endTime: string | undefined,
+  now: number = Date.now(),
+): { endTime: string | undefined } | { problem: string; hint: string } {
+  const start = startTime === undefined ? undefined : Date.parse(startTime);
+  const end = endTime === undefined ? undefined : Date.parse(endTime);
+  if (start !== undefined && Number.isNaN(start)) {
+    return { problem: '`startTime` is not an RFC 3339 timestamp.', hint: 'Use a value such as 2026-10-01T00:00:00Z.' };
+  }
+  if (end !== undefined && Number.isNaN(end)) {
+    return { problem: '`endTime` is not an RFC 3339 timestamp.', hint: 'Use a value such as 2026-10-31T00:00:00Z.' };
+  }
+  const effectiveEnd = endTime ?? (start !== undefined ? new Date(now).toISOString() : undefined);
+  if (applicationName !== 'gmail') return { endTime: effectiveEnd };
+  if (start === undefined) {
+    return {
+      problem: 'Gmail audit queries need a time window and `startTime` was not given.',
+      hint: 'Pass startTime, and optionally endTime (it defaults to now). The window may span at most 30 days.',
+    };
+  }
+  const span = Date.parse(effectiveEnd as string) - start;
+  if (span > GMAIL_REPORT_WINDOW_MS) {
+    return {
+      problem: 'The Gmail audit window is longer than 30 days.',
+      hint: 'Google allows at most 30 days between startTime and endTime for Gmail. Query one 30-day window at a time.',
+    };
+  }
+  return { endTime: effectiveEnd };
+}
 
 // Admin SDK requires Workspace super-admin (or delegated admin) on the account — personal @gmail.com accounts 403 on every endpoint.
 export function registerAdminTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
@@ -31,8 +67,8 @@ export function registerAdminTools(server: ToolRegistry, deps: CuratedToolDeps =
           'profile', 'contacts', 'takeout',
         ]).describe('Which application\'s activity to query'),
         userKey: z.string().default('all').optional().describe('User profile ID, email, or "all" (default)'),
-        startTime: z.string().optional().describe('RFC 3339 lower bound'),
-        endTime: z.string().optional().describe('RFC 3339 upper bound'),
+        startTime: z.string().optional().describe('RFC 3339 lower bound. Gmail needs it, with at most 30 days to endTime.'),
+        endTime: z.string().optional().describe('RFC 3339 upper bound (defaults to now when only startTime is given)'),
         eventName: z.string().optional().describe('Specific event name to filter'),
         actorIpAddress: z.string().optional(),
         filters: z.string().optional().describe('Comma-separated event-parameter filters with relational operators'),
@@ -43,7 +79,10 @@ export function registerAdminTools(server: ToolRegistry, deps: CuratedToolDeps =
         pageToken: z.string().optional(),
       },
     },
-    async ({ account, applicationName, userKey, startTime, endTime, eventName, actorIpAddress, filters, orgUnitID, groupIdFilter, customerId, maxResults, pageToken }) => {
+    async ({ account, applicationName, userKey, startTime, endTime: endTimeArg, eventName, actorIpAddress, filters, orgUnitID, groupIdFilter, customerId, maxResults, pageToken }) => {
+      const window = resolveReportsWindow(applicationName, startTime, endTimeArg);
+      if ('problem' in window) return invalidParams(account as Account, window.problem, window.hint);
+      const endTime = window.endTime;
       try {
         const auth = await getClientFn(account as Account);
         const reports = adminClient({ version: 'reports_v1', auth });
@@ -265,6 +304,25 @@ export function registerAdminTools(server: ToolRegistry, deps: CuratedToolDeps =
 }
 
 export function handleAdminError(error: any, account: Account) {
-  const admin = 'Admin tools require Workspace super-admin privileges AND the account must be listed as an admin account (then re-authenticated). Personal Gmail accounts cannot use these endpoints.';
+  // Google answers a group address passed as a user key with a terse 400.
+  const raw = error?.code ?? error?.status ?? error?.response?.status;
+  const status = typeof raw === 'string' ? Number(raw) : raw;
+  const text = String(error?.response?.data?.error?.message ?? error?.message ?? '');
+  if (status === 400 && /type not supported:\s*userKey/i.test(text)) {
+    return {
+      content: [{
+        type: 'text' as const,
+        text: stringifyEnvelope({
+          error: 'bad_request',
+          message: safeMessage(error),
+          hint: 'userKey must be a user\'s primary email address or user ID. A group address is not a user: list groups with admin_groups_list and read a group\'s members with admin_group_members_list.',
+          retriable: false,
+          account,
+        }),
+      }],
+      isError: true as const,
+    };
+  }
+  const admin ='Admin tools require Workspace super-admin privileges AND the account must be listed as an admin account (then re-authenticated). Personal Gmail accounts cannot use these endpoints.';
   return handleGoogleApiError(error, account, { scope: admin, resource: admin, bundle: 'admin' });
 }

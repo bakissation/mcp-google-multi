@@ -93,8 +93,8 @@ List Admin Activity audit log entries. Filter by application (login, drive, gmai
 | `account` | string | optional | Google account alias (must be a Workspace admin); "*" = all accounts; omit for the default account |
 | `applicationName` | enum | required | Which application's activity to query |
 | `userKey` | string | optional | User profile ID, email, or "all" (default) |
-| `startTime` | string | optional | RFC 3339 lower bound |
-| `endTime` | string | optional | RFC 3339 upper bound |
+| `startTime` | string | optional | RFC 3339 lower bound. Gmail needs it, with at most 30 days to endTime. |
+| `endTime` | string | optional | RFC 3339 upper bound (defaults to now when only startTime is given) |
 | `eventName` | string | optional | Specific event name to filter |
 | `actorIpAddress` | string | optional |  |
 | `filters` | string | optional | Comma-separated event-parameter filters with relational operators |
