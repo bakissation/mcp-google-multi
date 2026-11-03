@@ -151,3 +151,70 @@ describe('calendar_respond_event', () => {
     expect(env.error).toBe('write_disabled');
   });
 });
+
+describe('calendar event time zones on create/update', () => {
+  const sent = (h: ReturnType<typeof toolHarness>, verb: string) =>
+    (h.requests().find((r) => (r.method ?? 'GET').toUpperCase() === verb) as GoogleRequest | undefined)?.data as
+      { start?: unknown; end?: unknown } | undefined;
+
+  it('create sends a distinct zone for each end (a flight)', async () => {
+    const h = toolHarness({ respond: (req) => req.data ?? {} });
+    const res = await h.call('calendar_create_event', {
+      account: 'test',
+      summary: 'Flight: ATL -> GCM',
+      start: '2026-11-15T09:43:00',
+      end: '2026-11-15T12:25:00',
+      startTimeZone: 'America/New_York',
+      endTimeZone: 'America/Cayman',
+    });
+    expect(res.isError).toBeFalsy();
+    expect(sent(h, 'POST')).toMatchObject({
+      start: { dateTime: '2026-11-15T09:43:00', timeZone: 'America/New_York' },
+      end: { dateTime: '2026-11-15T12:25:00', timeZone: 'America/Cayman' },
+    });
+  });
+
+  it('create rejects an offset-less time with no zone, and a zone on an all-day event', async () => {
+    for (const args of [
+      { start: '2026-11-15T09:43:00', end: '2026-11-15T10:43:00-05:00' },
+      { start: '2026-11-15', end: '2026-11-16', allDay: true, startTimeZone: 'America/Cayman' },
+      { start: '2026-11-15T09:43:00', end: '2026-11-15T10:43:00', startTimeZone: 'Mars/Base', endTimeZone: 'UTC' },
+    ]) {
+      const h = toolHarness({ respond: () => ({}) });
+      const res = await h.call('calendar_create_event', { account: 'test', summary: 'x', ...args });
+      expect(res.isError).toBe(true);
+      expect(parseResult(res).error).toBe('invalid_params');
+      expect(h.request).not.toHaveBeenCalled();
+    }
+  });
+
+  it('update with only a zone re-labels the same instant', async () => {
+    const current = { id: 'e1', start: { dateTime: '2026-11-16T18:30:00-06:00', timeZone: 'America/Chicago' },
+      end: { dateTime: '2026-11-16T20:30:00-06:00', timeZone: 'America/Chicago' } };
+    const h = toolHarness({ respond: (req) => ((req.method ?? 'GET').toUpperCase() === 'GET' ? current : req.data) });
+    const res = await h.call('calendar_update_event', {
+      account: 'test', eventId: 'e1', startTimeZone: 'America/Cayman', endTimeZone: 'America/Cayman',
+    });
+    expect(res.isError).toBeFalsy();
+    expect(sent(h, 'PATCH')).toEqual({
+      start: { dateTime: '2026-11-16T18:30:00-06:00', timeZone: 'America/Cayman' },
+      end: { dateTime: '2026-11-16T20:30:00-06:00', timeZone: 'America/Cayman' },
+    });
+  });
+
+  it('update of a time keeps the zone already on that end', async () => {
+    const current = { id: 'e1', start: { dateTime: '2026-11-15T09:43:00-05:00', timeZone: 'America/New_York' },
+      end: { dateTime: '2026-11-15T12:25:00-05:00', timeZone: 'America/Cayman' } };
+    const h = toolHarness({ respond: (req) => ((req.method ?? 'GET').toUpperCase() === 'GET' ? current : req.data) });
+    const res = await h.call('calendar_update_event', { account: 'test', eventId: 'e1', end: '2026-11-15T12:40:00' });
+    expect(res.isError).toBeFalsy();
+    expect(sent(h, 'PATCH')).toEqual({ end: { dateTime: '2026-11-15T12:40:00', timeZone: 'America/Cayman' } });
+  });
+
+  it('update refuses a zone for an all-day end, without patching', async () => {
+    const h = toolHarness({ respond: () => ({ id: 'e1', start: { date: '2026-11-16' }, end: { date: '2026-11-17' } }) });
+    const res = await h.call('calendar_update_event', { account: 'test', eventId: 'e1', startTimeZone: 'America/Cayman' });
+    expect(res.isError).toBe(true);
+    expect(h.requests().some((r) => (r.method ?? 'GET').toUpperCase() === 'PATCH')).toBe(false);
+  });
+});

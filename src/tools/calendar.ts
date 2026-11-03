@@ -153,9 +153,18 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
           .describe('Calendar ID (default: primary)'),
         allDay: coerceBoolean.default(false).optional()
           .describe('If true, start/end are dates (YYYY-MM-DD) not datetimes'),
+        startTimeZone: z.string().optional()
+          .describe('IANA zone the event starts in, e.g. "America/Cayman"; start may then omit its offset (wall-clock time in that zone). Timed events only'),
+        endTimeZone: z.string().optional()
+          .describe('IANA zone the event ends in; may differ from startTimeZone (e.g. a flight). Timed events only'),
       },
     },
-    async ({ account, summary, start, end, description, location, attendees, calendarId, allDay }) => {
+    async ({ account, summary, start, end, description, location, attendees, calendarId, allDay,
+      startTimeZone, endTimeZone }) => {
+      const startTime = eventTime('start', start, startTimeZone, !!allDay);
+      if ('error' in startTime) return invalidParams(account as Account, startTime.error, EVENT_TIME_HINT);
+      const endTime = eventTime('end', end, endTimeZone, !!allDay);
+      if ('error' in endTime) return invalidParams(account as Account, endTime.error, EVENT_TIME_HINT);
       try {
         if (attendees) {
           const outbound = checkOutbound('calendar attendee', attendees.split(','), String(account));
@@ -164,15 +173,7 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
         const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 
-        const event: any = { summary };
-
-        if (allDay) {
-          event.start = { date: start };
-          event.end = { date: end };
-        } else {
-          event.start = { dateTime: start };
-          event.end = { dateTime: end };
-        }
+        const event: any = { summary, start: startTime.value, end: endTime.value };
 
         if (description) event.description = description;
         if (location) event.location = location;
@@ -207,6 +208,10 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
         summary: z.string().optional().describe('New event title'),
         start: z.string().optional().describe('New start time (ISO 8601)'),
         end: z.string().optional().describe('New end time (ISO 8601)'),
+        startTimeZone: z.string().optional()
+          .describe('IANA zone the event starts in. Alone (no start): moves the start to this zone at the same instant. With an offset-less start: wall-clock time in this zone. Omitted: the event keeps its current start zone'),
+        endTimeZone: z.string().optional()
+          .describe('IANA zone the event ends in; may differ from startTimeZone. Same rules as startTimeZone'),
         description: z.string().optional().describe('New event description'),
         location: z.string().optional().describe('New event location'),
         attendees: z.string().optional()
@@ -215,7 +220,8 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
           .describe('Calendar ID (default: primary)'),
       },
     },
-    async ({ account, eventId, summary, start, end, description, location, attendees, calendarId }) => {
+    async ({ account, eventId, summary, start, end, startTimeZone, endTimeZone, description, location, attendees,
+      calendarId }) => {
       try {
         if (attendees) {
           const outbound = checkOutbound('calendar attendee', attendees.split(','), String(account));
@@ -224,26 +230,24 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
         const auth = await getClientFn(account as Account);
         const cal = calendarClient({ version: 'v3', auth });
 
-        // Fetch the event first so a 404 surfaces before we attempt the patch.
-        await cal.events.get({
+        // Fetch first: a 404 surfaces before the patch, and the current start/end
+        // let a time change keep (or a zone-only change re-label) the event's zone.
+        const current = await cal.events.get({
           calendarId: calendarId ?? 'primary',
           eventId,
         });
+
+        const startPatch = patchEventTime('start', start, startTimeZone, current.data.start);
+        if ('error' in startPatch) return invalidParams(account as Account, startPatch.error, EVENT_TIME_HINT);
+        const endPatch = patchEventTime('end', end, endTimeZone, current.data.end);
+        if ('error' in endPatch) return invalidParams(account as Account, endPatch.error, EVENT_TIME_HINT);
 
         const patch: any = {};
         if (summary !== undefined) patch.summary = summary;
         if (description !== undefined) patch.description = description;
         if (location !== undefined) patch.location = location;
-        if (start !== undefined) {
-          patch.start = start.length === 10
-            ? { date: start }
-            : { dateTime: start };
-        }
-        if (end !== undefined) {
-          patch.end = end.length === 10
-            ? { date: end }
-            : { dateTime: end };
-        }
+        if (startPatch.value) patch.start = startPatch.value;
+        if (endPatch.value) patch.end = endPatch.value;
         if (attendees !== undefined) {
           patch.attendees = attendees.split(',').map((e: string) => ({ email: e.trim() }));
         }
@@ -566,6 +570,61 @@ export function missingTimeZoneError(field: 'timeMin' | 'timeMax', value: string
 
 export const MISSING_TIME_ZONE_HINT =
   'Add "Z" for UTC or an explicit offset, e.g. "2026-04-04T00:00:00Z" or "2026-04-04T00:00:00+01:00".';
+
+type EventTime = { date: string } | { dateTime: string; timeZone?: string };
+
+export const EVENT_TIME_HINT =
+  'Timed events: an ISO 8601 date-time with an offset ("2026-11-18T08:30:00-05:00"), or without one plus ' +
+  'startTimeZone/endTimeZone ("2026-11-18T08:30:00" + "America/Cayman"). All-day events: a date ' +
+  '("2026-11-18") and no time zone. Zones are IANA names.';
+
+/** IANA name check via Intl (accepts canonical names and aliases like America/Cayman). */
+export function timeZoneError(field: string, timeZone: string): string | null {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    return null;
+  } catch {
+    return `${field}TimeZone ("${timeZone}") is not an IANA time zone name.`;
+  }
+}
+
+/** Build a create-time start/end. An offset-less dateTime is only unambiguous with a zone. */
+export function eventTime(
+  field: 'start' | 'end', value: string, timeZone: string | undefined, allDay: boolean,
+): { value: EventTime } | { error: string } {
+  if (allDay || value.length === 10) {
+    if (timeZone !== undefined) return { error: `${field}TimeZone was given for an all-day ${field}; all-day events have no time zone.` };
+    return { value: { date: value } };
+  }
+  if (timeZone !== undefined) {
+    const bad = timeZoneError(field, timeZone);
+    if (bad) return { error: bad };
+    return { value: { dateTime: value, timeZone } };
+  }
+  if (!TZ_SUFFIX_RE.test(value)) {
+    return { error: `${field} ("${value}") has no UTC offset and no ${field}TimeZone, so its time is ambiguous.` };
+  }
+  return { value: { dateTime: value } };
+}
+
+/** Build an update-time start/end against the event as it stands. `value: undefined`
+ * means "leave unchanged"; a zone without a value re-labels the same instant; a new
+ * timed value keeps the event's current zone unless one is given. */
+export function patchEventTime(
+  field: 'start' | 'end', value: string | undefined, timeZone: string | undefined,
+  current: { date?: string | null; dateTime?: string | null; timeZone?: string | null } | undefined,
+): { value?: EventTime } | { error: string } {
+  if (value === undefined && timeZone === undefined) return {};
+  if (value === undefined) {
+    if (!current?.dateTime) return { error: `${field}TimeZone was given but the event's ${field} is all-day, which has no time zone.` };
+    const bad = timeZoneError(field, timeZone!);
+    if (bad) return { error: bad };
+    return { value: { dateTime: current.dateTime, timeZone: timeZone! } };
+  }
+  if (value.length === 10) return eventTime(field, value, timeZone, true);
+  const keep = timeZone ?? (current?.dateTime ? current.timeZone ?? undefined : undefined);
+  return eventTime(field, value, keep, false);
+}
 
 /** Google renders `dateTime` in the CALENDAR's zone, not the event's own
  * `timeZone` (see docs/features.md). Re-render the same instant in the event's
