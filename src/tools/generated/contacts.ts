@@ -197,24 +197,6 @@ export function registerContactsGeneratedTools(registry: ToolRegistry, deps: Exe
     },
   }, deps);
   registerGeneratedTool(registry, {
-    name: "contacts_people_search_directory_people",
-    cud: "read",
-    description: "Provides a list of domain profiles and domain contacts in the authenticated user's domain directory that match the search query.",
-    method: { id: "people.people.searchDirectoryPeople", httpMethod: "GET", path: "v1/people:searchDirectoryPeople", baseUrl: "https://people.googleapis.com/", requiredParams: [], scopes: S_people_v1[4] },
-    params: [{"field":"mergeSources","api":"mergeSources","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"query","api":"query","location":"query"},{"field":"readMask","api":"readMask","location":"query"},{"field":"sources","api":"sources","location":"query"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: false,
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      mergeSources: coerceArray(z.enum(["DIRECTORY_MERGE_SOURCE_TYPE_UNSPECIFIED","DIRECTORY_MERGE_SOURCE_TYPE_CONTACT"])).describe("Optional. Additional data to merge into the directory sources if they are connected through verified join keys such as email addresses or phone numbers.").optional(),
-      pageSize: z.number().describe("Optional. The number of people to include in the response. Valid values are between 1 and 500, inclusive. Defaults to 100 if not set or set to 0.").optional(),
-      pageToken: z.string().describe("Optional. A page token, received from a previous response `next_page_token`. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `SearchDirectoryPeople` mus").optional(),
-      query: z.string().describe("Required. Prefix query that matches fields in the person. Does NOT use the read_mask for determining what fields to match.").optional(),
-      readMask: z.string().describe("Required. A field mask to restrict which fields on each person are returned. Multiple fields can be specified by separating them with commas. Valid values are: * addresses * ageRanges * biographies * ").optional(),
-      sources: coerceArray(z.enum(["DIRECTORY_SOURCE_TYPE_UNSPECIFIED","DIRECTORY_SOURCE_TYPE_DOMAIN_CONTACT","DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE"])).describe("Required. Directory sources to return.").optional(),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
     name: "contacts_people_update_contact_photo",
     cud: "update",
     description: "Update a contact's photo. Mutate requests for the same user should be sent sequentially to avoid increased latency and failures.",

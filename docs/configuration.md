@@ -53,6 +53,7 @@ Each account can point at a named **scope profile** so consent is exactly what t
 | `slides` | low | Create and edit Slides presentations |
 | `keep` | low | Read and edit Keep notes (not for a personal account) |
 | `driveactivity` | low | Read the Drive activity feed |
+| `directory` | low | Search the Workspace domain directory with `contacts_search_directory` (Workspace accounts only) |
 | `postmaster` | low | Read Postmaster Tools deliverability data |
 | `analytics` | low | Read Google Analytics (GA4): reports, realtime, account/property config |
 | `analytics_write` | medium | Edit GA4 configuration: properties, streams, key events, custom definitions (includes read) |
@@ -201,7 +202,7 @@ Optional services register when their bundle is enabled (below): `slides`, `form
 
 Add bundle names to an account's [scope profile](#scope-profiles-per-account-consent) (or, legacy, to `GOOGLE_OPTIONAL_SCOPES` as CSV for every account), then re-run `auth --account <alias>` so the new scopes are granted:
 
-`slides`, `forms`, `chat`, `analytics`, `analytics_write`, `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket`.
+`slides`, `forms`, `chat`, `analytics`, `analytics_write`, `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket`, `directory`.
 
 Two bundles extend the always-on `gmail` service instead of enabling a new one — Gmail settings **writes** only accept the dedicated settings scopes (reads already work with the base scope):
 
@@ -209,6 +210,8 @@ Two bundles extend the always-on `gmail` service instead of enabling a new one �
 |---|---|---|
 | `gmail_settings` | `gmail.settings.basic` | writing filters, vacation responder, IMAP/POP, language |
 | `gmail_settings_sharing` | `gmail.settings.sharing` | send-as, delegates, auto-forwarding — kept separate because it can redirect or delegate your mail |
+
+The `directory` bundle likewise extends the always-on `contacts` service: it grants `directory.readonly`, which `contacts_search_directory` needs to look up colleagues and shared domain contacts. Without it the tool returns `insufficient_scope`; the rest of `contacts` is unaffected.
 
 A tool whose scope was never granted returns a typed `insufficient_scope` error with a re-auth hint instead of failing silently.
 

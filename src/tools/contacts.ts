@@ -12,6 +12,7 @@ import { parseAddresses } from './gmail.js';
 
 
 const PERSON_FIELDS = 'names,emailAddresses,phoneNumbers,organizations,addresses,photos,memberships';
+const DIRECTORY_FIELDS = 'names,emailAddresses,phoneNumbers,organizations,photos';
 
 // people.getBatchGet rejects more than 200 resource names per call.
 const BATCH_GET_LIMIT = 200;
@@ -283,6 +284,55 @@ export function registerContactsTools(server: ToolRegistry, deps: CuratedToolDep
         };
       } catch (error: any) {
         return handleContactsError(error, account as Account);
+      }
+    },
+  );
+
+  server.registerTool(
+    'contacts_search_directory',
+    {
+      description:
+        'Search the Workspace domain directory (colleagues and shared domain contacts) by name or email. ' +
+        'This finds people who are not in your own contacts; for your address book use contacts_search. ' +
+        'Needs the optional "directory" scope bundle and a Workspace account.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        query: z.string().min(1).describe('Search text (prefix matching on names and emails)'),
+        pageSize: z.number().min(1).max(100).default(10).optional().describe('Max results (1-100, default: 10)'),
+        pageToken: z.string().optional().describe('nextPageToken from the previous page to continue'),
+        includeDomainContacts: coerceBoolean.optional()
+          .describe('Also search shared domain contacts, not just user profiles (default true)'),
+      },
+    },
+    async ({ account, query, pageSize, pageToken, includeDomainContacts }) => {
+      try {
+        const auth = await getClientFn(account as Account);
+        const people = peopleClient({ version: 'v1', auth });
+        const res = await people.people.searchDirectoryPeople({
+          query,
+          readMask: DIRECTORY_FIELDS,
+          sources: includeDomainContacts === false
+            ? ['DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE']
+            : ['DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE', 'DIRECTORY_SOURCE_TYPE_DOMAIN_CONTACT'],
+          pageSize: pageSize ?? 10,
+          ...(pageToken ? { pageToken } : {}),
+        });
+        const found = (res.data.people ?? []).map((p: any) => {
+          const { addresses: _addresses, ...rest } = formatContact(p);
+          return rest;
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(listResult('people', found, {
+            nextPageToken: res.data.nextPageToken ?? undefined,
+            ...(typeof res.data.totalSize === 'number' ? { totalItems: res.data.totalSize } : {}),
+          }), null, 2) }],
+        };
+      } catch (error: any) {
+        return handleGoogleApiError(error, account as Account, {
+          scope: 'Directory search requires the optional "directory" scope bundle: add it to this account\'s scope profile, then re-auth.',
+          resource: 'The domain directory is only available to Workspace accounts, and a Workspace admin can turn directory sharing off for the domain.',
+          bundle: 'directory',
+        });
       }
     },
   );
