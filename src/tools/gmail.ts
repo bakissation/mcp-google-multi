@@ -106,8 +106,8 @@ function getAttachments(payload: any): GmailAttachment[] {
 
 // Reply auto-fill: parse an RFC 5322 address header into lowercased addr-specs
 // using nodemailer's bundled addressparser; groups are flattened, addressless entries dropped.
-interface ParsedAddress { address: string; name: string }
-function parseAddresses(headerValue: string): ParsedAddress[] {
+export interface ParsedAddress { address: string; name: string }
+export function parseAddresses(headerValue: string): ParsedAddress[] {
   if (!headerValue) return [];
   const out: ParsedAddress[] = [];
   const walk = (entries: any[]): void => {

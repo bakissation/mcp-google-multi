@@ -97,7 +97,7 @@ List all contacts (paginated)
 
 Class: read
 
-Resolve a free-text name/alias to ONE canonical email address (ranked + tie-broken), so you need not hand-expand transliteration OR-queries. Returns a single confident match, an explicit ambiguous candidate list, or null when nothing matches. For picking a recipient before gmail_send.
+Resolve a free-text name/alias to ONE canonical email address (ranked + tie-broken), so you need not hand-expand transliteration OR-queries. Returns a single confident match, an explicit ambiguous candidate list, or null when nothing matches. When no contact matches, it falls back to names seen in recent mail headers (source "gmail"). For picking a recipient before gmail_send.
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
@@ -105,6 +105,7 @@ Resolve a free-text name/alias to ONE canonical email address (ranked + tie-brok
 | `name` | string | required | Free-text name or alias to resolve (e.g. "Zoe") |
 | `maxCandidates` | number | optional | Max candidates to return when ambiguous (1-10, default: 5) |
 | `includeOtherContacts` | boolean | optional | Also search auto-saved "other contacts" (people you have emailed but not saved). Default true. |
+| `includeMailHeaders` | boolean | optional | When no contact matches, look for the name in the From/To/Cc headers of recent mail (needs Gmail access; skipped silently without it). Default true. |
 
 ## `contacts_search`
 

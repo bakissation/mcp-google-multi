@@ -1,12 +1,14 @@
 import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { people as peopleClient } from '@googleapis/people';
+import { gmail as gmailClient } from '@googleapis/gmail';
 import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { coerceBoolean } from './_coerce.js';
 import { handleGoogleApiError, invalidParams } from './_errors.js';
 import { listResult } from '../trim.js';
+import { parseAddresses } from './gmail.js';
 
 
 const PERSON_FIELDS = 'names,emailAddresses,phoneNumbers,organizations,addresses,photos,memberships';
@@ -46,9 +48,11 @@ function formatContact(person: any) {
 export interface ResolveCandidate {
   resourceName: string;
   displayName: string;
-  source: 'contacts' | 'otherContacts';
+  source: 'contacts' | 'otherContacts' | 'gmail';
   emails: { value: string; type?: string; primary?: boolean }[];
   hasOrg: boolean;
+  /** Gmail-header candidates only: how many scanned messages carried the address. */
+  seen?: number;
 }
 
 /** Accent-fold + lowercase for name comparison ("Zoe" == "Zoë"). */
@@ -91,6 +95,7 @@ const projectCandidate = (c: ResolveCandidate) => ({
   email: pickEmail(c).value,
   resourceName: c.resourceName,
   source: c.source,
+  ...(c.source === 'gmail' ? { seen: c.seen ?? 0 } : {}),
 });
 
 /** Rank candidates and return one confident match, an explicit ambiguous list,
@@ -106,7 +111,11 @@ export function resolveContacts(candidates: ResolveCandidate[], name: string, ma
     .sort((a, b) => cmpTuple(a.t, b.t));
 
   const top = ranked[0];
-  const tiedTop = ranked.filter((r) => cmpTuple(r.t, top.t) === 0);
+  // Ties stay ties (never a confident pick on volume alone); the more often
+  // an address appears in mail only orders the list shown to the caller.
+  const tiedTop = ranked
+    .filter((r) => cmpTuple(r.t, top.t) === 0)
+    .sort((a, b) => (b.c.seen ?? 0) - (a.c.seen ?? 0));
   if (tiedTop.length === 1) {
     return { query: name, resolved: projectCandidate(top.c) };
   }
@@ -130,6 +139,89 @@ function toCandidate(person: any, source: 'contacts' | 'otherContacts'): Resolve
     })),
     hasOrg: (person?.organizations?.length ?? 0) > 0,
   };
+}
+
+// --- Gmail header fallback --------------------------------------------------
+
+/** Messages scanned for the header fallback, and the parallel get calls. */
+const HEADER_SCAN_MAX = 25;
+const HEADER_SCAN_CHUNK = 10;
+
+export interface HeaderRow { from?: string; to?: string; cc?: string }
+
+const nameTokens = (s: string): string[] => foldName(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+/** True when every query token is a prefix of some token of the display name. */
+function nameMatches(displayName: string, queryTokens: string[]): boolean {
+  const have = nameTokens(displayName);
+  return queryTokens.length > 0 && queryTokens.every((q) => have.some((t) => t.startsWith(q)));
+}
+
+/** Display-name matches from From/To/Cc headers, grouped by address (own
+ * addresses and name-less or non-matching entries dropped). The most common
+ * spelling of the name wins per address. Pure, so it is unit-testable. */
+export function candidatesFromHeaders(rows: HeaderRow[], name: string, ownAddresses: ReadonlySet<string> = new Set()): ResolveCandidate[] {
+  const queryTokens = nameTokens(name);
+  const byAddress = new Map<string, { seen: number; names: Map<string, number> }>();
+  for (const row of rows) {
+    const seenHere = new Set<string>();
+    for (const header of [row.from, row.to, row.cc]) {
+      for (const a of parseAddresses(header ?? '')) {
+        const address = a.address.toLowerCase();
+        if (!a.name || ownAddresses.has(address) || !nameMatches(a.name, queryTokens)) continue;
+        const entry = byAddress.get(address) ?? { seen: 0, names: new Map() };
+        if (!seenHere.has(address)) { entry.seen += 1; seenHere.add(address); }
+        entry.names.set(a.name, (entry.names.get(a.name) ?? 0) + 1);
+        byAddress.set(address, entry);
+      }
+    }
+  }
+  return [...byAddress.entries()].map(([address, e]) => ({
+    resourceName: '',
+    displayName: [...e.names.entries()].sort((x, y) => y[1] - x[1])[0][0],
+    source: 'gmail' as const,
+    emails: [{ value: address }],
+    hasOrg: false,
+    seen: e.seen,
+  }));
+}
+
+/** Scan recent mail headers for the name. Any failure (no Gmail scope, API
+ * off, quota) yields no candidates: the fallback never breaks the lookup. */
+async function gmailHeaderCandidates(auth: any, name: string): Promise<ResolveCandidate[]> {
+  try {
+    const gmail = gmailClient({ version: 'v1', auth });
+    const q = name.replace(/["\\]/g, ' ').trim();
+    if (!q) return [];
+    const list = await gmail.users.messages.list({
+      userId: 'me',
+      q: `from:"${q}" OR to:"${q}" OR cc:"${q}"`,
+      maxResults: HEADER_SCAN_MAX,
+    });
+    const ids = (list.data.messages ?? []).map((m) => m.id).filter((id): id is string => !!id);
+    if (ids.length === 0) return [];
+    const rows: HeaderRow[] = [];
+    for (let i = 0; i < ids.length; i += HEADER_SCAN_CHUNK) {
+      const details = await Promise.all(ids.slice(i, i + HEADER_SCAN_CHUNK).map((id) => gmail.users.messages.get({
+        userId: 'me', id, format: 'metadata', metadataHeaders: ['From', 'To', 'Cc'],
+      })));
+      for (const d of details) {
+        const headers = d.data.payload?.headers ?? [];
+        const get = (n: string) => headers.find((h) => h.name?.toLowerCase() === n)?.value ?? '';
+        rows.push({ from: get('from'), to: get('to'), cc: get('cc') });
+      }
+    }
+    const own = new Set<string>();
+    try {
+      const profile = await gmail.users.getProfile({ userId: 'me' });
+      if (profile.data.emailAddress) own.add(profile.data.emailAddress.toLowerCase());
+    } catch {
+      // keep going without the own-address filter
+    }
+    return candidatesFromHeaders(rows, name, own);
+  } catch {
+    return [];
+  }
 }
 
 /** Merge saved + other contacts, deduped by resourceName (a saved match wins
@@ -199,7 +291,7 @@ export function registerContactsTools(server: ToolRegistry, deps: CuratedToolDep
     'contacts_resolve',
     {
       annotations: { openWorldHint: true },
-      description: 'Resolve a free-text name/alias to ONE canonical email address (ranked + tie-broken), so you need not hand-expand transliteration OR-queries. Returns a single confident match, an explicit ambiguous candidate list, or null when nothing matches. For picking a recipient before gmail_send.',
+      description: 'Resolve a free-text name/alias to ONE canonical email address (ranked + tie-broken), so you need not hand-expand transliteration OR-queries. Returns a single confident match, an explicit ambiguous candidate list, or null when nothing matches. When no contact matches, it falls back to names seen in recent mail headers (source "gmail"). For picking a recipient before gmail_send.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         name: z.string().min(1).describe('Free-text name or alias to resolve (e.g. "Zoe")'),
@@ -207,9 +299,11 @@ export function registerContactsTools(server: ToolRegistry, deps: CuratedToolDep
           .describe('Max candidates to return when ambiguous (1-10, default: 5)'),
         includeOtherContacts: coerceBoolean.optional()
           .describe('Also search auto-saved "other contacts" (people you have emailed but not saved). Default true.'),
+        includeMailHeaders: coerceBoolean.optional()
+          .describe('When no contact matches, look for the name in the From/To/Cc headers of recent mail (needs Gmail access; skipped silently without it). Default true.'),
       },
     },
-    async ({ account, name, maxCandidates, includeOtherContacts }) => {
+    async ({ account, name, maxCandidates, includeOtherContacts, includeMailHeaders }) => {
       try {
         const auth = await getClientFn(account as Account);
         const people = peopleClient({ version: 'v1', auth });
@@ -236,9 +330,22 @@ export function registerContactsTools(server: ToolRegistry, deps: CuratedToolDep
           }
         }
 
-        const result = resolveContacts(dedupeCandidates(candidates), name, maxCandidates ?? 5);
+        let merged = dedupeCandidates(candidates);
+        // Nobody in the address book matched: people often only exist as a
+        // display name in mail headers, so look there before giving up.
+        if (includeMailHeaders !== false && !merged.some((c) => c.emails.some((e) => e.value))) {
+          merged = await gmailHeaderCandidates(auth, name);
+        }
+
+        const result = resolveContacts(merged, name, maxCandidates ?? 5);
+        const fromMail = 'resolved' in result && result.resolved
+          ? result.resolved.source === 'gmail'
+          : 'candidates' in result && (result.candidates ?? []).some((c) => c.source === 'gmail');
+        const out = fromMail
+          ? { ...result, hint: 'Matched on names in recent mail headers, not on a saved contact. Confirm the address with the user before sending.' }
+          : result;
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }],
         };
       } catch (error: any) {
         return handleContactsError(error, account as Account);
