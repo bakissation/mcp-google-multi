@@ -161,6 +161,8 @@ interface ReplyDerivation {
   inReplyTo: string;
   references: string;
   sourceFound: boolean;
+  /** Gmail thread of the reply source; without it the reply starts a new thread on the sender's side. */
+  threadId?: string;
   to?: string;
   cc?: string;
   subject?: string;
@@ -177,6 +179,7 @@ export async function resolveReply(
   replyAll: boolean,
 ): Promise<ReplyDerivation> {
   let headers: any[] | undefined;
+  let threadId: string | undefined;
   try {
     const meta = await gmail.users.messages.get({
       userId: 'me',
@@ -185,6 +188,7 @@ export async function resolveReply(
       metadataHeaders: ['From', 'To', 'Cc', 'Subject', 'Message-ID', 'References'],
     });
     headers = meta.data.payload?.headers;
+    threadId = meta.data.threadId ?? undefined;
   } catch {
     // Degrade to the API id rather than blocking the send.
     return { inReplyTo: replyToMessageId, references: replyToMessageId, sourceFound: false };
@@ -223,6 +227,7 @@ export async function resolveReply(
   return {
     ...threading,
     sourceFound: true,
+    threadId,
     to: derivedTo || undefined,
     cc: derivedCc,
     subject: deriveReplySubject(getHeader(headers, 'Subject')),
@@ -834,8 +839,10 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           requestBody: { raw: encoded },
         };
 
-        if (replyToThreadId) {
-          sendParams.requestBody.threadId = replyToThreadId;
+        // An explicit replyToThreadId wins; otherwise keep the reply in the source's thread.
+        const sendThreadId = replyToThreadId ?? reply?.threadId;
+        if (sendThreadId) {
+          sendParams.requestBody.threadId = sendThreadId;
         }
 
         const res = await gmail.users.messages.send(sendParams);
@@ -983,8 +990,9 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           },
         };
 
-        if (replyToThreadId) {
-          draftParams.requestBody.message.threadId = replyToThreadId;
+        const draftThreadId = replyToThreadId ?? reply?.threadId;
+        if (draftThreadId) {
+          draftParams.requestBody.message.threadId = draftThreadId;
         }
 
         const res = await gmail.users.drafts.create(draftParams);
