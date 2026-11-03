@@ -5,7 +5,7 @@ name: pr-guards
 
 on:
   pull_request:
-    branches: [main, staging, dev]
+    branches: [main, staging, dev, feat/6.2]
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
