@@ -34,6 +34,8 @@ Create a Google Calendar event
 | `attendees` | string | optional | Comma-separated email addresses of attendees |
 | `calendarId` | string | optional | Calendar ID (default: primary) |
 | `allDay` | boolean | optional | If true, start/end are dates (YYYY-MM-DD) not datetimes |
+| `startTimeZone` | string | optional | IANA zone the event starts in, e.g. "America/Cayman"; start may then omit its offset (wall-clock time in that zone). Timed events only |
+| `endTimeZone` | string | optional | IANA zone the event ends in; may differ from startTimeZone (e.g. a flight). Timed events only |
 
 ## `calendar_delete_event`
 
@@ -169,6 +171,8 @@ Update a Google Calendar event
 | `summary` | string | optional | New event title |
 | `start` | string | optional | New start time (ISO 8601) |
 | `end` | string | optional | New end time (ISO 8601) |
+| `startTimeZone` | string | optional | IANA zone the event starts in. Alone (no start): moves the start to this zone at the same instant. With an offset-less start: wall-clock time in this zone. Omitted: the event keeps its current start zone |
+| `endTimeZone` | string | optional | IANA zone the event ends in; may differ from startTimeZone. Same rules as startTimeZone |
 | `description` | string | optional | New event description |
 | `location` | string | optional | New event location |
 | `attendees` | string | optional | Comma-separated email addresses (replaces existing attendees) |
