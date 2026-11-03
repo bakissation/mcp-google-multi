@@ -123,6 +123,46 @@ export function suggestKeys(unknown: string, declared: readonly string[], limit 
     .map((e) => e.key);
 }
 
+/**
+ * First-guess names that models reach for and that ranking cannot connect to
+ * the declared key (no shared tokens, too far apart by edit distance). These
+ * only ever feed the "Did you mean" line: a call that uses one is still
+ * rejected, never rewritten, because a wrong guess would act on the wrong
+ * field. Keys are compared flattened (case and separators ignored) and an
+ * entry is offered only when the tool really declares the target.
+ */
+const COMMON_ALIASES: Record<string, string[]> = {
+  limit: ['maxResults'],
+  max: ['maxResults'],
+  count: ['maxResults'],
+  pagesize: ['maxResults'],
+  q: ['query'],
+  search: ['query', 'findText', 'find'],
+  find: ['findText'],
+  replace: ['replaceText', 'replacement'],
+  replacement: ['replaceText'],
+  oldtext: ['findText', 'find'],
+  newtext: ['replaceText', 'replacement'],
+};
+
+const TOOL_ALIASES: Record<string, Record<string, string[]>> = {
+  drive_list: { parent: ['folderId'], parentid: ['folderId'], folder: ['folderId'] },
+  drive_move: { parent: ['newParentFolderId'], parentid: ['newParentFolderId'], newparentid: ['newParentFolderId'], destination: ['newParentFolderId'], folderid: ['newParentFolderId'] },
+  drive_upload: { name: ['filename'], title: ['filename'], format: ['convertTo'], parent: ['parentFolderId'] },
+  drive_create_folder: { title: ['name'], parent: ['parentFolderId'] },
+  drive_export: { format: ['mimeType'] },
+  gmail_read_batch: { messageids: ['ids'], messages: ['ids'], id: ['ids'] },
+  gmail_read: { id: ['messageId'] },
+  sheets_find_replace: { findtext: ['find'], replacetext: ['replacement'], replace: ['replacement'] },
+};
+
+function aliasSuggestions(tool: string, key: string, declaredSet: ReadonlySet<string>): string[] {
+  if (key.length > SUGGEST_MAX_INPUT) return [];
+  const f = flatten(key);
+  const wanted = [...(TOOL_ALIASES[tool]?.[f] ?? []), ...(COMMON_ALIASES[f] ?? [])];
+  return [...new Set(wanted)].filter((k) => declaredSet.has(k)).slice(0, 2);
+}
+
 export interface ScreenedKey {
   /** the key the caller sent; for stderr and the agent-facing hint only */
   sent: string;
@@ -152,7 +192,8 @@ export function screenArguments(tool: string, args: Record<string, unknown>, dec
   for (const key of Object.keys(args)) {
     if (declaredSet.has(key) || isExemptKey(key)) continue;
     const twins = key.length <= SUGGEST_MAX_INPUT ? byFlat.get(flatten(key)) : undefined;
-    const suggestions = twins ? twins.slice(0, 2) : ranked++ < MAX_SUGGESTED_KEYS ? suggestKeys(key, declared) : [];
+    let suggestions = twins ? twins.slice(0, 2) : ranked++ < MAX_SUGGESTED_KEYS ? suggestKeys(key, declared) : [];
+    if (suggestions.length === 0) suggestions = aliasSuggestions(tool, key, declaredSet);
     // The caller sent both spellings, so the declared one already won and the
     // outcome is what it has always been. Never fail a call that works today.
     if (suggestions.some((s) => s in args)) {

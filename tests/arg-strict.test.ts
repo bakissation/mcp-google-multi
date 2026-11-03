@@ -120,6 +120,34 @@ describe('screenArguments', () => {
   });
 });
 
+describe('first-guess aliases feed the suggestion, never the call', () => {
+  const sug = (tool: string, args: Record<string, unknown>, declared: string[]) =>
+    screenArguments(tool, args, declared).unknown.map((u) => [u.sent, u.suggestions]);
+
+  it('connects names that ranking cannot', () => {
+    const docs = sug('docs_replace_text', { find: 'a', replace: 'b' }, ['account', 'documentId', 'findText', 'replaceText', 'replacements']);
+    expect(docs[0]).toEqual(['find', ['findText']]);
+    expect(docs[1][1]).toContain('replaceText');
+    expect(sug('sheets_find_replace', { findText: 'a', replaceText: 'b' }, ['account', 'spreadsheetId', 'find', 'replacement'])).toEqual([
+      ['findText', ['find']],
+      ['replaceText', ['replacement']],
+    ]);
+    expect(sug('gmail_read_batch', { messageIds: ['x'] }, ['account', 'ids', 'full'])).toEqual([['messageIds', ['ids']]]);
+    expect(sug('drive_upload', { name: 'a.txt' }, ['account', 'filename', 'parentFolderId'])).toEqual([['name', ['filename']]]);
+    expect(sug('drive_search', { limit: 5 }, ['account', 'query', 'maxResults'])).toEqual([['limit', ['maxResults']]]);
+  });
+
+  it('offers only a key the tool really declares', () => {
+    expect(sug('drive_get_about', { limit: 5 }, ['account'])).toEqual([['limit', []]]);
+  });
+
+  it('still counts a call that sent both spellings as redundant, not unknown', () => {
+    const r = screenArguments('drive_search', { query: 'x', q: 'x' }, ['account', 'query', 'maxResults']);
+    expect(r.unknown).toEqual([]);
+    expect(r.redundant).toEqual(['q']);
+  });
+});
+
 // Caller-controlled names reach an O(n*m) edit distance; unbounded, a
 // megabyte-long key blocked the event loop for seconds.
 describe('suggestion work is bounded on caller input', () => {
