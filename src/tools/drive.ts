@@ -132,6 +132,16 @@ export function resolveShareNotification(opts: {
   return opts.sendNotification ?? true;
 }
 
+// Google refuses a grant to an address with no Google account unless the
+// invitation email is sent, and its 400 text only says so in passing.
+export function isNoGoogleAccountShareError(error: any): boolean {
+  const raw = error?.code ?? error?.status ?? error?.response?.status;
+  const status = typeof raw === 'string' ? Number(raw) : raw;
+  if (status !== 400) return false;
+  const message = String(error?.response?.data?.error?.message ?? error?.message ?? '');
+  return /no google account|not (?:have|associated with) a google account|sendNotificationEmail|notification email/i.test(message);
+}
+
 export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
   // Per-registry, live account enum + injectable client: the schema follows
   // the registry's account view at parse time, not a process-global default.
@@ -923,6 +933,22 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
         };
       } catch (error: any) {
+        const notifyOff = resolveShareNotification({ type, role, transferOwnership, sendNotification }) === false;
+        if (notifyOff && isNoGoogleAccountShareError(error)) {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: stringifyEnvelope({
+                error: 'bad_request',
+                message: safeMessage(error),
+                hint: `Google has no account for ${emailAddress ?? 'this address'}, and it only grants access to such an address by emailing an invitation. Retry with sendNotification:true (an email is sent), or share with an address that has a Google account.`,
+                retriable: false,
+                account: account as Account,
+              }),
+            }],
+            isError: true as const,
+          };
+        }
         return handleDriveError(error, account as Account);
       }
     },
