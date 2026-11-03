@@ -384,3 +384,39 @@ describe('§7 HTTP', () => {
     expect(s.lines.join(' ')).toContain('PRM + AS metadata verified');
   });
 });
+
+describe('§5 Scopes: registered tools the account cannot call', () => {
+  const summary = {
+    total: 10, callable: 6, requestableNotGranted: 1,
+    byBundle: [{ bundle: 'slides', tools: 3 }], neverRequestable: 0,
+  };
+
+  it('adds a per-account tool line and a remediation hint for the operator', async () => {
+    const r = await runDiagnostics(deps({ toolScopes: () => summary }));
+    const s = r.sections.find((x) => x.id === 5)!;
+    expect(s.lines).toContain(
+      'work: 6 of 10 tools callable; 1 need re-auth to grant a scope already in the profile; 3 need a bundle not in the profile (slides 3)',
+    );
+    expect(s.hint).toMatch(/profile bundles/);
+    expect(s.verdict).toBe('ok');
+  });
+
+  it('keeps the section byte-identical when no tool counts are wired', async () => {
+    const r = await runDiagnostics(deps());
+    const s = r.sections.find((x) => x.id === 5)!;
+    expect(s.lines).toEqual(['work: 0 callable, all profile scopes granted']);
+    expect(s.hint).toBeUndefined();
+  });
+
+  it('stays out of tenant-scoped reports', async () => {
+    const r = await runDiagnostics(deps({ toolScopes: () => summary }), { scope: 'tenant' });
+    expect(JSON.stringify(r)).not.toContain('tools callable');
+  });
+
+  it('gives a plain line and no hint when every tool is callable', async () => {
+    const r = await runDiagnostics(deps({ toolScopes: () => ({ total: 4, callable: 4, requestableNotGranted: 0, byBundle: [], neverRequestable: 0 }) }));
+    const s = r.sections.find((x) => x.id === 5)!;
+    expect(s.lines).toContain('work: 4 of 4 tools callable');
+    expect(s.hint).toBeUndefined();
+  });
+});

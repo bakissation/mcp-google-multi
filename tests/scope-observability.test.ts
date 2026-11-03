@@ -5,6 +5,8 @@ import {
   scopeHint,
   scopeHintForMethod,
   buildScopesReport,
+  summarizeToolScopes,
+  formatToolScopeLine,
 } from '../src/scope-observability.js';
 import { setHttpReauthLink } from '../src/reauth-hint.js';
 import { setHintProvider, type HintCase } from '../src/hint-provider.js';
@@ -229,5 +231,60 @@ describe('buildScopesReport / account_list block', () => {
     expect(health.scopes.callable).toContain(GMAIL_MODIFY);
     expect(Array.isArray(health.scopes.requestable)).toBe(true);
     expect(health.scopes.notRequestable).toBeDefined();
+  });
+});
+
+describe('summarizeToolScopes (registered tools vs what the account can call)', () => {
+  const SLIDES = 'https://www.googleapis.com/auth/presentations';
+  const CHAT_BOT = 'https://www.googleapis.com/auth/chat.bot';
+  const tools = [
+    { requiredScopes: [GMAIL_MODIFY] },
+    { requiredScopes: [FORMS_BODY] },
+    { requiredScopes: [SLIDES] },
+    { requiredScopes: [SLIDES] },
+    { requiredScopes: [CHAT_BOT] },
+    {},
+    { requiredScopes: [] },
+  ];
+
+  it('splits tools into callable, re-auth, add-a-bundle and never-grantable', () => {
+    const sum = summarizeToolScopes(tools, new Set([GMAIL_MODIFY]), new Set([GMAIL_MODIFY, FORMS_BODY]));
+    expect(sum).toEqual({
+      total: 5,
+      callable: 1,
+      requestableNotGranted: 1,
+      byBundle: [{ bundle: 'slides', tools: 2 }],
+      neverRequestable: 1,
+    });
+  });
+
+  it('skips tools with no baked scopes instead of counting them as callable', () => {
+    const sum = summarizeToolScopes([{}, { requiredScopes: [] }], new Set(), new Set());
+    expect(sum.total).toBe(0);
+    expect(formatToolScopeLine('work', sum)).toBeNull();
+  });
+
+  it('formats one readable line, omitting parts that are zero', () => {
+    const all = summarizeToolScopes(tools, new Set([GMAIL_MODIFY]), new Set([GMAIL_MODIFY, FORMS_BODY]));
+    expect(formatToolScopeLine('work', all)).toBe(
+      'work: 1 of 5 tools callable; 1 need re-auth to grant a scope already in the profile; ' +
+        '2 need a bundle not in the profile (slides 2); 1 cannot be granted by any bundle',
+    );
+    const clean = summarizeToolScopes([{ requiredScopes: [GMAIL_MODIFY] }], new Set([GMAIL_MODIFY]), new Set([GMAIL_MODIFY]));
+    expect(formatToolScopeLine('work', clean)).toBe('work: 1 of 1 tools callable');
+  });
+
+  it('caps the bundle list and says how many more there are', () => {
+    // The narrowest bundle for a scope is catalog-derived, so take scopes only
+    // one bundle offers: six distinct bundles, whatever the catalog grows into.
+    const scopes = Object.values(BUNDLE_CATALOG)
+      .map((b) => b.scopes.find((sc) => Object.values(BUNDLE_CATALOG).filter((o) => o.scopes.includes(sc)).length === 1))
+      .filter((sc): sc is string => !!sc)
+      .slice(0, 6);
+    expect(scopes.length).toBe(6);
+    const sum = summarizeToolScopes(scopes.map((x) => ({ requiredScopes: [x] })), new Set(), new Set());
+    const line = formatToolScopeLine('work', sum)!;
+    expect(sum.byBundle.length).toBeGreaterThan(4);
+    expect(line).toMatch(/more bundles\)/);
   });
 });

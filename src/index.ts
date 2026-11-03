@@ -124,6 +124,18 @@ async function main() {
     const { getAccountSet } = await import('./accounts.js');
     const set = getAccountSet();
     console.log(`Default account: ${set.defaultAccount ? `${set.defaultAccount} (${set.defaultAccountSource})` : '(none — "account" is required per call)'}`);
+    {
+      const { accountScopeSets, formatToolScopeLine, summarizeToolScopes } = await import('./scope-observability.js');
+      const { resolveScopesForAccount } = await import('./auth.js');
+      for (const alias of set.aliases) {
+        const sets = accountScopeSets(alias, {
+          readTokenFn: ctx.tokenStore.readToken,
+          profileFn: (a) => resolveScopesForAccount(a, ctx.accounts),
+        });
+        const line = sets ? formatToolScopeLine(alias, summarizeToolScopes(registry.tools, sets.granted, sets.profile)) : null;
+        if (line) console.log(`Tool scopes: ${line}`);
+      }
+    }
     const { peekMasterKeyProvenance } = await import('./master-key.js');
     const prov = peekMasterKeyProvenance();
     console.log(`MASTER_KEY: ${prov === 'unprovisioned' ? 'unprovisioned (will be generated on first use)' : prov}`);
