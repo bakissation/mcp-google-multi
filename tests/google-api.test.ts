@@ -1292,6 +1292,24 @@ describe('escape hatch: round 7 prompt integrity', () => {
     expect(lines.filter((l) => l === 'Accept to run it as shown; decline or cancel to refuse.')).toHaveLength(1);
   });
 
+  it('the first three lines of the prompt are the method with its verb, the destinations and the body', async () => {
+    const { call, dir, elicitInput } = setup(SAFE, { elicit: 'accept' });
+    cleanupDirs.push(dir);
+    await call({
+      account: 'test',
+      api: 'calendar',
+      methodId: 'calendar.events.insert',
+      pathParams: { calendarId: 'primary' },
+      body: { summary: 'Lunch', attendees: [{ email: 'guest@corp.example' }] },
+    });
+    const lines = (elicitInput.mock.calls[0][0] as { message: string }).message.split('\n');
+    expect(lines[0]).toMatch(/^Method: calendar\.events\.insert \(POST\)$/);
+    expect(lines[1]).toMatch(/^Destinations: .*guest@corp\.example/);
+    expect(lines[2]).toMatch(/^Body: .*Lunch/);
+    expect(lines.some((l) => l.startsWith('Account: '))).toBe(true);
+    expect(lines[lines.length - 1]).toBe('Accept to run it as shown; decline or cancel to refuse.');
+  });
+
   it('MEDIUM 3: an undeclared pathParams key is rejected outright, never reaching the prompt', async () => {
     const { call, dir, elicitInput, request } = setup(SAFE, { elicit: 'accept' });
     cleanupDirs.push(dir);
