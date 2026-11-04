@@ -12,9 +12,10 @@ export interface BundleCatalogEntry {
   description: string;
   risk: 'low' | 'medium' | 'high';
   workspaceOnly?: boolean;
-  // Google's consent screen refuses these scopes for a personal account
+  // Google's consent screen refuses these scopes for a personal account, and
+  // for a Workspace account outside the OAuth app's own organisation
   // ("Some requested scopes cannot be shown"), failing the whole sign-in.
-  personalRefused?: boolean;
+  orgOnly?: boolean;
 }
 
 export const ADMIN_SCOPES = [
@@ -79,7 +80,7 @@ export const BUNDLE_CATALOG: Record<string, BundleCatalogEntry> = {
     ],
     description: 'Manage Cloud Identity groups and devices across the directory.',
     risk: 'high',
-    personalRefused: true,
+    orgOnly: true,
   },
   directory: {
     scopes: ['https://www.googleapis.com/auth/directory.readonly'],
@@ -102,7 +103,7 @@ export const BUNDLE_CATALOG: Record<string, BundleCatalogEntry> = {
     scopes: ['https://www.googleapis.com/auth/keep'],
     description: 'Read and edit Google Keep notes.',
     risk: 'low',
-    personalRefused: true,
+    orgOnly: true,
   },
   driveactivity: {
     scopes: ['https://www.googleapis.com/auth/drive.activity.readonly'],
@@ -199,10 +200,34 @@ export function isPersonalGoogleAddress(email: string): boolean {
   return PERSONAL_ADDRESS_RE.test(email.trim());
 }
 
-/** The bundles in `bundles` that Google refuses on the consent screen of the account at `email`. */
-export function refusedBundlesFor(email: string, bundles: readonly string[]): string[] {
-  if (!isPersonalGoogleAddress(email)) return [];
-  return bundles.filter((b) => isKnownBundle(b) && BUNDLE_CATALOG[b].personalRefused === true);
+/** The domains of the OAuth app's own Workspace organisation, from
+ * GOOGLE_HOME_DOMAINS (comma-separated, lower-cased). Empty when unset: no
+ * organisation is known, so only personal addresses are treated as outside it. */
+export function homeDomains(env: NodeJS.ProcessEnv = process.env): string[] {
+  return (env.GOOGLE_HOME_DOMAINS ?? '')
+    .split(',')
+    .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
+    .filter(Boolean);
+}
+
+/** True when `home` names an organisation and the address is in none of its domains. */
+export function isExternalAddress(email: string, home: readonly string[]): boolean {
+  if (home.length === 0) return false;
+  const at = email.trim().toLowerCase().lastIndexOf('@');
+  return at < 0 || !home.includes(email.trim().toLowerCase().slice(at + 1));
+}
+
+/** Why Google refuses org-only bundles for the account at `email`, or null when it does not. */
+export function orgOnlyRefusal(email: string, home: readonly string[] = homeDomains()): 'personal' | 'external' | null {
+  if (isPersonalGoogleAddress(email)) return 'personal';
+  return isExternalAddress(email, home) ? 'external' : null;
+}
+
+/** The bundles in `bundles` that Google refuses on the consent screen of the account at `email`:
+ * the org-only ones, for a personal account or (with GOOGLE_HOME_DOMAINS set) an external one. */
+export function refusedBundlesFor(email: string, bundles: readonly string[], home: readonly string[] = homeDomains()): string[] {
+  if (orgOnlyRefusal(email, home) === null) return [];
+  return bundles.filter((b) => isKnownBundle(b) && BUNDLE_CATALOG[b].orgOnly === true);
 }
 
 export function resolveBundleAliases(bundles: string[]): string[] {

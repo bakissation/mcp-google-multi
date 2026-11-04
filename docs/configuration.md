@@ -51,7 +51,7 @@ Each account can point at a named **scope profile** so consent is exactly what t
 | Bundle | Risk | Unlocks |
 |---|---|---|
 | `slides` | low | Create and edit Slides presentations |
-| `keep` | low | Read and edit Keep notes (not for a personal account) |
+| `keep` | low | Read and edit Keep notes (not for a personal or external-organisation account) |
 | `driveactivity` | low | Read the Drive activity feed |
 | `directory` | low | Search the Workspace domain directory with `contacts_search_directory` (Workspace accounts only) |
 | `postmaster` | low | Read Postmaster Tools deliverability data |
@@ -66,7 +66,7 @@ Each account can point at a named **scope profile** so consent is exactly what t
 | `script` | medium | Apps Script projects and deployments |
 | `groupssettings` | medium | Google Groups settings |
 | `gmail_settings_sharing` | high | Forwarding/delegation — can route mail out |
-| `cloudidentity` | high | Cloud Identity groups and devices (not for a personal account) |
+| `cloudidentity` | high | Cloud Identity groups and devices (not for a personal or external-organisation account) |
 | `groupsmigration` | high | Migrate messages into Groups |
 | `licensing` | high | Assign/revoke license seats |
 | `reseller` | high | Reseller subscriptions and orders |
@@ -75,6 +75,8 @@ Each account can point at a named **scope profile** so consent is exactly what t
 | `admin` | high (Workspace-only) | Directory management + audit reports |
 
 Google refuses the `keep` and `cloudidentity` scopes on a personal account's consent screen, and the refusal fails the whole sign-in. So for a `gmail.com` or `googlemail.com` address, `allBundles` leaves both out, and naming either one is refused with `E_VALIDATION`.
+
+The same refusal applies to a Workspace account outside the organisation that owns your OAuth app (for example a tenant from another company signing in through a hosted deployment): Google rejects the whole consent with `invalid_scope` ("Some requested scopes cannot be shown: .../auth/keep, .../auth/cloud-identity.devices"). Set `GOOGLE_HOME_DOMAINS` to the comma-separated domains of your own organisation (`GOOGLE_HOME_DOMAINS=ideacrafters.com`); any other address is then treated like a personal one for `keep` and `cloudidentity`: `allBundles` leaves them out, naming them is refused with `E_VALIDATION`, and the unknown-bundle hint stops listing them. Unset (the default), only `gmail.com` and `googlemail.com` addresses are refused, exactly as before.
 
 ## Environment variables
 
@@ -85,6 +87,7 @@ Google refuses the `keep` and `cloudidentity` scopes on a personal account's con
 | `GOOGLE_DEFAULT_ACCOUNT` | | Alias used when a tool call omits `account` (or set `"defaultAccount"` in config.json; env wins; note: while `GOOGLE_ACCOUNTS` is set, the whole registry — including the default — comes from env, so the config field is inert). Unset = `account` stays required per call (`E_NO_DEFAULT_ACCOUNT` hint on omission). An alias that is not configured fails startup with `E_DEFAULT_ACCOUNT_UNKNOWN`. Explicit aliases, `*` and CSV are never affected |
 | `GOOGLE_DISCOVERY` | | Tool-surface visibility: `lazy` (default — meta-tools only until `{service}_discover`), `curated` (all 197 curated tools advertised eagerly), `eager` (everything). An invalid value warns and falls back to `lazy`; over HTTP the mode is always `curated`. At runtime an agent can `discover_all` / `discover_reset` to expand/collapse a lazy surface without config changes |
 | `MASTER_KEY` | | encrypts the token store. Optional: resolved as env > OS keychain > `master.key` (0600, in the config dir) > generated on first use. Keep it in env for deployments that may downgrade or move hosts. Never regenerated while encrypted tokens exist (`E_MASTER_KEY_MISSING_TOKENS_EXIST`) |
+| `GOOGLE_HOME_DOMAINS` | — | CSV of your own Workspace domains; accounts outside them are not offered the org-only `keep` and `cloudidentity` bundles |
 | `GOOGLE_PROFILE` | — | write policy: `read-only` (default) · `safe-writes` · `full-writes`; an invalid value warns and falls back to `read-only` |
 | `GOOGLE_READ_ONLY` | — | `true` (or `1`/`yes`) = hard kill-switch for all writes |
 | `GOOGLE_WRITE_ALLOW` / `GOOGLE_WRITE_DENY` | — | glob overrides, e.g. `calendar:*`, `*:delete*`, `tool:drive_update` (deny wins) |
