@@ -191,7 +191,7 @@ The prompt shows the account alias, the method id, the HTTP verb, the path param
 
 This replaces the escape hatch's own pre-6.0.2 content inspection (the raw outbound-allowlist rules for `chat.spaces.setup`, Drive access proposals and revisions, guardian invitations, `recoveryEmail`, `updateVacation`, `permissions.update`, and the generic `emailAddress`/`email` key walk): a human looking at the real body decides instead, so none of that reasoning exists on this path any more. Curated tools are unaffected either way: they keep their own profile/allow/deny gate and their own outbound checks (`drive_share`, `drive_permission_update`, `drive_access_proposal_resolve`, `gmail_send`/`create_draft`/`send_draft`, calendar attendees, `gmail_set_vacation`, `drive_revision_update`) exactly as described above.
 
-#### Confirming writes over HTTP
+### Confirming writes over HTTP
 
 Every `/mcp` request over HTTP is dispatched statelessly, through a fresh transport with no session id, so the server cannot hold a call open and ask the client mid-call. By default an escape-hatch write over HTTP that needs confirmation is therefore refused at once with `elicitation_unsupported`, whatever the client declared. Run `GOOGLE_PROFILE=full-writes` (with `GOOGLE_OUTBOUND_ALLOWLIST` unset) to allow such writes outright, or use a curated tool. stdio keeps one live connection for the whole call and is unaffected. Two ways to ask over HTTP without holding a connection:
 

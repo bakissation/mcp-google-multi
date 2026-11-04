@@ -167,7 +167,10 @@ tool) to pause for that confirmation unless the deployment runs
 "elicitation_unsupported", ... }` instead, and a decline or cancel comes
 back as `{ error: "write_declined", ... }`; neither is worth retrying
 without changing the write-control configuration or using a curated tool
-instead. Over HTTP a write can instead come back as `{ error:
+instead. Over HTTP a client on the 2026-07-28 protocol revision gets an
+"input required" result carrying the confirmation prompt: show it to the user
+and repeat the same call with their answer attached. Otherwise, on the 2025
+revision with the operator's opt-in, a write can come back as `{ error:
 "confirmation_required", summary, confirmToken }`: show the summary to the
 user and, only if they agree, repeat the identical call with `confirmToken`
 added (it works once and expires; an error of "confirmation_invalid" means start over). The escape hatch returns JSON only (binary media is refused with a

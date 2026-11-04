@@ -20,7 +20,7 @@ See CONTRIBUTING.md for the full workflow.
 - [ ] Conventional commit messages
 - [ ] If the tool surface changed: `npm run gen:coverage` re-run and the tool/service counts in `README.md` / `docs/features.md` updated (no manual version bump or `CHANGELOG.md` edit; releases are automated)
 - [ ] No secrets, tokens, or `.env` committed
-- [ ] If this touches a module published via the package `exports` map (see `package.json` — `identity`, `compose`, `registry`, `oauth-as`, `accounts`, `token-store`, `http-transport`, `client`, `config-file`, `fs-atomic`, `master-key`, `mcp-token`, `boot-gates`, `tenant-purge`, `doctor`, `http-config`, `write-control`, `scope-catalog`, `auth`, `usage-metrics`, `metrics-tap`, `hint-provider`), the exported signatures are unchanged — or the change is called out in the PR description and `MIGRATION-v6.md`
+- [ ] If this touches a module published via the package `exports` map (see `package.json` — `identity`, `compose`, `registry`, `oauth-as`, `accounts`, `token-store`, `http-transport`, `client`, `config-file`, `fs-atomic`, `master-key`, `mcp-token`, `boot-gates`, `tenant-purge`, `doctor`, `http-config`, `write-control`, `scope-catalog`, `auth`, `usage-metrics`, `metrics-tap`, `hint-provider`, `http-confirm`, `scope-observability`), the exported signatures are unchanged — or the change is called out in the PR description and `MIGRATION-v6.md`
 - [ ] New pure-logic helpers have unit tests (handlers verified by manual smoke test)
 
 ## How was this tested?
