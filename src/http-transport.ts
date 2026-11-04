@@ -718,6 +718,24 @@ export class HttpTransportHost {
     body: unknown,
     clientGone: () => boolean,
   ): Promise<void> {
+    // The server is stateless and cannot push list-changed events, so a
+    // subscriptions/listen stream would only sit open. Served by the SDK it
+    // would own the lane mutex and the dispatch deadline, and every request
+    // queued behind it (tools/list, tools/call) would time out. Refuse it at
+    // once, outside both; clients proceed without a push channel.
+    if (!Array.isArray(body) && jsonRpcMethod(body) === 'subscriptions/listen') {
+      const id = (body as { id?: unknown }).id;
+      this.log('200 listen_unsupported path=/mcp');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: typeof id === 'string' || typeof id === 'number' ? id : null,
+          error: { code: -32601, message: 'Method not found: subscriptions/listen (this server is stateless and sends no list-changed events)' },
+        }),
+      );
+      return;
+    }
     let lane: ModernLane;
     try {
       lane = await this.modernLane(target);
