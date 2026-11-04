@@ -8,6 +8,8 @@ import { decryptToken, deriveKey, deriveTenantKey, encryptToken, createTokenStor
 import { RefreshStore, jwtSecretFrom, refreshFamilyTagger, refreshMacKey, wipeRefreshKeyMemo } from '../src/mcp-token.js';
 import {
   clearKeyCacheForTest,
+  rearmKeys,
+  resolveMasterKeyForDispatch,
   deleteMasterKeyMaterial,
   peekMasterKeyProvenance,
   resolveJwtKey,
@@ -362,6 +364,8 @@ describe('wipeKeyCache', () => {
     expect(r.bytes.equals(buf(B64_KEY))).toBe(true);
     wipeKeyCache();
     expect(r.bytes.equals(buf(B64_KEY))).toBe(false);
+    expect(() => resolveMasterKey()).toThrow(/E_KEYS_WIPED/);
+    rearmKeys();
     expect(resolveMasterKey().key).toBe(B64_KEY);
     expect(resolveMasterKey()).not.toBe(r);
   });
@@ -379,11 +383,12 @@ describe('after a wipe, encryption and MAC minting fail closed', () => {
     expect(() => deriveKey(B64_KEY)).toThrow(/E_KEYS_WIPED/);
   });
 
-  it('a fresh resolve re-arms the module, but the old store stays refused', () => {
+  it('rearmKeys re-arms the module, but the old store stays refused', () => {
     process.env.MASTER_KEY = B64_KEY;
     const file = path.join(dir, 'refresh.enc');
     const old = new RefreshStore(file, resolveMasterKey().bytes);
     wipeKeyCache();
+    rearmKeys();
     const next = new RefreshStore(file, resolveMasterKey().bytes);
     expect(() => old.issue(Date.now(), 'sub')).toThrow(/E_KEYS_WIPED/);
     expect(() => next.issue(Date.now(), 'sub')).not.toThrow();
@@ -414,5 +419,43 @@ describe('explicit deps do not take the process-wide scrub default', () => {
     const env: NodeJS.ProcessEnv = { MASTER_KEY: B64_KEY };
     resolveMasterKey({ env, dir, keychain: () => null, scrubEnv: true });
     expect(env.MASTER_KEY).toBeUndefined();
+  });
+});
+
+describe('a wiped Buffer stays refused after a re-arm', () => {
+  it('encryptToken, refreshMacKey, deriveKey and a new RefreshStore refuse the old bytes and write nothing', () => {
+    process.env.MASTER_KEY = B64_KEY;
+    const oldBytes = resolveMasterKey().bytes;
+    wipeKeyCache();
+    rearmKeys();
+    const fresh = resolveMasterKeyForDispatch();
+    expect(fresh.bytes).not.toBe(oldBytes);
+    const file = path.join(dir, 'refresh.enc');
+    expect(() => encryptToken(sample, oldBytes)).toThrow(/E_KEYS_WIPED/);
+    expect(() => deriveKey(oldBytes)).toThrow(/E_KEYS_WIPED/);
+    expect(() => deriveTenantKey(oldBytes, 't')).toThrow(/E_KEYS_WIPED/);
+    expect(() => refreshMacKey(oldBytes)).toThrow(/E_KEYS_WIPED/);
+    expect(() => new RefreshStore(file, oldBytes)).toThrow(/E_KEYS_WIPED/);
+    expect(existsSync(file)).toBe(false);
+    expect(() => encryptToken(sample, fresh.bytes)).not.toThrow();
+  });
+
+  it('KeyMemo.wipe marks its held values as wiped too', () => {
+    const v = deriveTenantKey(B64_KEY, 'memo-wiped');
+    wipeTenantKeyMemo();
+    clearKeyCacheForTest();
+    expect(() => encryptToken(sample, v)).toThrow(/E_KEYS_WIPED/);
+  });
+});
+
+describe('a wiped cache does not resolve again by itself', () => {
+  it('with the env key scrubbed, a late resolve throws instead of resolving or minting a key', () => {
+    process.env.MASTER_KEY = B64_KEY;
+    setScrubKeyEnv(true);
+    resolveMasterKey();
+    expect(process.env.MASTER_KEY).toBeUndefined();
+    wipeKeyCache();
+    expect(() => resolveMasterKeyForDispatch()).toThrow(/E_KEYS_WIPED/);
+    expect(() => resolveJwtKey()).toThrow(/E_KEYS_WIPED/);
   });
 });

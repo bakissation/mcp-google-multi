@@ -3,14 +3,21 @@ import { randomFillSync, timingSafeEqual } from 'node:crypto';
 /**
  * Key text as the operator provisions it: the base64 of 32 random bytes, or a
  * passphrase. A Buffer holds the UTF-8 bytes of that same text, so a string
- * and a Buffer of equal content always derive the same keys.
+ * and a Buffer of equal content always derive the same keys. A raw Buffer that
+ * is not valid UTF-8 is outside that contract: it has no equal string.
  */
 export type KeyMaterial = string | Buffer;
 
-/** Overwrite with random bytes, not zeros: a use after the wipe then fails
- * closed instead of running on a publicly known all-zero key. */
+// Every Buffer wipeBytes touched, so a wiped key handed back in later (a
+// captured `.bytes`, an old resolveKey closure) is refused by assertKeysLive
+// instead of being used as if it were the key.
+const wiped = new WeakSet<Uint8Array>();
+
+/** Overwrite with random bytes, not zeros: a use after the wipe then cannot
+ * run on a publicly known all-zero key. */
 export function wipeBytes(bytes: Uint8Array): void {
   randomFillSync(bytes);
+  wiped.add(bytes);
 }
 
 export function isEmptyKey(key: KeyMaterial | undefined | null): boolean {
@@ -31,9 +38,10 @@ export function base64KeyBytes(key: KeyMaterial): Buffer | null {
 
 // Set by the wipe functions. Wiped key bytes are random, not absent, so a write
 // that used them would succeed and produce data nothing can decrypt. Once any
-// wipe ran, key derivation and encryption throw until a fresh resolve of the
-// master or JWT key re-arms them. A holder built before a wipe (RefreshStore,
-// the family tagger) also throws for good, through the epoch it captured.
+// wipe ran, key derivation and encryption throw until rearmKeys() (master-key)
+// is called. A holder built before a wipe (RefreshStore, the family tagger)
+// throws for good, through the epoch it captured, and a Buffer that was wiped
+// is refused by identity even after a re-arm.
 let disposed = false;
 let wipeEpoch = 0;
 
@@ -50,10 +58,13 @@ export function keysEpoch(): number {
   return wipeEpoch;
 }
 
-export function assertKeysLive(epoch?: number): void {
-  if (disposed || (epoch !== undefined && epoch !== wipeEpoch)) {
-    throw new Error('E_KEYS_WIPED: the key material was wiped at shutdown; nothing may derive, encrypt or sign with it');
-  }
+export function keysWipedError(): Error {
+  return new Error('E_KEYS_WIPED: the key material was wiped at shutdown; key derivation, encryption and refresh-store writes are refused');
+}
+
+export function assertKeysLive(epoch?: number, key?: KeyMaterial): void {
+  if (disposed || (epoch !== undefined && epoch !== wipeEpoch)) throw keysWipedError();
+  if (key !== undefined && typeof key !== 'string' && wiped.has(key)) throw keysWipedError();
 }
 
 function keyBytes(key: KeyMaterial): Buffer {

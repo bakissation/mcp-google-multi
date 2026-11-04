@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { configDir, failStartup } from './config-file.js';
 import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 import { getTokenDir } from './accounts.js';
-import { markKeysDisposed, markKeysLive, wipeBytes } from './key-material.js';
+import { keysWipedError, markKeysDisposed, markKeysLive, wipeBytes } from './key-material.js';
 
 export type KeyProvenance = 'env' | 'keychain' | 'file' | 'generated';
 
@@ -255,14 +255,26 @@ function resolveKey(
 
 let cachedMaster: ResolvedKey | null = null;
 let cachedJwt: ResolvedKey | null = null;
+// Set by wipeKeyCache. The cached resolvers then refuse to resolve again: with
+// the env key scrubbed they would find nothing and could mint a new master.key
+// beside the operator's. rearmKeys() lifts it for a host that boots again.
+let cacheWiped = false;
+
+/** For a host that boots again in the same process after its shutdown wiped
+ * the keys: lets the cached resolvers resolve afresh and the key functions
+ * derive again. Buffers and holders from before the wipe stay refused. */
+export function rearmKeys(): void {
+  cacheWiped = false;
+  markKeysLive();
+}
 
 /** Single choke point: no other module may read the env vars directly.
  * Boot/CLI form: failures exit with a clean stderr slug ("fatal at startup"). */
 export function resolveMasterKey(deps?: KeyDeps): ResolvedKey {
   if (deps) return resolveKey('MASTER_KEY', 'master.key', true, deps);
+  if (cacheWiped) throw keysWipedError();
   if (!cachedMaster) {
     cachedMaster = resolveKey('MASTER_KEY', 'master.key', true, { scrubEnv: scrubKeyEnvDefault });
-    markKeysLive();
   }
   return cachedMaster;
 }
@@ -270,9 +282,9 @@ export function resolveMasterKey(deps?: KeyDeps): ResolvedKey {
 /** Dispatch form: identical resolution, but failures THROW (caught by the tool
  * handler into an error envelope) — a live server is never process.exit'd. */
 export function resolveMasterKeyForDispatch(): ResolvedKey {
+  if (cacheWiped) throw keysWipedError();
   if (!cachedMaster) {
     cachedMaster = resolveKey('MASTER_KEY', 'master.key', true, { scrubEnv: scrubKeyEnvDefault }, 'throw');
-    markKeysLive();
   }
   return cachedMaster;
 }
@@ -295,9 +307,9 @@ export function peekMasterKeyProvenance(deps?: KeyDeps): KeyProvenance | 'unprov
  * outstanding MCP tokens and clients re-auth silently. */
 export function resolveJwtKey(deps?: KeyDeps): ResolvedKey {
   if (deps) return resolveKey('MCP_JWT_KEY', 'mcp-jwt.key', false, deps);
+  if (cacheWiped) throw keysWipedError();
   if (!cachedJwt) {
     cachedJwt = resolveKey('MCP_JWT_KEY', 'mcp-jwt.key', false, { scrubEnv: scrubKeyEnvDefault });
-    markKeysLive();
   }
   return cachedJwt;
 }
@@ -363,6 +375,7 @@ export function wipeKeyCache(): void {
   for (const k of [cachedMaster, cachedJwt]) if (k) wipeBytes(k.bytes);
   cachedMaster = null;
   cachedJwt = null;
+  cacheWiped = true;
   markKeysDisposed();
 }
 
@@ -373,5 +386,6 @@ export function clearKeyCacheForTest(): void {
   mirrored = false;
   scrubbedEnv.clear();
   scrubKeyEnvDefault = false;
+  cacheWiped = false;
   markKeysLive();
 }

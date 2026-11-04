@@ -342,7 +342,7 @@ export function wipeRefreshKeyMemo(): void {
  * that never touches a RefreshStore (the AS computing a request's
  * clientFingerprint) can key it the same way the store does. */
 export function refreshMacKey(masterKey: KeyMaterial): Buffer {
-  assertKeysLive();
+  assertKeysLive(undefined, masterKey);
   const hit = macKeyMemo.get(masterKey);
   if (hit) return hit;
   if (masterKey.length === 0) deriveKey(masterKey); // throws the missing-key error
@@ -612,6 +612,7 @@ export class RefreshStore {
     this.idleMs = lifetimeMs('idleSec', options.idleSec);
     this.maxFamiliesPerSub = positiveInt('maxFamiliesPerSub', options.maxFamiliesPerSub);
     this.log = options.log ?? (() => undefined);
+    assertKeysLive(undefined, masterKey);
   }
 
   private get timed(): boolean {

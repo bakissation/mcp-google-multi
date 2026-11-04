@@ -30,7 +30,7 @@ interface EncFile {
 // key as the equal string. The returned Buffer is fresh: the caller owns it
 // and may wipe it.
 export function deriveKey(masterKey: KeyMaterial): Buffer {
-  assertKeysLive();
+  assertKeysLive(undefined, masterKey);
   if (isEmptyKey(masterKey)) {
     throw new Error(
       'MASTER_KEY is required to encrypt/decrypt tokens. Generate one with: openssl rand -base64 32',
@@ -48,7 +48,7 @@ export function deriveKey(masterKey: KeyMaterial): Buffer {
 const tenantKeyMemo = new KeyMemo();
 
 export function deriveTenantKey(masterKey: KeyMaterial, tenantId: string): Buffer {
-  assertKeysLive();
+  assertKeysLive(undefined, masterKey);
   const hit = tenantKeyMemo.get(masterKey, tenantId);
   if (hit) return hit;
   const ikm = deriveKey(masterKey);
@@ -70,7 +70,7 @@ export function wipeTenantKeyMemo(): void {
 }
 
 export function encryptToken(data: object, masterKey: KeyMaterial, tenantId?: string): string {
-  assertKeysLive();
+  assertKeysLive(undefined, masterKey);
   // v1 derives a fresh key per call, so it is ours to wipe; a tenant subkey is memoized.
   const key = tenantId === undefined ? deriveKey(masterKey) : deriveTenantKey(masterKey, tenantId);
   const plain = Buffer.from(JSON.stringify(data), 'utf8');
