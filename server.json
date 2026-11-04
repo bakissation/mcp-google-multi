@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.bakissation/mcp-google-multi",
   "title": "Google Workspace (multi-account)",
-  "description": "Multi-account Google Workspace MCP server: 942 tools, 29 services, discover-first, BYO OAuth.",
+  "description": "Multi-account Google Workspace MCP server: 944 tools, 29 services, discover-first, BYO OAuth.",
   "repository": {
     "url": "https://github.com/bakissation/mcp-google-multi.git",
     "source": "github"

@@ -10,9 +10,8 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.acls"],
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.acls","https://www.googleapis.com/auth/calendar.acls.readonly","https://www.googleapis.com/auth/calendar.readonly"],
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.acls","https://www.googleapis.com/auth/calendar.acls.readonly"],
-    ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/calendar.calendarlist"],
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/calendar.calendarlist","https://www.googleapis.com/auth/calendar.calendarlist.readonly","https://www.googleapis.com/auth/calendar.readonly"],
-    ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.calendarlist"],
+    ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/calendar.calendarlist"],
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.calendarlist","https://www.googleapis.com/auth/calendar.calendarlist.readonly","https://www.googleapis.com/auth/calendar.readonly"],
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.calendars"],
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/calendar.calendars"],
@@ -134,57 +133,15 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     },
   }, deps);
   registerGeneratedTool(registry, {
-    name: "calendar_calendar_list_delete",
-    cud: "delete",
-    description: "Removes a calendar from the user's calendar list.",
-    method: { id: "calendar.calendarList.delete", httpMethod: "DELETE", path: "users/me/calendarList/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[3] },
-    params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: false,
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
     name: "calendar_calendar_list_get",
     cud: "read",
     description: "Returns a calendar from the user's calendar list.",
-    method: { id: "calendar.calendarList.get", httpMethod: "GET", path: "users/me/calendarList/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[4] },
+    method: { id: "calendar.calendarList.get", httpMethod: "GET", path: "users/me/calendarList/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[3] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
       account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
-    name: "calendar_calendar_list_insert",
-    cud: "create",
-    description: "Inserts an existing calendar into the user's calendar list.",
-    method: { id: "calendar.calendarList.insert", httpMethod: "POST", path: "users/me/calendarList", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[5] },
-    params: [{"field":"colorRgbFormat","api":"colorRgbFormat","location":"query"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: true,
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      colorRgbFormat: coerceBoolean.describe("Whether to use the foregroundColor and backgroundColor fields to write the calendar colors (RGB). If this feature is used, the index-based colorId field will be set to the best matching option automat").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("CalendarListEntry JSON request body. Top-level fields: accessRole, autoAcceptInvitations, backgroundColor, colorId, conferenceProperties, dataOwner, defaultReminders, deleted, description, etag, foregroundColor, hidden, +9 more."),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
-    name: "calendar_calendar_list_patch",
-    cud: "update",
-    description: "Updates an existing calendar on the user's calendar list. This method supports patch semantics.",
-    method: { id: "calendar.calendarList.patch", httpMethod: "PATCH", path: "users/me/calendarList/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[3] },
-    params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"colorRgbFormat","api":"colorRgbFormat","location":"query"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: true,
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
-      colorRgbFormat: coerceBoolean.describe("Whether to use the foregroundColor and backgroundColor fields to write the calendar colors (RGB). If this feature is used, the index-based colorId field will be set to the best matching option automat").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("CalendarListEntry JSON request body. Top-level fields: accessRole, autoAcceptInvitations, backgroundColor, colorId, conferenceProperties, dataOwner, defaultReminders, deleted, description, etag, foregroundColor, hidden, +9 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -192,7 +149,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_calendar_list_update",
     cud: "update",
     description: "Updates an existing calendar on the user's calendar list.",
-    method: { id: "calendar.calendarList.update", httpMethod: "PUT", path: "users/me/calendarList/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[3] },
+    method: { id: "calendar.calendarList.update", httpMethod: "PUT", path: "users/me/calendarList/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[4] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"colorRgbFormat","api":"colorRgbFormat","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -207,7 +164,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_calendar_list_watch",
     cud: "create",
     description: "Watch for changes to CalendarList resources.",
-    method: { id: "calendar.calendarList.watch", httpMethod: "POST", path: "users/me/calendarList/watch", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[6] },
+    method: { id: "calendar.calendarList.watch", httpMethod: "POST", path: "users/me/calendarList/watch", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[5] },
     params: [{"field":"maxResults","api":"maxResults","location":"query"},{"field":"minAccessRole","api":"minAccessRole","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"showDeleted","api":"showDeleted","location":"query"},{"field":"showHidden","api":"showHidden","location":"query"},{"field":"showOwnOrganizationOnly","api":"showOwnOrganizationOnly","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -227,7 +184,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_calendars_clear",
     cud: "delete",
     description: "Clears a primary calendar. This operation deletes all events associated with the primary calendar of an account.",
-    method: { id: "calendar.calendars.clear", httpMethod: "POST", path: "calendars/{calendarId}/clear", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[7] },
+    method: { id: "calendar.calendars.clear", httpMethod: "POST", path: "calendars/{calendarId}/clear", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[6] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -240,7 +197,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_calendars_delete",
     cud: "delete",
     description: "Deletes a secondary calendar. Use calendars.clear for clearing all events on primary calendars.",
-    method: { id: "calendar.calendars.delete", httpMethod: "DELETE", path: "calendars/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[8] },
+    method: { id: "calendar.calendars.delete", httpMethod: "DELETE", path: "calendars/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[7] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -253,7 +210,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_calendars_get",
     cud: "read",
     description: "Returns metadata for a calendar.",
-    method: { id: "calendar.calendars.get", httpMethod: "GET", path: "calendars/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[9] },
+    method: { id: "calendar.calendars.get", httpMethod: "GET", path: "calendars/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[8] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -266,7 +223,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_calendars_patch",
     cud: "update",
     description: "Updates metadata for a calendar. This method supports patch semantics.",
-    method: { id: "calendar.calendars.patch", httpMethod: "PATCH", path: "calendars/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[8] },
+    method: { id: "calendar.calendars.patch", httpMethod: "PATCH", path: "calendars/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[7] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -280,7 +237,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_calendars_transfer_ownership",
     cud: "create",
     description: "Transfers a secondary calendar between users within a Google Workspace organization. Requires user authentication with Manage Calendars administrator privilege,",
-    method: { id: "calendar.calendars.transferOwnership", httpMethod: "POST", path: "calendars/{calendarId}/transferOwnership", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","newDataOwner","useAdminAccess"], scopes: S_calendar_v3[7] },
+    method: { id: "calendar.calendars.transferOwnership", httpMethod: "POST", path: "calendars/{calendarId}/transferOwnership", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","newDataOwner","useAdminAccess"], scopes: S_calendar_v3[6] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"newDataOwner","api":"newDataOwner","location":"query"},{"field":"useAdminAccess","api":"useAdminAccess","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -295,7 +252,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_calendars_update",
     cud: "update",
     description: "Updates metadata for a calendar.",
-    method: { id: "calendar.calendars.update", httpMethod: "PUT", path: "calendars/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[8] },
+    method: { id: "calendar.calendars.update", httpMethod: "PUT", path: "calendars/{calendarId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[7] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -309,7 +266,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_channels_stop",
     cud: "delete",
     description: "Stop watching resources through this channel",
-    method: { id: "calendar.channels.stop", httpMethod: "POST", path: "channels/stop", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[10] },
+    method: { id: "calendar.channels.stop", httpMethod: "POST", path: "channels/stop", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[9] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -322,7 +279,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_colors_get",
     cud: "read",
     description: "Returns the color definitions for calendars and events.",
-    method: { id: "calendar.colors.get", httpMethod: "GET", path: "colors", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[11] },
+    method: { id: "calendar.colors.get", httpMethod: "GET", path: "colors", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[10] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -334,7 +291,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_events_import",
     cud: "create",
     description: "Imports an event. This operation is used to add a private copy of an existing event to a calendar. Only events with an eventType of default may be imported.",
-    method: { id: "calendar.events.import", httpMethod: "POST", path: "calendars/{calendarId}/events/import", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[12] },
+    method: { id: "calendar.events.import", httpMethod: "POST", path: "calendars/{calendarId}/events/import", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[11] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"conferenceDataVersion","api":"conferenceDataVersion","location":"query"},{"field":"eventLabelVersion","api":"eventLabelVersion","location":"query"},{"field":"supportsAttachments","api":"supportsAttachments","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -351,7 +308,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_events_update",
     cud: "update",
     description: "Updates an event.",
-    method: { id: "calendar.events.update", httpMethod: "PUT", path: "calendars/{calendarId}/events/{eventId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","eventId"], scopes: S_calendar_v3[12] },
+    method: { id: "calendar.events.update", httpMethod: "PUT", path: "calendars/{calendarId}/events/{eventId}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId","eventId"], scopes: S_calendar_v3[11] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"eventId","api":"eventId","location":"path"},{"field":"alwaysIncludeEmail","api":"alwaysIncludeEmail","location":"query"},{"field":"conferenceDataVersion","api":"conferenceDataVersion","location":"query"},{"field":"eventLabelVersion","api":"eventLabelVersion","location":"query"},{"field":"maxAttendees","api":"maxAttendees","location":"query"},{"field":"sendNotifications","api":"sendNotifications","location":"query"},{"field":"sendUpdates","api":"sendUpdates","location":"query"},{"field":"supportsAttachments","api":"supportsAttachments","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -373,7 +330,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_events_watch",
     cud: "create",
     description: "Watch for changes to Events resources.",
-    method: { id: "calendar.events.watch", httpMethod: "POST", path: "calendars/{calendarId}/events/watch", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[13] },
+    method: { id: "calendar.events.watch", httpMethod: "POST", path: "calendars/{calendarId}/events/watch", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["calendarId"], scopes: S_calendar_v3[12] },
     params: [{"field":"calendarId","api":"calendarId","location":"path"},{"field":"alwaysIncludeEmail","api":"alwaysIncludeEmail","location":"query"},{"field":"eventTypes","api":"eventTypes","location":"query"},{"field":"iCalUID","api":"iCalUID","location":"query"},{"field":"maxAttendees","api":"maxAttendees","location":"query"},{"field":"maxResults","api":"maxResults","location":"query"},{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"privateExtendedProperty","api":"privateExtendedProperty","location":"query"},{"field":"q","api":"q","location":"query"},{"field":"sharedExtendedProperty","api":"sharedExtendedProperty","location":"query"},{"field":"showDeleted","api":"showDeleted","location":"query"},{"field":"showHiddenInvitations","api":"showHiddenInvitations","location":"query"},{"field":"singleEvents","api":"singleEvents","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"timeMax","api":"timeMax","location":"query"},{"field":"timeMin","api":"timeMin","location":"query"},{"field":"timeZone","api":"timeZone","location":"query"},{"field":"updatedMin","api":"updatedMin","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -405,7 +362,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_settings_get",
     cud: "read",
     description: "Returns a single user setting.",
-    method: { id: "calendar.settings.get", httpMethod: "GET", path: "users/me/settings/{setting}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["setting"], scopes: S_calendar_v3[14] },
+    method: { id: "calendar.settings.get", httpMethod: "GET", path: "users/me/settings/{setting}", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: ["setting"], scopes: S_calendar_v3[13] },
     params: [{"field":"setting","api":"setting","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -418,7 +375,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_settings_list",
     cud: "read",
     description: "Returns all user settings for the authenticated user.",
-    method: { id: "calendar.settings.list", httpMethod: "GET", path: "users/me/settings", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[14] },
+    method: { id: "calendar.settings.list", httpMethod: "GET", path: "users/me/settings", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[13] },
     params: [{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -433,7 +390,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     name: "calendar_settings_watch",
     cud: "create",
     description: "Watch for changes to Settings resources.",
-    method: { id: "calendar.settings.watch", httpMethod: "POST", path: "users/me/settings/watch", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[14] },
+    method: { id: "calendar.settings.watch", httpMethod: "POST", path: "users/me/settings/watch", baseUrl: "https://www.googleapis.com/calendar/v3/", requiredParams: [], scopes: S_calendar_v3[13] },
     params: [{"field":"maxResults","api":"maxResults","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"syncToken","api":"syncToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

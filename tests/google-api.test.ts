@@ -255,6 +255,27 @@ const SEARCHCONSOLE_FIXTURE = {
   },
 };
 
+const analyticsAdminFixture = (methods: Record<string, { id: string; path: string }>) => ({
+  baseUrl: 'https://analyticsadmin.googleapis.com/',
+  resources: {
+    properties: {
+      methods: Object.fromEntries(
+        Object.entries(methods).map(([name, m]) => [
+          name,
+          { id: m.id, httpMethod: 'GET', path: m.path, description: name, parameters: { name: { location: 'path', required: true, type: 'string' } } },
+        ]),
+      ),
+    },
+  },
+});
+const ANALYTICS_ADMIN_BETA_FIXTURE = analyticsAdminFixture({
+  get: { id: 'analyticsadmin.properties.get', path: 'v1beta/{+name}' },
+});
+const ANALYTICS_ADMIN_ALPHA_FIXTURE = analyticsAdminFixture({
+  get: { id: 'analyticsadmin.properties.get', path: 'v1alpha/{+name}' },
+  getGoogleSignalsSettings: { id: 'analyticsadmin.properties.getGoogleSignalsSettings', path: 'v1alpha/{+name}' },
+});
+
 function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string>; elicit?: ElicitMode } = {}) {
   const registered: { name: string; handler: (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }> }[] = [];
   const elicitInput = vi.fn(async (params: { message: string }) => {
@@ -289,7 +310,9 @@ function setup(policy: Policy, opts: { toolsets?: 'all' | Set<string>; elicit?: 
       ok: true,
       status: 200,
       json: async () =>
-        url.includes('/people/') ? PEOPLE_FIXTURE
+        url.includes('/analyticsadmin/v1alpha') ? ANALYTICS_ADMIN_ALPHA_FIXTURE
+        : url.includes('/analyticsadmin/v1beta') ? ANALYTICS_ADMIN_BETA_FIXTURE
+        : url.includes('/people/') ? PEOPLE_FIXTURE
         : url.includes('/slides/') ? POISONED_FIXTURE
         : url.includes('/searchconsole/') ? SEARCHCONSOLE_FIXTURE
         : url.includes('/drive/') ? DRIVE_FIXTURE
@@ -551,6 +574,31 @@ describe('google_api_call', () => {
     const payload = JSON.parse(res.content[0].text);
     expect(payload.error).toBe('unknown_method');
     expect(payload.hint).toContain('google_api_search');
+  });
+
+  it('says when a method only exists in the other version of the same API', async () => {
+    const { call, dir } = setup(FULL);
+    cleanupDirs.push(dir);
+    const res = await call({ account: 'test', api: 'analyticsadmin', methodId: 'analyticsadmin.properties.getGoogleSignalsSettings', pathParams: { name: 'properties/1/googleSignalsSettings' } });
+    expect(res.isError).toBe(true);
+    const payload = JSON.parse(res.content[0].text);
+    expect(payload.error).toBe('unknown_method');
+    expect(payload.hint).toContain('analyticsadmin_v1alpha');
+  });
+
+  it('serves a v1alpha-only method through the second api id', async () => {
+    const { call, request, dir } = setup(FULL);
+    cleanupDirs.push(dir);
+    const res = await call({ account: 'test', api: 'analyticsadmin_v1alpha', methodId: 'analyticsadmin.properties.getGoogleSignalsSettings', pathParams: { name: 'properties/1/googleSignalsSettings' } });
+    expect(res.isError).toBeUndefined();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not point at another version for a method neither version has', async () => {
+    const { call, dir } = setup(FULL);
+    cleanupDirs.push(dir);
+    const res = await call({ account: 'test', api: 'analyticsadmin', methodId: 'analyticsadmin.properties.nope' });
+    expect(JSON.parse(res.content[0].text).hint).not.toContain('another version');
   });
 
   it('retries an alias-prefixed methodId under the discovery doc prefix (searchconsole -> webmasters)', async () => {

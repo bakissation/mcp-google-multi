@@ -1,13 +1,14 @@
 // Streamable HTTP transport host: node:http server, route table, front guard,
 // and stateless per-request /mcp dispatch. See docs/internals.md.
-import type { McpServer, Transport, AuthInfo } from "@modelcontextprotocol/server";
-import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
+import { createMcpHandler, isLegacyRequest, type McpServer, type Transport, type AuthInfo } from "@modelcontextprotocol/server";
+import { NodeStreamableHTTPServerTransport, toNodeHandler, toWebRequest } from "@modelcontextprotocol/node";
 
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import type { Socket } from 'node:net';
 import type { HttpConfig } from './http-config.js';
 import { withArgNormalization, type ArgShape, type StrictArgOptions, withValidationEnvelope, type ValidationEnvelopeOptions } from './arg-normalize.js';
 import { logSafe } from './trim.js';
+import { withConfirmTokenLift } from './http-confirm.js';
 // A host wrapping the log callbacks it hands core needs this, and trim has no package export.
 export { logSafe } from './trim.js';
 export type AuthOutcome =
@@ -29,6 +30,14 @@ export interface ServerTarget {
   argShapeFor?: (tool: string) => ArgShape | undefined;
   strictArgs?: StrictArgOptions;
   validationEnvelope?: ValidationEnvelopeOptions;
+  /** Builds, on the first modern-era (2026-07-28) request, the second server
+   * that serves that wire era. An McpServer is pinned to one era by its first
+   * request, so a lane serving both eras needs two; this is called at most
+   * once per lane. Absent = the lane serves the 2025 era only, as before. */
+  modern?: () => ServerTarget | Promise<ServerTarget>;
+  /** Accept the two-step confirm token in tools/call arguments for this lane
+   * (see http-confirm.ts). Absent = the host-wide setting. */
+  confirmToken?: boolean;
 }
 
 export interface HttpHostOptions {
@@ -76,6 +85,44 @@ export interface HttpHostOptions {
   maxQueuedPerLane?: number;
   /** Max JSON-RPC messages in one /mcp body (default 16). */
   maxBatchFrames?: number;
+  /** Host-wide default for ServerTarget.confirmToken. */
+  confirmToken?: boolean;
+  /** ServerTarget.modern for the boot server's lane. */
+  modern?: ServerTarget['modern'];
+}
+
+interface ModernLane {
+  handle: ReturnType<typeof toNodeHandler>;
+  close: () => Promise<void>;
+}
+
+// The members a transport wrapper overrides. Everything else, including the
+// prototype the SDK's era binding tests, is served by the real transport.
+const WRAPPED_MEMBERS = new Set(['start', 'send', 'close', 'onmessage', 'onclose', 'onerror', 'sessionId', 'setProtocolVersion', 'setSupportedProtocolVersions']);
+
+/** Present `wrapped` through the real transport's identity. The SDK binds a
+ * server's wire era from the transport it is connected to, and only its own
+ * per-request transport selects the modern era; a plain wrapper object would
+ * silently serve it as the 2025 era. */
+function viaIdentityOf(real: Transport, wrapped: Transport): Transport {
+  const w = wrapped as unknown as Record<string, unknown>;
+  return new Proxy(real, {
+    get: (t, prop) => {
+      if (typeof prop === 'string' && WRAPPED_MEMBERS.has(prop)) {
+        const v = w[prop];
+        return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(wrapped) : v;
+      }
+      const v = Reflect.get(t, prop, t);
+      return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(t) : v;
+    },
+    set: (t, prop, value) => {
+      if (typeof prop === 'string' && WRAPPED_MEMBERS.has(prop)) {
+        w[prop] = value;
+        return true;
+      }
+      return Reflect.set(t, prop, value, t);
+    },
+  });
 }
 
 // A hung handler that keeps the connection open would otherwise hold the global
@@ -84,6 +131,7 @@ const DISPATCH_TIMEOUT_DEFAULT = 120_000;
 // Without a cap, one body multiplies per-call work by however many
 // JSON-RPC frames the SDK's synchronous batch screening finds in it.
 const MAX_BATCH_FRAMES = 16;
+const DEFAULT_MAX_BODY_BYTES = 4_000_000;
 
 // A refusal's body reaches the wire verbatim, so it's validated: no new slug
 // literal enters core, and an overlong message can't leak an operator path/env var.
@@ -168,6 +216,24 @@ function stopReading(socket: Socket): void {
   socket.resume = () => socket;
 }
 
+/** How long a refused oversized request may keep its socket open so the client
+ * can read the refusal before the connection is cut. */
+const REFUSAL_LINGER_MS = 5000;
+
+// Refuses a request whose body is not going to be read. Closing the socket
+// with unread input makes the kernel reset the connection, and on Windows the
+// reset also drops the answer still in flight, so the client sees ECONNRESET
+// instead of the 413. Stop reading (TCP flow control then stops the client),
+// end the socket once the answer is flushed, and cut it after a short grace.
+function lingerAfterRefusal(socket: Socket): void {
+  if (socket.destroyed) return;
+  stopReading(socket);
+  socket.destroySoon = () => endAfterFlush(socket);
+  const timer = setTimeout(() => socket.destroy(), REFUSAL_LINGER_MS);
+  timer.unref();
+  socket.once('close', () => clearTimeout(timer));
+}
+
 // For a log line: the pathname only (a query can carry a code or a state),
 // and never a throw, since the caller is the catch-all.
 function pathOf(req: IncomingMessage): string {
@@ -184,6 +250,8 @@ export class HttpTransportHost {
   private readonly locks = new Map<McpServer, Promise<unknown>>();
   // Requests holding a lane slot, per server; used only with maxQueuedPerLane.
   private readonly depth = new Map<McpServer, number>();
+  // The lazily built modern-era server of each lane, keyed by the lane's primary server.
+  private readonly modernLanes = new Map<McpServer, Promise<ModernLane>>();
   // What a graceful close waits on: open sockets and every handle() not yet
   // settled; see docs/internals.md (Graceful close).
   private readonly sockets = new Set<Socket>();
@@ -306,6 +374,7 @@ export class HttpTransportHost {
         s.closeAllConnections?.();
       });
       this.httpServer = undefined;
+      await this.closeModernLanes();
       return;
     }
     // Starting over would arm a second grace, and a shorter one would cut
@@ -345,7 +414,15 @@ export class HttpTransportHost {
       await closed;
       this.httpServer = undefined;
       this.closing = false;
+      await this.closeModernLanes();
     }
+  }
+
+  /** Releases each 2026-07-28 lane's handler once the listener is gone. */
+  private async closeModernLanes(): Promise<void> {
+    const lanes = [...this.modernLanes.values()];
+    this.modernLanes.clear();
+    await Promise.all(lanes.map((l) => l.then((m) => m.close()).catch(() => undefined)));
   }
 
   /** The bound port (useful when listening on port 0 in tests). */
@@ -426,6 +503,7 @@ export class HttpTransportHost {
       argShapeFor: this.opts.argShapeFor,
       strictArgs: this.opts.strictArgs,
       validationEnvelope: this.opts.validationEnvelope,
+      modern: this.opts.modern,
     };
     if (this.opts.resolveServer) {
       let resolved: ServerTarget | null | { refused: { error: string; message: string } };
@@ -492,6 +570,19 @@ export class HttpTransportHost {
       extra: { sub },
     };
 
+    // A declared length over the cap is refused before a single byte is read;
+    // chunked bodies without a length are still bounded while streaming.
+    const declared = Number(req.headers['content-length']);
+    if (Number.isFinite(declared) && declared > (this.opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES)) {
+      this.log('413 payload_too_large path=/mcp');
+      // Answer first and let the client read it: destroying the socket with
+      // the body unread would reset the client before it can see the 413.
+      lingerAfterRefusal(req.socket);
+      res.setHeader('Connection', 'close');
+      this.fail(res, 413, 'payload_too_large', 'request body too large');
+      return;
+    }
+
     let body: unknown;
     try {
       body = await this.readJson(req);
@@ -503,6 +594,10 @@ export class HttpTransportHost {
       return this.fail(res, 400, 'batch_too_large', `a JSON-RPC batch may hold at most ${maxFrames} messages`);
     }
 
+    if (target.modern && (await this.isModernRequest(req, body))) {
+      return this.admittedModern(req, res, target, body, clientGone);
+    }
+
     // The SDK's own DNS-rebind guard is disabled: Host/Origin are already
     // enforced above, and its stricter exact-Host match would 403 valid Hosts.
     const transport = new NodeStreamableHTTPServerTransport({
@@ -512,56 +607,131 @@ export class HttpTransportHost {
     });
     // connect + dispatch + disconnect run inside the per-server mutex, keyed
     // on the server identity, never the subject; see docs/internals.md.
-    const deadlineMs = this.opts.dispatchTimeoutMs ?? DISPATCH_TIMEOUT_DEFAULT;
-    const { server: mcpServer, argShapeFor, strictArgs, validationEnvelope } = target;
+    const { server: mcpServer } = target;
     await this.serializeFor(mcpServer, async () => {
       if (clientGone()) {
         this.log('499 client_gone path=/mcp');
         return;
       }
-      const disconnected = new Promise<'closed'>((resolve) => res.once('close', () => resolve('closed')));
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const timedOut = new Promise<'timeout'>((resolve) => {
-        timer = setTimeout(() => resolve('timeout'), deadlineMs);
-        timer.unref?.();
-      });
-      // Envelope rewrite innermost, as on stdio; see docs/internals.md (Argument normalization).
-      const enveloped = withValidationEnvelope(transport, validationEnvelope ?? {});
-      const tapped = this.opts.metricsTap ? this.opts.metricsTap(enveloped) : enveloped;
-      await mcpServer.connect(
-        argShapeFor || strictArgs
-          ? withArgNormalization(tapped, argShapeFor ?? (() => undefined), this.opts.log, this.opts.onArgRename, strictArgs)
-          : tapped,
-      );
-      // Non-rejecting arm: an orphaned handler settling after the deadline wins
-      // must not surface as an unhandled rejection; a real error is rethrown below.
-      let dispatchErr: unknown;
-      const dispatchArm = transport
-        .handleRequest(req, res, body)
-        .then(() => 'done' as const, (e) => {
-          dispatchErr = e;
-          return 'error' as const;
-        });
       try {
-        const outcome = await Promise.race([dispatchArm, disconnected, timedOut]);
-        if (outcome === 'error') throw dispatchErr;
-        if (outcome === 'timeout') {
-          this.log('504 dispatch_timeout path=/mcp');
-          if (!res.headersSent) {
-            res.writeHead(504, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'dispatch_timeout', message: 'the handler exceeded the dispatch deadline' }));
-          } else {
-            res.destroy();
-          }
-        } else if (outcome === 'done') {
-          // Success path: close the observability gap (failures already log; a
-          // completed dispatch logged nothing). Method only — no params, no PII.
-          this.log(`200 /mcp method=${jsonRpcMethod(body)}`);
-        }
+        await this.dispatchWithDeadline(res, body, async () => {
+          await mcpServer.connect(this.wrapTransport(transport, target));
+          await transport.handleRequest(req, res, body);
+        });
       } finally {
-        if (timer) clearTimeout(timer);
         await transport.close().catch(() => undefined);
       }
+    });
+  }
+
+  /** The inbound wrapper chain, identical for both wire eras. Envelope rewrite
+   * innermost, as on stdio; see docs/internals.md (Argument normalization). */
+  private wrapTransport(transport: Transport, target: ServerTarget): Transport {
+    const { argShapeFor, strictArgs, validationEnvelope } = target;
+    // The confirm token is lifted out of the arguments before anything else
+    // sees the frame, so unknown-argument screening never meets it.
+    const lifted = (target.confirmToken ?? this.opts.confirmToken) ? withConfirmTokenLift(transport) : transport;
+    const enveloped = withValidationEnvelope(lifted, validationEnvelope ?? {});
+    const tapped = this.opts.metricsTap ? this.opts.metricsTap(enveloped) : enveloped;
+    return argShapeFor || strictArgs
+      ? withArgNormalization(tapped, argShapeFor ?? (() => undefined), this.opts.log, this.opts.onArgRename, strictArgs)
+      : tapped;
+  }
+
+  private async isModernRequest(req: IncomingMessage, body: unknown): Promise<boolean> {
+    try {
+      return !(await isLegacyRequest(await toWebRequest(req, body), body));
+    } catch {
+      // Unclassifiable: the 2025 path answers it exactly as it always has.
+      return false;
+    }
+  }
+
+  /** Shared by both wire eras: the dispatch races the client leaving and the
+   * deadline, so a hung handler releases the lane instead of wedging it. */
+  private async dispatchWithDeadline(res: ServerResponse, body: unknown, dispatch: () => Promise<unknown>): Promise<void> {
+    const deadlineMs = this.opts.dispatchTimeoutMs ?? DISPATCH_TIMEOUT_DEFAULT;
+    const disconnected = new Promise<'closed'>((resolve) => res.once('close', () => resolve('closed')));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), deadlineMs);
+      timer.unref?.();
+    });
+    // Non-rejecting arm: an orphaned handler settling after the deadline wins
+    // must not surface as an unhandled rejection; a real error is rethrown below.
+    let dispatchErr: unknown;
+    const dispatchArm = dispatch().then(() => 'done' as const, (e) => {
+      dispatchErr = e;
+      return 'error' as const;
+    });
+    try {
+      const outcome = await Promise.race([dispatchArm, disconnected, timedOut]);
+      if (outcome === 'error') throw dispatchErr;
+      if (outcome === 'timeout') {
+        this.log('504 dispatch_timeout path=/mcp');
+        if (!res.headersSent) {
+          res.writeHead(504, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'dispatch_timeout', message: 'the handler exceeded the dispatch deadline' }));
+        } else {
+          res.destroy();
+        }
+      } else if (outcome === 'done') {
+        // Success path: close the observability gap (failures already log; a
+        // completed dispatch logged nothing). Method only, no params, no PII.
+        this.log(`200 /mcp method=${jsonRpcMethod(body)}`);
+      }
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  private modernLane(target: ServerTarget): Promise<ModernLane> {
+    const key = target.server;
+    let lane = this.modernLanes.get(key);
+    if (!lane) {
+      lane = Promise.resolve(target.modern!()).then((modern) => {
+        const server = modern.server;
+        const connect = server.connect.bind(server) as (t: Transport) => Promise<void>;
+        // The wrappers apply where the SDK connects its per-request transport.
+        (server as { connect: (t: Transport) => Promise<void> }).connect = (t) => connect(viaIdentityOf(t, this.wrapTransport(t, modern)));
+        const handler = createMcpHandler(() => server, {
+          legacy: 'reject',
+          responseMode: 'json',
+          maxRequestBodySize: this.opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES,
+          onerror: (e: Error) => this.log(`modern_handler_error ${logSafe(e.message, 200)}`),
+        });
+        return { handle: toNodeHandler(handler), close: () => Promise.resolve(handler.close()).then(() => undefined) };
+      });
+      // A failed build must not stay cached: the next request retries it.
+      lane.catch(() => this.modernLanes.delete(key));
+      this.modernLanes.set(key, lane);
+    }
+    return lane;
+  }
+
+  /** A 2026-07-28 request: served by the lane's second server, under the same
+   * per-lane mutex and deadline as the 2025 path. */
+  private async admittedModern(
+    req: IncomingMessage,
+    res: ServerResponse,
+    target: ServerTarget,
+    body: unknown,
+    clientGone: () => boolean,
+  ): Promise<void> {
+    let lane: ModernLane;
+    try {
+      lane = await this.modernLane(target);
+    } catch (e) {
+      this.log(`500 modern_lane_unavailable ${logSafe((e as Error).message, 200)}`);
+      return this.fail(res, 500, 'internal_error', 'the server could not start serving this protocol revision');
+    }
+    // Same mutex key as the 2025 path, so a lane never runs two tool calls at once.
+    await this.serializeFor(target.server, async () => {
+      if (clientGone()) {
+        this.log('499 client_gone path=/mcp');
+        return;
+      }
+      await this.dispatchWithDeadline(res, body, () => lane.handle(req as never, res as never, body));
     });
   }
 
@@ -581,7 +751,7 @@ export class HttpTransportHost {
   }
 
   private readJson(req: IncomingMessage): Promise<unknown> {
-    const max = this.opts.maxBodyBytes ?? 4_000_000;
+    const max = this.opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
     return new Promise((resolve, reject) => {
       // A client that left while the request was authenticated or resolved has
       // already destroyed it, and no 'end' or 'error' would ever follow.

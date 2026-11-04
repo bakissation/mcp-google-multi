@@ -16,6 +16,8 @@ import { safeMessage, stringifyEnvelope } from './tools/_errors.js';
 import { resolveHttpConfig, HttpConfigError, type HttpConfig } from './http-config.js';
 import { parseOwnerEmails } from './http-transport.js';
 import { hints } from './hint-provider.js';
+import { accountScopeSets, formatToolScopeLine, summarizeToolScopes, type ToolScopeSummary } from './scope-observability.js';
+import { resolveScopesForAccount } from './auth.js';
 
 // One engine (runDiagnostics), two skins; `doctor` (CLI glyph) and `diagnose`
 // (agent tool, structured). Read-only: no mutation, only probes.
@@ -63,6 +65,9 @@ export interface DiagnosticsDeps {
   /** Optional live section-7 endpoint probe (PRM/AS-metadata self-fetch);
    * when absent, section 7 stays on its offline config checks. */
   probeHttp?: (cfg: HttpConfig) => Promise<HttpProbeResult>;
+  /** Optional per-account count of registered tools the account cannot call
+   * for lack of a scope; absent = the scopes section stays grant-level only. */
+  toolScopes?: (alias: string) => ToolScopeSummary | null;
 }
 
 /** Live §7 probe outcome. `unreachable` = connection-level failure (server not
@@ -211,6 +216,13 @@ function sectionConfig(deps: DiagnosticsDeps, set: ReturnType<typeof getAccountS
     }
   }
 
+  // Informational only, no verdict change: with several accounts and no
+  // default, a call that omits `account` fails and costs a round trip.
+  if (set.aliases.length > 1 && !set.defaultAccount) {
+    lines.push(`No default account: with ${set.aliases.length} accounts, a call that omits "account" is refused.`);
+    hint = (hint ? `${hint} ` : '') + 'To allow omitting it, set GOOGLE_DEFAULT_ACCOUNT or "defaultAccount" in config.json to one alias.';
+  }
+
   lines.push(usageMetricsStatusLine(deps.env));
 
   return { id: 2, title: 'Config', verdict, lines, ...(hint ? { hint } : {}), ...(slug ? { slug } : {}) };
@@ -250,7 +262,7 @@ function sectionKeys(deps: DiagnosticsDeps, aliases: string[]): DiagnosticSectio
   return { id: 3, title: 'Keys', verdict: 'ok', lines: [line] };
 }
 
-function sectionsTokensAndScopes(deps: DiagnosticsDeps, aliases: string[]): [DiagnosticSection, DiagnosticSection] {
+function sectionsTokensAndScopes(deps: DiagnosticsDeps, aliases: string[], tenantScope = false): [DiagnosticSection, DiagnosticSection] {
   const tokenLines: string[] = [];
   const scopeLines: string[] = [];
   let tokenVerdict: Verdict = 'ok';
@@ -280,6 +292,16 @@ function sectionsTokensAndScopes(deps: DiagnosticsDeps, aliases: string[]): [Dia
       scopeHint = rendered?.hint ?? `Re-auth to grant missing scopes. ${reauthHint(alias)}`;
     } else {
       scopeLines.push(`${alias}: ${r.callable.length} callable, all profile scopes granted`);
+    }
+
+    // Operator output only: tenant reports stay grant-level.
+    const toolSummary = !tenantScope ? deps.toolScopes?.(alias) : null;
+    const toolLine = toolSummary ? formatToolScopeLine(alias, toolSummary) : null;
+    if (toolLine) {
+      scopeLines.push(toolLine);
+      if (toolSummary!.byBundle.length > 0 && !scopeHint) {
+        scopeHint = `Some tools are registered but not callable on ${alias}: add the named bundle to ${alias}'s profile bundles in config.json, then ${reauthHint(alias)}`;
+      }
     }
   }
 
@@ -423,7 +445,7 @@ export async function runDiagnostics(
   if (!tenantScope) sections.push(sectionKeys(deps, aliases));
 
   if (aliases.length > 0) {
-    const [tokens, scopes] = sectionsTokensAndScopes(deps, aliases);
+    const [tokens, scopes] = sectionsTokensAndScopes(deps, aliases, tenantScope);
     sections.push(tokens, scopes);
     sections.push(await sectionApiEnablement(deps, aliases, tenantScope));
   }
@@ -533,6 +555,15 @@ export function registerDiagnoseTool(registry: ToolRegistry, ctx?: DiagnoseConte
   // (or the context-free CLI surface) keeps the full operator report.
   const scope: 'operator' | 'tenant' = ctx && !isOwnerContext(ctx) ? 'tenant' : 'operator';
   const deps = ctx ? diagnosticsDepsFor(ctx) : DEFAULT_DEPS;
+  if (ctx && scope === 'operator') {
+    deps.toolScopes = (alias) => {
+      const sets = accountScopeSets(alias, {
+        readTokenFn: ctx.tokenStore.readToken,
+        profileFn: (a) => resolveScopesForAccount(a, ctx.accounts),
+      });
+      return sets ? summarizeToolScopes(registry.tools, sets.granted, sets.profile) : null;
+    };
+  }
   registry.registerMeta(
     'diagnose',
     {

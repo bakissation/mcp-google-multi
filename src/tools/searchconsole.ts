@@ -6,7 +6,11 @@ import { webmasters as webmastersClient } from '@googleapis/webmasters';
 import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
-import { handleGoogleApiError } from './_errors.js';
+import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
+
+// The URL Inspection API allows 600 queries a minute per site, so a batch stays small and gently parallel.
+const INSPECT_BATCH_MAX = 20;
+const INSPECT_CONCURRENCY = 3;
 
 
 export function registerSearchConsoleTools(server: ToolRegistry, deps: CuratedToolDeps = {}): void {
@@ -274,29 +278,57 @@ export function registerSearchConsoleTools(server: ToolRegistry, deps: CuratedTo
   server.registerTool(
     'searchconsole_url_inspect',
     {
-      description: 'Inspect a URL using the Google Search Console URL Inspection API. Returns indexing status, crawl info, rich results, AMP status, and mobile usability for a specific URL.',
+      description: 'Inspect a URL using the Google Search Console URL Inspection API. Returns indexing status, crawl info, rich results, AMP status, and mobile usability for a specific URL. Pass `inspectionUrls` instead to inspect up to ' + INSPECT_BATCH_MAX + ' URLs of the same property in one call (one result per URL; a failing URL does not stop the others).',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         siteUrl: z.string().min(1).describe('Site URL as registered in Search Console (e.g. "https://example.com/" or "sc-domain:example.com")'),
-        inspectionUrl: z.string().min(1).describe('The fully-qualified URL to inspect (must be under the siteUrl property)'),
+        inspectionUrl: z.string().min(1).optional().describe('The fully-qualified URL to inspect (must be under the siteUrl property). Pass this or inspectionUrls.'),
+        inspectionUrls: coerceArray(z.string().min(1)).optional().describe(`Several fully-qualified URLs to inspect, all under the siteUrl property, up to ${INSPECT_BATCH_MAX}. Pass this or inspectionUrl.`),
         languageCode: z.string().optional().describe('BCP-47 language code for localized results (e.g. "en-US", "fr")'),
       },
     },
-    async ({ account, siteUrl, inspectionUrl, languageCode }) => {
+    async ({ account, siteUrl, inspectionUrl, inspectionUrls, languageCode }) => {
+      const urls = [...new Set([...(inspectionUrl ? [inspectionUrl] : []), ...(inspectionUrls ?? [])])];
+      if (urls.length === 0) {
+        return invalidParams(account as Account, 'Pass inspectionUrl or inspectionUrls.', `Give the URL to inspect, or a list of up to ${INSPECT_BATCH_MAX} URLs under the siteUrl property.`);
+      }
+      if (urls.length > INSPECT_BATCH_MAX) {
+        return invalidParams(
+          account as Account,
+          `${urls.length} URLs given; one call inspects at most ${INSPECT_BATCH_MAX}.`,
+          `Split inspectionUrls into calls of ${INSPECT_BATCH_MAX} or fewer.`,
+        );
+      }
       try {
         const auth = await getClientFn(account as Account);
         const searchconsole = searchconsoleClient({ version: 'v1', auth });
+        const inspectOne = async (url: string) => (await searchconsole.urlInspection.index.inspect({
+          requestBody: { inspectionUrl: url, siteUrl, languageCode: languageCode ?? 'en' },
+        })).data;
 
-        const res = await searchconsole.urlInspection.index.inspect({
-          requestBody: {
-            inspectionUrl,
-            siteUrl,
-            languageCode: languageCode ?? 'en',
-          },
-        });
+        // One URL through the single-URL field keeps the original response shape.
+        if (inspectionUrl && !inspectionUrls) {
+          return { content: [{ type: 'text' as const, text: JSON.stringify(await inspectOne(inspectionUrl), null, 2) }] };
+        }
 
+        const results = new Array<Record<string, unknown>>(urls.length);
+        let next = 0;
+        await Promise.all(Array.from({ length: Math.min(INSPECT_CONCURRENCY, urls.length) }, async () => {
+          while (next < urls.length) {
+            const i = next++;
+            try {
+              results[i] = { inspectionUrl: urls[i], ok: true, ...(await inspectOne(urls[i])) };
+            } catch (e: any) {
+              const env = mapGoogleError(e, account as Account);
+              results[i] = { inspectionUrl: urls[i], ok: false, error: env.error, message: env.message, ...(env.hint ? { hint: env.hint } : {}) };
+            }
+          }
+        }));
+        const inspected = results.filter((r) => r.ok).length;
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify({ inspected, failed: results.length - inspected, results }, null, 2) }],
+          // Only a call that inspected nothing is an error; a partial result is reported as data.
+          ...(inspected === 0 ? { isError: true as const } : {}),
         };
       } catch (error: any) {
         return handleSearchConsoleError(error, account as Account);

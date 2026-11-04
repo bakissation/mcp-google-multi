@@ -93,10 +93,7 @@ export const GENERATED_METHOD_TOOLS: Record<string, string> = {
   "calendar.acl.patch": "calendar_acl_patch",
   "calendar.acl.update": "calendar_acl_update",
   "calendar.acl.watch": "calendar_acl_watch",
-  "calendar.calendarList.delete": "calendar_calendar_list_delete",
   "calendar.calendarList.get": "calendar_calendar_list_get",
-  "calendar.calendarList.insert": "calendar_calendar_list_insert",
-  "calendar.calendarList.patch": "calendar_calendar_list_patch",
   "calendar.calendarList.update": "calendar_calendar_list_update",
   "calendar.calendarList.watch": "calendar_calendar_list_watch",
   "calendar.calendars.clear": "calendar_calendars_clear",
@@ -656,7 +653,6 @@ export const GENERATED_METHOD_TOOLS: Record<string, string> = {
   "people.people.batchUpdateContacts": "contacts_people_batch_update_contacts",
   "people.people.deleteContactPhoto": "contacts_people_delete_contact_photo",
   "people.people.listDirectoryPeople": "contacts_people_list_directory_people",
-  "people.people.searchDirectoryPeople": "contacts_people_search_directory_people",
   "people.people.updateContactPhoto": "contacts_people_update_contact_photo",
   "reports.activities.watch": "admin_activities_watch",
   "reports.customerUsageReports.get": "admin_customer_usage_reports_get",
@@ -760,7 +756,10 @@ export const CURATED_METHOD_IDS: readonly string[] = [
   "analyticsdata.properties.getMetadata",
   "analyticsdata.properties.runRealtimeReport",
   "analyticsdata.properties.runReport",
+  "calendar.calendarList.delete",
+  "calendar.calendarList.insert",
   "calendar.calendarList.list",
+  "calendar.calendarList.patch",
   "calendar.calendars.insert",
   "calendar.events.delete",
   "calendar.events.get",
@@ -855,6 +854,7 @@ export const CURATED_METHOD_IDS: readonly string[] = [
   "people.people.get",
   "people.people.getBatchGet",
   "people.people.searchContacts",
+  "people.people.searchDirectoryPeople",
   "people.people.updateContact",
   "reports.activities.list",
   "searchconsole.urlInspection.index.inspect",
@@ -896,14 +896,15 @@ export const CURATED_METHOD_IDS: readonly string[] = [
   "webmasters.sites.list",
 ];
 
-// Every curated tool name registered on each curated method id (see
-// gen-config.ts: derived from the curated registrations themselves).
 export const CURATED_METHOD_TOOLS: Record<string, string[]> = {
   "analyticsadmin.accountSummaries.list": ["analytics_account_summaries"],
   "analyticsdata.properties.getMetadata": ["analytics_get_metadata"],
   "analyticsdata.properties.runRealtimeReport": ["analytics_run_realtime_report"],
   "analyticsdata.properties.runReport": ["analytics_run_report"],
+  "calendar.calendarList.delete": ["calendar_remove_subscription"],
+  "calendar.calendarList.insert": ["calendar_add_subscription"],
   "calendar.calendarList.list": ["calendar_list_calendars"],
+  "calendar.calendarList.patch": ["calendar_update_subscription"],
   "calendar.calendars.insert": ["calendar_create_calendar"],
   "calendar.events.delete": ["calendar_delete_event"],
   "calendar.events.get": ["calendar_get_event","calendar_respond_event","calendar_update_event"],
@@ -913,11 +914,11 @@ export const CURATED_METHOD_TOOLS: Record<string, string[]> = {
   "calendar.events.move": ["calendar_move_event"],
   "calendar.events.patch": ["calendar_respond_event","calendar_update_event"],
   "calendar.events.quickAdd": ["calendar_quick_add"],
-  "calendar.freebusy.query": ["calendar_get_freebusy"],
+  "calendar.freebusy.query": ["calendar_get_freebusy","calendar_suggest_times"],
   "chat.spaces.get": ["chat_spaces_get"],
-  "chat.spaces.list": ["chat_spaces_list"],
+  "chat.spaces.list": ["chat_messages_search","chat_spaces_list"],
   "chat.spaces.messages.create": ["chat_messages_create"],
-  "chat.spaces.messages.list": ["chat_messages_list"],
+  "chat.spaces.messages.list": ["chat_messages_list","chat_messages_search"],
   "directory.groups.list": ["admin_groups_list"],
   "directory.members.list": ["admin_group_members_list"],
   "directory.users.get": ["admin_users_get"],
@@ -967,7 +968,7 @@ export const CURATED_METHOD_TOOLS: Record<string, string[]> = {
   "gmail.users.drafts.get": ["gmail_get_draft","gmail_send_draft"],
   "gmail.users.drafts.list": ["gmail_list_drafts"],
   "gmail.users.drafts.send": ["gmail_send_draft"],
-  "gmail.users.getProfile": ["gmail_get_profile"],
+  "gmail.users.getProfile": ["contacts_resolve","gmail_get_profile"],
   "gmail.users.history.list": ["gmail_list_history"],
   "gmail.users.labels.create": ["gmail_create_label"],
   "gmail.users.labels.delete": ["gmail_delete_label"],
@@ -976,8 +977,8 @@ export const CURATED_METHOD_TOOLS: Record<string, string[]> = {
   "gmail.users.messages.batchDelete": ["gmail_batch_delete"],
   "gmail.users.messages.batchModify": ["gmail_batch_modify"],
   "gmail.users.messages.delete": ["gmail_delete"],
-  "gmail.users.messages.get": ["gmail_create_draft","gmail_read","gmail_read_batch","gmail_search","gmail_send"],
-  "gmail.users.messages.list": ["gmail_search"],
+  "gmail.users.messages.get": ["contacts_resolve","gmail_create_draft","gmail_download_attachment","gmail_read","gmail_read_batch","gmail_search","gmail_send"],
+  "gmail.users.messages.list": ["contacts_resolve","gmail_search"],
   "gmail.users.messages.modify": ["gmail_modify_labels"],
   "gmail.users.messages.send": ["gmail_send"],
   "gmail.users.messages.trash": ["gmail_trash"],
@@ -998,6 +999,7 @@ export const CURATED_METHOD_TOOLS: Record<string, string[]> = {
   "people.people.get": ["contacts_get","contacts_update"],
   "people.people.getBatchGet": ["contacts_group_members"],
   "people.people.searchContacts": ["contacts_resolve","contacts_search"],
+  "people.people.searchDirectoryPeople": ["contacts_search_directory"],
   "people.people.updateContact": ["contacts_update"],
   "reports.activities.list": ["reports_activities_list"],
   "searchconsole.urlInspection.index.inspect": ["searchconsole_url_inspect"],
@@ -1039,12 +1041,6 @@ export const CURATED_METHOD_TOOLS: Record<string, string[]> = {
   "webmasters.sites.list": ["searchconsole_sites_list"],
 };
 
-// A runtime copy of scripts/gen-config.ts's own CUD_OVERRIDES (scripts/ and
-// src/ are separate compilation roots, so src/ code cannot import the build
-// script directly). google-api.ts applies this the same way gen-tools.ts
-// does when generating a method's twin (CUD_OVERRIDES[id] ?? cudFromMethod),
-// so the escape hatch and a method's generated twin always agree on its
-// write class, including for the methods HTTP-verb inference misreads.
 export const CUD_OVERRIDES: Record<string, Cud> = {
   "admin.customer.devices.chromeos.batchChangeStatus": "delete",
   "admin.customer.devices.chromeos.issueCommand": "delete",

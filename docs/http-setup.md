@@ -100,6 +100,8 @@ MCP_OWNER_EMAILS=<owner@example.com> \
 
 HTTP transport needs 6.0.0 or later, which npm `latest` serves (5.x is stdio-only).
 
+Over HTTP the server cannot ask a question mid-call, so an escape-hatch write that needs a person is confirmed in a second round trip instead; see [Confirming writes over HTTP](./configuration.md#confirming-writes-over-http) before you rely on `safe-writes` through a remote client.
+
 Confirm it's alive: `curl https://mcp.example.com/health` returns `{"status":"ok","transport":"http",…}` (no secrets).
 
 ### Load-bearing wiring

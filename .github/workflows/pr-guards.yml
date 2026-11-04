@@ -1,0 +1,103 @@
+name: pr-guards
+
+# Release-train guards. Read-only checks plus one sticky comment on promotion
+# PRs. Logic lives in scripts/ci-guards.ts (unit-tested).
+
+on:
+  pull_request:
+    branches: [main, staging, dev, feat/6.2]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  breaking-commits:
+    # A breaking commit on a 6.x line makes semantic-release compute the next
+    # major (a 6.1.0-alpha.N line would jump to 7.0.0). Intentional majors
+    # carry the "breaking-ok" label.
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'breaking-ok') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Reject breaking commits
+        env:
+          BASE: origin/${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npx tsx scripts/ci-guards.ts breaking "$BASE" "$HEAD_SHA"
+
+  lockfile-libc:
+    # npm 10.9.3 drops the "libc" fields of native optional dependencies when
+    # it regenerates package-lock.json, which breaks installs on musl/glibc.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Compare libc fields with the base branch
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          git show "$BASE:package-lock.json" > "$RUNNER_TEMP/base-lock.json"
+          npx tsx scripts/ci-guards.ts libc "$RUNNER_TEMP/base-lock.json" package-lock.json
+
+  promotion:
+    # dev -> staging and staging -> main only. The base must already be
+    # contained in the head: a hotfix or release commit that was not
+    # back-merged makes the promotion PR conflict (PR #233 -> #307 on 6.0.0).
+    if: >-
+      (github.base_ref == 'staging' && github.head_ref == 'dev') ||
+      (github.base_ref == 'main' && github.head_ref == 'staging')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Base is contained in head
+        env:
+          BASE: origin/${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: npx tsx scripts/ci-guards.ts ancestor "$BASE" "$HEAD_SHA"
+      - name: Comment the bump this promotion will produce
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: origin/${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          {
+            echo '<!-- release-bump-preview -->'
+            echo '### Release bump preview'
+            echo
+            npx tsx scripts/ci-guards.ts bump "$BASE" "$HEAD_SHA"
+          } > "$RUNNER_TEMP/preview.md"
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- release-bump-preview -->")) | .id' | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$RUNNER_TEMP/preview.md" > /dev/null
+          else
+            gh pr comment "$PR" --repo "$REPO" --body-file "$RUNNER_TEMP/preview.md"
+          fi

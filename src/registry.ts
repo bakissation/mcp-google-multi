@@ -1,4 +1,4 @@
-import type { ListToolsResult, McpServer } from "@modelcontextprotocol/server";
+import type { ListToolsResult, McpServer, ServerContext } from "@modelcontextprotocol/server";
 import { z } from 'zod';
 import { type Policy, isAllowed, writeDisabledResult, IRREVERSIBLE_TOOLS } from './write-control.js';
 import { getAccountSet, isLiveAccountField, refreshAccountSetIfStale, type AccountSet } from './accounts.js';
@@ -10,6 +10,7 @@ import type { Metrics } from './usage-metrics.js';
 import { MAX_SUGGESTED_KEYS, suggestKeys } from './arg-strict.js';
 import { classifyScope } from './scope-observability.js';
 import { hints } from './hint-provider.js';
+import { HttpConfirm } from './http-confirm.js';
 
 /** Nothing granted, no profile: asks the BUNDLE CATALOG whether a scope is
  * reachable at all, independently of any account. */
@@ -205,7 +206,12 @@ export class ToolRegistry {
   readonly tools: ToolEntry[] = [];
   readonly policy: Policy;
   readonly registerTool: McpServer['registerTool'];
+  /** How a write is confirmed over HTTP (modern input_required, optional
+   * two-step token). A host embedding this registry may replace it per
+   * identity; unused on stdio. */
+  httpConfirm: HttpConfirm = new HttpConfirm();
   private readonly revealed = new Set<string>();
+  private hiddenServices = new Set<string>();
   private readonly jsonSchemaCache = new Map<string, unknown>();
   private readonly argShapeCache = new Map<string, ArgShape>();
   // Memoized isUngrantable verdict: depends on the frozen bundle catalog only.
@@ -397,8 +403,17 @@ export class ToolRegistry {
    */
   async elicitConfirmation(
     message: string,
-  ): Promise<{ action: 'accept' | 'decline' | 'cancel' } | { action: 'unsupported'; reason: string; cause: 'http_transport' | 'no_capability' | 'error' }> {
+    http?: { ctx: ServerContext | undefined; call: unknown; account: string },
+  ): Promise<
+    | { action: 'accept' | 'decline' | 'cancel' }
+    | { action: 'respond'; result: unknown }
+    | { action: 'unsupported'; reason: string; cause: 'http_transport' | 'no_capability' | 'error' }
+  > {
     if (this.policy.transport === 'http') {
+      if (http) {
+        const outcome = await this.httpConfirm.confirm(http.ctx, message, http.call, http.account);
+        if (outcome.action !== 'unavailable') return outcome;
+      }
       return {
         action: 'unsupported',
         reason: 'elicitation is not available over this server\'s HTTP transport',
@@ -555,6 +570,15 @@ export class ToolRegistry {
     return { curated: [...new Set(curated)], generated: [...new Set(generated)] };
   }
 
+  /** Keep these services out of tools/list whatever the discovery mode or a
+   * later reveal says. Hidden, not unregistered: the tools stay callable by
+   * name and {service}_discover still lists them. Meta tools are never hidden.
+   * For a host that serves one registry per identity and knows which services
+   * that identity can reach; replaces any earlier set. */
+  hideServices(services: Iterable<string>): void {
+    this.hiddenServices = new Set(services);
+  }
+
   reveal(service: string): boolean {
     if (this.revealed.has(service)) return false;
     this.revealed.add(service);
@@ -614,6 +638,7 @@ export class ToolRegistry {
     // Hidden, not unregistered: calling an ungrantable tool by name still
     // produces the real scope error, and {service}_discover still lists it, marked.
     if (!tool.meta && this.isUngrantable(tool)) return false;
+    if (!tool.meta && this.hiddenServices.has(tool.service)) return false;
     return (
       tool.meta ||
       mode === 'eager' ||

@@ -124,6 +124,18 @@ async function main() {
     const { getAccountSet } = await import('./accounts.js');
     const set = getAccountSet();
     console.log(`Default account: ${set.defaultAccount ? `${set.defaultAccount} (${set.defaultAccountSource})` : '(none — "account" is required per call)'}`);
+    {
+      const { accountScopeSets, formatToolScopeLine, summarizeToolScopes } = await import('./scope-observability.js');
+      const { resolveScopesForAccount } = await import('./auth.js');
+      for (const alias of set.aliases) {
+        const sets = accountScopeSets(alias, {
+          readTokenFn: ctx.tokenStore.readToken,
+          profileFn: (a) => resolveScopesForAccount(a, ctx.accounts),
+        });
+        const line = sets ? formatToolScopeLine(alias, summarizeToolScopes(registry.tools, sets.granted, sets.profile)) : null;
+        if (line) console.log(`Tool scopes: ${line}`);
+      }
+    }
     const { peekMasterKeyProvenance } = await import('./master-key.js');
     const prov = peekMasterKeyProvenance();
     console.log(`MASTER_KEY: ${prov === 'unprovisioned' ? 'unprovisioned (will be generated on first use)' : prov}`);
@@ -318,11 +330,22 @@ async function main() {
     // binding a loopback listener.
     setWizardHttpConsent({ mintConsentUrl: (alias) => authServer.reauthLink(alias) });
 
+    // A second server (and registry) for 2026-07-28 clients, built on the first such request.
+    let modernRegistry: ReturnType<typeof buildRegistry> | undefined;
+    const modern = () => {
+      const server = createMcpServer(pkg.version);
+      modernRegistry = buildRegistry(server, httpCtx, 'curated', httpMetrics);
+      modernRegistry.installListHandler();
+      registerSetupPrompt(server);
+      return { server, ...requestHooksFor(modernRegistry, httpCtx, httpMetrics) };
+    };
     let httpTap: ((t: Transport) => Transport) | undefined;
     if (httpMetrics) {
       const { tapUsageMetrics } = await import('./metrics-tap.js');
-      httpTap = (t) => tapUsageMetrics(t, httpMetrics, (n) => registry.hasTool(n));
+      // A lane serving both wire eras has two registries, so a tool is known to either.
+      httpTap = (t) => tapUsageMetrics(t, httpMetrics, (n) => registry.hasTool(n) || (modernRegistry?.hasTool(n) ?? false));
     }
+    const { confirmTokenEnabled } = await import('./http-confirm.js');
     const host = new HttpTransportHost({
       server: httpServer,
       config: httpCfg,
@@ -332,6 +355,8 @@ async function main() {
       routes: authServer.routes,
       log: (l) => process.stderr.write(`[http] ${l}\n`),
       ...requestHooksFor(registry, httpCtx, httpMetrics),
+      modern,
+      confirmToken: confirmTokenEnabled(),
       metricsTap: httpTap,
       onArgRename: httpMetrics ? (tool: string, n: number) => httpMetrics.recordArgFix(tool, n) : undefined,
     });

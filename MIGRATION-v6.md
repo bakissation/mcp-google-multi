@@ -334,7 +334,7 @@ declared explicitly (`mcp-google-multi/identity`, `/compose`, `/registry`,
 `/client`, `/config-file`, `/fs-atomic`, `/master-key`, `/mcp-token`,
 `/boot-gates`, `/tenant-purge`, `/doctor`, `/write-control`,
 `/scope-catalog`, `/auth`, `/usage-metrics`, `/metrics-tap`,
-`/hint-provider`). Any OTHER deep import into `dist/` (previously
+`/hint-provider`, `/http-confirm`, `/scope-observability`). Any OTHER deep import into `dist/` (previously
 unrestricted, e.g. `mcp-google-multi/dist/trim.js`) now fails with
 `ERR_PACKAGE_PATH_NOT_EXPORTED`. The CLI (`npx mcp-google-multi ...`) and the
 MCP server entry are unaffected. If you relied on an undeclared deep import,
@@ -350,6 +350,15 @@ set, unioned with `KNOWN_ERROR_SLUGS` for that instance, each entry matching
 also keeps `mid` off the next event: an escape-hatch method resolved during
 one `google_api_call` no longer attaches to whichever `google_api_call`
 records next, which on a shared instance could belong to a different caller.
+
+`/http-confirm` and `/scope-observability` are new declared entries for a host
+that builds its own servers. `/http-confirm` exports `HttpConfirm` (assign one
+to a registry's `httpConfirm` to turn the two-step confirm token on or off for
+that identity) together with `ConfirmTokens`, `confirmTokenEnabled` and the
+`confirmToken` argument and `_meta` key names. `/scope-observability` exports
+`accountScopeSets` (granted and profile scope sets for one account, with
+`ScopeSetDeps` to read them from a custom token store), `summarizeToolScopes`,
+`classifyMethodScopes` and the other scope classification helpers.
 
 `/hint-provider` is a new declared entry: a host serving more than one
 identity over one process (a single owner never needs this) can install one

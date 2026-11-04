@@ -91,8 +91,11 @@ function opOf(tool: ToolRef): string {
   return tool.name.includes('_') ? tool.name.slice(tool.name.indexOf('_') + 1) : tool.name;
 }
 
+// `tool:<name>` is the exact tool name. A tool named after its own class
+// (drive_update) has the same service:cud and service:op candidate, so no
+// service-prefixed pattern can single it out; no service is called "tool".
 function candidates(tool: ToolRef): string[] {
-  return [`${tool.service}:${tool.cud}`, `${tool.service}:${opOf(tool)}`];
+  return [`${tool.service}:${tool.cud}`, `${tool.service}:${opOf(tool)}`, `tool:${tool.name}`];
 }
 
 function firstMatch(tool: ToolRef, globs: string[]): string | undefined {
@@ -232,14 +235,15 @@ export function denyReason(tool: ToolRef, policy: Policy): DenyReason | undefine
 
 const CUD_CLASSES: readonly string[] = ['read', 'create', 'update', 'delete'];
 
-// The allow-list vocabulary is service:cud or service:op, never the tool
-// name, so suggesting the name would hand back a pattern that never matches.
+// The allow-list vocabulary is service:cud, service:op, or tool:<name>. The
+// bare tool name never matches, so it must carry the tool: prefix.
 function allowSuggestion(tool: ToolRef): string {
   const op = opOf(tool);
   const pattern = `${tool.service}:${op}`;
-  // An op spelled like a cud class (drive_update) is also that class's pattern.
+  // An op spelled like a cud class (drive_update) is also that class's
+  // pattern, so only the tool: form allows just this one.
   if (CUD_CLASSES.includes(op)) {
-    return `allow it with GOOGLE_WRITE_ALLOW="${pattern}", which also allows every other ${op}-class ${tool.service} tool`;
+    return `allow just this one with GOOGLE_WRITE_ALLOW="tool:${tool.name}", or every ${op}-class ${tool.service} tool with GOOGLE_WRITE_ALLOW="${pattern}"`;
   }
   return `allow just this one with GOOGLE_WRITE_ALLOW="${pattern}"`;
 }

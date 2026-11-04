@@ -40,7 +40,7 @@ function statusOf(error: any): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** gaxios 7 is fetch-based, so response.headers is a Headers instance with no
+/** gaxios 7 and 8 are fetch-based, so response.headers is a Headers instance with no
  * index signature; the plain-object form still appears in tests and in mocks. */
 function headerOf(error: any, name: string): string | undefined {
   const h = error?.response?.headers;
@@ -429,7 +429,8 @@ export function mapGoogleError(
         hint:
           rendered?.hint ??
           ('The path must exist on the machine running this server and be accessible to it. ' +
-            'When the server runs remotely (HTTP transport), paths on your own machine are not visible to it.'),
+            'When the server runs remotely (HTTP transport), or in a different container than the caller, paths on your own machine are not visible to it. ' +
+            'A relative path resolves inside GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); an absolute path must already be inside it.'),
         retriable: false,
         account,
       };

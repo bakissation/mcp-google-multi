@@ -53,6 +53,7 @@ Each account can point at a named **scope profile** so consent is exactly what t
 | `slides` | low | Create and edit Slides presentations |
 | `keep` | low | Read and edit Keep notes (not for a personal account) |
 | `driveactivity` | low | Read the Drive activity feed |
+| `directory` | low | Search the Workspace domain directory with `contacts_search_directory` (Workspace accounts only) |
 | `postmaster` | low | Read Postmaster Tools deliverability data |
 | `analytics` | low | Read Google Analytics (GA4): reports, realtime, account/property config |
 | `analytics_write` | medium | Edit GA4 configuration: properties, streams, key events, custom definitions (includes read) |
@@ -82,11 +83,11 @@ Google refuses the `keep` and `cloudidentity` scopes on a personal account's con
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ✓ | OAuth **Desktop** client from Google Cloud — see [Google Cloud setup](./google-cloud-setup.md) |
 | `GOOGLE_ACCOUNTS` | — | `alias:email,…` — e.g. `work:you@co.com,personal:you@gmail.com`. When set and non-empty it replaces the `config.json` registry; one of the two must define at least one account |
 | `GOOGLE_DEFAULT_ACCOUNT` | | Alias used when a tool call omits `account` (or set `"defaultAccount"` in config.json; env wins; note: while `GOOGLE_ACCOUNTS` is set, the whole registry — including the default — comes from env, so the config field is inert). Unset = `account` stays required per call (`E_NO_DEFAULT_ACCOUNT` hint on omission). An alias that is not configured fails startup with `E_DEFAULT_ACCOUNT_UNKNOWN`. Explicit aliases, `*` and CSV are never affected |
-| `GOOGLE_DISCOVERY` | | Tool-surface visibility: `lazy` (default — meta-tools only until `{service}_discover`), `curated` (all 191 curated tools advertised eagerly), `eager` (everything). An invalid value warns and falls back to `lazy`; over HTTP the mode is always `curated`. At runtime an agent can `discover_all` / `discover_reset` to expand/collapse a lazy surface without config changes |
+| `GOOGLE_DISCOVERY` | | Tool-surface visibility: `lazy` (default — meta-tools only until `{service}_discover`), `curated` (all 197 curated tools advertised eagerly), `eager` (everything). An invalid value warns and falls back to `lazy`; over HTTP the mode is always `curated`. At runtime an agent can `discover_all` / `discover_reset` to expand/collapse a lazy surface without config changes |
 | `MASTER_KEY` | | encrypts the token store. Optional: resolved as env > OS keychain > `master.key` (0600, in the config dir) > generated on first use. Keep it in env for deployments that may downgrade or move hosts. Never regenerated while encrypted tokens exist (`E_MASTER_KEY_MISSING_TOKENS_EXIST`) |
 | `GOOGLE_PROFILE` | — | write policy: `read-only` (default) · `safe-writes` · `full-writes`; an invalid value warns and falls back to `read-only` |
 | `GOOGLE_READ_ONLY` | — | `true` (or `1`/`yes`) = hard kill-switch for all writes |
-| `GOOGLE_WRITE_ALLOW` / `GOOGLE_WRITE_DENY` | — | glob overrides, e.g. `calendar:*`, `*:delete*` (deny wins) |
+| `GOOGLE_WRITE_ALLOW` / `GOOGLE_WRITE_DENY` | — | glob overrides, e.g. `calendar:*`, `*:delete*`, `tool:drive_update` (deny wins) |
 | `GOOGLE_OPTIONAL_SCOPES` | — | legacy: CSV of scope bundles applied to every account (warns `E_LEGACY_GLOBAL_SCOPES`; prefer [scope profiles](#scope-profiles-per-account-consent)) — see [bundles](#optional-scope-bundles) |
 | `GOOGLE_ADMIN_ACCOUNTS` | — | aliases granted Workspace-admin scopes (the account's own super-admin OAuth); when set, overrides per-account `admin` flags |
 | `GOOGLE_TOOLSETS` | — | `all` (default) or a CSV filter of service names; unknown names warn and are ignored — see [services](#services) |
@@ -121,6 +122,9 @@ By default the server speaks **stdio** (`MCP_TRANSPORT=stdio`), the zero-network
 | `MCP_CIMD_ALLOWED_ISSUERS` | `claude.ai` | CSV host allowlist for OAuth client-metadata documents. Other clients that pick CIMD are refused with `invalid_client` until their host is listed, e.g. `claude.ai,chatgpt.com` for Codex or ChatGPT |
 | `MCP_ACCESS_TTL` | `600` | MCP access-token lifetime (seconds) |
 | `MCP_JWT_KEY` | auto | signing key for the server's own MCP tokens; resolved like `MASTER_KEY` (env > OS keychain > `mcp-jwt.key` file > generated). Regenerating it only signs clients out |
+| `MCP_HTTP_CONFIRM_TOKEN` | off | `on\|1\|true` lets a client on the 2025 protocol revision confirm an escape-hatch write with a single-use token. See [Confirming writes over HTTP](#confirming-writes-over-http) before enabling |
+| `MCP_CONFIRM_TTL_SECONDS` | `300` | how long a confirmation token or a pending confirmation stays valid (capped at 900) |
+| `MCP_CONFIRM_KEY` | random per process | at least 32 bytes of secret that signs confirmation tokens; pin it so tokens verify on every replica behind a load balancer |
 
 Over HTTP the server is its own **OAuth 2.1 authorization server**: Claude Code and the claude.ai connector authenticate with zero custom UI. A client that connects to `${MCP_PUBLIC_URL}/mcp` is sent through Google login; only an email in `MCP_OWNER_EMAILS` is admitted (the owner gate), and the server then mints its own audience-bound token for the client — your Google tokens are never handed to the client, and the client's token is never sent to Google. Behind a Cloudflare named tunnel, keep the bind on loopback and set `MCP_PUBLIC_URL` to the public HTTPS host; add `${MCP_PUBLIC_URL}/callback` as an authorized redirect URI in your Google Cloud console. Register the URL with a local client via `mcp-google-multi write-client-config --url ${MCP_PUBLIC_URL}/mcp`. Full remote-HTTP walkthrough — named tunnel, Docker, and one-click Render/Railway deploys — is in [docs/http-setup.md](./http-setup.md).
 
@@ -151,7 +155,7 @@ Reads are never gated. **Every create/update/delete is off until you opt in** �
 | `safe-writes` | create + update on your own data, plus moving items to or from Trash; curated tools hard-refuse permanent deletes and privileged writes, the escape hatch asks for them instead (below) |
 | `full-writes` | everything |
 
-`GOOGLE_READ_ONLY=true` overrides all; an invalid `GOOGLE_PROFILE` falls back to `read-only`. For fine control over **curated tools**: `GOOGLE_WRITE_ALLOW="calendar:*, sheets:update*"` and `GOOGLE_WRITE_DENY="*:delete*"` (deny wins). Each tool matches as `service:cud` and as `service:op` (its name minus the service prefix), so a tool named after its own class shares that class's pattern: `drive:update` matches `drive_update` and every other update-class Drive tool (`drive_move`, `drive_permission_update`, …), including a bare `service:cud` allow (`gmail:create` opens every create-class Gmail tool, a push-channel registration such as `gmail_users_watch` included; name the tool, e.g. `gmail:users_watch`, to grant just that one).
+`GOOGLE_READ_ONLY=true` overrides all; an invalid `GOOGLE_PROFILE` falls back to `read-only`. For fine control over **curated tools**: `GOOGLE_WRITE_ALLOW="calendar:*, sheets:update*"` and `GOOGLE_WRITE_DENY="*:delete*"` (deny wins). Each tool matches as `service:cud` and as `service:op` (its name minus the service prefix), so a tool named after its own class shares that class's pattern: `drive:update` matches `drive_update` and every other update-class Drive tool (`drive_move`, `drive_permission_update`, …), including a bare `service:cud` allow (`gmail:create` opens every create-class Gmail tool, a push-channel registration such as `gmail_users_watch` included; name the tool, e.g. `gmail:users_watch`, to grant just that one). `tool:<name>` matches the exact tool name (and takes globs, `tool:gmail_*`), so it is the one pattern that singles out a tool named after its own class: `GOOGLE_WRITE_DENY="tool:drive_update"` blocks `drive_update` and leaves `drive_move` and `drive_permission_update` alone, and the refusal hint suggests it for such tools. On the escape hatch it matches the same names listed below, so `tool:drive_files_update` targets that one raw method.
 
 `GOOGLE_WRITE_DENY` (never `GOOGLE_WRITE_ALLOW`, see [Escape hatch](#escape-hatch-writes-ask-for-confirmation)) also reaches `google_api_call` and every generated per-method tool: a deny on a curated tool's name also blocks the raw Discovery method underneath it, resolved under the real tool's name when one exists, the full method-path name (`drive_permissions_create`, `gmail_users_settings_filters_create`), and the legacy last-dot-segment name, so a resource-scoped method can never hide behind a generic `drive_create`/`gmail_create` that a resource-scoped deny pattern cannot match. Denying any one of those names denies the call. A curated tool's own deny reaches every raw Discovery method it calls internally, not just its own primary one: `drive_transfer`'s download+upload fallback also calls `files.create`/`files.copy`/`files.update` and `permissions.create`/`permissions.delete` (see `CURATED_METHOD_TOOLS`), so `GOOGLE_WRITE_DENY="drive:transfer"` also blocks `google_api_call` on those raw methods, not only on `drive_transfer` itself.
 
@@ -187,7 +191,16 @@ The prompt shows the account alias, the method id, the HTTP verb, the path param
 
 This replaces the escape hatch's own pre-6.0.2 content inspection (the raw outbound-allowlist rules for `chat.spaces.setup`, Drive access proposals and revisions, guardian invitations, `recoveryEmail`, `updateVacation`, `permissions.update`, and the generic `emailAddress`/`email` key walk): a human looking at the real body decides instead, so none of that reasoning exists on this path any more. Curated tools are unaffected either way: they keep their own profile/allow/deny gate and their own outbound checks (`drive_share`, `drive_permission_update`, `drive_access_proposal_resolve`, `gmail_send`/`create_draft`/`send_draft`, calendar attendees, `gmail_set_vacation`, `drive_revision_update`) exactly as described above.
 
-**HTTP (EE) transport note.** Elicitation is a server-initiated request that needs the connected client to send a reply while the original tool call is still pending; this server's HTTP transport dispatches every `/mcp` request statelessly, through a fresh, disposable transport per call (`enableJsonResponse: true`, no session id; see `docs/internals.md`), which cannot deliver that mid-call request at all. Rather than let a declared-capable client hang until elicitInput's own request timeout before failing closed anyway, escape-hatch writes over HTTP skip the attempt entirely and refuse immediately with `elicitation_unsupported`, whatever the client declared: run `GOOGLE_PROFILE=full-writes` (with `GOOGLE_OUTBOUND_ALLOWLIST` unset) to allow them outright over HTTP, or use a curated tool instead. stdio keeps one live connection for the whole call and is unaffected; it still attempts a real elicitation there.
+### Confirming writes over HTTP
+
+Every `/mcp` request over HTTP is dispatched statelessly, through a fresh transport with no session id, so the server cannot hold a call open and ask the client mid-call. By default an escape-hatch write over HTTP that needs confirmation is therefore refused at once with `elicitation_unsupported`, whatever the client declared. Run `GOOGLE_PROFILE=full-writes` (with `GOOGLE_OUTBOUND_ALLOWLIST` unset) to allow such writes outright, or use a curated tool. stdio keeps one live connection for the whole call and is unaffected. Two ways to ask over HTTP without holding a connection:
+
+- **Clients on the 2026-07-28 protocol revision** get an `input_required` result that carries the confirmation prompt. The client shows it, then repeats the same call with the answer attached, and the write runs only if the answer is an accept for that exact call. A decline or cancel is `write_declined`. Nothing needs enabling, and a client that cannot show the prompt gets `elicitation_unsupported` as before. Whether a given client renders the prompt is the client's behavior; check yours before relying on it.
+- **Clients on the 2025 revision**, with `MCP_HTTP_CONFIRM_TOKEN=on`: the first call is refused with `confirmation_required`, a plain-language `summary` of the call, and a single-use `confirmToken`. The model is told to show the summary to the user and, only if they agree, repeat the identical call with `confirmToken` added. The token is signed, bound to the signed-in caller and to the exact call (account, method and arguments), expires after `MCP_CONFIRM_TTL_SECONDS`, and works once; a changed argument, a reused token or an expired one is `confirmation_invalid` and nothing is sent. The token travels outside the tool's declared arguments, so it adds nothing to any tool schema.
+
+The token is not human consent. It proves the call was shown to the model and then repeated unchanged; a model that was misled can repeat a call without ever asking the user. Enable it only where that is acceptable, for example when your client already asks you to approve each tool call, and prefer `full-writes` or the 2026-07-28 prompt when you need a person in the loop. Replay protection is per process: behind several replicas, pin the same `MCP_CONFIRM_KEY` on all of them so a token verifies anywhere, and know that a token can then be used once on each replica.
+
+`account_add` over HTTP with no arguments cannot open its form either; it returns `elicitation_unsupported` with a hint to call it again with `alias` and `email` (and optionally `bundles`, `allBundles`, `admin`).
 
 ## Services
 
@@ -201,7 +214,7 @@ Optional services register when their bundle is enabled (below): `slides`, `form
 
 Add bundle names to an account's [scope profile](#scope-profiles-per-account-consent) (or, legacy, to `GOOGLE_OPTIONAL_SCOPES` as CSV for every account), then re-run `auth --account <alias>` so the new scopes are granted:
 
-`slides`, `forms`, `chat`, `analytics`, `analytics_write`, `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket`.
+`slides`, `forms`, `chat`, `analytics`, `analytics_write`, `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket`, `directory`.
 
 Two bundles extend the always-on `gmail` service instead of enabling a new one — Gmail settings **writes** only accept the dedicated settings scopes (reads already work with the base scope):
 
@@ -209,6 +222,8 @@ Two bundles extend the always-on `gmail` service instead of enabling a new one �
 |---|---|---|
 | `gmail_settings` | `gmail.settings.basic` | writing filters, vacation responder, IMAP/POP, language |
 | `gmail_settings_sharing` | `gmail.settings.sharing` | send-as, delegates, auto-forwarding — kept separate because it can redirect or delegate your mail |
+
+The `directory` bundle likewise extends the always-on `contacts` service: it grants `directory.readonly`, which `contacts_search_directory` needs to look up colleagues and shared domain contacts. Without it the tool returns `insufficient_scope`; the rest of `contacts` is unaffected.
 
 A tool whose scope was never granted returns a typed `insufficient_scope` error with a re-auth hint instead of failing silently.
 

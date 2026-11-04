@@ -81,6 +81,12 @@ export const BUNDLE_CATALOG: Record<string, BundleCatalogEntry> = {
     risk: 'high',
     personalRefused: true,
   },
+  directory: {
+    scopes: ['https://www.googleapis.com/auth/directory.readonly'],
+    description: 'Search the Workspace domain directory: colleagues and shared domain contacts.',
+    risk: 'low',
+    workspaceOnly: true,
+  },
   cloudsearch: {
     scopes: ['https://www.googleapis.com/auth/cloud_search'],
     description: 'Query Google Cloud Search across Workspace content.',

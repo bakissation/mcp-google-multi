@@ -50,6 +50,30 @@ describe('maskEmails via renderReport (linear scan)', () => {
   });
 });
 
+describe('default account note', () => {
+  const config = (r: Awaited<ReturnType<typeof runDiagnostics>>) => r.sections.find((x) => x.title === 'Config')!;
+
+  it('notes a missing default when several accounts are configured, without failing the check', async () => {
+    const r = await runDiagnostics(deps({ accountSet: () => ({ aliases: ['a', 'b'], configs: {}, defaultAccount: undefined } as any) }));
+    const c = config(r);
+    expect(c.lines.some((l) => l.startsWith('No default account'))).toBe(true);
+    expect(c.hint).toContain('GOOGLE_DEFAULT_ACCOUNT');
+    expect(c.verdict).toBe('ok');
+  });
+
+  it('stays quiet with one account or with a default set', async () => {
+    const one = await runDiagnostics(deps());
+    expect(config(one).lines.some((l) => l.startsWith('No default account'))).toBe(false);
+    const set = await runDiagnostics(deps({ accountSet: () => ({ aliases: ['a', 'b'], configs: {}, defaultAccount: 'a' } as any) }));
+    expect(config(set).lines.some((l) => l.startsWith('No default account'))).toBe(false);
+  });
+
+  it('is not shown in the tenant-scoped report', async () => {
+    const t = await runDiagnostics(deps({ accountSet: () => ({ aliases: ['a', 'b'], configs: {}, defaultAccount: undefined } as any) }), { scope: 'tenant' });
+    expect(config(t).lines.some((l) => l.startsWith('No default account'))).toBe(false);
+  });
+});
+
 describe('tenant-scoped diagnose', () => {
   const httpEnv = { MCP_TRANSPORT: 'http', MCP_PUBLIC_URL: 'https://mcp.example.com', MCP_OWNER_EMAILS: 'operator-private@x.example' };
 
@@ -358,5 +382,41 @@ describe('§7 HTTP', () => {
     const s = r.sections.find((x) => x.id === 7)!;
     expect(s.verdict).toBe('ok');
     expect(s.lines.join(' ')).toContain('PRM + AS metadata verified');
+  });
+});
+
+describe('§5 Scopes: registered tools the account cannot call', () => {
+  const summary = {
+    total: 10, callable: 6, requestableNotGranted: 1,
+    byBundle: [{ bundle: 'slides', tools: 3 }], neverRequestable: 0,
+  };
+
+  it('adds a per-account tool line and a remediation hint for the operator', async () => {
+    const r = await runDiagnostics(deps({ toolScopes: () => summary }));
+    const s = r.sections.find((x) => x.id === 5)!;
+    expect(s.lines).toContain(
+      'work: 6 of 10 tools callable; 1 need re-auth to grant a scope already in the profile; 3 need a bundle not in the profile (slides 3)',
+    );
+    expect(s.hint).toMatch(/profile bundles/);
+    expect(s.verdict).toBe('ok');
+  });
+
+  it('keeps the section byte-identical when no tool counts are wired', async () => {
+    const r = await runDiagnostics(deps());
+    const s = r.sections.find((x) => x.id === 5)!;
+    expect(s.lines).toEqual(['work: 0 callable, all profile scopes granted']);
+    expect(s.hint).toBeUndefined();
+  });
+
+  it('stays out of tenant-scoped reports', async () => {
+    const r = await runDiagnostics(deps({ toolScopes: () => summary }), { scope: 'tenant' });
+    expect(JSON.stringify(r)).not.toContain('tools callable');
+  });
+
+  it('gives a plain line and no hint when every tool is callable', async () => {
+    const r = await runDiagnostics(deps({ toolScopes: () => ({ total: 4, callable: 4, requestableNotGranted: 0, byBundle: [], neverRequestable: 0 }) }));
+    const s = r.sections.find((x) => x.id === 5)!;
+    expect(s.lines).toContain('work: 4 of 4 tools callable');
+    expect(s.hint).toBeUndefined();
   });
 });

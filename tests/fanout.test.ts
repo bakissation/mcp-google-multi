@@ -104,6 +104,35 @@ describe('runFanout', () => {
     expect(body.results[1]).toMatchObject({ account: 'beta', ok: false, error: { error: 'auth_required' } });
   });
 
+  it('lists an account without the needed scope as skipped, not as a failure of the call', async () => {
+    const noScope = async (args: { account: string }) =>
+      args.account === 'beta'
+        ? { content: [{ type: 'text', text: JSON.stringify({ error: 'insufficient_scope', hint: 'add the bundle' }) }], isError: true }
+        : okHandler(args);
+    const out = await runFanout(noScope as never, [{ account: '*' }], ['alpha', 'beta']);
+    expect(out.isError).toBeUndefined();
+    const body = JSON.parse(out.content[0].text);
+    expect(body.partial).toBe(false);
+    expect(body.skipped).toEqual(['beta']);
+    expect(body.results[1]).toMatchObject({ account: 'beta', ok: false, skipped: true, error: { error: 'insufficient_scope', hint: 'add the bundle' } });
+  });
+
+  it('still reports a real failure next to a skipped account as partial', async () => {
+    const mixed = async (args: { account: string }) =>
+      args.account === 'alpha' ? okHandler(args)
+      : args.account === 'beta' ? { content: [{ type: 'text', text: '{"error":"insufficient_scope"}' }], isError: true }
+      : { content: [{ type: 'text', text: '{"error":"upstream_error"}' }], isError: true };
+    const body = JSON.parse((await runFanout(mixed as never, [{ account: '*' }], ['alpha', 'beta', 'gamma'])).content[0].text);
+    expect(body.partial).toBe(true);
+    expect(body.skipped).toEqual(['beta']);
+  });
+
+  it('stays an error when every account lacks the scope', async () => {
+    const noScope = async () => ({ content: [{ type: 'text', text: '{"error":"insufficient_scope"}' }], isError: true });
+    const out = await runFanout(noScope as never, [{ account: '*' }], ['alpha', 'beta']);
+    expect(out.isError).toBe(true);
+  });
+
   it('marks the result as an error only when every account fails', async () => {
     const failing = async () => ({ content: [{ type: 'text', text: '{"error":"x"}' }], isError: true });
     const out = await runFanout(failing as never, [{ account: '*' }], ['alpha', 'beta']);
