@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { configDir, failStartup } from './config-file.js';
 import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 import { getTokenDir } from './accounts.js';
-import { wipeBytes } from './key-material.js';
+import { markKeysDisposed, markKeysLive, wipeBytes } from './key-material.js';
 
 export type KeyProvenance = 'env' | 'keychain' | 'file' | 'generated';
 
@@ -41,8 +41,9 @@ export interface KeyDeps {
   keychain?: (account: string) => KeychainEntry | null;
   hasAnyToken?: () => boolean;
   /** Delete the env var once the key is read, so it no longer sits in
-   * process.env or a child's environment. Default: setScrubKeyEnv(). Only the
-   * cached form of resolveMasterKey/resolveJwtKey is safe to scrub: it keeps
+   * process.env or a child's environment. An explicit-deps call scrubs only
+   * when this is true; the setScrubKeyEnv() default applies to the cached
+   * resolveMasterKey/resolveJwtKey calls alone, because only that form keeps
    * the key for the process lifetime. */
   scrubEnv?: boolean;
 }
@@ -172,7 +173,7 @@ function resolveKey(
 
   const fromEnv = env[envName]?.trim();
   if (fromEnv) {
-    if (deps.scrubEnv ?? scrubKeyEnvDefault) {
+    if (deps.scrubEnv ?? false) {
       delete env[envName];
       if (env === process.env) scrubbedEnv.add(envName);
     }
@@ -259,14 +260,20 @@ let cachedJwt: ResolvedKey | null = null;
  * Boot/CLI form: failures exit with a clean stderr slug ("fatal at startup"). */
 export function resolveMasterKey(deps?: KeyDeps): ResolvedKey {
   if (deps) return resolveKey('MASTER_KEY', 'master.key', true, deps);
-  cachedMaster ??= resolveKey('MASTER_KEY', 'master.key', true, {});
+  if (!cachedMaster) {
+    cachedMaster = resolveKey('MASTER_KEY', 'master.key', true, { scrubEnv: scrubKeyEnvDefault });
+    markKeysLive();
+  }
   return cachedMaster;
 }
 
 /** Dispatch form: identical resolution, but failures THROW (caught by the tool
  * handler into an error envelope) — a live server is never process.exit'd. */
 export function resolveMasterKeyForDispatch(): ResolvedKey {
-  cachedMaster ??= resolveKey('MASTER_KEY', 'master.key', true, {}, 'throw');
+  if (!cachedMaster) {
+    cachedMaster = resolveKey('MASTER_KEY', 'master.key', true, { scrubEnv: scrubKeyEnvDefault }, 'throw');
+    markKeysLive();
+  }
   return cachedMaster;
 }
 
@@ -288,7 +295,10 @@ export function peekMasterKeyProvenance(deps?: KeyDeps): KeyProvenance | 'unprov
  * outstanding MCP tokens and clients re-auth silently. */
 export function resolveJwtKey(deps?: KeyDeps): ResolvedKey {
   if (deps) return resolveKey('MCP_JWT_KEY', 'mcp-jwt.key', false, deps);
-  cachedJwt ??= resolveKey('MCP_JWT_KEY', 'mcp-jwt.key', false, {});
+  if (!cachedJwt) {
+    cachedJwt = resolveKey('MCP_JWT_KEY', 'mcp-jwt.key', false, { scrubEnv: scrubKeyEnvDefault });
+    markKeysLive();
+  }
   return cachedJwt;
 }
 
@@ -353,6 +363,7 @@ export function wipeKeyCache(): void {
   for (const k of [cachedMaster, cachedJwt]) if (k) wipeBytes(k.bytes);
   cachedMaster = null;
   cachedJwt = null;
+  markKeysDisposed();
 }
 
 /** Test hook: the production cache is process-lifetime by design. */
@@ -362,4 +373,5 @@ export function clearKeyCacheForTest(): void {
   mirrored = false;
   scrubbedEnv.clear();
   scrubKeyEnvDefault = false;
+  markKeysLive();
 }

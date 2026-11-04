@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { SignJWT, jwtVerify } from 'jose';
 import { deriveKey, encryptToken, decryptToken } from './token-store.js';
-import { base64KeyBytes, KeyMemo, wipeBytes, type KeyMaterial } from './key-material.js';
+import { assertKeysLive, base64KeyBytes, KeyMemo, keysEpoch, markKeysDisposed, wipeBytes, type KeyMaterial } from './key-material.js';
 import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 
 export const ACCESS_TTL_DEFAULT = 600; // seconds
@@ -335,12 +335,14 @@ const macKeyMemo = new KeyMemo();
  * already holds its key sees it overwritten too. */
 export function wipeRefreshKeyMemo(): void {
   macKeyMemo.wipe();
+  markKeysDisposed();
 }
 
 /** The store's own MAC key for `masterKey`, memoized. Exported so a caller
  * that never touches a RefreshStore (the AS computing a request's
  * clientFingerprint) can key it the same way the store does. */
 export function refreshMacKey(masterKey: KeyMaterial): Buffer {
+  assertKeysLive();
   const hit = macKeyMemo.get(masterKey);
   if (hit) return hit;
   if (masterKey.length === 0) deriveKey(masterKey); // throws the missing-key error
@@ -416,7 +418,9 @@ function mintR1Successor(key: Buffer, presentedBody: Buffer): { token: string; c
  */
 export function refreshFamilyTagger(masterKey: KeyMaterial): (token: string) => string | null {
   const key = refreshMacKey(masterKey);
+  const epoch = keysEpoch();
   return (token) => {
+    assertKeysLive(epoch);
     const p = parseR1(token, key);
     return p ? familyTag(p.fidBytes) : null;
   };
@@ -539,7 +543,7 @@ function dropSub(data: RefreshData, sub: string): number {
  * release can read it; throws when it does not decrypt under `masterKey`
  * (E_REFRESH_STORE_UNREADABLE) or a newer release wrote it
  * (E_REFRESH_STORE_FORMAT). */
-export function assertRefreshStoreReadable(file: string, masterKey: string): void {
+export function assertRefreshStoreReadable(file: string, masterKey: KeyMaterial): void {
   let d: unknown;
   try {
     d = readPlain(file, masterKey);
@@ -592,6 +596,9 @@ export class RefreshStore {
   private readonly idleMs: number | undefined;
   private readonly maxFamiliesPerSub: number | undefined;
   private macKey: Buffer | undefined;
+  // A wipe after construction makes every write of this store throw: its key
+  // bytes are overwritten, and a write under them could never be read back.
+  private readonly epoch = keysEpoch();
   // Set once a load finds no earlier-release record. Nothing here adds one,
   // so from then on a legacy-shaped token is refused before the lock.
   private legacyEmpty = false;
@@ -660,6 +667,7 @@ export class RefreshStore {
   }
 
   private key(): Buffer {
+    assertKeysLive(this.epoch);
     return (this.macKey ??= refreshMacKey(this.masterKey));
   }
 
@@ -685,6 +693,7 @@ export class RefreshStore {
   }
 
   private save(data: RefreshData): void {
+    assertKeysLive(this.epoch);
     // Earlier-release evidence matters only while its family lives on, as a
     // legacy record or as the family it migrated into.
     const live = new Set<string>();

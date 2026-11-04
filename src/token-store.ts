@@ -6,7 +6,7 @@ import { getAccountSet } from './accounts.js';
 import { noteSuccessfulDecrypt, resolveMasterKeyForDispatch } from './master-key.js';
 import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 import type { TokenData } from './types.js';
-import { base64KeyBytes, isEmptyKey, KeyMemo, wipeBytes, type KeyMaterial } from './key-material.js';
+import { assertKeysLive, base64KeyBytes, isEmptyKey, KeyMemo, markKeysDisposed, wipeBytes, type KeyMaterial } from './key-material.js';
 
 export type { KeyMaterial };
 
@@ -30,6 +30,7 @@ interface EncFile {
 // key as the equal string. The returned Buffer is fresh: the caller owns it
 // and may wipe it.
 export function deriveKey(masterKey: KeyMaterial): Buffer {
+  assertKeysLive();
   if (isEmptyKey(masterKey)) {
     throw new Error(
       'MASTER_KEY is required to encrypt/decrypt tokens. Generate one with: openssl rand -base64 32',
@@ -47,6 +48,7 @@ export function deriveKey(masterKey: KeyMaterial): Buffer {
 const tenantKeyMemo = new KeyMemo();
 
 export function deriveTenantKey(masterKey: KeyMaterial, tenantId: string): Buffer {
+  assertKeysLive();
   const hit = tenantKeyMemo.get(masterKey, tenantId);
   if (hit) return hit;
   const ikm = deriveKey(masterKey);
@@ -64,9 +66,11 @@ export function deriveTenantKey(masterKey: KeyMaterial, tenantId: string): Buffe
  * out earlier by deriveTenantKey is overwritten too. */
 export function wipeTenantKeyMemo(): void {
   tenantKeyMemo.wipe();
+  markKeysDisposed();
 }
 
 export function encryptToken(data: object, masterKey: KeyMaterial, tenantId?: string): string {
+  assertKeysLive();
   // v1 derives a fresh key per call, so it is ours to wipe; a tenant subkey is memoized.
   const key = tenantId === undefined ? deriveKey(masterKey) : deriveTenantKey(masterKey, tenantId);
   const plain = Buffer.from(JSON.stringify(data), 'utf8');

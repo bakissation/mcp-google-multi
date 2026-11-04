@@ -18,14 +18,42 @@ export function isEmptyKey(key: KeyMaterial | undefined | null): boolean {
 }
 
 /** The decoded 32 bytes when `key` is base64 of exactly 32 bytes, else null.
- * A fresh Buffer the caller owns. A Buffer input is read as latin1 so the
- * decode sees one character per byte; bytes above 0x7f are not base64 either
- * way, so the result equals the string form's. */
+ * A fresh Buffer the caller owns. A Buffer is decoded to the string it is the
+ * UTF-8 of first, so it takes the same branch as the equal string. Reading it
+ * as latin1 instead would differ for a character above U+00FF: Node's base64
+ * decoder looks at that character's low UTF-16 byte, not at its UTF-8 bytes. */
 export function base64KeyBytes(key: KeyMaterial): Buffer | null {
-  const raw = Buffer.from(typeof key === 'string' ? key : key.toString('latin1'), 'base64');
+  const raw = Buffer.from(typeof key === 'string' ? key : key.toString('utf8'), 'base64');
   if (raw.length === 32) return raw;
   wipeBytes(raw);
   return null;
+}
+
+// Set by the wipe functions. Wiped key bytes are random, not absent, so a write
+// that used them would succeed and produce data nothing can decrypt. Once any
+// wipe ran, key derivation and encryption throw until a fresh resolve of the
+// master or JWT key re-arms them. A holder built before a wipe (RefreshStore,
+// the family tagger) also throws for good, through the epoch it captured.
+let disposed = false;
+let wipeEpoch = 0;
+
+export function markKeysDisposed(): void {
+  disposed = true;
+  wipeEpoch += 1;
+}
+
+export function markKeysLive(): void {
+  disposed = false;
+}
+
+export function keysEpoch(): number {
+  return wipeEpoch;
+}
+
+export function assertKeysLive(epoch?: number): void {
+  if (disposed || (epoch !== undefined && epoch !== wipeEpoch)) {
+    throw new Error('E_KEYS_WIPED: the key material was wiped at shutdown; nothing may derive, encrypt or sign with it');
+  }
 }
 
 function keyBytes(key: KeyMaterial): Buffer {
@@ -56,7 +84,8 @@ export class KeyMemo {
     this.slots.set(sub, entries);
   }
 
-  /** Overwrite every held key copy and value, then drop them. */
+  /** Overwrite every held key copy and value, then drop them. Not a disposal
+   * by itself: the wipe functions that own a memo also call markKeysDisposed. */
   wipe(): void {
     for (const entries of this.slots.values()) {
       for (const e of entries) {

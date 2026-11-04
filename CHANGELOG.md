@@ -8,7 +8,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Added
 
-- Key APIs accept a Buffer as well as a string: `deriveKey`, `deriveTenantKey`, `encryptToken`, `decryptToken`, `createTokenStore`, `refreshMacKey`, `refreshFamilyTagger`, `jwtSecretFrom` and `RefreshStore` take the key text as a string or as its UTF-8 bytes and derive the same keys, so existing callers are unchanged. `resolveMasterKey` and `resolveJwtKey` results carry the key as `bytes`, and the cached key is held as bytes rather than a string. The per-call derived keys and plaintext are overwritten after use, and `wipeKeyCache`, `wipeTenantKeyMemo` and `wipeRefreshKeyMemo` overwrite the caches for a shutdown path.
+- Key APIs accept a Buffer as well as a string: `deriveKey`, `deriveTenantKey`, `encryptToken`, `decryptToken`, `createTokenStore`, `refreshMacKey`, `refreshFamilyTagger`, `jwtSecretFrom` and `RefreshStore` take the key text as a string or as its UTF-8 bytes and derive the same keys, so existing callers are unchanged. `resolveMasterKey` and `resolveJwtKey` results carry the key as `bytes`, and the cached key is held as bytes rather than a string. The per-call derived keys and plaintext are overwritten after use, and `wipeKeyCache`, `wipeTenantKeyMemo` and `wipeRefreshKeyMemo` overwrite the caches for a shutdown path. After a wipe, key derivation, `encryptToken` and every `RefreshStore` write throw `E_KEYS_WIPED` until a fresh resolve re-arms new holders.
 - `MCP_SCRUB_KEY_ENV=1` removes `MASTER_KEY` and `MCP_JWT_KEY` from `process.env` once the server has read them. Off by default.
 
 ### Documentation

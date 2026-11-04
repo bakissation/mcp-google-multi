@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { base64KeyBytes, KeyMemo, wipeBytes } from '../src/key-material.js';
@@ -60,6 +60,55 @@ describe('key-material', () => {
     memo.wipe();
     expect(memo.get(PASSPHRASE, 't1')).toBeUndefined();
     expect(v.equals(Buffer.from('derived'))).toBe(false);
+  });
+});
+
+// Computed with dev 45842e2's algorithm (string keys): deriveKey is base64 of
+// exactly 32 bytes or bare sha256 of the UTF-8 text; the refresh MAC key is
+// HKDF over the same raw key, or over scrypt of the text for a passphrase.
+// Key text is given as code points so the file holds no hidden characters.
+const GOLDEN: Array<{ name: string; cps: number[]; branch: 'raw' | 'sha256'; derive: string; mac: string }> = [
+  { name: 'b64', cps: [65, 119, 111, 82, 71, 66, 56, 109, 76, 84, 81, 55, 81, 107, 108, 81, 86, 49, 53, 108, 98, 72, 78, 54, 103, 89, 105, 80, 108, 112, 50, 107, 113, 55, 75, 53, 119, 77, 102, 79, 49, 100, 119, 61], branch: 'raw', derive: '030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc', mac: 'e5d998557373d7268553fa15b1ac813902cdaf8f1dd500d0d53977eefd03c48c' },
+  { name: 'passphrase', cps: [99, 111, 114, 114, 101, 99, 116, 32, 104, 111, 114, 115, 101, 32, 98, 97, 116, 116, 101, 114, 121, 32, 115, 116, 97, 112, 108, 101], branch: 'sha256', derive: 'c4bbcb1fbec99d65bf59d85c8cb62ee2db963f0fe106f483d9afa73bd4e39a8a', mac: '5ecec63e53c030b3e4a7ca576875e6e1b99d93023584a59b16fdc14448c88e76' },
+  { name: 'latin1', cps: [99, 108, 233, 45, 115, 101, 99, 114, 232, 116, 101, 45, 65, 119, 111, 82, 71, 66, 56, 109, 76, 84, 81, 55, 81, 107, 108, 81, 86, 49, 53, 108], branch: 'sha256', derive: '7e774d4913d619524b5bc04a2087be41178788a718e790aba07222593e2036be', mac: '282be6b8059c82334652f9df1cb6949ef46a0334249a05e196fb2f16878d5774' },
+  { name: 'han', cps: [23383, 65, 119, 111, 82, 71, 66, 56, 109, 76, 84, 81, 55, 81, 107, 108, 81, 86, 49, 53, 108, 98, 72, 78, 54, 103, 89, 105, 80, 108, 112, 50, 107, 113, 55, 75, 53, 119, 77, 102, 79, 49, 100, 119, 61], branch: 'sha256', derive: '9b50e10c2ee866153e338a40689b77811b6d0e178b8bd736164bb52d5a6c3d07', mac: 'bf8620a3630a82d943c2ee91243cd8b1664fc8489a392151125590d9c26bf7f0' },
+  { name: 'emoji', cps: [128273, 65, 119, 111, 82, 71, 66, 56, 109, 76, 84, 81, 55, 81, 107, 108, 81, 86, 49, 53, 108, 98, 72, 78, 54, 103, 89, 105, 80, 108, 112, 50, 107, 113, 55, 75, 53, 119, 77, 102, 79, 49, 100, 119, 61], branch: 'sha256', derive: '085bcc037626a7b8d652bdc74c13b8299e102df9a99a3ab7e25521a452865459', mac: 'fb963565e6a61fe0ba295797a8d6a3143f8a6067dd01b05b8106874223407c40' },
+  { name: 'lcaron', cps: [317, 65, 119, 111, 82, 71, 66, 56, 109, 76, 84, 81, 55, 81, 107, 108, 81, 86, 49, 53, 108, 98, 72, 78, 54, 103, 89, 105, 80, 108, 112, 50, 107, 113, 55, 75, 53, 119, 77, 102, 79, 49, 100, 119, 61], branch: 'sha256', derive: '9763121ac75e95ec0853cd184acc620dddda044acd8ce68be89204b02f05e723', mac: 'ceb15e62f3e4a155fd68668fec67f6372f97dc6e27186efea2e533c04930baaf' },
+  { name: 'arabic43', cps: [1605, 1601, 1578, 1575, 1581, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97], branch: 'sha256', derive: '274cdb82d00a580063bf0a5600fc0c1243b3e42b2da34ca778a9753d416a4d81', mac: '5286bf35e1583607eaec0f08cd22d51512e370d8576cf3edddff24a7689ac5d4' },
+  { name: 'han43', cps: [65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 23383, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66, 66], branch: 'raw', derive: '0000000000000000000000000000000160410410410410410410410410410410', mac: 'afd04d074227208f52ebfcf5056280391f63d455cc7e88cb6e2ad8c43332e687' },
+  { name: 'arabicDash43', cps: [1581, 90, 109, 57, 118, 90, 109, 57, 118, 90, 109, 57, 118, 90, 109, 57, 118, 90, 109, 57, 118, 90, 109, 57, 118, 90, 109, 57, 118, 90, 109, 57, 118, 90, 109, 57, 118, 90, 109, 57, 118, 90, 109, 57], branch: 'sha256', derive: '644c7c2ba1347b1f5f95bbb2bda05ca6e0c91af53b281f47f3d0954d0980052b', mac: 'c6363672a790d273c08506c3679f013cc557597723feba89f54ebf2226df897d' },
+  { name: 'arabicMixed', cps: [1605, 1601, 1578, 1575, 1581, 32, 1587, 1585, 1610, 32, 65, 119, 111, 82, 71, 66, 56, 109, 76, 84, 81, 55, 81, 107, 108, 81, 86, 49, 53, 108, 98, 72, 78, 54, 103, 89, 105, 80, 108, 112], branch: 'sha256', derive: '90b3813a0690b4b9224b63d152d1ae8d058a5b50e931bee2c7dab36927972d90', mac: 'a00f22cec1b49f8dd0828f694eba83ad38ccc03a2b80898ce2b82754855a91d1' },
+];
+const textOf = (cps: number[]): string => String.fromCodePoint(...cps);
+
+describe('golden vectors from dev: string and Buffer both derive the old keys', () => {
+  for (const g of GOLDEN) {
+    it(`${g.name} (${g.branch} branch)`, () => {
+      const text = textOf(g.cps);
+      for (const form of [text, buf(text)]) {
+        expect(deriveKey(form).toString('hex')).toBe(g.derive);
+        expect(refreshMacKey(form).toString('hex')).toBe(g.mac);
+        expect(base64KeyBytes(form) !== null).toBe(g.branch === 'raw');
+      }
+    });
+  }
+
+  it('a Buffer takes the same branch as the equal string for characters above U+00FF', () => {
+    const B64 = 'AwoRGB8mLTQ7QklQV15lbHN6gYiPlp2kq7K5wMfO1dw=';
+    for (const text of ['\u5b57' + B64, String.fromCodePoint(0x1f511) + B64, '\u013d' + B64, 'A'.repeat(21) + '\u5b57' + 'B'.repeat(21)]) {
+      expect(base64KeyBytes(buf(text))?.toString('hex')).toBe(base64KeyBytes(text)?.toString('hex'));
+    }
+  });
+
+  it('fuzz: random keys with characters above U+00FF derive the same in both forms', () => {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/-_= ';
+    const wide = [0x13d, 0x5b57, 0x62d, 0x627, 0xe9, 0x1f511, 0x1d11e, 0xfeff, 0x2028];
+    const pick = (): string => (Math.random() < 0.2 ? String.fromCodePoint(wide[Math.floor(Math.random() * wide.length)]) : alphabet[Math.floor(Math.random() * alphabet.length)]);
+    for (let i = 0; i < 400; i++) {
+      const len = 36 + Math.floor(Math.random() * 14);
+      const text = Array.from({ length: len }, pick).join('');
+      expect(deriveKey(buf(text)).toString('hex')).toBe(deriveKey(text).toString('hex'));
+    }
   });
 });
 
@@ -138,6 +187,8 @@ describe('encryptToken / decryptToken accept a Buffer key', () => {
     const copy = Buffer.from(first);
     wipeTenantKeyMemo();
     expect(first.equals(copy)).toBe(false);
+    expect(() => deriveTenantKey(B64_KEY, 'wipe-me')).toThrow(/E_KEYS_WIPED/);
+    clearKeyCacheForTest();
     expect(deriveTenantKey(B64_KEY, 'wipe-me').equals(copy)).toBe(true);
   });
 });
@@ -195,6 +246,8 @@ describe('mcp-token with Buffer keys', () => {
     const copy = Buffer.from(mac);
     wipeRefreshKeyMemo();
     expect(mac.equals(copy)).toBe(false);
+    expect(() => refreshMacKey(B64_KEY)).toThrow(/E_KEYS_WIPED/);
+    clearKeyCacheForTest();
     expect(refreshMacKey(B64_KEY).equals(copy)).toBe(true);
   });
 });
@@ -311,5 +364,55 @@ describe('wipeKeyCache', () => {
     expect(r.bytes.equals(buf(B64_KEY))).toBe(false);
     expect(resolveMasterKey().key).toBe(B64_KEY);
     expect(resolveMasterKey()).not.toBe(r);
+  });
+});
+
+describe('after a wipe, encryption and MAC minting fail closed', () => {
+  it('wipeKeyCache: a RefreshStore built before it throws on write and writes nothing', () => {
+    process.env.MASTER_KEY = B64_KEY;
+    const file = path.join(dir, 'refresh.enc');
+    const store = new RefreshStore(file, resolveMasterKey().bytes);
+    wipeKeyCache();
+    expect(() => store.issue(Date.now(), 'sub')).toThrow(/E_KEYS_WIPED/);
+    expect(existsSync(file)).toBe(false);
+    expect(() => encryptToken(sample, B64_KEY)).toThrow(/E_KEYS_WIPED/);
+    expect(() => deriveKey(B64_KEY)).toThrow(/E_KEYS_WIPED/);
+  });
+
+  it('a fresh resolve re-arms the module, but the old store stays refused', () => {
+    process.env.MASTER_KEY = B64_KEY;
+    const file = path.join(dir, 'refresh.enc');
+    const old = new RefreshStore(file, resolveMasterKey().bytes);
+    wipeKeyCache();
+    const next = new RefreshStore(file, resolveMasterKey().bytes);
+    expect(() => old.issue(Date.now(), 'sub')).toThrow(/E_KEYS_WIPED/);
+    expect(() => next.issue(Date.now(), 'sub')).not.toThrow();
+    expect(existsSync(file)).toBe(true);
+  });
+
+  it('wipeRefreshKeyMemo: the family tagger and a store built earlier throw', () => {
+    const tagger = refreshFamilyTagger(B64_KEY);
+    const file = path.join(dir, 'refresh.enc');
+    const store = new RefreshStore(file, B64_KEY);
+    wipeRefreshKeyMemo();
+    expect(() => tagger('x')).toThrow(/E_KEYS_WIPED/);
+    expect(() => store.issue(Date.now(), 'sub')).toThrow(/E_KEYS_WIPED/);
+    expect(existsSync(file)).toBe(false);
+  });
+});
+
+describe('explicit deps do not take the process-wide scrub default', () => {
+  it('resolveMasterKey({ dir }) keeps process.env when setScrubKeyEnv(true)', () => {
+    process.env.MASTER_KEY = B64_KEY;
+    setScrubKeyEnv(true);
+    expect(resolveMasterKey({ dir, keychain: () => null }).key).toBe(B64_KEY);
+    expect(process.env.MASTER_KEY).toBe(B64_KEY);
+    expect(resolveJwtKey({ dir, keychain: () => null }).key.length).toBeGreaterThan(0);
+  });
+
+  it('an explicit scrubEnv: true on an injected env still scrubs that env', () => {
+    const env: NodeJS.ProcessEnv = { MASTER_KEY: B64_KEY };
+    resolveMasterKey({ env, dir, keychain: () => null, scrubEnv: true });
+    expect(env.MASTER_KEY).toBeUndefined();
   });
 });
