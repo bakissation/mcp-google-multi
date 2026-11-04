@@ -30,6 +30,11 @@ Two layers under `${XDG_STATE_HOME:-~/.local/state}/mcp-google-multi/metrics`
   Per error class: hint coverage and retry self-correction. Escape hatch:
   resolved Discovery method ids and searched API keys. Protocol-level failures
   (schema validation, tool-not-found, enumerated JSON-RPC codes). Tool bigrams.
+  Which protocol revision (`YYYY-MM-DD`) and which client (`name@major.minor`)
+  announced themselves, as counts only: the name is cut to a lowercase slug
+  of at most 32 characters and the version to major.minor, anything that
+  does not fit is counted as `other`, and each map is capped, so no id,
+  session, caller or free text can reach the file.
 - `events.jsonl`: a bounded raw tail (4 MB rotation, one rotated file), one
   line per dispatch with **minute-precision** timestamps, a random per-boot id
   and sequence number, tool name, ok flag, error slug, latency, and a bucketed

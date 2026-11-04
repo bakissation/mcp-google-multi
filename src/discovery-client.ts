@@ -22,6 +22,7 @@ export const SUPPORTED_APIS: Record<string, { id: string; version: string }> = {
   admin_datatransfer: { id: 'admin', version: 'datatransfer_v1' },
   groupssettings: { id: 'groupssettings', version: 'v1' },
   analyticsadmin: { id: 'analyticsadmin', version: 'v1beta' },
+  analyticsadmin_v1alpha: { id: 'analyticsadmin', version: 'v1alpha' },
   analyticsdata: { id: 'analyticsdata', version: 'v1beta' },
   appsmarket: { id: 'appsmarket', version: 'v2' },
   classroom: { id: 'classroom', version: 'v1' },
@@ -35,6 +36,17 @@ export const SUPPORTED_APIS: Record<string, { id: string; version: string }> = {
   script: { id: 'script', version: 'v1' },
   vault: { id: 'vault', version: 'v1' },
   workspaceevents: { id: 'workspaceevents', version: 'v1' },
+};
+
+/**
+ * APIs that exist in more than one version here. Some methods live in only one
+ * (Analytics Admin keeps enhanced measurement, Google Signals, access bindings
+ * and data filters in v1alpha), so a miss in one version is worth a look in the
+ * other before the caller is told the method does not exist.
+ */
+export const API_VERSION_SIBLINGS: Record<string, string[]> = {
+  analyticsadmin: ['analyticsadmin_v1alpha'],
+  analyticsadmin_v1alpha: ['analyticsadmin'],
 };
 
 // Names agents actually type for an API, mapped to real SUPPORTED_APIS keys;

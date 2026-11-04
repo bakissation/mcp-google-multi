@@ -4,6 +4,7 @@
 // full-writes with GOOGLE_OUTBOUND_ALLOWLIST unset allows outright;
 // everything else asks a human via MCP elicitation, server-side, showing
 // the real call, and executes only on "accept".
+import type { InputRequiredResult, ServerContext } from '@modelcontextprotocol/server';
 import type { ToolRegistry, Cud } from '../registry.js';
 import { escapeHatchVerdict, writeDisabledResult, type Policy } from '../write-control.js';
 import { resolveOutboundAllowlist } from '../outbound-allowlist.js';
@@ -196,16 +197,22 @@ function buildSummary(info: EscapeHatchCallInfo): Summary | SummaryFailure {
   return { ok: true, destinationsText, bodyText };
 }
 
+// Claude Code's dialog collapses the message to its first 3 lines, so those
+// must be what will be written: the method and verb, the destinations, the body.
+// Query params can change what a call does (addParents, transferOwnership) and
+// are not all destinations, so when there are any they stay ahead of the body.
 function buildPrompt(info: EscapeHatchCallInfo, summary: Summary): string {
+  const query = `Query params: ${sanitizeDisplay(JSON.stringify(info.queryParams ?? {}))}`;
+  const hasQuery = Object.keys(info.queryParams ?? {}).length > 0;
   return [
+    `Method: ${sanitizeDisplay(info.methodId)} (${sanitizeDisplay(info.httpMethod)})`,
+    `Destinations: ${summary.destinationsText}`,
+    ...(hasQuery ? [query] : []),
+    `Body: ${summary.bodyText}`,
     'A write via the Google API escape hatch needs your confirmation.',
     `Account: ${sanitizeDisplay(info.account)}${info.accountEmail ? ` (${sanitizeDisplay(info.accountEmail)})` : ''}`,
-    `Method: ${sanitizeDisplay(info.methodId)}`,
-    `HTTP verb: ${sanitizeDisplay(info.httpMethod)}`,
     `Path params: ${sanitizeDisplay(JSON.stringify(info.pathParams ?? {}))}`,
-    `Query params: ${sanitizeDisplay(JSON.stringify(info.queryParams ?? {}))}`,
-    `Destinations: ${summary.destinationsText}`,
-    `Body: ${summary.bodyText}`,
+    ...(hasQuery ? [] : [query]),
     'Accept to run it as shown; decline or cancel to refuse.',
   ].join('\n');
 }
@@ -226,7 +233,8 @@ export async function escapeHatchGate(
   base: { service: string; cud: Cud; scopes?: readonly string[] },
   policy: Policy,
   info: EscapeHatchCallInfo,
-): Promise<ReturnType<typeof jsonResult> | null> {
+  ctx?: ServerContext,
+): Promise<ReturnType<typeof jsonResult> | InputRequiredResult | null> {
   const outboundActive = resolveOutboundAllowlist() !== null;
   const verdict = escapeHatchVerdict(denyNames, base, primaryName, policy, outboundActive);
   if (verdict.decision === 'allow') return null;
@@ -240,8 +248,13 @@ export async function escapeHatchGate(
     );
   }
 
-  const outcome = await registry.elicitConfirmation(buildPrompt(info, summary));
+  const outcome = await registry.elicitConfirmation(buildPrompt(info, summary), {
+    ctx,
+    call: { account: info.account, methodId: info.methodId, httpMethod: info.httpMethod, pathParams: info.pathParams, queryParams: info.queryParams, body: info.body },
+    account: info.account,
+  });
   if (outcome.action === 'accept') return null;
+  if (outcome.action === 'respond') return outcome.result as ReturnType<typeof jsonResult> | InputRequiredResult;
   if (outcome.action === 'unsupported') {
     // Owner decision: over HTTP this covers BOTH a self-hosted HTTP
     // deployment and an EE hosted tenant, which this server cannot tell

@@ -118,11 +118,12 @@ List all sites (properties) the account has access to in Google Search Console
 
 Class: read
 
-Inspect a URL using the Google Search Console URL Inspection API. Returns indexing status, crawl info, rich results, AMP status, and mobile usability for a specific URL.
+Inspect a URL using the Google Search Console URL Inspection API. Returns indexing status, crawl info, rich results, AMP status, and mobile usability for a specific URL. Pass `inspectionUrls` instead to inspect up to 20 URLs of the same property in one call (one result per URL; a failing URL does not stop the others).
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `account` | string | optional | Google account alias; "*" = all accounts; omit for the default account |
 | `siteUrl` | string | required | Site URL as registered in Search Console (e.g. "https://example.com/" or "sc-domain:example.com") |
-| `inspectionUrl` | string | required | The fully-qualified URL to inspect (must be under the siteUrl property) |
+| `inspectionUrl` | string | optional | The fully-qualified URL to inspect (must be under the siteUrl property). Pass this or inspectionUrls. |
+| `inspectionUrls` | array | optional | Several fully-qualified URLs to inspect, all under the siteUrl property, up to 20. Pass this or inspectionUrl. |
 | `languageCode` | string | optional | BCP-47 language code for localized results (e.g. "en-US", "fr") |

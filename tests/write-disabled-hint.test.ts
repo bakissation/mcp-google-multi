@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { denyReason, isAllowed, writeDisabledResult, type Policy, type Profile } from '../src/write-control.js';
+import { denyReason, escapeHatchVerdict, isAllowed, writeDisabledResult, type Policy, type Profile } from '../src/write-control.js';
 import type { Cud } from '../src/registry.js';
 
 const policy = (over: Partial<Policy> = {}): Policy =>
@@ -78,15 +78,37 @@ describe('the suggested allow pattern is one the matcher accepts', () => {
 
   // #312: drive_update's op IS its cud, so "drive:update" also matches
   // drive_move, drive_permission_update and the rest of the update class.
-  it('does not call a class-wide pattern "just this one"', () => {
+  // The tool: form is the one that singles it out.
+  it('offers the exact-tool pattern for a tool named after its own class', () => {
     const UPDATE = { name: 'drive_update', service: 'drive', cud: 'update' as Cud };
     const h = hintOf(UPDATE as typeof TRASH, policy({ profile: 'read-only' }));
-    expect(h).toContain('GOOGLE_WRITE_ALLOW="drive:update"');
-    expect(h).not.toContain('just this one');
-    expect(h).toContain('every other update-class drive tool');
+    expect(h).toContain('allow just this one with GOOGLE_WRITE_ALLOW="tool:drive_update"');
+    expect(h).toContain('every update-class drive tool with GOOGLE_WRITE_ALLOW="drive:update"');
+    const allow = policy({ profile: 'read-only', allow: ['tool:drive_update'] });
+    expect(isAllowed(UPDATE, allow)).toBe(true);
     for (const sibling of ['drive_move', 'drive_permission_update']) {
+      expect(isAllowed({ name: sibling, service: 'drive', cud: 'update' }, allow)).toBe(false);
       expect(isAllowed({ name: sibling, service: 'drive', cud: 'update' }, policy({ profile: 'read-only', allow: ['drive:update'] }))).toBe(true);
     }
+  });
+
+  it('tool: denies one tool and leaves its same-class siblings alone', () => {
+    const deny = policy({ profile: 'full-writes', deny: ['tool:drive_update'] });
+    expect(isAllowed({ name: 'drive_update', service: 'drive', cud: 'update' }, deny)).toBe(false);
+    expect(denyReason({ name: 'drive_update', service: 'drive', cud: 'update' }, deny)).toEqual({ rule: 'deny_glob', pattern: 'tool:drive_update' });
+    for (const sibling of ['drive_move', 'drive_permission_update', 'drive_untrash']) {
+      expect(isAllowed({ name: sibling, service: 'drive', cud: 'update' }, deny)).toBe(true);
+    }
+  });
+
+  it('tool: takes globs, and a service-prefixed pattern never matches the tool: namespace', () => {
+    const deny = policy({ profile: 'full-writes', deny: ['tool:gmail_*'] });
+    expect(isAllowed({ name: 'gmail_send', service: 'gmail', cud: 'create' }, deny)).toBe(false);
+    expect(isAllowed({ name: 'drive_update', service: 'drive', cud: 'update' }, deny)).toBe(true);
+    // "*:update" must not start matching because of the extra candidate.
+    const star = policy({ profile: 'full-writes', deny: ['*:send'] });
+    expect(isAllowed({ name: 'gmail_send', service: 'gmail', cud: 'create' }, star)).toBe(false);
+    expect(isAllowed({ name: 'gmail_draft', service: 'gmail', cud: 'create' }, star)).toBe(true);
   });
 
   it('a "just this one" pattern permits no sibling of the same class', () => {
@@ -96,6 +118,15 @@ describe('the suggested allow pattern is one the matcher accepts', () => {
     for (const sibling of ['drive_update', 'drive_permission_update']) {
       expect(isAllowed({ name: sibling, service: 'drive', cud: 'update' }, policy({ profile: 'read-only', allow: ['drive:move'] }))).toBe(false);
     }
+  });
+});
+
+describe('tool: deny on the escape hatch', () => {
+  it('matches the raw method name, so one raw method can be blocked alone', () => {
+    const p = policy({ profile: 'full-writes', deny: ['tool:drive_files_update'] });
+    const base = { service: 'drive', cud: 'update' as Cud };
+    expect(escapeHatchVerdict(['drive_files_update'], base, 'drive_files_update', p, false).decision).toBe('deny');
+    expect(escapeHatchVerdict(['drive_files_copy'], base, 'drive_files_copy', p, false).decision).toBe('allow');
   });
 });
 

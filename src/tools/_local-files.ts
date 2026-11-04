@@ -39,12 +39,17 @@ export class LocalFileError extends Error {
  * host-file tools render the same shape instead of each inventing one. */
 export function localFileErrorResult(error: LocalFileError, account: string | undefined) {
   const code = error.reason === 'exists' ? 'local_path_exists' : 'local_path_forbidden';
+  const hint =
+    error.reason === 'exists'
+      ? 'A file is already at that path and is never overwritten. Pick another filename or remove or rename the existing file.'
+      : `Local paths are resolved on the machine running this server; a caller in a container and a server on the host see different paths. Put the file under ${localFilesRoot()} (a relative path resolves inside it) or point GOOGLE_LOCAL_FILES_DIR at a folder that contains it.`;
   return {
     content: [{
       type: 'text' as const,
       text: stringifyEnvelope({
         error: code,
         message: error.message,
+        hint,
         retriable: false,
         account,
       }),
@@ -204,7 +209,7 @@ export async function assertLocalPathAllowed(targetPath: string, kind: 'read' | 
   if (!(await isInsideRealDir(root, realPath))) {
     throw new LocalFileError(
       'forbidden',
-      `refusing to ${kind} a path outside the allowed local-files root (${root}): ${path.basename(targetPath)}`,
+      `refusing to ${kind} a path outside the allowed local-files root (${root}): ${targetPath}`,
     );
   }
 

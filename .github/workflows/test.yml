@@ -2,9 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [main, staging, dev]
+    branches: [main, staging, dev, feat/6.2]
   pull_request:
-    branches: [main, staging, dev]
+    branches: [main, staging, dev, feat/6.2]
 
 # Least privilege: CI only checks out code + runs npm. (CodeQL: actions/missing-workflow-permissions)
 permissions:
@@ -37,6 +37,15 @@ jobs:
       # without anyone noticing. See scripts/extract-curated-method-map.ts.
       - name: Curated method map drift check
         run: npx tsx scripts/extract-curated-method-map.ts --check
+
+      # COVERAGE.md and the skill reference tables are generated from the tool
+      # registry; a tool added, removed or reclassified without regenerating
+      # them would otherwise drift silently.
+      - name: Generated docs drift check
+        run: |
+          npm run gen:coverage
+          npm run gen:skill
+          git diff --exit-code -- COVERAGE.md skills
 
       - name: Build
         run: npm run build

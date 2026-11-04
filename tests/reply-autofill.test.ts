@@ -3,13 +3,13 @@ import { resolveReply, deriveReplySubject } from '../src/tools/gmail.js';
 
 // Fake Gmail client exposing only what resolveReply touches. It memoizes the own-address set
 // per account, so every test below uses a unique account string to avoid cross-test cache bleed.
-function fakeGmail(opts: { headers?: Array<{ name: string; value: string }>; sendAs?: string[]; throwGet?: boolean; sendAsThrows?: boolean }) {
+function fakeGmail(opts: { headers?: Array<{ name: string; value: string }>; sendAs?: string[]; throwGet?: boolean; sendAsThrows?: boolean; threadId?: string }) {
   return {
     users: {
       messages: {
         get: async () => {
           if (opts.throwGet) throw new Error('404');
-          return { data: { payload: { headers: opts.headers ?? [] } } };
+          return { data: { threadId: opts.threadId, payload: { headers: opts.headers ?? [] } } };
         },
       },
       settings: {
@@ -110,3 +110,18 @@ describe('resolveReply (auto-fill)', () => {
   });
 });
 
+
+describe('resolveReply (thread)', () => {
+  it('returns the source thread id so the reply stays in the thread', async () => {
+    const g = fakeGmail({ threadId: 'T-42', headers: H({ From: 'a@ext.com', Subject: 'x', 'Message-ID': '<m@ext>' }) });
+    const r = await resolveReply(g, 'acct-thread', 'me@acct.com', 'MID9', false);
+    expect(r.threadId).toBe('T-42');
+  });
+
+  it('has no thread id when the source cannot be fetched', async () => {
+    const g = fakeGmail({ throwGet: true });
+    const r = await resolveReply(g, 'acct-thread-miss', 'me@acct.com', 'MID10', false);
+    expect(r.sourceFound).toBe(false);
+    expect(r.threadId).toBeUndefined();
+  });
+});

@@ -2,7 +2,95 @@
 
 All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-> **This file is frozen at v4.2.0.** From v4.3.0 onward, releases are cut automatically by semantic-release from Conventional Commits and published as [GitHub Releases](https://github.com/bakissation/mcp-google-multi/releases) (`dev` → alpha, `staging` → beta, `main` → stable). See the Releases page for current notes.
+> **Versions 4.3.0 to 6.1.0 are not listed here.** Releases from 4.3.0 onward are cut by semantic-release from Conventional Commits and published as [GitHub Releases](https://github.com/bakissation/mcp-google-multi/releases) (`dev` is alpha, `staging` is beta, `main` is stable). This file lists 6.1.1 and later, and the history up to 4.2.0 below.
+
+## [Unreleased]
+
+### Documentation
+
+- Markdown docs aligned with what 6.2 ships: `CLAUDE.md`, `SECURITY.md`, `docs/features.md`, `docs/configuration.md`, `docs/http-setup.md`, the pull request template and the skill's escape-hatch paragraph (#349).
+- This changelog brought up to date from 6.1.1.
+
+## [6.2.0-alpha.2](https://github.com/bakissation/mcp-google-multi/releases/tag/v6.2.0-alpha.2) - 2026-11-03
+
+### Fixed
+
+- The package `exports` map now declares the `./http-confirm` and `./scope-observability` subpaths. Both modules shipped in `dist` but could not be imported by name, so a program embedding the package could not set a registry's `httpConfirm` or use `accountScopeSets`, `summarizeToolScopes` and `classifyMethodScopes`. A test imports every declared subpath from the built package. (#347)
+- Bumped the googleapis group: `@googleapis/sheets` 18.1.1 to 18.1.2 and `@googleapis/tasks` 17.0.1 to 17.1.0. (#345)
+
+## [6.2.0-alpha.1](https://github.com/bakissation/mcp-google-multi/releases/tag/v6.2.0-alpha.1) - 2026-11-03
+
+First 6.2 prerelease. No breaking changes. 944 tools (197 curated, 747 generated); a default install registers 337.
+
+### Added
+
+**Calendar**
+- `calendar_suggest_times` checks free/busy for your primary calendar and each attendee calendar and returns the earliest slots when everyone is free. It is read-only and books nothing. Working hours default to 09:00 to 17:00 Monday to Friday in the primary calendar's time zone; `timeZone`, `workStart`, `workEnd`, `includeWeekends`, `bufferMinutes` and `durationMinutes` adjust the search, over a window of up to 31 days. An attendee whose calendar cannot be read is reported under `unavailable` instead of counted as free.
+- `calendar_add_subscription`, `calendar_update_subscription` and `calendar_remove_subscription` manage the calendar list (which calendars an account shows, with what name and colour).
+- `calendar_create_event` and `calendar_update_event` take optional `startTimeZone` and `endTimeZone` (IANA names, each end may differ). With a zone, start and end may be wall-clock times without an offset; without one an offset is required. An update with a zone alone re-labels that end at the same instant, and an update with a new time and no zone keeps the zone the end already has. (#330)
+- Timed events are now reported in their own time zone, with `startTimeZone` and `endTimeZone`, instead of the calendar's zone. Events without a zone, all-day events and unknown zone names are unchanged. (#330)
+
+**Drive**
+- `drive_read` extracts text from PDF and Office files (`.docx`, `.xlsx`, `.pptx`) locally, with no conversion into the user's Drive and no extra scope. PDF and Office files may be up to 10MB, other files keep the 2MB limit. A scanned or encrypted PDF or a corrupt file returns `error:binary` with the reason.
+- `drive_upload` takes `localDir` to upload a whole local folder: the folder becomes a new Drive folder under `parentFolderId`, subfolders are recreated and files upload three at a time. The local-files confinement applies per file, hidden entries and symlinks are skipped and listed, and a folder over 200 files is refused before anything is created.
+- `drive_move` takes `fileIds` (up to 50) to move many files into one folder in a single call, with a per-file result.
+
+**Contacts**
+- `contacts_search_directory` searches the Workspace directory (user profiles and shared domain contacts) by name or email. It needs the new optional `directory` scope bundle (`directory.readonly`, Workspace accounts only).
+- `contacts_resolve` falls back to the From, To and Cc headers of recent mail when no contact matches, and returns a single match or an ambiguous list marked `source: "gmail"`. `includeMailHeaders: false` turns it off.
+
+**Chat, Search Console, Analytics**
+- `chat_messages_search` finds Chat messages by text, newest first, across one space or the first `maxSpaces` spaces. The result says how many spaces and messages were scanned and sets `truncated` when a cap ended the search.
+- `searchconsole_url_inspect` takes `inspectionUrls` (up to 20 URLs of one property), inspected three at a time, with one result per URL. A single `inspectionUrl` behaves as before.
+- The generic API call reaches Analytics Admin v1alpha methods (enhanced measurement, Google Signals, access bindings, data filters) through a second api id, `analyticsadmin_v1alpha`. An `unknown_method` hint names the sibling version when a method exists there.
+
+**HTTP transport**
+- Writes behind the escape hatch can be confirmed over HTTP without sticky sessions. Clients on the 2026-07-28 protocol revision get an "input required" result with the confirmation prompt and a signed request state, and the retry runs the write only when the accepted answer belongs to the identical call for the same caller. With `MCP_HTTP_CONFIRM_TOKEN=on`, clients on the 2025 revision get `confirmation_required` and a single-use token bound to the caller and the exact call (`MCP_CONFIRM_TTL_SECONDS`, default 300, cap 900; `MCP_CONFIRM_KEY`). The token flag is off by default.
+- `hideServices()` on the registry keeps whole services out of `tools/list` in every discovery mode. The tools stay registered and callable by name, and meta tools are never hidden.
+
+**Operations**
+- Write-control patterns can match a tool by exact name with `tool:<name>` (globs work, for example `tool:gmail_*`).
+- Local usage metrics count protocol revisions and clients as `name@major.minor`. Counts only; names and versions are normalised and capped, and days written before this change load unchanged.
+- `doctor` and `config check` report, per account, how many registered tools it can call, how many need a re-auth, how many need a scope bundle that is not in its profile, and how many no bundle can grant. `doctor` also notes when several accounts exist and none is the default. (#114)
+
+### Fixed
+
+- `drive_upload` no longer requires `filename` with `localPath`, and `gmail_download_attachment` no longer requires `filename`. Local-file refusals now carry a hint about where paths resolve.
+- `gmail_download_attachment` is recorded in the curated method map under `gmail.users.messages.get`, which it reads first, so write-control globs on that method are correct.
+- `create_event` validates `start` and `end` locally and accepts the `{"date"}` and `{"dateTime","timeZone"}` shapes instead of failing at Google with a bare Bad Request. (#330)
+- HTTP: a declared body over the cap is answered with 413 `payload_too_large` before it is read, and the client can now read that 413 (on Windows the socket reset used to drop it).
+- Reads fanned out with `account: "*"` list accounts that lack the needed scope as skipped, so they no longer make the whole result partial.
+- Clearer errors and hints: Admin audit reports default `endTime` and refuse a Gmail query without a window of at most 30 days; a group address passed as a user key points at the group tools; sharing with a non-Google address explains the invitation requirement; GA4 incompatible fields point at `analytics_get_metadata` and the compatibility check; a scope no bundle grants now opens with "Do not retry".
+- Argument-name suggestions for common first guesses (for example `limit`, `messageIds`, `find` and `replace`), and for `google_api_call` and `gmail_search` date bounds. Calls with the wrong name are still rejected.
+
+### Security
+
+- Updated the MCP SDK (`@modelcontextprotocol/node` 2.1.2, `@modelcontextprotocol/server` 2.4.0) to bound request bodies and JSON-RPC batch length (GHSA-f897-62hf-6gxq), and used overrides to clear flagged transitive packages (`@hono/node-server`, `qs`, `node-forge`, `minimatch`). `npm audit --omit=dev` reports no vulnerabilities.
+
+### Documentation and CI
+
+- Tool counts updated for the new curated tools; the calendar skill reference regenerated for the time zone inputs.
+- CI runs test, docker and pr-guards on the `feat/6.2` integration branch.
+
+## [6.1.2-alpha.1](https://github.com/bakissation/mcp-google-multi/releases/tag/v6.1.2-alpha.1) - 2026-11-03
+
+### Fixed
+
+- Gmail replies stay in the source thread: `gmail_send` and `gmail_create_draft` with `replyToMessageId` now carry the source `threadId` (an explicit `replyToThreadId` still wins).
+
+### Changed
+
+- Dev tooling security patches: npm 11.21.1 and lock-only updates of `undici`, `ip-address`, `http-cache-semantics` and `brace-expansion`. Nothing in the published package changes.
+- Deduplicated `gaxios`: `google-auth-library` moves to the gaxios 8 line, so the tree resolves a single gaxios. A test pins that invariant.
+
+### CI
+
+- Release-train guards: reject breaking commits on the 6.x train unless the PR carries `breaking-ok`, compare `package-lock` `libc` fields with the base, require the base to be contained in the head on promotion PRs, and post the bump a promotion will produce. The test workflow fails on drift of the generated `COVERAGE.md` and skill reference, and the registry publish waits for npm to serve the new version.
+- The backmerge job reads the release tag through the API instead of a checkout (CodeQL `untrusted-checkout`).
+
+## [6.1.1] - 2026-10-25
+
+Stable release. Notes for 4.3.0 through 6.1.1 are on the [GitHub Releases](https://github.com/bakissation/mcp-google-multi/releases) page.
 
 ## [4.2.0] — 2026-05-20
 

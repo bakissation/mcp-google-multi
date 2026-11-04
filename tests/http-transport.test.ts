@@ -166,6 +166,43 @@ describe('HttpTransportHost (stateless dispatch)', () => {
     expect(atCap.status).not.toBe(400);
   });
 
+  // The SDK transports do not bound a request body themselves, so the host
+  // reads and bounds it first and hands the parsed value over.
+  it('refuses a declared body length above the cap with 413 before reading it', async () => {
+    const port = await startHost(undefined, { maxBodyBytes: 200 });
+    const over = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, raw: JSON.stringify({ pad: 'x'.repeat(400) }) });
+    expect(over.status).toBe(413);
+    expect(JSON.parse(over.text).error).toBe('payload_too_large');
+    const ok = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: initBody });
+    expect(ok.status).toBe(200);
+  });
+
+  it('cuts a chunked body without a length once it passes the cap and keeps serving', async () => {
+    const port = await startHost(undefined, { maxBodyBytes: 200 });
+    const outcome = await new Promise<string>((resolve) => {
+      const req = http.request(
+        { hostname: '127.0.0.1', port, method: 'POST', path: '/mcp', headers: { host: '127.0.0.1', accept: MCP_ACCEPT, 'content-type': 'application/json' } },
+        (res) => resolve(`status:${res.statusCode}`),
+      );
+      req.on('error', () => resolve('reset'));
+      req.write(Buffer.alloc(150, 0x20));
+      req.write(Buffer.alloc(150, 0x20));
+      req.end();
+    });
+    expect(['reset', 'status:400', 'status:413']).toContain(outcome);
+    const ok = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: initBody });
+    expect(ok.status).toBe(200);
+  });
+
+  it('applies the default body cap when none is configured', async () => {
+    const port = await startHost();
+    const over = await request(port, 'POST', '/mcp', {
+      headers: { accept: MCP_ACCEPT },
+      raw: JSON.stringify({ pad: 'x'.repeat(4_000_100) }),
+    });
+    expect(over.status).toBe(413);
+  });
+
   it('POST /mcp initialize returns a JSON-RPC result', async () => {
     const port = await startHost();
     const res = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, body: initBody });

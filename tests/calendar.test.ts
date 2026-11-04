@@ -151,3 +151,119 @@ describe('calendar_respond_event', () => {
     expect(env.error).toBe('write_disabled');
   });
 });
+
+describe('calendar event time zones on create/update', () => {
+  const sent = (h: ReturnType<typeof toolHarness>, verb: string) =>
+    (h.requests().find((r) => (r.method ?? 'GET').toUpperCase() === verb) as GoogleRequest | undefined)?.data as
+      { start?: unknown; end?: unknown } | undefined;
+
+  it('create sends a distinct zone for each end (a flight)', async () => {
+    const h = toolHarness({ respond: (req) => req.data ?? {} });
+    const res = await h.call('calendar_create_event', {
+      account: 'test',
+      summary: 'Flight: ATL -> GCM',
+      start: '2026-11-15T09:43:00',
+      end: '2026-11-15T12:25:00',
+      startTimeZone: 'America/New_York',
+      endTimeZone: 'America/Cayman',
+    });
+    expect(res.isError).toBeFalsy();
+    expect(sent(h, 'POST')).toMatchObject({
+      start: { dateTime: '2026-11-15T09:43:00', timeZone: 'America/New_York' },
+      end: { dateTime: '2026-11-15T12:25:00', timeZone: 'America/Cayman' },
+    });
+  });
+
+  it('create rejects an offset-less time with no zone, and a zone on an all-day event', async () => {
+    for (const args of [
+      { start: '2026-11-15T09:43:00', end: '2026-11-15T10:43:00-05:00' },
+      { start: '2026-11-15', end: '2026-11-16', allDay: true, startTimeZone: 'America/Cayman' },
+      { start: '2026-11-15T09:43:00', end: '2026-11-15T10:43:00', startTimeZone: 'Mars/Base', endTimeZone: 'UTC' },
+    ]) {
+      const h = toolHarness({ respond: () => ({}) });
+      const res = await h.call('calendar_create_event', { account: 'test', summary: 'x', ...args });
+      expect(res.isError).toBe(true);
+      expect(parseResult(res).error).toBe('invalid_params');
+      expect(h.request).not.toHaveBeenCalled();
+    }
+  });
+
+  it('update with only a zone re-labels the same instant', async () => {
+    const current = { id: 'e1', start: { dateTime: '2026-11-16T18:30:00-06:00', timeZone: 'America/Chicago' },
+      end: { dateTime: '2026-11-16T20:30:00-06:00', timeZone: 'America/Chicago' } };
+    const h = toolHarness({ respond: (req) => ((req.method ?? 'GET').toUpperCase() === 'GET' ? current : req.data) });
+    const res = await h.call('calendar_update_event', {
+      account: 'test', eventId: 'e1', startTimeZone: 'America/Cayman', endTimeZone: 'America/Cayman',
+    });
+    expect(res.isError).toBeFalsy();
+    expect(sent(h, 'PATCH')).toEqual({
+      start: { dateTime: '2026-11-16T18:30:00-06:00', timeZone: 'America/Cayman' },
+      end: { dateTime: '2026-11-16T20:30:00-06:00', timeZone: 'America/Cayman' },
+    });
+  });
+
+  it('update of a time keeps the zone already on that end', async () => {
+    const current = { id: 'e1', start: { dateTime: '2026-11-15T09:43:00-05:00', timeZone: 'America/New_York' },
+      end: { dateTime: '2026-11-15T12:25:00-05:00', timeZone: 'America/Cayman' } };
+    const h = toolHarness({ respond: (req) => ((req.method ?? 'GET').toUpperCase() === 'GET' ? current : req.data) });
+    const res = await h.call('calendar_update_event', { account: 'test', eventId: 'e1', end: '2026-11-15T12:40:00' });
+    expect(res.isError).toBeFalsy();
+    expect(sent(h, 'PATCH')).toEqual({ end: { dateTime: '2026-11-15T12:40:00', timeZone: 'America/Cayman' } });
+  });
+
+  it('update refuses a zone for an all-day end, without patching', async () => {
+    const h = toolHarness({ respond: () => ({ id: 'e1', start: { date: '2026-11-16' }, end: { date: '2026-11-17' } }) });
+    const res = await h.call('calendar_update_event', { account: 'test', eventId: 'e1', startTimeZone: 'America/Cayman' });
+    expect(res.isError).toBe(true);
+    expect(h.requests().some((r) => (r.method ?? 'GET').toUpperCase() === 'PATCH')).toBe(false);
+  });
+});
+
+describe('calendar_create_event start/end shapes', () => {
+  const posted = (h: ReturnType<typeof toolHarness>) =>
+    (h.requests().find((r) => (r.method ?? 'GET').toUpperCase() === 'POST') as GoogleRequest | undefined)?.data as
+      { start?: unknown; end?: unknown } | undefined;
+
+  it('accepts Google\'s {"date": ...} shape passed as a string, as an all-day event', async () => {
+    const h = toolHarness({ respond: (req) => req.data ?? {} });
+    const res = await h.call('calendar_create_event', {
+      account: 'test', summary: 'Holiday', start: '{"date":"2027-10-26"}', end: '{"date":"2027-10-27"}',
+    });
+    expect(res.isError).toBeFalsy();
+    expect(posted(h)).toMatchObject({ start: { date: '2027-10-26' }, end: { date: '2027-10-27' } });
+  });
+
+  it('accepts the {"dateTime", "timeZone"} shape and keeps its zone', async () => {
+    const h = toolHarness({ respond: (req) => req.data ?? {} });
+    const res = await h.call('calendar_create_event', {
+      account: 'test', summary: 'Call',
+      start: '{"dateTime":"2027-10-26T09:00:00","timeZone":"Europe/Paris"}',
+      end: '{"dateTime":"2027-10-26T10:00:00+02:00"}',
+    });
+    expect(res.isError).toBeFalsy();
+    expect(posted(h)).toMatchObject({
+      start: { dateTime: '2027-10-26T09:00:00', timeZone: 'Europe/Paris' },
+      end: { dateTime: '2027-10-26T10:00:00+02:00' },
+    });
+  });
+
+  it('names the field and sends nothing for values that are not dates', async () => {
+    const bad: Array<[string, string, string]> = [
+      ['start', 'next tuesday', 'start'],
+      ['end', '2027-02-30', 'end'],
+      ['start', '{"date":"26/10/2027"}', 'start'],
+      ['end', '2027-10-26T25:99:00Z', 'end'],
+    ];
+    for (const [field, value, named] of bad) {
+      const h = toolHarness({ respond: () => ({}) });
+      const args: Record<string, unknown> = { account: 'test', summary: 'x', start: '2027-10-26T09:00:00Z', end: '2027-10-26T10:00:00Z' };
+      args[field] = value;
+      const res = await h.call('calendar_create_event', args);
+      const env = parseResult(res);
+      expect(res.isError, `${field}=${value}`).toBe(true);
+      expect(env.error).toBe('invalid_params');
+      expect(env.message).toContain(named);
+      expect(h.request).not.toHaveBeenCalled();
+    }
+  });
+});
