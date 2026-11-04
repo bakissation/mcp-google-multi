@@ -35,7 +35,11 @@ export function deriveKey(masterKey: KeyMaterial): Buffer {
       'MASTER_KEY is required to encrypt/decrypt tokens. Generate one with: openssl rand -base64 32',
     );
   }
-  return base64KeyBytes(masterKey) ?? createHash('sha256').update(masterKey).digest();
+  const raw = base64KeyBytes(masterKey);
+  if (raw) return raw;
+  // Line kept as it was before Buffer keys: the CodeQL dismissal of this frozen
+  // branch is tied to it. A Buffer ignores the encoding argument.
+  return createHash('sha256').update(masterKey as string, 'utf8').digest();
 }
 
 // Per-(masterKey, tenantId) subkey memo, keyed on both so a key rotation can

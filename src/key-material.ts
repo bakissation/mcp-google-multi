@@ -1,4 +1,4 @@
-import { createHash, randomFillSync } from 'node:crypto';
+import { createHmac, randomBytes, randomFillSync } from 'node:crypto';
 
 /**
  * Key text as the operator provisions it: the base64 of 32 random bytes, or a
@@ -28,8 +28,13 @@ export function base64KeyBytes(key: KeyMaterial): Buffer | null {
   return null;
 }
 
+// Per-process: a fingerprint is only ever compared inside this process, and a
+// keyed hash is not a bare hash of the key text.
+const FINGERPRINT_SALT = randomBytes(32);
+
 /** Memo-map key for a key: lets a cache be keyed on a key without holding the
- * key text itself as a Map key. Equal text gives an equal fingerprint. */
+ * key text itself as a Map key. Equal text gives an equal fingerprint within
+ * one process; it means nothing outside it. */
 export function keyFingerprint(key: KeyMaterial): string {
-  return createHash('sha256').update(key).digest('hex');
+  return createHmac('sha256', FINGERPRINT_SALT).update(key).digest('hex');
 }
