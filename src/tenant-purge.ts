@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { tenantConfigFilePath, tenantTokenDir } from './config-file.js';
 import { createTokenStore } from './token-store.js';
+import type { KeyMaterial } from './key-material.js';
 import type { TokenData } from './types.js';
 
 /** Best-effort Google-side revocation (RFC 7009 endpoint). Returns whether
@@ -40,7 +41,7 @@ export interface TenantTokenPurge {
  * token is exactly the thing to delete. Only THIS tenant's dir is touched. */
 export async function purgeTenantTokens(
   tenantId: string,
-  opts: { env?: NodeJS.ProcessEnv; revoke?: (t: TokenData) => Promise<boolean>; resolveKey?: () => string } = {},
+  opts: { env?: NodeJS.ProcessEnv; revoke?: (t: TokenData) => Promise<boolean>; resolveKey?: () => KeyMaterial } = {},
 ): Promise<TenantTokenPurge> {
   const dir = tenantTokenDir(tenantId, opts.env);
   const store = createTokenStore(dir, { tenantId, resolveKey: opts.resolveKey });

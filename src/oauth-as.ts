@@ -13,6 +13,7 @@ import {
   ReplayGuard, type ReplaySpend, RefreshStore, STATE_TTL_DEFAULT, CODE_TTL_DEFAULT, ACCESS_TTL_DEFAULT,
   type StatePayload, clientFingerprint, refreshMacKey,
 } from './mcp-token.js';
+import { assertKeysLive, type KeyMaterial } from './key-material.js';
 import { fetchCimdDocument } from './ssrf-guard.js';
 import { CimdClientCache } from './cimd-cache.js';
 import { logSafe } from './trim.js';
@@ -41,7 +42,7 @@ export interface AuthServerConfig {
   ownerEmails: string[]; // lowercased
   cimdIssuers: string[]; // host allowlist, e.g. ['claude.ai']
   accessTtlSec?: number;
-  masterKey: string;
+  masterKey: KeyMaterial;
   refreshStorePath: string;
   /** `maxAgeSec` of the refresh store buildAuthServer creates: sessions end
    * this long after their sign-in. Unset: unlimited. */
@@ -342,8 +343,10 @@ export function buildAuthServer(config: AuthServerConfig, deps: AuthServerDeps =
   // brute-force the client_id/user-agent/address that produced a stored `by`.
   // See docs/internals.md.
   const fingerprintKey = refreshMacKey(config.masterKey);
-  const fingerprintOf = (req: IncomingMessage, clientId: string): string =>
-    clientFingerprint(clientId, req.headers['user-agent'] ?? '', clientAddress(req) ?? '', fingerprintKey);
+  const fingerprintOf = (req: IncomingMessage, clientId: string): string => {
+    assertKeysLive();
+    return clientFingerprint(clientId, req.headers['user-agent'] ?? '', clientAddress(req) ?? '', fingerprintKey);
+  };
   // Silently dropping a lifetime the caller asked for would leave sessions unlimited.
   if (deps.refreshStore && (config.refreshMaxAgeSec !== undefined || config.refreshIdleSec !== undefined || config.refreshMaxFamiliesPerSub !== undefined)) {
     throw new Error('E_REFRESH_OPTION_CONFLICT: refreshMaxAgeSec, refreshIdleSec and refreshMaxFamiliesPerSub configure the refresh store buildAuthServer creates; set them on the injected refreshStore instead');
