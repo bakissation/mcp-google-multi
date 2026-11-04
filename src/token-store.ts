@@ -6,7 +6,7 @@ import { getAccountSet } from './accounts.js';
 import { noteSuccessfulDecrypt, resolveMasterKeyForDispatch } from './master-key.js';
 import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 import type { TokenData } from './types.js';
-import { base64KeyBytes, isEmptyKey, keyFingerprint, wipeBytes, type KeyMaterial } from './key-material.js';
+import { base64KeyBytes, isEmptyKey, KeyMemo, wipeBytes, type KeyMaterial } from './key-material.js';
 
 export type { KeyMaterial };
 
@@ -42,14 +42,12 @@ export function deriveKey(masterKey: KeyMaterial): Buffer {
   return createHash('sha256').update(masterKey as string, 'utf8').digest();
 }
 
-// Per-(masterKey, tenantId) subkey memo, keyed on both so a key rotation can
-// never hit a stale subkey. The key side is a fingerprint, so the key text is
-// not kept as a Map key.
-const tenantKeyMemo = new Map<string, Buffer>();
+// Per-(masterKey, tenantId) subkey memo, matched on both so a key rotation can
+// never hit a stale subkey.
+const tenantKeyMemo = new KeyMemo();
 
 export function deriveTenantKey(masterKey: KeyMaterial, tenantId: string): Buffer {
-  const memoKey = `${tenantId} ${keyFingerprint(masterKey)}`;
-  const hit = tenantKeyMemo.get(memoKey);
+  const hit = tenantKeyMemo.get(masterKey, tenantId);
   if (hit) return hit;
   const ikm = deriveKey(masterKey);
   let subkey: Buffer;
@@ -58,15 +56,14 @@ export function deriveTenantKey(masterKey: KeyMaterial, tenantId: string): Buffe
   } finally {
     wipeBytes(ikm);
   }
-  tenantKeyMemo.set(memoKey, subkey);
+  tenantKeyMemo.set(masterKey, subkey, tenantId);
   return subkey;
 }
 
 /** Overwrite and drop every memoized tenant subkey (shutdown). A key handed
  * out earlier by deriveTenantKey is overwritten too. */
 export function wipeTenantKeyMemo(): void {
-  for (const subkey of tenantKeyMemo.values()) wipeBytes(subkey);
-  tenantKeyMemo.clear();
+  tenantKeyMemo.wipe();
 }
 
 export function encryptToken(data: object, masterKey: KeyMaterial, tenantId?: string): string {

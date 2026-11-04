@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { SignJWT, jwtVerify } from 'jose';
 import { deriveKey, encryptToken, decryptToken } from './token-store.js';
-import { base64KeyBytes, keyFingerprint, wipeBytes, type KeyMaterial } from './key-material.js';
+import { base64KeyBytes, KeyMemo, wipeBytes, type KeyMaterial } from './key-material.js';
 import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 
 export const ACCESS_TTL_DEFAULT = 600; // seconds
@@ -328,23 +328,20 @@ const sha256 = (b: Buffer | string): Buffer => createHash('sha256').update(b).di
 /** A non-secret tag for log lines and rate-limit keys: never the token. */
 const familyTag = (family: Buffer | string): string => sha256(family).toString('hex').slice(0, 8);
 
-// Keyed on a fingerprint of the master key: scrypt runs once per process, not
-// once per store, and the key text is not kept as a Map key.
-const macKeyMemo = new Map<string, Buffer>();
+// Matched on the master key: scrypt runs once per process, not once per store.
+const macKeyMemo = new KeyMemo();
 
 /** Overwrite and drop every memoized refresh MAC key (shutdown). A store that
  * already holds its key sees it overwritten too. */
 export function wipeRefreshKeyMemo(): void {
-  for (const key of macKeyMemo.values()) wipeBytes(key);
-  macKeyMemo.clear();
+  macKeyMemo.wipe();
 }
 
 /** The store's own MAC key for `masterKey`, memoized. Exported so a caller
  * that never touches a RefreshStore (the AS computing a request's
  * clientFingerprint) can key it the same way the store does. */
 export function refreshMacKey(masterKey: KeyMaterial): Buffer {
-  const memoKey = keyFingerprint(masterKey);
-  const hit = macKeyMemo.get(memoKey);
+  const hit = macKeyMemo.get(masterKey);
   if (hit) return hit;
   if (masterKey.length === 0) deriveKey(masterKey); // throws the missing-key error
   const ikm = base64KeyBytes(masterKey) ?? scryptSync(masterKey, R1_SCRYPT_SALT, 32, R1_SCRYPT);
@@ -354,7 +351,7 @@ export function refreshMacKey(masterKey: KeyMaterial): Buffer {
   } finally {
     wipeBytes(ikm);
   }
-  macKeyMemo.set(memoKey, key);
+  macKeyMemo.set(masterKey, key);
   return key;
 }
 

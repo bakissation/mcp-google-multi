@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, randomFillSync } from 'node:crypto';
+import { randomFillSync, timingSafeEqual } from 'node:crypto';
 
 /**
  * Key text as the operator provisions it: the base64 of 32 random bytes, or a
@@ -28,13 +28,42 @@ export function base64KeyBytes(key: KeyMaterial): Buffer | null {
   return null;
 }
 
-// Per-process: a fingerprint is only ever compared inside this process, and a
-// keyed hash is not a bare hash of the key text.
-const FINGERPRINT_SALT = randomBytes(32);
+function keyBytes(key: KeyMaterial): Buffer {
+  return typeof key === 'string' ? Buffer.from(key, 'utf8') : Buffer.from(key);
+}
 
-/** Memo-map key for a key: lets a cache be keyed on a key without holding the
- * key text itself as a Map key. Equal text gives an equal fingerprint within
- * one process; it means nothing outside it. */
-export function keyFingerprint(key: KeyMaterial): string {
-  return createHmac('sha256', FINGERPRINT_SALT).update(key).digest('hex');
+/** Memo of derived values per (key, sub id). A hit is found by comparing the
+ * key bytes, not by hashing the key text into a lookup string. The entries
+ * hold a private copy of the key bytes and the derived value; wipe() overwrites
+ * both. */
+export class KeyMemo {
+  private readonly slots = new Map<string, Array<{ key: Buffer; value: Buffer }>>();
+
+  get(key: KeyMaterial, sub = ''): Buffer | undefined {
+    const entries = this.slots.get(sub);
+    if (!entries) return undefined;
+    const probe = keyBytes(key);
+    try {
+      return entries.find((e) => e.key.length === probe.length && timingSafeEqual(e.key, probe))?.value;
+    } finally {
+      wipeBytes(probe);
+    }
+  }
+
+  set(key: KeyMaterial, value: Buffer, sub = ''): void {
+    const entries = this.slots.get(sub) ?? [];
+    entries.push({ key: keyBytes(key), value });
+    this.slots.set(sub, entries);
+  }
+
+  /** Overwrite every held key copy and value, then drop them. */
+  wipe(): void {
+    for (const entries of this.slots.values()) {
+      for (const e of entries) {
+        wipeBytes(e.key);
+        wipeBytes(e.value);
+      }
+    }
+    this.slots.clear();
+  }
 }

@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { base64KeyBytes, keyFingerprint, wipeBytes } from '../src/key-material.js';
+import { base64KeyBytes, KeyMemo, wipeBytes } from '../src/key-material.js';
 import { decryptToken, deriveKey, deriveTenantKey, encryptToken, createTokenStore, wipeTenantKeyMemo } from '../src/token-store.js';
 import { RefreshStore, jwtSecretFrom, refreshFamilyTagger, refreshMacKey, wipeRefreshKeyMemo } from '../src/mcp-token.js';
 import {
@@ -50,10 +50,16 @@ describe('key-material', () => {
     expect(base64KeyBytes(buf(PASSPHRASE))).toBeNull();
   });
 
-  it('keyFingerprint is equal for equal text and differs otherwise', () => {
-    expect(keyFingerprint(PASSPHRASE)).toBe(keyFingerprint(buf(PASSPHRASE)));
-    expect(keyFingerprint(PASSPHRASE)).not.toBe(keyFingerprint(`${PASSPHRASE}x`));
-    expect(keyFingerprint(PASSPHRASE)).not.toContain('correct');
+  it('KeyMemo matches on key bytes across string and Buffer, per sub id', () => {
+    const memo = new KeyMemo();
+    const v = Buffer.from('derived');
+    memo.set(PASSPHRASE, v, 't1');
+    expect(memo.get(buf(PASSPHRASE), 't1')).toBe(v);
+    expect(memo.get(`${PASSPHRASE}x`, 't1')).toBeUndefined();
+    expect(memo.get(PASSPHRASE, 't2')).toBeUndefined();
+    memo.wipe();
+    expect(memo.get(PASSPHRASE, 't1')).toBeUndefined();
+    expect(v.equals(Buffer.from('derived'))).toBe(false);
   });
 });
 
