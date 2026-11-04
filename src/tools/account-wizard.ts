@@ -5,7 +5,7 @@ import { getAccountSet, invalidateAccountSet, refreshAccountSetIfStale } from '.
 import { ALIAS_RE, mutateConfigFile } from '../config-file.js';
 import { writeToken } from '../token-store.js';
 import { resolveScopesForAccount } from '../auth.js';
-import { BUNDLE_CATALOG, closestBundle, isKnownBundle, refusedBundlesFor, resolveBundleAliases } from '../scope-catalog.js';
+import { BUNDLE_CATALOG, closestBundle, isKnownBundle, orgOnlyRefusal, refusedBundlesFor, resolveBundleAliases } from '../scope-catalog.js';
 import { openUrl } from '../open-url.js';
 import { coerceBoolean } from './_coerce.js';
 import { safeMessage, stringifyEnvelope } from './_errors.js';
@@ -90,7 +90,7 @@ export function validateAddForm(input: Partial<AddForm>, existingAliases: string
     }
     if (!isKnownBundle(b)) {
       const closest = closestBundle(b);
-      const known = Object.keys(BUNDLE_CATALOG).filter((n) => n !== 'admin').join(', ');
+      const known = allOptionalBundles(email).join(', ');
       return {
         ok: false,
         slug: 'E_UNKNOWN_BUNDLE',
@@ -102,10 +102,20 @@ export function validateAddForm(input: Partial<AddForm>, existingAliases: string
   }
   const refused = refusedBundlesFor(email, bundles);
   if (refused.length > 0) {
+    const names = refused.map((b) => `"${b}"`).join(', ');
+    if (orgOnlyRefusal(email) === 'external') {
+      return {
+        ok: false,
+        slug: 'E_VALIDATION',
+        message: `Google does not let an account outside this server's Workspace organisation grant ${names}.`,
+        hint: `${email} is not in GOOGLE_HOME_DOMAINS. Leave ${names} out (Google would reject the whole consent with invalid_scope), or use an account from the home organisation for it.`,
+        alias,
+      };
+    }
     return {
       ok: false,
       slug: 'E_VALIDATION',
-      message: `Google does not let a personal account grant ${refused.map((b) => `"${b}"`).join(', ')}.`,
+      message: `Google does not let a personal account grant ${names}.`,
       hint: 'Leave it out, or link a Google Workspace account for it.',
       alias,
     };

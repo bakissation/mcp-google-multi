@@ -66,6 +66,34 @@ describe('validateAddForm', () => {
     }
   });
 
+  it('with GOOGLE_HOME_DOMAINS set, an external Workspace account is refused keep and cloudidentity with a hint, and allBundles leaves them out', () => {
+    const saved = process.env.GOOGLE_HOME_DOMAINS;
+    process.env.GOOGLE_HOME_DOMAINS = 'ideacrafters.com';
+    try {
+      const r = validateAddForm({ alias: 'ext', email: 'dounia@le2.agency', otherBundles: 'forms,keep,cloudidentity' }, existing);
+      expect(r).toMatchObject({ ok: false, slug: 'E_VALIDATION' });
+      if (!r.ok) {
+        expect(r.message).toContain('"keep"');
+        expect(r.message).toContain('"cloudidentity"');
+        expect(r.hint).toContain('GOOGLE_HOME_DOMAINS');
+      }
+      const all = validateAddForm({ alias: 'ext', email: 'dounia@le2.agency', allBundles: true }, existing);
+      expect(all.ok && !all.bundles.includes('keep') && !all.bundles.includes('cloudidentity')).toBe(true);
+      const own = validateAddForm({ alias: 'own', email: 'baki@ideacrafters.com', otherBundles: 'keep,cloudidentity' }, existing);
+      expect(own.ok).toBe(true);
+      const typo = validateAddForm({ alias: 'ext', email: 'dounia@le2.agency', otherBundles: 'nope' }, existing);
+      expect(!typo.ok && typo.hint).not.toMatch(/\bkeep\b/);
+    } finally {
+      if (saved === undefined) delete process.env.GOOGLE_HOME_DOMAINS;
+      else process.env.GOOGLE_HOME_DOMAINS = saved;
+    }
+  });
+
+  it('without GOOGLE_HOME_DOMAINS, a Workspace address keeps both bundles (existing installs unchanged)', () => {
+    expect(process.env.GOOGLE_HOME_DOMAINS).toBeUndefined();
+    expect(validateAddForm({ alias: 'ext', email: 'dounia@le2.agency', otherBundles: 'keep,cloudidentity' }, existing).ok).toBe(true);
+  });
+
   it('refuses a named keep or cloudidentity bundle for a personal address only', () => {
     const r = validateAddForm({ alias: 'me', email: 'someone@googlemail.com', otherBundles: 'forms,keep' }, existing);
     expect(r).toMatchObject({ ok: false, slug: 'E_VALIDATION', message: 'Google does not let a personal account grant "keep".' });

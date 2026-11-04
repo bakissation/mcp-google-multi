@@ -115,7 +115,7 @@ function post(port: number, body: Record<string, any>): Promise<{ status: number
           accept: 'application/json, text/event-stream',
           'content-type': 'application/json',
           'content-length': String(data.length),
-          ...(version ? { 'mcp-protocol-version': version, 'mcp-method': body.method, 'mcp-name': body.params.name } : {}),
+          ...(version ? { 'mcp-protocol-version': version, 'mcp-method': body.method, ...(body.params.name ? { 'mcp-name': body.params.name } : {}) } : {}),
         },
       },
       (res) => {
@@ -200,6 +200,36 @@ describe('a gated write over HTTP (real registry and gate)', () => {
     expect(accepted.json.result.isError).not.toBe(true);
     expect(request).toHaveBeenCalledTimes(1);
   });
+});
+
+describe('subscriptions/listen over HTTP (2026-07-28)', () => {
+  const meta = {
+    [PROTOCOL_VERSION_META_KEY]: '2026-07-28',
+    [CLIENT_INFO_META_KEY]: { name: 'test-client', version: '1.0.0' },
+    [CLIENT_CAPABILITIES_META_KEY]: {},
+  };
+  const listen = { jsonrpc: '2.0', id: 'listen:0', method: 'subscriptions/listen', params: { notifications: { toolsListChanged: true, promptsListChanged: true }, _meta: meta } };
+  const toolsList = { jsonrpc: '2.0', id: 7, method: 'tools/list', params: { _meta: meta } };
+
+  it('is answered at once and never holds the lane: tools/list and tools/call still answer', async () => {
+    const port = await startHost(false, vi.fn());
+    const l = await Promise.race([post(port, listen), new Promise<never>((_, rej) => setTimeout(() => rej(new Error('listen held the request')), 5000))]);
+    expect(l.status).toBe(200);
+    expect(l.json.id).toBe('listen:0');
+    expect(l.json.error.code).toBe(-32601);
+
+    const list = await post(port, toolsList);
+    expect(list.json.result.tools.length).toBeGreaterThan(0);
+    const call = await post(port, modern('diagnose', {}));
+    expect(call.json.result).toBeDefined();
+  }, 15000);
+
+  it('repeated listens (client retries) do not queue up behind each other', async () => {
+    const port = await startHost(false, vi.fn());
+    const all = await Promise.all([post(port, listen), post(port, listen), post(port, toolsList), post(port, listen)]);
+    expect(all.map((r) => r.status)).toEqual([200, 200, 200, 200]);
+    expect(all[2].json.result.tools.length).toBeGreaterThan(0);
+  }, 15000);
 });
 
 describe('account_add over HTTP', () => {

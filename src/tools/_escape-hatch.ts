@@ -197,16 +197,22 @@ function buildSummary(info: EscapeHatchCallInfo): Summary | SummaryFailure {
   return { ok: true, destinationsText, bodyText };
 }
 
+// Claude Code's dialog collapses the message to its first 3 lines, so those
+// must be what will be written: the method and verb, the destinations, the body.
+// Query params can change what a call does (addParents, transferOwnership) and
+// are not all destinations, so when there are any they stay ahead of the body.
 function buildPrompt(info: EscapeHatchCallInfo, summary: Summary): string {
+  const query = `Query params: ${sanitizeDisplay(JSON.stringify(info.queryParams ?? {}))}`;
+  const hasQuery = Object.keys(info.queryParams ?? {}).length > 0;
   return [
+    `Method: ${sanitizeDisplay(info.methodId)} (${sanitizeDisplay(info.httpMethod)})`,
+    `Destinations: ${summary.destinationsText}`,
+    ...(hasQuery ? [query] : []),
+    `Body: ${summary.bodyText}`,
     'A write via the Google API escape hatch needs your confirmation.',
     `Account: ${sanitizeDisplay(info.account)}${info.accountEmail ? ` (${sanitizeDisplay(info.accountEmail)})` : ''}`,
-    `Method: ${sanitizeDisplay(info.methodId)}`,
-    `HTTP verb: ${sanitizeDisplay(info.httpMethod)}`,
     `Path params: ${sanitizeDisplay(JSON.stringify(info.pathParams ?? {}))}`,
-    `Query params: ${sanitizeDisplay(JSON.stringify(info.queryParams ?? {}))}`,
-    `Destinations: ${summary.destinationsText}`,
-    `Body: ${summary.bodyText}`,
+    ...(hasQuery ? [] : [query]),
     'Accept to run it as shown; decline or cancel to refuse.',
   ].join('\n');
 }
