@@ -6,6 +6,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- Key APIs accept a Buffer as well as a string: `deriveKey`, `deriveTenantKey`, `encryptToken`, `decryptToken`, `createTokenStore`, `refreshMacKey`, `refreshFamilyTagger`, `jwtSecretFrom` and `RefreshStore` take the key text as a string or as its UTF-8 bytes and derive the same keys, so existing callers are unchanged. `resolveMasterKey` and `resolveJwtKey` results carry the key as `bytes`, and the cached key is held as bytes rather than a string. The per-call derived keys and plaintext are overwritten after use, and `wipeKeyCache`, `wipeTenantKeyMemo` and `wipeRefreshKeyMemo` overwrite the caches for a shutdown path.
+- `MCP_SCRUB_KEY_ENV=1` removes `MASTER_KEY` and `MCP_JWT_KEY` from `process.env` once the server has read them. Off by default.
+
 ### Documentation
 
 - Markdown docs aligned with what 6.2 ships: `CLAUDE.md`, `SECURITY.md`, `docs/features.md`, `docs/configuration.md`, `docs/http-setup.md`, the pull request template and the skill's escape-hatch paragraph (#349).

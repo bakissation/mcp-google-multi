@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { SignJWT, jwtVerify } from 'jose';
 import { deriveKey, encryptToken, decryptToken } from './token-store.js';
+import { base64KeyBytes, keyFingerprint, wipeBytes, type KeyMaterial } from './key-material.js';
 import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 
 export const ACCESS_TTL_DEFAULT = 600; // seconds
@@ -13,9 +14,16 @@ export const STATE_TTL_DEFAULT = 600;
 export const CODE_TTL_DEFAULT = 60;
 export const REPLAY_CAP_DEFAULT = 100_000;
 
-/** Derive the HS256 secret (32 bytes) from the provisioned MCP_JWT_KEY string. */
-export function jwtSecretFrom(jwtKey: string): Uint8Array {
-  return new Uint8Array(deriveKey(jwtKey));
+/** Derive the HS256 secret (32 bytes) from the provisioned MCP_JWT_KEY, as a
+ * string or as the bytes of its text (ResolvedKey.bytes). The returned array
+ * is the caller's to keep or overwrite; no other copy is left behind. */
+export function jwtSecretFrom(jwtKey: KeyMaterial): Uint8Array {
+  const derived = deriveKey(jwtKey);
+  try {
+    return new Uint8Array(derived);
+  } finally {
+    wipeBytes(derived);
+  }
 }
 
 function newJti(): string {
@@ -320,19 +328,33 @@ const sha256 = (b: Buffer | string): Buffer => createHash('sha256').update(b).di
 /** A non-secret tag for log lines and rate-limit keys: never the token. */
 const familyTag = (family: Buffer | string): string => sha256(family).toString('hex').slice(0, 8);
 
-// Keyed on the master key: scrypt runs once per process, not once per store.
+// Keyed on a fingerprint of the master key: scrypt runs once per process, not
+// once per store, and the key text is not kept as a Map key.
 const macKeyMemo = new Map<string, Buffer>();
+
+/** Overwrite and drop every memoized refresh MAC key (shutdown). A store that
+ * already holds its key sees it overwritten too. */
+export function wipeRefreshKeyMemo(): void {
+  for (const key of macKeyMemo.values()) wipeBytes(key);
+  macKeyMemo.clear();
+}
 
 /** The store's own MAC key for `masterKey`, memoized. Exported so a caller
  * that never touches a RefreshStore (the AS computing a request's
  * clientFingerprint) can key it the same way the store does. */
-export function refreshMacKey(masterKey: string): Buffer {
-  const hit = macKeyMemo.get(masterKey);
+export function refreshMacKey(masterKey: KeyMaterial): Buffer {
+  const memoKey = keyFingerprint(masterKey);
+  const hit = macKeyMemo.get(memoKey);
   if (hit) return hit;
-  const raw = deriveKey(masterKey);
-  const ikm = Buffer.from(masterKey, 'base64').length === 32 ? raw : scryptSync(masterKey, R1_SCRYPT_SALT, 32, R1_SCRYPT);
-  const key = Buffer.from(hkdfSync('sha256', ikm, Buffer.alloc(0), R1_KEY_INFO, 32));
-  macKeyMemo.set(masterKey, key);
+  if (masterKey.length === 0) deriveKey(masterKey); // throws the missing-key error
+  const ikm = base64KeyBytes(masterKey) ?? scryptSync(masterKey, R1_SCRYPT_SALT, 32, R1_SCRYPT);
+  let key: Buffer;
+  try {
+    key = Buffer.from(hkdfSync('sha256', ikm, Buffer.alloc(0), R1_KEY_INFO, 32));
+  } finally {
+    wipeBytes(ikm);
+  }
+  macKeyMemo.set(memoKey, key);
   return key;
 }
 
@@ -395,7 +417,7 @@ function mintR1Successor(key: Buffer, presentedBody: Buffer): { token: string; c
  * for anything else. Derives the key once; the returned function does no I/O,
  * so a host can key a pre-auth rate limit on it.
  */
-export function refreshFamilyTagger(masterKey: string): (token: string) => string | null {
+export function refreshFamilyTagger(masterKey: KeyMaterial): (token: string) => string | null {
   const key = refreshMacKey(masterKey);
   return (token) => {
     const p = parseR1(token, key);
@@ -459,7 +481,7 @@ function formatError(file: string, format: unknown): Error {
 
 /** The decrypted plaintext, or null when the file is absent. Throws when it
  * does not decrypt; the caller decides what that means. */
-function readPlain(file: string, masterKey: string): unknown {
+function readPlain(file: string, masterKey: KeyMaterial): unknown {
   if (!existsSync(file)) return null;
   return decryptToken(readFileSync(file, 'utf-8'), masterKey);
 }
@@ -579,7 +601,7 @@ export class RefreshStore {
 
   constructor(
     private readonly path: string,
-    private readonly masterKey: string,
+    private readonly masterKey: KeyMaterial,
     options: RefreshStoreOptions = {},
   ) {
     this.maxAgeMs = lifetimeMs('maxAgeSec', options.maxAgeSec);
