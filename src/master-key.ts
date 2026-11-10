@@ -5,16 +5,32 @@ import { createRequire } from 'node:module';
 import { configDir, failStartup } from './config-file.js';
 import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 import { getTokenDir } from './accounts.js';
+import { keysWipedError, markKeysDisposed, markKeysLive, wipeBytes } from './key-material.js';
 
 export type KeyProvenance = 'env' | 'keychain' | 'file' | 'generated';
 
+/**
+ * A resolved key. `bytes` holds the key text as UTF-8 bytes (a KeyMaterial
+ * every key API accepts) and can be overwritten; `key` is the same text as a
+ * string, built on each read so the resolver itself keeps no string copy.
+ * `bytes` is non-enumerable: a spread or JSON.stringify sees `key` and
+ * `provenance` as before.
+ */
 export interface ResolvedKey {
-  key: string;
-  provenance: KeyProvenance;
+  readonly key: string;
+  readonly bytes: Buffer;
+  readonly provenance: KeyProvenance;
+}
+
+function resolved(bytes: Buffer, provenance: KeyProvenance): ResolvedKey {
+  const r = { provenance } as { provenance: KeyProvenance; key: string; bytes: Buffer };
+  Object.defineProperty(r, 'key', { enumerable: true, get: () => bytes.toString('utf8') });
+  Object.defineProperty(r, 'bytes', { enumerable: false, value: bytes });
+  return r;
 }
 
 interface KeychainEntry {
-  get(): string | null;
+  get(): string | Buffer | null;
   set(value: string): void;
   del(): void;
 }
@@ -24,6 +40,22 @@ export interface KeyDeps {
   dir?: string;
   keychain?: (account: string) => KeychainEntry | null;
   hasAnyToken?: () => boolean;
+  /** Delete the env var once the key is read, so it no longer sits in
+   * process.env or a child's environment. An explicit-deps call scrubs only
+   * when this is true; the setScrubKeyEnv() default applies to the cached
+   * resolveMasterKey/resolveJwtKey calls alone, because only that form keeps
+   * the key for the process lifetime. */
+  scrubEnv?: boolean;
+}
+
+let scrubKeyEnvDefault = false;
+// Names whose env var was scrubbed from process.env, so later probes still
+// know the key came from there.
+const scrubbedEnv = new Set<string>();
+
+/** Process-wide default for KeyDeps.scrubEnv. Call before the first resolve. */
+export function setScrubKeyEnv(on: boolean): void {
+  scrubKeyEnvDefault = on;
 }
 
 // Native optionalDependency, loaded lazily and synchronously (the token
@@ -78,10 +110,34 @@ function anyTokenFileExists(): boolean {
   return anyEncFileUnder(getTokenDir()) || anyEncFileUnder(configDir());
 }
 
-function readKeyFile(filePath: string): string | null {
+const isAsciiWs = (b: number): boolean => b === 32 || (b >= 9 && b <= 13);
+
+/** String.prototype.trim on bytes. ASCII content (any real key) is trimmed in
+ * place with no string made; anything else takes the string route so a BOM or
+ * a Unicode space is trimmed exactly as before. */
+function trimKeyBytes(raw: Buffer): Buffer | null {
+  if (raw.every((b) => b < 0x80)) {
+    let start = 0;
+    let end = raw.length;
+    while (start < end && isAsciiWs(raw[start])) start++;
+    while (end > start && isAsciiWs(raw[end - 1])) end--;
+    if (start === end) return null;
+    return Buffer.from(raw.subarray(start, end));
+  }
+  const text = raw.toString('utf8').trim();
+  return text ? Buffer.from(text, 'utf8') : null;
+}
+
+function readKeyFile(filePath: string): Buffer | null {
   try {
-    const raw = fs.readFileSync(filePath, 'utf8').trim();
-    if (!raw) return null;
+    const file = fs.readFileSync(filePath);
+    let trimmed: Buffer | null;
+    try {
+      trimmed = trimKeyBytes(file);
+    } finally {
+      wipeBytes(file);
+    }
+    if (!trimmed) return null;
     try {
       const mode = fs.statSync(filePath).mode & 0o777;
       if (process.platform !== 'win32' && (mode & 0o077) !== 0) {
@@ -90,11 +146,13 @@ function readKeyFile(filePath: string): string | null {
     } catch {
       // stat raced a delete; the read already succeeded.
     }
-    return raw;
+    return trimmed;
   } catch {
     return null;
   }
 }
+
+const toBytes = (v: string | Buffer): Buffer => (typeof v === 'string' ? Buffer.from(v, 'utf8') : v);
 
 function resolveKey(
   envName: 'MASTER_KEY' | 'MCP_JWT_KEY',
@@ -114,15 +172,21 @@ function resolveKey(
   };
 
   const fromEnv = env[envName]?.trim();
-  if (fromEnv) return { key: fromEnv, provenance: 'env' };
+  if (fromEnv) {
+    if (deps.scrubEnv ?? false) {
+      delete env[envName];
+      if (env === process.env) scrubbedEnv.add(envName);
+    }
+    return resolved(Buffer.from(fromEnv, 'utf8'), 'env');
+  }
 
   const entry = keychain(envName);
   const fromKeychain = entry?.get();
-  if (fromKeychain) return { key: fromKeychain, provenance: 'keychain' };
+  if (fromKeychain && fromKeychain.length > 0) return resolved(toBytes(fromKeychain), 'keychain');
 
   const filePath = path.join(dir, fileName);
   const fromFile = readKeyFile(filePath);
-  if (fromFile) return { key: fromFile, provenance: 'file' };
+  if (fromFile) return resolved(fromFile, 'file');
 
   // Generate-on-setup. The hard guard: minting a fresh
   // MASTER_KEY while <alias>.enc files exist would silently brick them all.
@@ -140,9 +204,9 @@ function resolveKey(
     filePath,
     () => {
       const racedKeychain = keychain(envName)?.get();
-      if (racedKeychain) return { key: racedKeychain, provenance: 'keychain' as const };
+      if (racedKeychain && racedKeychain.length > 0) return resolved(toBytes(racedKeychain), 'keychain');
       const racedFile = readKeyFile(filePath);
-      if (racedFile) return { key: racedFile, provenance: 'file' as const };
+      if (racedFile) return resolved(racedFile, 'file');
 
       // Exactly randomBytes(32) base64: hits deriveKey's 32-byte fast path.
       const generated = randomBytes(32).toString('base64');
@@ -150,7 +214,11 @@ function resolveKey(
       // The 0600 file is ALWAYS written (some keychain backends don't survive
       // a reboot); byte-exact read-back gates any use of the key.
       atomicWriteFileSync(filePath, `${generated}\n`, 0o600);
-      if (readKeyFile(filePath) !== generated) {
+      const readBack = readKeyFile(filePath);
+      const generatedBytes = Buffer.from(generated, 'utf8');
+      if (!readBack || !readBack.equals(generatedBytes)) {
+        if (readBack) wipeBytes(readBack);
+        wipeBytes(generatedBytes);
         fail(
           'E_KEY_PROVISIONING_FAILED',
           `generated ${envName} could not be read back byte-exact from ${filePath}; refusing to encrypt anything with an unverified key.`,
@@ -163,7 +231,8 @@ function resolveKey(
       try {
         if (entry) {
           entry.set(generated);
-          if (keychain(envName)?.get() === generated) {
+          const kcBack = keychain(envName)?.get();
+          if (kcBack !== undefined && kcBack !== null && toBytes(kcBack).equals(generatedBytes)) {
             keychainNote = ' and the OS keychain (service mcp-google-multi)';
           } else {
             try {
@@ -177,7 +246,8 @@ function resolveKey(
         // Keychain unavailable; the file already has the key.
       }
       process.stderr.write(`Generated ${envName}: stored at ${filePath} (0600)${keychainNote}.\n`);
-      return { key: generated, provenance: 'generated' as const };
+      if (readBack) wipeBytes(readBack);
+      return resolved(generatedBytes, 'generated');
     },
     `${envName} provisioning`,
   );
@@ -185,19 +255,37 @@ function resolveKey(
 
 let cachedMaster: ResolvedKey | null = null;
 let cachedJwt: ResolvedKey | null = null;
+// Set by wipeKeyCache. The cached resolvers then refuse to resolve again: with
+// the env key scrubbed they would find nothing and could mint a new master.key
+// beside the operator's. rearmKeys() lifts it for a host that boots again.
+let cacheWiped = false;
+
+/** For a host that boots again in the same process after its shutdown wiped
+ * the keys: lets the cached resolvers resolve afresh and the key functions
+ * derive again. Buffers and holders from before the wipe stay refused. */
+export function rearmKeys(): void {
+  cacheWiped = false;
+  markKeysLive();
+}
 
 /** Single choke point: no other module may read the env vars directly.
  * Boot/CLI form: failures exit with a clean stderr slug ("fatal at startup"). */
 export function resolveMasterKey(deps?: KeyDeps): ResolvedKey {
   if (deps) return resolveKey('MASTER_KEY', 'master.key', true, deps);
-  cachedMaster ??= resolveKey('MASTER_KEY', 'master.key', true, {});
+  if (cacheWiped) throw keysWipedError();
+  if (!cachedMaster) {
+    cachedMaster = resolveKey('MASTER_KEY', 'master.key', true, { scrubEnv: scrubKeyEnvDefault });
+  }
   return cachedMaster;
 }
 
 /** Dispatch form: identical resolution, but failures THROW (caught by the tool
  * handler into an error envelope) — a live server is never process.exit'd. */
 export function resolveMasterKeyForDispatch(): ResolvedKey {
-  cachedMaster ??= resolveKey('MASTER_KEY', 'master.key', true, {}, 'throw');
+  if (cacheWiped) throw keysWipedError();
+  if (!cachedMaster) {
+    cachedMaster = resolveKey('MASTER_KEY', 'master.key', true, { scrubEnv: scrubKeyEnvDefault }, 'throw');
+  }
   return cachedMaster;
 }
 
@@ -206,6 +294,8 @@ export function resolveMasterKeyForDispatch(): ResolvedKey {
 export function peekMasterKeyProvenance(deps?: KeyDeps): KeyProvenance | 'unprovisioned' {
   const env = deps?.env ?? process.env;
   if (env.MASTER_KEY?.trim()) return 'env';
+  // Scrubbed from process.env after the cached read: the key still came from there.
+  if (!deps?.env && cachedMaster?.provenance === 'env') return 'env';
   const keychain = deps?.keychain ?? keychainFactory;
   if (keychain('MASTER_KEY')?.get()) return 'keychain';
   const dir = deps?.dir ?? configDir();
@@ -217,7 +307,10 @@ export function peekMasterKeyProvenance(deps?: KeyDeps): KeyProvenance | 'unprov
  * outstanding MCP tokens and clients re-auth silently. */
 export function resolveJwtKey(deps?: KeyDeps): ResolvedKey {
   if (deps) return resolveKey('MCP_JWT_KEY', 'mcp-jwt.key', false, deps);
-  cachedJwt ??= resolveKey('MCP_JWT_KEY', 'mcp-jwt.key', false, {});
+  if (cacheWiped) throw keysWipedError();
+  if (!cachedJwt) {
+    cachedJwt = resolveKey('MCP_JWT_KEY', 'mcp-jwt.key', false, { scrubEnv: scrubKeyEnvDefault });
+  }
   return cachedJwt;
 }
 
@@ -251,7 +344,7 @@ export function noteSuccessfulDecrypt(): void {
 export function deleteMasterKeyMaterial(deps?: { dir?: string; keychain?: (a: string) => KeychainEntry | null }): { file: boolean; keychain: boolean; env: boolean } {
   const dir = deps?.dir ?? configDir();
   const keychain = deps?.keychain ?? keychainFactory;
-  const env = Boolean(process.env.MASTER_KEY?.trim());
+  const env = Boolean(process.env.MASTER_KEY?.trim()) || scrubbedEnv.has('MASTER_KEY');
   let file = false;
   let kc = false;
   try {
@@ -269,8 +362,21 @@ export function deleteMasterKeyMaterial(deps?: { dir?: string; keychain?: (a: st
   } catch {
     // keychain unavailable
   }
-  cachedMaster = null;
+  // A scrubbed env key lives only in this cache; dropping it would lose the key.
+  if (!scrubbedEnv.has('MASTER_KEY')) cachedMaster = null;
   return { file, keychain: kc, env };
+}
+
+/** Shutdown: overwrite the cached key bytes and drop the cache. A ResolvedKey
+ * handed out earlier shares those bytes, so it is overwritten too and fails
+ * closed. A key that was scrubbed from the env cannot be read again after
+ * this; call it only when the process is going away. */
+export function wipeKeyCache(): void {
+  for (const k of [cachedMaster, cachedJwt]) if (k) wipeBytes(k.bytes);
+  cachedMaster = null;
+  cachedJwt = null;
+  cacheWiped = true;
+  markKeysDisposed();
 }
 
 /** Test hook: the production cache is process-lifetime by design. */
@@ -278,4 +384,8 @@ export function clearKeyCacheForTest(): void {
   cachedMaster = null;
   cachedJwt = null;
   mirrored = false;
+  scrubbedEnv.clear();
+  scrubKeyEnvDefault = false;
+  cacheWiped = false;
+  markKeysLive();
 }

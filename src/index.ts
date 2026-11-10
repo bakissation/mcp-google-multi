@@ -179,7 +179,10 @@ async function main() {
 
   // Resolve (or provision) the master key BEFORE serving: the hard guard is
   // specced "fatal at startup", never mid-dispatch.
-  const { resolveMasterKey } = await import('./master-key.js');
+  const { resolveMasterKey, setScrubKeyEnv } = await import('./master-key.js');
+  // Opt-in: MASTER_KEY and MCP_JWT_KEY leave process.env once read (the cached
+  // key stays in memory), so no child process inherits them.
+  if (process.env.MCP_SCRUB_KEY_ENV === '1') setScrubKeyEnv(true);
   resolveMasterKey();
 
   // One Metrics instance per transport so `boots` keys stay honest under `both`.
@@ -292,11 +295,11 @@ async function main() {
       {
         base: httpCfg.publicUrl,
         resourceUri: httpCfg.resourceUri,
-        secret: jwtSecretFrom(resolveJwtKey().key),
+        secret: jwtSecretFrom(resolveJwtKey().bytes),
         ownerEmails: owners,
         cimdIssuers: (process.env.MCP_CIMD_ALLOWED_ISSUERS ?? 'claude.ai').split(',').map((s) => s.trim()).filter(Boolean),
         accessTtlSec: Number(process.env.MCP_ACCESS_TTL) || undefined,
-        masterKey: resolveMasterKeyForDispatch().key,
+        masterKey: resolveMasterKeyForDispatch().bytes,
         refreshStorePath: path.join(configDir(), 'mcp-tokens.enc'),
       },
       {

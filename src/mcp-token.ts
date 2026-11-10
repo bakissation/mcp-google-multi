@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { SignJWT, jwtVerify } from 'jose';
 import { deriveKey, encryptToken, decryptToken } from './token-store.js';
+import { assertKeysLive, base64KeyBytes, KeyMemo, keysEpoch, markKeysDisposed, wipeBytes, type KeyMaterial } from './key-material.js';
 import { atomicWriteFileSync, withFileLock } from './fs-atomic.js';
 
 export const ACCESS_TTL_DEFAULT = 600; // seconds
@@ -13,9 +14,16 @@ export const STATE_TTL_DEFAULT = 600;
 export const CODE_TTL_DEFAULT = 60;
 export const REPLAY_CAP_DEFAULT = 100_000;
 
-/** Derive the HS256 secret (32 bytes) from the provisioned MCP_JWT_KEY string. */
-export function jwtSecretFrom(jwtKey: string): Uint8Array {
-  return new Uint8Array(deriveKey(jwtKey));
+/** Derive the HS256 secret (32 bytes) from the provisioned MCP_JWT_KEY, as a
+ * string or as the bytes of its text (ResolvedKey.bytes). The returned array
+ * is the caller's to keep or overwrite; no other copy is left behind. */
+export function jwtSecretFrom(jwtKey: KeyMaterial): Uint8Array {
+  const derived = deriveKey(jwtKey);
+  try {
+    return new Uint8Array(derived);
+  } finally {
+    wipeBytes(derived);
+  }
 }
 
 function newJti(): string {
@@ -320,18 +328,31 @@ const sha256 = (b: Buffer | string): Buffer => createHash('sha256').update(b).di
 /** A non-secret tag for log lines and rate-limit keys: never the token. */
 const familyTag = (family: Buffer | string): string => sha256(family).toString('hex').slice(0, 8);
 
-// Keyed on the master key: scrypt runs once per process, not once per store.
-const macKeyMemo = new Map<string, Buffer>();
+// Matched on the master key: scrypt runs once per process, not once per store.
+const macKeyMemo = new KeyMemo();
+
+/** Overwrite and drop every memoized refresh MAC key (shutdown). A store that
+ * already holds its key sees it overwritten too. */
+export function wipeRefreshKeyMemo(): void {
+  macKeyMemo.wipe();
+  markKeysDisposed();
+}
 
 /** The store's own MAC key for `masterKey`, memoized. Exported so a caller
  * that never touches a RefreshStore (the AS computing a request's
  * clientFingerprint) can key it the same way the store does. */
-export function refreshMacKey(masterKey: string): Buffer {
+export function refreshMacKey(masterKey: KeyMaterial): Buffer {
+  assertKeysLive(undefined, masterKey);
   const hit = macKeyMemo.get(masterKey);
   if (hit) return hit;
-  const raw = deriveKey(masterKey);
-  const ikm = Buffer.from(masterKey, 'base64').length === 32 ? raw : scryptSync(masterKey, R1_SCRYPT_SALT, 32, R1_SCRYPT);
-  const key = Buffer.from(hkdfSync('sha256', ikm, Buffer.alloc(0), R1_KEY_INFO, 32));
+  if (masterKey.length === 0) deriveKey(masterKey); // throws the missing-key error
+  const ikm = base64KeyBytes(masterKey) ?? scryptSync(masterKey, R1_SCRYPT_SALT, 32, R1_SCRYPT);
+  let key: Buffer;
+  try {
+    key = Buffer.from(hkdfSync('sha256', ikm, Buffer.alloc(0), R1_KEY_INFO, 32));
+  } finally {
+    wipeBytes(ikm);
+  }
   macKeyMemo.set(masterKey, key);
   return key;
 }
@@ -395,9 +416,11 @@ function mintR1Successor(key: Buffer, presentedBody: Buffer): { token: string; c
  * for anything else. Derives the key once; the returned function does no I/O,
  * so a host can key a pre-auth rate limit on it.
  */
-export function refreshFamilyTagger(masterKey: string): (token: string) => string | null {
+export function refreshFamilyTagger(masterKey: KeyMaterial): (token: string) => string | null {
   const key = refreshMacKey(masterKey);
+  const epoch = keysEpoch();
   return (token) => {
+    assertKeysLive(epoch);
     const p = parseR1(token, key);
     return p ? familyTag(p.fidBytes) : null;
   };
@@ -459,7 +482,7 @@ function formatError(file: string, format: unknown): Error {
 
 /** The decrypted plaintext, or null when the file is absent. Throws when it
  * does not decrypt; the caller decides what that means. */
-function readPlain(file: string, masterKey: string): unknown {
+function readPlain(file: string, masterKey: KeyMaterial): unknown {
   if (!existsSync(file)) return null;
   return decryptToken(readFileSync(file, 'utf-8'), masterKey);
 }
@@ -520,7 +543,7 @@ function dropSub(data: RefreshData, sub: string): number {
  * release can read it; throws when it does not decrypt under `masterKey`
  * (E_REFRESH_STORE_UNREADABLE) or a newer release wrote it
  * (E_REFRESH_STORE_FORMAT). */
-export function assertRefreshStoreReadable(file: string, masterKey: string): void {
+export function assertRefreshStoreReadable(file: string, masterKey: KeyMaterial): void {
   let d: unknown;
   try {
     d = readPlain(file, masterKey);
@@ -573,19 +596,23 @@ export class RefreshStore {
   private readonly idleMs: number | undefined;
   private readonly maxFamiliesPerSub: number | undefined;
   private macKey: Buffer | undefined;
+  // A wipe after construction makes every write of this store throw: its key
+  // bytes are overwritten, and a write under them could never be read back.
+  private readonly epoch = keysEpoch();
   // Set once a load finds no earlier-release record. Nothing here adds one,
   // so from then on a legacy-shaped token is refused before the lock.
   private legacyEmpty = false;
 
   constructor(
     private readonly path: string,
-    private readonly masterKey: string,
+    private readonly masterKey: KeyMaterial,
     options: RefreshStoreOptions = {},
   ) {
     this.maxAgeMs = lifetimeMs('maxAgeSec', options.maxAgeSec);
     this.idleMs = lifetimeMs('idleSec', options.idleSec);
     this.maxFamiliesPerSub = positiveInt('maxFamiliesPerSub', options.maxFamiliesPerSub);
     this.log = options.log ?? (() => undefined);
+    assertKeysLive(undefined, masterKey);
   }
 
   private get timed(): boolean {
@@ -641,6 +668,7 @@ export class RefreshStore {
   }
 
   private key(): Buffer {
+    assertKeysLive(this.epoch);
     return (this.macKey ??= refreshMacKey(this.masterKey));
   }
 
@@ -666,6 +694,7 @@ export class RefreshStore {
   }
 
   private save(data: RefreshData): void {
+    assertKeysLive(this.epoch);
     // Earlier-release evidence matters only while its family lives on, as a
     // legacy record or as the family it migrated into.
     const live = new Set<string>();
