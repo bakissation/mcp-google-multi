@@ -41,6 +41,11 @@ function sanitizeDisplay(value: string): string {
 // call's own arguments), so there is nothing to protect by value shape.
 const SECRET_KEY_RE = /(token|secret|password|passwd|authoriz|api[_-]?key|private[_-]?key|credential)/i;
 
+// Narrower than SECRET_KEY_RE on purpose: it decides which values the Destinations scan
+// skips, and a key that merely CONTAINS a secret word (`changePasswordUri`,
+// `kaclsUri` under `privateKeyMetadata`) names a real destination the human must still see.
+const SECRET_VALUE_KEY_RE = /(token|secret|password|passwd|authoriz\w*|api[_-]?key|private[_-]?key|credentials?)$/i;
+
 function redactSecretsByKey(value: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
   if (value === null || typeof value !== 'object') return value;
   if (seen.has(value as object)) return '[circular]';
@@ -48,7 +53,8 @@ function redactSecretsByKey(value: unknown, seen: WeakSet<object> = new WeakSet(
   if (Array.isArray(value)) return value.map((v) => redactSecretsByKey(v, seen));
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    out[k] = SECRET_KEY_RE.test(k) ? '[redacted]' : redactSecretsByKey(v, seen);
+    // A boolean cannot carry a secret, and hiding `changePasswordAtNextLogin: true` would leave the human unable to tell what the call does.
+    out[k] = SECRET_KEY_RE.test(k) && typeof v !== 'boolean' ? '[redacted]' : redactSecretsByKey(v, seen);
   }
   return out;
 }
@@ -62,7 +68,7 @@ function redactSecretsByKey(value: unknown, seen: WeakSet<object> = new WeakSet(
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const URL_RE = /\bhttps?:\/\/[^\s"'<>]+/gi;
 const DESTINATION_KEY_RE =
-  /^(parents?|folder[_-]?id|new[_-]?owner|owner|destination|target|recipient|delegate(email)?|forwarding(email)?|send[_-]?as(email)?|grantee|member|attendee|to|cc|bcc|email(address)?|address|file[_-]?id|calendar[_-]?id|user[_-]?id|space[_-]?id|document[_-]?id|spreadsheet[_-]?id|presentation[_-]?id|drive[_-]?id|group[_-]?id|customer[_-]?id|device[_-]?id)$/i;
+  /^(parents?|folder[_-]?id|new[_-]?owner|owner|destination|target|recipient|delegate(email)?|forwarding(email)?|send[_-]?as(email)?|grantee|member|attendee|to|cc|bcc|email(address)?|address|file[_-]?id|calendar[_-]?id|user[_-]?id|space[_-]?id|document[_-]?id|spreadsheet[_-]?id|presentation[_-]?id|drive[_-]?id|group[_-]?id|user[_-]?key|group[_-]?key|customer[_-]?id|device[_-]?id)$/i;
 
 const MAX_DESTINATION_LEN = 200;
 
@@ -89,6 +95,9 @@ function collectDestinations(value: unknown, keyPath: string, out: string[], see
     return;
   }
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    // A secret-valued key is redacted in the Body section, so it must not resurface here just
+    // because its value looks like an email or a URL. Tested on the real key, not the dotted path.
+    if (SECRET_VALUE_KEY_RE.test(k) && typeof v !== 'boolean') continue;
     collectDestinations(v, keyPath ? `${keyPath}.${k}` : k, out, seen);
   }
 }

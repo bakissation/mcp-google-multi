@@ -79,7 +79,7 @@ server.registerTool(
 ## Adding a service
 
 1. `src/tools/<service>.ts` exporting `register<Service>Tools(server: ToolRegistry, deps: CuratedToolDeps = {})`.
-2. Scopes: always-on → `BASE_SCOPES` in `auth.ts` (breaking — forces re-auth → needs a `BREAKING CHANGE:` footer); optional → a `BUNDLE_CATALOG` entry in `src/scope-catalog.ts` (`OPTIONAL_SCOPE_BUNDLES` in `auth.ts` is derived from it); admin → `ADMIN_SCOPES` (`scope-catalog.ts`, re-exported by `auth.ts`).
+2. Scopes: always-on → `BASE_SCOPES` in `auth.ts` (breaking — forces re-auth → needs a `BREAKING CHANGE:` footer); optional → a `BUNDLE_CATALOG` entry in `src/scope-catalog.ts` (`OPTIONAL_SCOPE_BUNDLES` in `auth.ts` is derived from it); admin → `ADMIN_SCOPES` (`scope-catalog.ts`, re-exported by `auth.ts`); read-only admin → `ADMIN_READONLY_SCOPES` via the `admin_readonly` catalog entry (per-account, never global; keep `isAdminBundle` in step).
 3. Add a `ServiceEntry` to `SERVICES` (`src/services.ts`), with an `enabled()` gate for optional bundles — `buildRegistry()` picks it up.
 4. Run `npm run gen:coverage` to regenerate `COVERAGE.md` (never hand-edit it), and update the tool/service counts in `README.md`, `docs/features.md` and the `server.json` description.
 

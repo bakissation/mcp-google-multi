@@ -10,7 +10,7 @@ All operational tools are hidden until their `{service}_discover` tool reveals t
 
 That total is the **ceiling**, reached with every optional scope bundle granted plus an admin account. A default install (client id and secret, one account, no optional bundles) registers **337 tools across 10 services**: calendar, contacts, docs, drive, gmail, meet, searchconsole, sheets, tasks, workspaceevents. Everything else in the table is one scope bundle away, and the `Enabled by` column says which.
 
-**208 generated tools cannot succeed on any account under any configuration**, because no bundle in the catalog grants a scope they accept. They are not advertised in `tools/list` for that reason, though `{service}_discover` still lists them marked `unreachable` and they stay callable by name so the failure names the missing scope. Subtracting them, the reachable ceiling is **736 tools**.
+**192 generated tools cannot succeed on any account under any configuration**, because no bundle in the catalog grants a scope they accept. They are not advertised in `tools/list` for that reason, though `{service}_discover` still lists them marked `unreachable` and they stay callable by name so the failure names the missing scope. Subtracting them, the reachable ceiling is **752 tools**.
 
 Not covered: Alert Center (requires service-account domain-wide delegation; this server is per-user OAuth consent by design), Drive v2 (superseded by v3), Google Ads (no Discovery document; outside the generator by construction), and non-REST surfaces (Marketplace SDK, CalDAV).
 
@@ -187,7 +187,7 @@ Optional scope bundles: `analytics`, `analytics_write`, `appsmarket`, `chat`, `c
 | `admin_users_replace` | generated | update | Updates a user. This method supports patch semantics, meaning that you only need to include the fields you wish to updat |
 | `admin_users_sign_out` | generated | delete | Signs a user out of all web and device sessions and reset their sign-in cookies. User will have to sign in by authentica |
 | `admin_users_undelete` | generated | update | Undeletes a deleted user. |
-| `admin_users_update` | curated | update | Update a Workspace user (PATCH semantics). Gated by write-control (a CUD tool). |
+| `admin_users_update` | curated | update | Update a Workspace user (PATCH semantics). Can suspend a user or set a password, so it asks for confirmation like the Go |
 | `admin_users_watch` | generated | create | Watches for changes in users list. |
 | `admin_verification_codes_generate` | generated | create | Generates new backup verification codes for the user. |
 | `admin_verification_codes_invalidate` | generated | delete | Invalidates the current backup verification codes for the user. |
