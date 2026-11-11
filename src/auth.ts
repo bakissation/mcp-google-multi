@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { openUrl } from './open-url.js';
 import { ACCOUNTS, getAccountSet } from './accounts.js';
 import type { AccountSet } from './accounts.js';
-import { ADMIN_SCOPES, BUNDLE_CATALOG, closestBundle, isKnownBundle, resolveBundleAliases } from './scope-catalog.js';
+import { ADMIN_SCOPES, BUNDLE_CATALOG, adminBundleGrantHint, closestBundle, isAdminBundle, isKnownBundle, resolveBundleAliases } from './scope-catalog.js';
 import { resolveMasterKey } from './master-key.js';
 import type { ScopeProfile } from './scope-catalog.js';
 import { writeToken } from './token-store.js';
@@ -24,10 +24,10 @@ export const BASE_SCOPES = [
 ];
 
 // Kept as a derived view for compat (docs generator, tests); the catalog in
-// scope-catalog.ts is the source of truth. "admin" is not an optional bundle.
+// scope-catalog.ts is the source of truth. The admin bundles are per-account, not optional.
 export const OPTIONAL_SCOPE_BUNDLES: Record<string, string[]> = Object.fromEntries(
   Object.entries(BUNDLE_CATALOG)
-    .filter(([name]) => name !== 'admin')
+    .filter(([name]) => !isAdminBundle(name))
     .map(([name, entry]) => [name, entry.scopes]),
 );
 
@@ -50,9 +50,9 @@ function legacyGlobalProfile(): ScopeProfile | null {
   // Boot-time validation lives in resolveAccounts (runs whatever
   // GOOGLE_TOOLSETS selects); this is defense-in-depth for direct callers.
   for (const bundle of bundles) {
-    if (bundle === 'admin') {
+    if (isAdminBundle(bundle)) {
       throw new Error(
-        'E_UNKNOWN_BUNDLE: "admin" is not a global bundle: grant it per account via GOOGLE_ADMIN_ACCOUNTS or an "admin: true" scope profile.',
+        `E_UNKNOWN_BUNDLE: "${bundle}" is not a global bundle: ${adminBundleGrantHint(bundle)}.`,
       );
     }
     if (!isKnownBundle(bundle)) {
@@ -78,26 +78,34 @@ function profileForAccount(alias: string, set: AccountSet = getAccountSet()): Sc
  * account can authorize it; per-account authz happens at call time. */
 export function getOptionalBundles(set: AccountSet = getAccountSet()): string[] {
   const legacy = legacyGlobalProfile();
-  if (legacy) return legacy.bundles.filter(b => b !== 'admin');
+  if (legacy) return legacy.bundles.filter(b => !isAdminBundle(b));
   const union = new Set<string>();
   for (const alias of set.aliases) {
     for (const b of profileForAccount(alias, set).bundles) {
-      if (b !== 'admin') union.add(b);
+      if (!isAdminBundle(b)) union.add(b);
     }
   }
   return [...union];
 }
 
-/** Aliases granted ADMIN_SCOPES: per-account admin flag (env
+/** Aliases granted ADMIN_SCOPES (read and write): per-account admin flag (env
  * GOOGLE_ADMIN_ACCOUNTS overrides config.json at resolve) OR the account's
  * scope profile carrying admin (boolean or "admin" bundle) — equivalent forms. */
-export function getAdminAccounts(set: AccountSet = getAccountSet()): string[] {
+export function getFullAdminAccounts(set: AccountSet = getAccountSet()): string[] {
   const { aliases, configs } = set;
   return aliases.filter((a) => {
     if (configs[a].admin === true) return true;
     const p = profileForAccount(a, set);
     return p.admin === true || p.bundles.includes('admin');
   });
+}
+
+/** Aliases that enable the admin service: the full admin ones plus those whose
+ * profile carries only the read-only bundle (its own scopes come from the
+ * catalog loop, never ADMIN_SCOPES). */
+export function getAdminAccounts(set: AccountSet = getAccountSet()): string[] {
+  const full = new Set(getFullAdminAccounts(set));
+  return set.aliases.filter((a) => full.has(a) || profileForAccount(a, set).bundles.includes('admin_readonly'));
 }
 
 /** Scopes are fixed at consent time: changing an account's profile (or the
@@ -113,7 +121,7 @@ export function resolveScopesForAccount(alias: string, set: AccountSet = getAcco
     scopes.push(...BUNDLE_CATALOG[bundle].scopes);
   }
 
-  if (getAdminAccounts(set).includes(alias)) {
+  if (getFullAdminAccounts(set).includes(alias)) {
     scopes.push(...ADMIN_SCOPES);
   }
 
@@ -168,8 +176,10 @@ export async function runAuthFlow(args: string[]): Promise<void> {
 
   console.log(`Authenticating account "${alias}" (${config.email})...`);
   console.log(`Requesting ${scopes.length} scopes.`);
-  if (getAdminAccounts().includes(alias)) {
+  if (getFullAdminAccounts().includes(alias)) {
     console.log('  ⚠ Admin scopes included — this account will be granted Workspace admin access.');
+  } else if (getAdminAccounts().includes(alias)) {
+    console.log('  ⚠ Read-only admin scopes included: this account will be able to read Workspace users, groups, org units and audit reports.');
   }
   // Always print the URL first: the browser launch is best-effort and
   // silently does nothing on headless/SSH sessions.

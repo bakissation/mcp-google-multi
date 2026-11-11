@@ -75,6 +75,8 @@ The hard guard globs the token dir for any `.enc` file instead of checking only 
 
 The Admin SDK requires a Workspace account with admin privileges; consumer @gmail.com accounts always get a 403. Requesting admin scopes on an account that cannot use them would only add consent-screen noise, so they are granted per account (`GOOGLE_ADMIN_ACCOUNTS`, or `admin: true` on the account or its scope profile in `config.json`) instead of globally. `GOOGLE_OPTIONAL_SCOPES` refuses `admin` as a global bundle.
 
+`admin` grants `ADMIN_SCOPES`: read and write on users, groups and org units, plus the group member and audit report read scopes. `admin_readonly` is a catalog bundle that grants only `ADMIN_READONLY_SCOPES` (user, group, group member, org unit and audit report, all `.readonly`) and is set in an account's scope profile `bundles`. Both enable the `admin` service (`getAdminAccounts`), but only `getFullAdminAccounts` adds `ADMIN_SCOPES` at consent, so a read-only account never receives a write scope and a write call on it fails at Google with a scope error (the generated tools name the bundle in the hint, the curated ones say the account is read-only). Neither is a global bundle, and `allBundles` grants neither. Generated admin writes go through the escape hatch, so under safe-writes they ask before running. The curated `admin_users_update` declares no scopes, so the privileged-scope rule (`admin.directory.*`) does not cover it.
+
 ## Networking
 
 ### Why the server raises Node's happy-eyeballs timeout (`applyNetTuning`, `src/net-tuning.ts`)

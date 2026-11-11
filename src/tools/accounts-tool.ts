@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import type { ToolRegistry } from '../registry.js';
 import { getAccountSet, refreshAccountSetIfStale, type AccountSet } from '../accounts.js';
 import { buildScopesReport, type ScopesReport } from '../scope-observability.js';
-import { getAdminAccounts, resolveScopesForAccount } from '../auth.js';
+import { getAdminAccounts, getFullAdminAccounts, resolveScopesForAccount } from '../auth.js';
 import { hasToken, readToken, type TokenStore } from '../token-store.js';
 import { hints } from '../hint-provider.js';
 import { coerceBoolean } from './_coerce.js';
@@ -44,6 +44,8 @@ export interface AccountHealth {
   alias: string;
   email: string;
   admin: boolean;
+  /** Set only for read-only admin accounts (`admin_readonly`); `admin` stays true for them. */
+  adminLevel?: 'readonly';
   source: 'config' | 'env';
   sourceNote?: string;
   token: { status: TokenStatus; expiryDate?: string; hint?: string };
@@ -54,6 +56,7 @@ export function deriveAccountHealth(alias: string, deps: AccountHealthDeps = DEF
   const set = (deps.accounts ?? getAccountSet)();
   const config = set.configs[alias];
   const admin = getAdminAccounts(set).includes(alias);
+  const readOnlyAdmin = admin && !getFullAdminAccounts(set).includes(alias);
   const configured = resolveScopesForAccount(alias, set);
   // Env-sourced accounts are not persisted in config.json, so the
   // account wizard cannot edit them — the deployer edits env instead.
@@ -61,6 +64,7 @@ export function deriveAccountHealth(alias: string, deps: AccountHealthDeps = DEF
     alias,
     email: config.email,
     admin,
+    ...(readOnlyAdmin ? { adminLevel: 'readonly' as const } : {}),
     source: config.source,
     ...(config.source === 'env'
       ? { sourceNote: 'Defined by GOOGLE_ACCOUNTS env (not editable via config.json)' }
@@ -132,6 +136,7 @@ export interface AccountSummary {
   alias: string;
   email: string;
   admin: boolean;
+  adminLevel?: 'readonly';
   tokenStatus: TokenStatus;
   default: boolean;
 }
@@ -141,6 +146,7 @@ function summarizeAccountHealth(health: AccountHealth, isDefault: boolean): Acco
     alias: health.alias,
     email: health.email,
     admin: health.admin,
+    ...(health.adminLevel ? { adminLevel: health.adminLevel } : {}),
     tokenStatus: health.token.status,
     default: isDefault,
   };
