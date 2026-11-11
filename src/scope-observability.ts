@@ -1,4 +1,4 @@
-import { ADMIN_SCOPES, BUNDLE_CATALOG } from './scope-catalog.js';
+import { ADMIN_READONLY_SCOPES, ADMIN_SCOPES, BUNDLE_CATALOG } from './scope-catalog.js';
 import { BASE_SCOPES, resolveScopesForAccount } from './auth.js';
 import { readToken } from './token-store.js';
 import { reauthHint } from './reauth-hint.js';
@@ -191,7 +191,7 @@ export function scopeHintForMethod(
   const base = scopeHint(best.scope, best.classification, alias);
   // Hedged, never fabricated: the inputs can't distinguish a Workspace account
   // needing re-auth from a personal account that can never grant admin, so say both.
-  if (best.state === 'requestable_not_granted' && ADMIN_SCOPES.includes(best.scope)) {
+  if (best.state === 'requestable_not_granted' && (ADMIN_SCOPES.includes(best.scope) || ADMIN_READONLY_SCOPES.includes(best.scope))) {
     return {
       hint:
         `${base.hint} Note: personal (non-Workspace) accounts can never grant admin scopes — if ${alias} is a personal Gmail account, use a Workspace alias instead.`,

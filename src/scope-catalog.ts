@@ -21,9 +21,29 @@ export interface BundleCatalogEntry {
 export const ADMIN_SCOPES = [
   'https://www.googleapis.com/auth/admin.reports.audit.readonly',
   'https://www.googleapis.com/auth/admin.directory.user',
+  'https://www.googleapis.com/auth/admin.directory.group',
   'https://www.googleapis.com/auth/admin.directory.group.readonly',
   'https://www.googleapis.com/auth/admin.directory.group.member.readonly',
+  'https://www.googleapis.com/auth/admin.directory.orgunit',
 ];
+
+export const ADMIN_READONLY_SCOPES = [
+  'https://www.googleapis.com/auth/admin.reports.audit.readonly',
+  'https://www.googleapis.com/auth/admin.directory.user.readonly',
+  'https://www.googleapis.com/auth/admin.directory.group.readonly',
+  'https://www.googleapis.com/auth/admin.directory.group.member.readonly',
+  'https://www.googleapis.com/auth/admin.directory.orgunit.readonly',
+];
+
+/** The two bundles that enable the Admin SDK tools. Neither is a global bundle: both are per-account. */
+export const ADMIN_BUNDLES: readonly string[] = ['admin', 'admin_readonly'];
+export const isAdminBundle = (name: string): boolean => ADMIN_BUNDLES.includes(name);
+
+/** How to grant an admin bundle, since neither is global. `admin_readonly` must not be steered to `admin`, which adds write scopes. */
+export const adminBundleGrantHint = (bundle: string): string =>
+  bundle === 'admin_readonly'
+    ? `put "admin_readonly" in that account's scope profile bundles in config.json (run migrate-config first if GOOGLE_OPTIONAL_SCOPES is set)`
+    : 'grant it per account via GOOGLE_ADMIN_ACCOUNTS or an "admin: true" scope profile';
 
 export const BUNDLE_CATALOG: Record<string, BundleCatalogEntry> = {
   slides: {
@@ -175,7 +195,13 @@ export const BUNDLE_CATALOG: Record<string, BundleCatalogEntry> = {
   },
   admin: {
     scopes: ADMIN_SCOPES,
-    description: 'Workspace admin: user directory management and audit reports.',
+    description: 'Workspace admin: user, group and org unit management and audit reports.',
+    risk: 'high',
+    workspaceOnly: true,
+  },
+  admin_readonly: {
+    scopes: ADMIN_READONLY_SCOPES,
+    description: 'Workspace admin, read only: read users, groups, org units and audit reports.',
     risk: 'high',
     workspaceOnly: true,
   },

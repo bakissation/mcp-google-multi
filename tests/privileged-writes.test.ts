@@ -21,6 +21,14 @@ const FORMS_WATCHES_RENEW = { name: 'forms_forms_watches_renew', service: 'forms
 // gains anything); it is not, and should not be, flagged.
 const FORMS_WATCHES_DELETE = { name: 'forms_forms_watches_delete', service: 'forms', cud: 'delete' as const, scopes: [S('forms.body')] };
 
+describe('admin group and org unit writes are privileged by scope name', () => {
+  it('flags admin.directory.group and admin.directory.orgunit', () => {
+    for (const sc of ['admin.directory.group', 'admin.directory.orgunit']) {
+      expect(privilegeOf({ name: 'x', service: 'admin', cud: 'update', scopes: [S(sc)] }), sc).toBe('privileged_scope');
+    }
+  });
+});
+
 describe('safe-writes refuses privileged writes whatever the verb', () => {
   it('blocks an org-wide update that looks like an ordinary update', () => {
     expect(isAllowed(MAKE_ADMIN, safe())).toBe(false);

@@ -72,7 +72,8 @@ Each account can point at a named **scope profile** so consent is exactly what t
 | `reseller` | high | Reseller subscriptions and orders |
 | `appsmarket` | high | Marketplace license assignments |
 | `vault` | high (Workspace-only) | eDiscovery over the whole domain |
-| `admin` | high (Workspace-only) | Directory management + audit reports |
+| `admin` | high (Workspace-only) | Directory management (users, groups, org units: read and write) + audit reports |
+| `admin_readonly` | high (Workspace-only) | Read users, groups, group members, org units and audit reports. Set in a scope profile's `bundles`; never global |
 
 Google refuses the `keep` and `cloudidentity` scopes on a personal account's consent screen, and the refusal fails the whole sign-in. So for a `gmail.com` or `googlemail.com` address, `allBundles` leaves both out, and naming either one is refused with `E_VALIDATION`.
 
@@ -210,7 +211,7 @@ The token is not human consent. It proves the call was shown to the model and th
 
 Core services register by default: `gmail`, `drive`, `calendar`, `sheets`, `docs`, `contacts`, `searchconsole`, `tasks`, `meet`, `workspaceevents`.
 
-Optional services register when their bundle is enabled (below): `slides`, `forms`, `chat`, `analytics` (or `analytics_write`), `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket` — plus `admin`, which requires `GOOGLE_ADMIN_ACCOUNTS`.
+Optional services register when their bundle is enabled (below): `slides`, `forms`, `chat`, `analytics` (or `analytics_write`), `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket` — plus `admin`, which requires `GOOGLE_ADMIN_ACCOUNTS` (or `admin: true` in a scope profile), and its read-only form `admin_readonly`, which goes in an account's scope profile `bundles`.
 
 `GOOGLE_TOOLSETS` is a filter only: listing an optional service does not enable it without its bundle/admin gate.
 

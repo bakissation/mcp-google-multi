@@ -4,6 +4,7 @@ import { coerceBoolean } from './_coerce.js';
 import { admin as adminClient } from '@googleapis/admin';
 import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
+import { getAdminAccounts, getFullAdminAccounts } from '../auth.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, safeMessage, stringifyEnvelope } from './_errors.js';
 
@@ -323,6 +324,9 @@ export function handleAdminError(error: any, account: Account) {
       isError: true as const,
     };
   }
-  const admin ='Admin tools require Workspace super-admin privileges AND the account must be listed as an admin account (then re-authenticated). Personal Gmail accounts cannot use these endpoints.';
+  const readOnly = getAdminAccounts().includes(account) && !getFullAdminAccounts().includes(account);
+  const admin = readOnly
+    ? 'This account has read-only admin (admin_readonly). Writes need the admin bundle or admin: true on the account, then a re-authorization.'
+    : 'Admin tools require Workspace super-admin privileges AND the account must be listed as an admin account (then re-authenticated). Personal Gmail accounts cannot use these endpoints.';
   return handleGoogleApiError(error, account, { scope: admin, resource: admin, bundle: 'admin' });
 }

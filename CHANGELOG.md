@@ -9,7 +9,12 @@ All notable changes to this project are documented here. Format follows [Keep a 
 ### Added
 
 - Key APIs accept a Buffer as well as a string: `deriveKey`, `deriveTenantKey`, `encryptToken`, `decryptToken`, `createTokenStore`, `refreshMacKey`, `refreshFamilyTagger`, `jwtSecretFrom` and `RefreshStore` take the key text as a string or as its UTF-8 bytes and derive the same keys, so existing callers are unchanged. `resolveMasterKey` and `resolveJwtKey` results carry the key as `bytes`, and the cached key is held as bytes rather than a string. The per-call derived keys and plaintext are overwritten after use, and `wipeKeyCache`, `wipeTenantKeyMemo` and `wipeRefreshKeyMemo` overwrite the caches for a shutdown path. After a wipe, key derivation, `encryptToken` and every `RefreshStore` write throw `E_KEYS_WIPED` until `rearmKeys()`; the cached resolvers refuse too, and a Buffer that was wiped stays refused. The authorization server's JWT secret is the host's to wipe.
+- New `admin_readonly` bundle: read-only Workspace admin (users, groups, group members, org units and audit reports, all `.readonly` scopes). It enables the admin tools for the account without granting any write scope, goes in a scope profile's `bundles` (never global), and is not part of `allBundles`. `ADMIN_SCOPES` (the `admin` bundle) gains `admin.directory.group` and `admin.directory.orgunit`, so an account that already has `admin` re-authorizes once to use group and org unit writes; its existing tools keep working until then. `getAdminAccounts` now also returns accounts that have only `admin_readonly` (it means "admin tools enabled"); use the new `getFullAdminAccounts` to ask whether `ADMIN_SCOPES` are requested. `accounts_list` and `diagnose` add `adminLevel: "readonly"` for read-only admin accounts. New exports: `ADMIN_READONLY_SCOPES`, `ADMIN_BUNDLES`, `isAdminBundle`, `adminBundleGrantHint`, `getFullAdminAccounts`.
 - `MCP_SCRUB_KEY_ENV=1` removes `MASTER_KEY` and `MCP_JWT_KEY` from `process.env` once the server has read them. Off by default.
+
+### Changed
+
+- Existing admin accounts request two more scopes (`admin.directory.group`, `admin.directory.orgunit`), so after upgrading `doctor` reports them as requested but not granted and `doctor --strict` exits 1 until the account re-authorizes. An HTTP re-auth that declines either new scope keeps the old token and is refused; accept the wider grant or switch the account to `admin_readonly`. The `admin` bundle now also lets the account manage group membership.
 
 ### Documentation
 
