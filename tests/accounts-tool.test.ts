@@ -171,6 +171,19 @@ describe('account_list (registered tool)', () => {
     ]);
   });
 
+  it('marks a read-only admin account with adminLevel and leaves full admins unmarked', async () => {
+    const set = accountSet(
+      { ro: { email: 'ro@example.com', scopeProfile: 'ro' }, full: { email: 'full@example.com', admin: true } },
+      { defaultAccount: 'full', scopeProfiles: { ro: { bundles: ['admin_readonly'] } } },
+    );
+    const { call } = toolHarness({ accounts: set });
+    const payload = parseResult(await call('account_list', {}));
+    expect(payload.accounts).toEqual([
+      { alias: 'ro', email: 'ro@example.com', admin: true, adminLevel: 'readonly', tokenStatus: 'ok', default: false },
+      { alias: 'full', email: 'full@example.com', admin: true, tokenStatus: 'ok', default: true },
+    ]);
+  });
+
   it('verbose: true is byte-identical to deriveAccountHealth\'s own report', async () => {
     const { call, ctx } = toolHarness({ accounts: ACCOUNTS });
     const health = accountHealthDepsFor(ctx.tokenStore, () => ACCOUNTS);

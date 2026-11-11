@@ -1,6 +1,6 @@
 import { CONFIG_VERSION, configFilePath, loadConfigFile, mutateConfigFile } from './config-file.js';
 import type { ConfigFile } from './config-file.js';
-import { closestBundle, isKnownBundle, resolveBundleAliases } from './scope-catalog.js';
+import { adminBundleGrantHint, closestBundle, isAdminBundle, isKnownBundle, resolveBundleAliases } from './scope-catalog.js';
 
 function parseCsv(value: string | undefined): string[] {
   return (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -44,9 +44,9 @@ export function runMigrateConfig(env: NodeJS.ProcessEnv = process.env): void {
   if (legacyNames.length > 0) {
     const bundles = resolveBundleAliases(legacyNames);
     for (const bundle of bundles) {
-      if (bundle === 'admin') {
+      if (isAdminBundle(bundle)) {
         console.error(
-          'E_UNKNOWN_BUNDLE: "admin" is not a global bundle: use GOOGLE_ADMIN_ACCOUNTS or an "admin: true" scope profile. Nothing written.',
+          `E_UNKNOWN_BUNDLE: "${bundle}" is not a global bundle: ${adminBundleGrantHint(bundle)}. Nothing written.`,
         );
         process.exitCode = 1;
         return;

@@ -72,7 +72,8 @@ Each account can point at a named **scope profile** so consent is exactly what t
 | `reseller` | high | Reseller subscriptions and orders |
 | `appsmarket` | high | Marketplace license assignments |
 | `vault` | high (Workspace-only) | eDiscovery over the whole domain |
-| `admin` | high (Workspace-only) | Directory management + audit reports |
+| `admin` | high (Workspace-only) | Directory management (users, groups, org units: read and write) + audit reports |
+| `admin_readonly` | high (Workspace-only) | Read users, groups, group members, org units and audit reports. Set in a scope profile's `bundles`; never global |
 
 Google refuses the `keep` and `cloudidentity` scopes on a personal account's consent screen, and the refusal fails the whole sign-in. So for a `gmail.com` or `googlemail.com` address, `allBundles` leaves both out, and naming either one is refused with `E_VALIDATION`.
 
@@ -174,7 +175,9 @@ The rule is derived from each method's declared scopes and name, not from a hand
 
 `GOOGLE_WRITE_ALLOW` still wins over this, because naming a tool explicitly is a deliberate opt-in. `GOOGLE_WRITE_DENY` still wins over that.
 
-**Neither protection extends to the escape hatch.** The same underlying method is still reachable through `google_api_call` or its generated twin (`admin_users_update`'s raw method, say, or `gmail_users_watch`), which has no concept of "privileged scope" or "push-channel registration" at all: it follows the plain four-branch model in [Escape hatch](#escape-hatch-writes-ask-for-confirmation), so under `safe-writes` it ASKS a human rather than refusing outright. A privileged or push-registration write is therefore one ask away through the escape hatch even while its named curated tool stays hard-refused; `GOOGLE_WRITE_DENY` is the only way to hard-block it on both paths (see above).
+**Neither protection extends to the escape hatch.** The same underlying method is still reachable through `google_api_call` or its generated twin (`gmail_users_watch`, say), which has no concept of "privileged scope" or "push-channel registration" at all: it follows the plain four-branch model in [Escape hatch](#escape-hatch-writes-ask-for-confirmation), so under `safe-writes` it ASKS a human rather than refusing outright. A privileged or push-registration write is therefore one ask away through the escape hatch even while its named curated tool stays hard-refused; `GOOGLE_WRITE_DENY` is the only way to hard-block it on both paths (see above).
+
+**`admin_users_update` is the one curated admin write, and it asks.** It changes users org-wide (suspend, password reset, org unit move), so instead of the privileged-scope refusal it uses the same confirmation as the escape hatch: under `safe-writes` it asks a human first; under `full-writes` it runs, unless `GOOGLE_OUTBOUND_ALLOWLIST` is set, which asks again; `GOOGLE_READ_ONLY=true` or a matching `GOOGLE_WRITE_DENY` entry (`tool:admin_users_update`, `admin:update`) refuses it; the default `read-only` profile refuses it unless a `GOOGLE_WRITE_ALLOW` entry names the tool, in which case it asks. An allow entry never skips the ask. The prompt never shows the password. Over hosted HTTP the ask needs `input_required` confirmation support, otherwise the call is refused; with `MCP_HTTP_CONFIRM_TOKEN=on` the model, not a human, confirms (see above), so leave that off where this tool is exposed.
 
 ### Trash is the one delete-shaped exception
 
@@ -210,7 +213,7 @@ The token is not human consent. It proves the call was shown to the model and th
 
 Core services register by default: `gmail`, `drive`, `calendar`, `sheets`, `docs`, `contacts`, `searchconsole`, `tasks`, `meet`, `workspaceevents`.
 
-Optional services register when their bundle is enabled (below): `slides`, `forms`, `chat`, `analytics` (or `analytics_write`), `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket` — plus `admin`, which requires `GOOGLE_ADMIN_ACCOUNTS`.
+Optional services register when their bundle is enabled (below): `slides`, `forms`, `chat`, `analytics` (or `analytics_write`), `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket` — plus `admin`, which requires `GOOGLE_ADMIN_ACCOUNTS` (or `admin: true` in a scope profile), and its read-only form `admin_readonly`, which goes in an account's scope profile `bundles`.
 
 `GOOGLE_TOOLSETS` is a filter only: listing an optional service does not enable it without its bundle/admin gate.
 

@@ -69,7 +69,7 @@ List users in the Workspace customer. Filter by domain or customer=my_customer.
 
 Class: update
 
-Update a Workspace user (PATCH semantics). Gated by write-control (a CUD tool).
+Update a Workspace user (PATCH semantics). Can suspend a user or set a password, so it asks for confirmation like the Google API escape hatch (runs without asking only under full-writes).
 
 | Argument | Type | Required | Description |
 |---|---|---|---|

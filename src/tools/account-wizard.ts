@@ -5,7 +5,7 @@ import { getAccountSet, invalidateAccountSet, refreshAccountSetIfStale } from '.
 import { ALIAS_RE, mutateConfigFile } from '../config-file.js';
 import { writeToken } from '../token-store.js';
 import { resolveScopesForAccount } from '../auth.js';
-import { BUNDLE_CATALOG, closestBundle, isKnownBundle, orgOnlyRefusal, refusedBundlesFor, resolveBundleAliases } from '../scope-catalog.js';
+import { BUNDLE_CATALOG, closestBundle, isAdminBundle, isKnownBundle, orgOnlyRefusal, refusedBundlesFor, resolveBundleAliases } from '../scope-catalog.js';
 import { openUrl } from '../open-url.js';
 import { coerceBoolean } from './_coerce.js';
 import { safeMessage, stringifyEnvelope } from './_errors.js';
@@ -34,10 +34,10 @@ export interface AddForm {
 // multi-select; the long tail stays a comma-separated field, `allBundles` grants all.
 const CHECKBOX_BUNDLES = ['forms', 'chat'] as const;
 
-/** Every optional bundle (admin is granted via its own checkbox, not here),
+/** Every optional bundle (admin is granted via its own checkbox, admin_readonly only by name, neither by allBundles),
  * less those Google refuses for the account at `email` when one is given. */
 export function allOptionalBundles(email?: string): string[] {
-  const all = Object.keys(BUNDLE_CATALOG).filter((n) => n !== 'admin');
+  const all = Object.keys(BUNDLE_CATALOG).filter((n) => !isAdminBundle(n));
   if (email === undefined) return all;
   const refused = new Set(refusedBundlesFor(email, all));
   return all.filter((n) => !refused.has(n));
