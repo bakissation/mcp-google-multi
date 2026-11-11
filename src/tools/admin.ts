@@ -6,7 +6,6 @@ import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getAdminAccounts, getFullAdminAccounts } from '../auth.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
-import type { ServerContext } from '@modelcontextprotocol/server';
 import { escapeHatchGate } from './_escape-hatch.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
 import { escapeHatchNames } from './google-api.js';
@@ -189,32 +188,29 @@ export function registerAdminTools(server: ToolRegistry, deps: CuratedToolDeps =
     },
   );
 
-  // Widened locally, as the generated tools do: `escapeHatch` and `requiredScopes`
-  // are registry extensions the SDK config type does not carry.
-  const registerWrite = server.registerTool as unknown as (
-    name: string,
-    config: Record<string, unknown>,
-    handler: (args: Record<string, unknown>, ctx?: ServerContext) => unknown,
-  ) => void;
-  registerWrite(
-    'admin_users_update',
-    {
-      description: 'Update a Workspace user (PATCH semantics). Can suspend a user or set a password, so it asks for confirmation like the Google API escape hatch (runs without asking only under full-writes).',
-      // Same gate as the generated admin.users.patch twin: the handler asks a
-      // human under safe-writes, so the registry's name-based gate stands aside.
-      escapeHatch: true,
-      requiredScopes: ['https://www.googleapis.com/auth/admin.directory.user'],
-      inputSchema: {
-        account: accountEnum.describe('Google account alias (must be a Workspace admin)'),
-        userKey: z.string().min(1).describe('User email or ID'),
-        givenName: z.string().optional(),
-        familyName: z.string().optional(),
-        suspended: coerceBoolean.optional(),
-        password: z.string().optional(),
-        changePasswordAtNextLogin: coerceBoolean.optional(),
-        orgUnitPath: z.string().optional(),
-      },
+  // `escapeHatch` and `requiredScopes` are registry extensions the SDK config type does not
+  // carry. Passing the config as a variable (not a fresh literal) skips the excess-property
+  // check while keeping `server.registerTool(` visible to scripts/extract-curated-method-map.ts.
+  const usersUpdateConfig = {
+    description: 'Update a Workspace user (PATCH semantics). Can suspend a user or set a password, so it asks for confirmation like the Google API escape hatch (runs without asking only under full-writes).',
+    // Same gate as the generated admin.users.patch twin: the handler asks a
+    // human under safe-writes, so the registry's name-based gate stands aside.
+    escapeHatch: true,
+    requiredScopes: ['https://www.googleapis.com/auth/admin.directory.user'],
+    inputSchema: {
+      account: accountEnum.describe('Google account alias (must be a Workspace admin)'),
+      userKey: z.string().min(1).describe('User email or ID'),
+      givenName: z.string().optional(),
+      familyName: z.string().optional(),
+      suspended: coerceBoolean.optional(),
+      password: z.string().optional(),
+      changePasswordAtNextLogin: coerceBoolean.optional(),
+      orgUnitPath: z.string().optional(),
     },
+  };
+  server.registerTool(
+    'admin_users_update',
+    usersUpdateConfig,
     async (args, ctx) => {
       const { account, userKey, givenName, familyName, suspended, password, changePasswordAtNextLogin, orgUnitPath } = args as {
         account: string;
