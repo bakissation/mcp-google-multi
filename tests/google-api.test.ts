@@ -1041,6 +1041,22 @@ describe('escape hatch: round 6 human-confirmation model', () => {
     expect(prompt).toContain('to: a@corp.example');
   });
 
+  it('Destinations hides a secret-valued key but still shows a destination under a key that only contains a secret word', async () => {
+    const { call, dir, elicitInput } = setup(ASK_POLICY, { elicit: 'decline' });
+    cleanupDirs.push(dir);
+    await call({
+      ...CALL,
+      body: {
+        password: 'Summer@2024.Co',
+        idpConfig: { changePasswordUri: 'https://phish.example/reset' },
+      },
+    });
+    const prompt = (elicitInput.mock.calls[0][0] as { message: string }).message;
+    const destinations = prompt.split('\n').find((l) => l.startsWith('Destinations')) ?? '';
+    expect(destinations).not.toContain('Summer@2024.Co');
+    expect(destinations).toContain('https://phish.example/reset');
+  });
+
   it('decline refuses with write_declined and never calls Google', async () => {
     const { call, request, dir } = setup(ASK_POLICY, { elicit: 'decline' });
     cleanupDirs.push(dir);
