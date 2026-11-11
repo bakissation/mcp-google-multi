@@ -187,7 +187,7 @@ Optional scope bundles: `analytics`, `analytics_write`, `appsmarket`, `chat`, `c
 | `admin_users_replace` | generated | update | Updates a user. This method supports patch semantics, meaning that you only need to include the fields you wish to updat |
 | `admin_users_sign_out` | generated | delete | Signs a user out of all web and device sessions and reset their sign-in cookies. User will have to sign in by authentica |
 | `admin_users_undelete` | generated | update | Undeletes a deleted user. |
-| `admin_users_update` | curated | update | Update a Workspace user (PATCH semantics). Gated by write-control (a CUD tool). |
+| `admin_users_update` | curated | update | Update a Workspace user (PATCH semantics). Can suspend a user or set a password, so it asks for confirmation like the Go |
 | `admin_users_watch` | generated | create | Watches for changes in users list. |
 | `admin_verification_codes_generate` | generated | create | Generates new backup verification codes for the user. |
 | `admin_verification_codes_invalidate` | generated | delete | Invalidates the current backup verification codes for the user. |

@@ -16,6 +16,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 - Existing admin accounts request two more scopes (`admin.directory.group`, `admin.directory.orgunit`), so after upgrading `doctor` reports them as requested but not granted and `doctor --strict` exits 1 until the account re-authorizes. An HTTP re-auth that declines either new scope keeps the old token and is refused; accept the wider grant or switch the account to `admin_readonly`. The `admin` bundle now also lets the account manage group membership.
 
+### Fixed
+
+- `admin_users_update` (suspend, password reset, org unit move) ran without asking under `safe-writes`, because the curated tool carried no required scope and so skipped the privileged-scope rule. It now asks for confirmation like the generated admin writes: it prompts under `safe-writes`, runs under `full-writes` (asks if `GOOGLE_OUTBOUND_ALLOWLIST` is set), and is refused under `GOOGLE_READ_ONLY=true` or a `tool:admin_users_update` deny entry, and under the default `read-only` profile unless `GOOGLE_WRITE_ALLOW` names it (then it asks). A call that changes nothing still does not ask. The confirmation prompt no longer shows an email-shaped or URL-shaped password, and shows `changePasswordAtNextLogin`.
+
 ### Documentation
 
 - Markdown docs aligned with what 6.2 ships: `CLAUDE.md`, `SECURITY.md`, `docs/features.md`, `docs/configuration.md`, `docs/http-setup.md`, the pull request template and the skill's escape-hatch paragraph (#349).
