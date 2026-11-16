@@ -106,7 +106,7 @@ Download an email attachment to local disk. Use gmail_read first to get the atta
 | `messageId` | string | required | The Gmail message ID |
 | `attachmentId` | string | required | The attachment ID from gmail_read response |
 | `filename` | string | optional | Filename to save as (e.g. report.xlsx). Optional: defaults to the attachment's own name from the message. |
-| `savePath` | string | required | Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`. |
+| `savePath` | string | optional | Where to save, on the machine running the server: a folder (created if missing) or a full file path. Confined to /home/abdelbaki/Downloads/mcp-google-multi (GOOGLE_LOCAL_FILES_DIR); a relative path resolves inside it, an absolute path must already be inside it. Optional: omitted, the file goes straight into that root. The file name comes from `filename` or, for a file path, from its last segment. |
 
 ## `gmail_get_draft`
 

@@ -56,6 +56,7 @@ export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Di
       readTokenFn: ctx.tokenStore.readToken,
       profileFn: (alias) => resolveScopesForAccount(alias, ctx.accounts),
     },
+    hasTool: (name) => registry.hasTool(name),
   };
   const toolsets = getToolsets();
   if (toolsets !== 'all') {

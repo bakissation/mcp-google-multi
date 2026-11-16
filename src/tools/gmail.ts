@@ -7,7 +7,7 @@ import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
-import { hostFilesRefused, prepareLocalDest, cleanupPartialWrite, assertLocalPathAllowed, localFileErrorResult, LocalFileError } from './_local-files.js';
+import { localRootNote, hostFilesRefused, prepareLocalDest, cleanupPartialWrite, assertLocalPathAllowed, localFileErrorResult, LocalFileError } from './_local-files.js';
 import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import addressparser from 'nodemailer/lib/addressparser/index.js';
 import { lookup as lookupMime } from 'mime-types';
@@ -282,7 +282,7 @@ const estimateEncoded = (rawBytes: number) => Math.ceil((rawBytes * 4) / 3);
 const attachmentSchema = z
   .array(
     z.object({
-      path: z.string().describe('Path to the file to attach, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it.'),
+      path: z.string().describe('Path to the file to attach, on the machine running the server: confined to ' + localRootNote() + '; a relative path resolves inside it, an absolute path must already be inside it.'),
       filename: z.string().optional().describe('MIME filename; defaults to the path basename'),
       contentType: z.string().optional().describe('MIME type; defaults to a lookup on the filename'),
     }),
@@ -920,7 +920,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
         messageId: z.string().min(1).describe('The Gmail message ID'),
         attachmentId: z.string().min(1).describe('The attachment ID from gmail_read response'),
         filename: z.string().optional().describe('Filename to save as (e.g. report.xlsx). Optional: defaults to the attachment\'s own name from the message.'),
-        savePath: z.string().min(1).describe('Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`.'),
+        savePath: z.string().min(1).optional().describe('Where to save, on the machine running the server: a folder (created if missing) or a full file path. Confined to ' + localRootNote() + '; a relative path resolves inside it, an absolute path must already be inside it. Optional: omitted, the file goes straight into that root. The file name comes from `filename` or, for a file path, from its last segment.'),
       },
     },
     async ({ account, messageId, attachmentId, filename, savePath }) => {
@@ -961,7 +961,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           release();
         }
         const name = filename?.trim() || (await attachmentNameOf(gmail, messageId, attachmentId)) || `attachment-${attachmentId.slice(0, 8)}`;
-        const fullPath = await prepareLocalDest(savePath, name);
+        const fullPath = await prepareLocalDest(savePath, name, { nameGiven: !!filename?.trim() });
         try {
           // wx: never silently clobber; prepareLocalDest already checked
           // existence, this is the belt-and-suspenders race guard.

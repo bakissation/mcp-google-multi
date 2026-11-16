@@ -6,7 +6,7 @@ import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, mapGoogleError, safeMessage, stringifyEnvelope } from './_errors.js';
-import { hostFilesRefused, assertLocalPathAllowed, openLocalReadStream, openInternalReadStream, prepareLocalDest, cleanupPartialWrite, localFileErrorResult, LocalFileError } from './_local-files.js';
+import { localRootNote, hostFilesRefused, assertLocalPathAllowed, openLocalReadStream, openInternalReadStream, prepareLocalDest, cleanupPartialWrite, localFileErrorResult, LocalFileError } from './_local-files.js';
 import { checkOutbound, checkOutboundGrantee, driveGranteeFromAccessProposal, driveGranteeFromPermission, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import { isAllowed, writeDisabledResult } from '../write-control.js';
 import { capText, listResult } from '../trim.js';
@@ -25,6 +25,27 @@ import mime from 'mime-types';
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const FALLBACK_MAX_BYTES = 1024 * 1024 * 1024; // 1GB
 const MAX_UPLOAD_BASE64_BYTES = 25 * 1024 * 1024; // 25MB decoded
+
+// Several single-file uploads from one folder in a short span is the pattern
+// localDir exists for; say so once the pattern shows, not on every upload.
+const REPEAT_UPLOAD_WINDOW_MS = 5 * 60_000;
+const REPEAT_UPLOAD_THRESHOLD = 3;
+const recentSingleUploads = new Map<string, number[]>();
+
+function repeatedUploadHint(account: string, localPath: string, now: number = Date.now()): string | undefined {
+  const key = `${account}\0${path.dirname(path.resolve(localPath))}`;
+  const stamps = (recentSingleUploads.get(key) ?? []).filter((t) => now - t < REPEAT_UPLOAD_WINDOW_MS);
+  stamps.push(now);
+  recentSingleUploads.set(key, stamps);
+  if (recentSingleUploads.size > 200) {
+    for (const [k, v] of recentSingleUploads) {
+      if (v.every((t) => now - t >= REPEAT_UPLOAD_WINDOW_MS)) recentSingleUploads.delete(k);
+    }
+  }
+  return stamps.length >= REPEAT_UPLOAD_THRESHOLD
+    ? 'Several files from the same folder: pass localDir with that folder to upload it with its subfolders in one call.'
+    : undefined;
+}
 
 const GOOGLE_WORKSPACE_TYPES = new Set([
   'application/vnd.google-apps.document',
@@ -53,8 +74,14 @@ export function isTextualMime(mimeType: string): boolean {
   return TEXTUAL_EXACT.has(bare);
 }
 
-const BINARY_READ_HINT =
-  'Binary content cannot be inlined. Use drive_download to save the file to disk, or drive_export for Google Workspace files.';
+// drive_download and drive_export exist only when this server exposes the host
+// filesystem; naming them to a caller that lacks them sent it to a dead end.
+const binaryReadHint = (localFiles: boolean): string =>
+  localFiles
+    ? 'Binary content cannot be inlined. Use drive_download to save the file to disk, or drive_export for Google Workspace files.'
+    : 'Binary content cannot be inlined here. Open webViewLink to view the file, or ask for a copy in a text-based format.';
+const saveOrOpenHint = (localFiles: boolean): string =>
+  localFiles ? 'Use drive_download to save it to disk, or open webViewLink.' : 'Open webViewLink to view it.';
 
 const SHEET_READ_HINT =
   'Google Sheets are read cell by cell, not as plain text. Use sheets_get for the tab list, then sheets_read_range for the values.';
@@ -328,7 +355,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
             return fail(
               'too_large',
               `"${name}" is ${fileSize} bytes, over the ${DOC_MAX_DOWNLOAD_BYTES}-byte limit for reading text out of a ${docKind.toUpperCase()} file.`,
-              'Use drive_download to save it to disk, or open webViewLink.',
+              saveOrOpenHint(localFiles),
             );
           }
           const downloaded = await drive.files.get(
@@ -340,13 +367,13 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
             text = await extractDocumentText(docKind, new Uint8Array(downloaded.data as ArrayBuffer));
           } catch (e) {
             const why = e instanceof DocTextError ? e.message : 'the text could not be extracted';
-            return fail('binary', `Could not read text from "${name}": ${why}.`, BINARY_READ_HINT);
+            return fail('binary', `Could not read text from "${name}": ${why}.`, binaryReadHint(localFiles));
           }
           if (!text) {
             return fail(
               'binary',
               `"${name}" has no text to inline${docKind === 'pdf' ? ' (a scanned PDF has no text layer)' : ''}.`,
-              BINARY_READ_HINT,
+              binaryReadHint(localFiles),
             );
           }
           return respond(text);
@@ -363,7 +390,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
                 mimeType,
                 error: 'too_large',
                 message: `"${name}" is ${fileSize} bytes, over the ${MAX_FILE_SIZE}-byte inline limit for non-Google files.`,
-                hint: 'Use drive_download to save it to disk, or open webViewLink.',
+                hint: saveOrOpenHint(localFiles),
                 retriable: false,
                 account: account as string,
                 webViewLink,
@@ -390,7 +417,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
               mimeType,
               error: 'binary',
               message: `"${name}" is ${mimeType}, which has no text to inline.`,
-              hint: mimeType === 'application/vnd.google-apps.form' ? FORM_READ_HINT : BINARY_READ_HINT,
+              hint: mimeType === 'application/vnd.google-apps.form' ? FORM_READ_HINT : binaryReadHint(localFiles),
               retriable: false,
               account: account as string,
               webViewLink,
@@ -527,14 +554,17 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
   server.registerTool(
     'drive_upload',
     {
-      description: 'Upload a file to Google Drive, from inline base64 content or (when this server exposes the host filesystem) a local path. Pass `convertTo` to import it as a native, editable Google Doc/Sheet/Slides/Drawing instead of storing the raw bytes.' + (localFiles ? ` Pass \`localDir\` instead to upload a whole local folder, keeping its subfolders, in one call (up to ${FOLDER_UPLOAD_MAX_FILES} files).` : ''),
+      description: (localFiles
+        ? `Upload to Google Drive: one local file (\`localPath\`), a whole local folder with its subfolders in one call (\`localDir\`, up to ${FOLDER_UPLOAD_MAX_FILES} files), or inline base64 content (\`contentBase64\`).`
+        : 'Upload a file to Google Drive from inline base64 content.')
+        + ' Pass `convertTo` to import it as a native, editable Google Doc/Sheet/Slides/Drawing instead of storing the raw bytes.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         filename: z.string().optional().describe('Name as it appears in Drive. Optional with localPath (defaults to the file\'s own name); required with contentBase64.'),
         contentBase64: z.string().optional().describe(`Base64-encoded file content. contentBase64${localFiles ? ', localPath or localDir' : ''} is how the file is passed: exactly one is required. Decoded size is capped at ${MAX_UPLOAD_BASE64_BYTES / (1024 * 1024)} MB; over the HTTP transport the request body limit (4 MB by default, about 3 MB of file once base64-encoded) applies first.`),
         ...(localFiles
           ? {
-              localPath: z.string().min(1).optional().describe('Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64, localPath or localDir is required.'),
+              localPath: z.string().min(1).optional().describe('Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to ' + localRootNote() + '; a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64, localPath or localDir is required.'),
               localDir: z.string().min(1).optional().describe(`Path of a SOURCE folder to upload with its whole tree, on the machine running the server, confined like localPath. It becomes a new Drive folder (named by \`filename\` or the folder's own name) under parentFolderId, with subfolders recreated. Hidden entries and symlinks are skipped and reported, at most ${FOLDER_UPLOAD_MAX_FILES} files per call, and a file that fails does not stop the others. Not combinable with contentBase64, localPath, mimeType or convertTo. Running it twice uploads a second copy.`),
             }
           : {}),
@@ -619,8 +649,9 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           fields: 'id,name,mimeType,webViewLink,size',
           supportsAllDrives: true,
         });
+        const repeatHint = hasLocalPath ? repeatedUploadHint(account as string, localPathArg!) : undefined;
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(repeatHint ? { ...res.data, hint: repeatHint } : res.data, null, 2) }],
         };
       } catch (error: any) {
         if (error instanceof LocalFileError) return localFileErrorResult(error, account as string);
@@ -636,7 +667,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().min(1).describe('Google Drive file ID'),
-        savePath: z.string().min(1).describe('Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`.'),
+        savePath: z.string().min(1).optional().describe('Where to save, on the machine running the server: a folder (created if missing) or a full file path. Confined to ' + localRootNote() + '; a relative path resolves inside it, an absolute path must already be inside it. Optional: omitted, the file goes straight into that root. The file name comes from `filename` or, for a file path, from its last segment.'),
         filename: z.string().optional().describe('Filename to save as (defaults to the file name in Drive)'),
       },
     },
@@ -648,7 +679,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         const name = filename
           ?? (await drive.files.get({ fileId, fields: 'name', supportsAllDrives: true })).data.name
           ?? fileId;
-        const dest = await prepareLocalDest(savePath, name);
+        const dest = await prepareLocalDest(savePath, name, { nameGiven: filename !== undefined });
         const res = await drive.files.get(
           { fileId, alt: 'media', supportsAllDrives: true },
           { responseType: 'stream' },
@@ -688,7 +719,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().min(1).describe('Google Drive file ID'),
         mimeType: z.string().describe('Target export MIME type (e.g. "application/pdf", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")'),
-        savePath: z.string().min(1).describe('Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`.'),
+        savePath: z.string().min(1).optional().describe('Where to save, on the machine running the server: a folder (created if missing) or a full file path. Confined to ' + localRootNote() + '; a relative path resolves inside it, an absolute path must already be inside it. Optional: omitted, the file goes straight into that root. The file name comes from `filename` or, for a file path, from its last segment.'),
         filename: z.string().optional().describe('Filename to save as (defaults to the Drive name plus the extension implied by mimeType)'),
       },
     },
@@ -703,7 +734,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           const ext = mime.extension(exportMime);
           name = `${meta.data.name ?? fileId}${ext ? `.${ext}` : ''}`;
         }
-        const dest = await prepareLocalDest(savePath, name);
+        const dest = await prepareLocalDest(savePath, name, { nameGiven: !!filename });
         const res = await drive.files.export(
           { fileId, mimeType: exportMime },
           { responseType: 'stream' },
@@ -778,7 +809,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         newParentFolderId: z.string().optional().describe('Move to this folder, named newParentFolderId here, not parentFolderId'),
         ...(localFiles
           ? {
-              localPath: z.string().optional().describe('Replace file content with this local file, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it.'),
+              localPath: z.string().optional().describe('Replace file content with this local file, on the machine running the server: confined to ' + localRootNote() + '; a relative path resolves inside it, an absolute path must already be inside it.'),
               mimeType: z.string().optional().describe('MIME type of the replacement file (required if localPath is provided)'),
               convertTo: z.enum(CONVERT_TO_VALUES).optional().describe('When replacing content via localPath, convert the new content into this native Google Workspace type on import: "document" | "spreadsheet" | "presentation" | "drawing" (full application/vnd.google-apps.* ids also accepted).'),
             }

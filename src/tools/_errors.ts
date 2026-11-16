@@ -165,6 +165,12 @@ function netCodeOf(error: any): string | undefined {
   return undefined;
 }
 
+/** True for a transient connect/DNS/timeout failure (never ENOTFOUND). */
+export function isRetriableNetworkError(error: any): boolean {
+  const code = netCodeOf(error);
+  return code !== undefined && RETRIABLE_NET_CODES.has(code);
+}
+
 /** Console deep-link to enable one API (noob-proofing hint). */
 function apiEnableLink(api: string): string {
   return `https://console.cloud.google.com/apis/library/${api}.googleapis.com`;

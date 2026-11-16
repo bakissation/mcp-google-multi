@@ -384,7 +384,7 @@ export function registerEscapeTools(registry: ToolRegistry, policy: Policy, deps
           queryParams: queryParams as QueryParams | undefined,
           body,
         },
-        { getClientFn, scopeDeps: deps.scopeDeps },
+        { getClientFn, scopeDeps: deps.scopeDeps, hasTool: deps.hasTool },
       );
     },
   );
