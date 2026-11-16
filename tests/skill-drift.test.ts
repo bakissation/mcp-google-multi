@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generateReferenceFiles, allToolNames, argNamesFor } from '../scripts/gen-skill.js';
+import { generateReferenceFiles, allToolNames, argNamesFor, portableRoot } from '../scripts/gen-skill.js';
 
 // Keeps skills/google-workspace in sync with the real tool registry: the
 // generated reference tables must match what the generator produces right
@@ -65,6 +65,22 @@ describe('skill reference tables', () => {
     for (const name of onDisk) {
       const diskContent = fs.readFileSync(path.join(referenceDir, name), 'utf8');
       expect(diskContent, `${name} is stale, run npm run gen:skill`).toBe(generated[name]);
+    }
+  });
+
+  it('maps a platform-resolved local-files root back to the portable placeholder', () => {
+    const winRoot = 'D:\\path\\to\\local-files';
+    expect(portableRoot(`confined to ${winRoot} (GOOGLE_LOCAL_FILES_DIR); a relative path`, winRoot)).toBe(
+      'confined to /path/to/local-files (GOOGLE_LOCAL_FILES_DIR); a relative path',
+    );
+    const posix = path.posix.resolve('/path/to/local-files');
+    expect(portableRoot(`root ${posix}`, posix)).toBe('root /path/to/local-files');
+  });
+
+  it('the committed tables carry no drive letter or backslash root', () => {
+    for (const name of fs.readdirSync(referenceDir).filter((f) => f.endsWith('.md'))) {
+      const text = fs.readFileSync(path.join(referenceDir, name), 'utf8');
+      expect(text, name).not.toMatch(/[A-Za-z]:\\+path/);
     }
   });
 
