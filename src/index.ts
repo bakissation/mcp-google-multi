@@ -352,6 +352,7 @@ async function main() {
     const host = new HttpTransportHost({
       server: httpServer,
       config: httpCfg,
+      maxBodyBytes: httpCfg.maxBodyBytes,
       version: pkg.version,
       ownerConfigured: owners.length > 0,
       authenticate: authServer.authenticate,

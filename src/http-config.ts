@@ -34,6 +34,23 @@ export interface HttpConfig {
   allowedHosts: string[];
   /** Origin allowlist for the front guard (publicUrl origin + claude.ai + extras). */
   allowedOrigins: string[];
+  /** Max `/mcp` request body in bytes; undefined keeps the transport default. */
+  maxBodyBytes?: number;
+}
+
+export const MAX_BODY_MB_LIMIT = 128;
+
+function resolveMaxBodyBytes(raw: string | undefined): number | undefined {
+  const s = (raw ?? '').trim();
+  if (s === '') return undefined;
+  const n = Number(s);
+  if (!Number.isInteger(n) || n < 1 || n > MAX_BODY_MB_LIMIT) {
+    throw new HttpConfigError(
+      'E_INVALID_MAX_BODY',
+      `MCP_HTTP_MAX_BODY_MB must be an integer 1-${MAX_BODY_MB_LIMIT} (got "${raw}")`,
+    );
+  }
+  return n * 1024 * 1024;
 }
 
 export function transportIncludesHttp(t: Transport): boolean {
@@ -135,5 +152,6 @@ export function resolveHttpConfig(env: NodeJS.ProcessEnv = process.env): HttpCon
     resourceUri: `${publicUrl}/mcp`,
     allowedHosts: deriveAllowedHosts(publicUrl, host, port),
     allowedOrigins: deriveAllowedOrigins(publicUrl, env.MCP_ALLOWED_ORIGINS),
+    maxBodyBytes: resolveMaxBodyBytes(env.MCP_HTTP_MAX_BODY_MB),
   };
 }

@@ -50,9 +50,45 @@ function coerceRenamedValue(value: unknown, kind: ArgKind | undefined): unknown 
   return value;
 }
 
+// Deliberately narrow: only the names models keep sending for a local file or
+// folder location, and only on the tools where that one parameter is
+// unambiguous. Keys are lowercased with '_' and '-' removed before lookup.
+// Every other near-miss still goes to the unknown-argument screen.
+const PATH_ALIASES: Record<string, Record<string, string[]>> = {
+  savePath: ['path', 'filepath', 'outputpath', 'destination', 'dest', 'saveto', 'directory', 'dir', 'outputdir'].reduce(
+    (acc, k) => ({ ...acc, [k]: ['drive_download', 'drive_export', 'gmail_download_attachment'] }),
+    {} as Record<string, string[]>,
+  ),
+  // No `file` anywhere, and no `path` on drive_update: on an update those read
+  // as a rename or a target, and rewriting them would replace file content.
+  localPath: {
+    ...['path', 'filepath', 'localfile', 'sourcepath'].reduce(
+      (acc, k) => ({ ...acc, [k]: ['drive_upload'] }),
+      {} as Record<string, string[]>,
+    ),
+    ...['filepath', 'localfile', 'sourcepath'].reduce(
+      (acc, k) => ({ ...acc, [k]: ['drive_upload', 'drive_update'] }),
+      {} as Record<string, string[]>,
+    ),
+  },
+  localDir: ['directory', 'dir', 'sourcedir', 'localdirectory'].reduce(
+    (acc, k) => ({ ...acc, [k]: ['drive_upload'] }),
+    {} as Record<string, string[]>,
+  ),
+};
+
+function pathAliasTarget(tool: string, key: string): string | undefined {
+  const flat = key.toLowerCase().replace(/[_-]/g, '');
+  for (const [target, byKey] of Object.entries(PATH_ALIASES)) {
+    if (byKey[flat]?.includes(tool)) return target;
+  }
+  return undefined;
+}
+
 export function normalizeCallArguments(
   shape: ArgShape,
   args: Record<string, unknown>,
+  tool?: string,
 ): { args: Record<string, unknown>; renamed: [string, string][] } {
   const renamed: [string, string][] = [];
   let out: Record<string, unknown> | undefined;
@@ -64,6 +100,18 @@ export function normalizeCallArguments(
       out[camel] = coerceRenamedValue(out[key], shape.get(camel));
       delete out[key];
       renamed.push([key, camel]);
+    }
+  }
+  if (tool) {
+    const current = out ?? args;
+    for (const key of Object.keys(current)) {
+      if (shape.has(key)) continue;
+      const target = pathAliasTarget(tool, key);
+      if (!target || !shape.has(target) || target in (out ?? args)) continue;
+      out ??= { ...args };
+      out[target] = out[key];
+      delete out[key];
+      renamed.push([key, target]);
     }
   }
   return { args: out ?? args, renamed };
@@ -86,7 +134,7 @@ export function normalizeMessage(
   if (!args || typeof args !== 'object' || Array.isArray(args)) return msg;
   const shape = shapeFor(m.params.name);
   if (!shape) return msg;
-  const { args: normalized, renamed } = normalizeCallArguments(shape, args as Record<string, unknown>);
+  const { args: normalized, renamed } = normalizeCallArguments(shape, args as Record<string, unknown>, m.params.name);
   if (renamed.length === 0) return msg;
   // Key names only — argument VALUES never reach the log.
   log(`[args] ${m.params.name}: ${renamed.map(([f, t]) => `${f} -> ${t}`).join(', ')}`);
