@@ -17,6 +17,8 @@ export interface ScopeClassification {
 
 // Reverse index scope -> bundles offering it, narrowest first, so the
 // remediation names the smallest grant.
+const RISK_RANK = { low: 0, medium: 1, high: 2 } as const;
+
 let reverseIndex: Map<string, string[]> | null = null;
 
 function scopeIndex(): Map<string, string[]> {
@@ -31,10 +33,33 @@ function scopeIndex(): Map<string, string[]> {
     for (const scope of entry.scopes) add(scope, name);
   }
   for (const scope of BASE_SCOPES) add(scope, 'base');
+  const riskOf = (b: string) => (b === 'base' ? 0 : RISK_RANK[BUNDLE_CATALOG[b].risk]);
   const size = (b: string) => (b === 'base' ? BASE_SCOPES.length : BUNDLE_CATALOG[b].scopes.length);
-  for (const list of idx.values()) list.sort((a, b) => size(a) - size(b) || a.localeCompare(b));
+  for (const list of idx.values()) list.sort((a, b) => size(a) - size(b) || riskOf(a) - riskOf(b) || a.localeCompare(b));
   reverseIndex = idx;
   return idx;
+}
+
+/** The least risky, then smallest, catalog bundle that carries one of a method's accepted scopes,
+ * or undefined when the always-on base set already covers it. A read method
+ * therefore points at a read-only bundle when one exists. */
+export function bundleForMethodScopes(scopes: readonly string[]): string | undefined {
+  let best: string | undefined;
+  let bestRank = Infinity;
+  for (const scope of scopes) {
+    const list = scopeIndex().get(scope);
+    if (!list) continue;
+    if (list.includes('base')) return undefined;
+    for (const bundle of list) {
+      const { scopes: carried, risk } = BUNDLE_CATALOG[bundle];
+      const rank = RISK_RANK[risk] * 1000 + carried.length;
+      if (rank < bestRank) {
+        best = bundle;
+        bestRank = rank;
+      }
+    }
+  }
+  return best;
 }
 
 export function classifyScope(scope: string, granted: ReadonlySet<string>, profile: ReadonlySet<string>): ScopeClassification {

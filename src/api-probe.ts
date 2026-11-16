@@ -33,6 +33,7 @@ export const API_PROBES: ApiProbeSpec[] = [
   { service: 'searchconsole', api: 'searchconsole', url: 'https://www.googleapis.com/webmasters/v3/sites', scopePrefixes: [`${P}webmasters`] },
   { service: 'tasks', api: 'tasks', url: 'https://tasks.googleapis.com/tasks/v1/users/@me/lists?maxResults=1', scopePrefixes: [`${P}tasks`] },
   { service: 'chat', api: 'chat', url: 'https://chat.googleapis.com/v1/spaces?pageSize=1', scopePrefixes: [`${P}chat.`] },
+  { service: 'classroom', api: 'classroom', url: 'https://classroom.googleapis.com/v1/courses?pageSize=1', scopePrefixes: [`${P}classroom.courses`] },
   { service: 'meet', api: 'meet', url: 'https://meet.googleapis.com/v2/conferenceRecords?pageSize=1', scopePrefixes: [`${P}meetings.`] },
   { service: 'forms', api: 'forms', url: `https://forms.googleapis.com/v1/forms/${BOGUS_ID}`, scopePrefixes: [`${P}forms.`], notFoundMeansEnabled: true },
   // Probes the Admin API only: the Data API has no no-arg read (every call

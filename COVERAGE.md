@@ -47,7 +47,7 @@ Not covered: Alert Center (requires service-account domain-wide delegation; this
 | workspaceevents | 0 | 15 | 15 | default |
 | **Total** | **197** | **747** | **944** | |
 
-Optional scope bundles: `analytics`, `analytics_write`, `appsmarket`, `chat`, `classroom`, `cloudidentity`, `cloudsearch`, `directory`, `driveactivity`, `drivelabels`, `forms`, `gmail_settings`, `gmail_settings_sharing`, `groupsmigration`, `groupssettings`, `keep`, `licensing`, `postmaster`, `reseller`, `script`, `slides`, `vault`.
+Optional scope bundles: `analytics`, `analytics_write`, `appsmarket`, `chat`, `classroom`, `classroom_readonly`, `cloudidentity`, `cloudsearch`, `directory`, `driveactivity`, `drivelabels`, `forms`, `gmail_settings`, `gmail_settings_sharing`, `groupsmigration`, `groupssettings`, `keep`, `licensing`, `postmaster`, `reseller`, `script`, `slides`, `vault`.
 
 ## Tools by service
 

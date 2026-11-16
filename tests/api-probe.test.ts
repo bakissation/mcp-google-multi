@@ -32,6 +32,13 @@ describe('planProbes', () => {
     expect(services).not.toContain('chat');
   });
 
+  it('probes Classroom for either the read-write or the read-only grant', () => {
+    for (const scope of ['classroom.courses', 'classroom.courses.readonly']) {
+      const services = planProbes([...BASE_GRANTED, `https://www.googleapis.com/auth/${scope}`]).map((p) => p.service);
+      expect(services).toContain('classroom');
+    }
+  });
+
   it('empty grants → nothing to probe', () => {
     expect(planProbes([])).toEqual([]);
   });

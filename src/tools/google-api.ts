@@ -7,6 +7,7 @@ import { getClient } from '../client.js';
 import { coerceJson } from './_coerce.js';
 import { getToolsets, toolsetEnabled, type Toolsets } from '../toolsets.js';
 import { editDistance, SUGGEST_MAX_INPUT } from '../scope-catalog.js';
+import { bundleForMethodScopes } from '../scope-observability.js';
 import { executeApiMethod, jsonResult, type ExecuteDeps, type QueryParams } from '../executor.js';
 import {
   SUPPORTED_APIS,
@@ -126,6 +127,7 @@ export function escapeHatchNames(policyService: string, methodId: string): Escap
 }
 
 function describeMethod(m: DiscoveryMethod) {
+  const requiresBundle = bundleForMethodScopes(m.scopes);
   return {
     api: m.api,
     methodId: m.id,
@@ -134,6 +136,7 @@ function describeMethod(m: DiscoveryMethod) {
     description: m.description,
     requiredParams: m.requiredParams,
     cud: CUD_OVERRIDES[m.id] ?? cudFromMethod(m),
+    ...(requiresBundle ? { requiresBundle } : {}),
   };
 }
 

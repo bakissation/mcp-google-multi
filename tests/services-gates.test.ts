@@ -39,6 +39,14 @@ describe('per-set service gates', () => {
     expect(analytics(setWith({}))).toBe(false);
   });
 
+  it('classroom accepts the read-only bundle too', () => {
+    const gate = GENERATED_GATES.classroom.enabled;
+    expect(gate(setWith({ bundles: ['classroom'] }))).toBe(true);
+    expect(gate(setWith({ bundles: ['classroom_readonly'] }))).toBe(true);
+    expect(gate(setWith({}))).toBe(false);
+    expect(GENERATED_GATES.classroom.hint).toContain('classroom_readonly');
+  });
+
   it('admin gates on the SET\'s admin accounts, not the global registry', () => {
     const admin = gateFor('admin');
     expect(admin(setWith({ admin: true }))).toBe(true);

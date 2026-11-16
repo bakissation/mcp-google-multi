@@ -60,7 +60,8 @@ Each account can point at a named **scope profile** so consent is exactly what t
 | `forms` | medium | Build Forms and read responses |
 | `chat` | medium | Read/send Chat messages, manage spaces |
 | `gmail_settings` | medium | Mailbox settings: filters, labels, vacation |
-| `classroom` | medium | Courses, coursework, rosters, announcements |
+| `classroom` | medium | Courses, coursework, rosters, announcements; reads submissions and profile emails |
+| `classroom_readonly` | low | Read Classroom courses, coursework, materials, rosters, announcements and submissions; cannot change anything |
 | `cloudsearch` | medium | Query Cloud Search across Workspace content |
 | `drivelabels` | medium | Manage Drive labels |
 | `script` | medium | Apps Script projects and deployments |
@@ -213,7 +214,7 @@ The token is not human consent. It proves the call was shown to the model and th
 
 Core services register by default: `gmail`, `drive`, `calendar`, `sheets`, `docs`, `contacts`, `searchconsole`, `tasks`, `meet`, `workspaceevents`.
 
-Optional services register when their bundle is enabled (below): `slides`, `forms`, `chat`, `analytics` (or `analytics_write`), `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket` — plus `admin`, which requires `GOOGLE_ADMIN_ACCOUNTS` (or `admin: true` in a scope profile), and its read-only form `admin_readonly`, which goes in an account's scope profile `bundles`.
+Optional services register when their bundle is enabled (below): `slides`, `forms`, `chat`, `analytics` (or `analytics_write`), `classroom` (or `classroom_readonly`), `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket` — plus `admin`, which requires `GOOGLE_ADMIN_ACCOUNTS` (or `admin: true` in a scope profile), and its read-only form `admin_readonly`, which goes in an account's scope profile `bundles`.
 
 `GOOGLE_TOOLSETS` is a filter only: listing an optional service does not enable it without its bundle/admin gate.
 
@@ -221,7 +222,7 @@ Optional services register when their bundle is enabled (below): `slides`, `form
 
 Add bundle names to an account's [scope profile](#scope-profiles-per-account-consent) (or, legacy, to `GOOGLE_OPTIONAL_SCOPES` as CSV for every account), then re-run `auth --account <alias>` so the new scopes are granted:
 
-`slides`, `forms`, `chat`, `analytics`, `analytics_write`, `classroom`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket`, `directory`.
+`slides`, `forms`, `chat`, `analytics`, `analytics_write`, `classroom`, `classroom_readonly`, `cloudidentity`, `cloudsearch`, `vault`, `keep`, `driveactivity`, `drivelabels`, `script`, `postmaster`, `groupssettings`, `groupsmigration`, `licensing`, `reseller`, `appsmarket`, `directory`.
 
 Two bundles extend the always-on `gmail` service instead of enabling a new one — Gmail settings **writes** only accept the dedicated settings scopes (reads already work with the base scope):
 
