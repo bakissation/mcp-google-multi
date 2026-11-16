@@ -122,6 +122,7 @@ By default the server speaks **stdio** (`MCP_TRANSPORT=stdio`), the zero-network
 | `MCP_TRANSPORT` | `stdio` | `stdio`, `http`, or `both` |
 | `MCP_HTTP_HOST` | `127.0.0.1` | bind address |
 | `MCP_HTTP_PORT` | `4243` | bind port |
+| `MCP_HTTP_MAX_BODY_MB` | `36` | largest `/mcp` request body, in MB (1 to 128). The default fits a 25 MB file sent inline as base64 (about 33 MB) plus the request envelope. A larger body is refused with a 413 that states the limit. Lower it to bound memory per request |
 | `MCP_PUBLIC_URL` | `http://<host>:<port>` | the canonical public base URL; `${MCP_PUBLIC_URL}/mcp` is the endpoint clients connect to |
 | `MCP_OWNER_EMAILS` | *(required for http)* | CSV of Google emails allowed to authenticate; the server refuses to start HTTP without it |
 | `MCP_ALLOWED_ORIGINS` | — | extra Origins to allow beyond `MCP_PUBLIC_URL` and `https://claude.ai` |

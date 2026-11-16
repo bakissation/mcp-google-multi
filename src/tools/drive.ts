@@ -565,7 +565,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         filename: z.string().optional().describe('Name as it appears in Drive. Optional with localPath (defaults to the file\'s own name); required with contentBase64.'),
-        contentBase64: z.string().optional().describe(`Base64-encoded file content. contentBase64${localFiles ? ', localPath or localDir' : ''} is how the file is passed: exactly one is required. Decoded size is capped at ${MAX_UPLOAD_BASE64_BYTES / (1024 * 1024)} MB; over the HTTP transport the request body limit (4 MB by default, about 3 MB of file once base64-encoded) applies first.`),
+        contentBase64: z.string().optional().describe(`Base64-encoded file content. contentBase64${localFiles ? ', localPath or localDir' : ''} is how the file is passed: exactly one is required. Decoded size is capped at ${MAX_UPLOAD_BASE64_BYTES / (1024 * 1024)} MB.`),
         ...(localFiles
           ? {
               localPath: z.string().min(1).optional().describe('Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to ' + localRootNote() + '; a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64, localPath or localDir is required.'),
