@@ -24,7 +24,7 @@ import mime from 'mime-types';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const FALLBACK_MAX_BYTES = 1024 * 1024 * 1024; // 1GB
-const MAX_UPLOAD_BASE64_BYTES = 10 * 1024 * 1024; // 10MB decoded
+const MAX_UPLOAD_BASE64_BYTES = 25 * 1024 * 1024; // 25MB decoded
 
 const GOOGLE_WORKSPACE_TYPES = new Set([
   'application/vnd.google-apps.document',
@@ -55,6 +55,11 @@ export function isTextualMime(mimeType: string): boolean {
 
 const BINARY_READ_HINT =
   'Binary content cannot be inlined. Use drive_download to save the file to disk, or drive_export for Google Workspace files.';
+
+const SHEET_READ_HINT =
+  'Google Sheets are read cell by cell, not as plain text. Use sheets_get for the tab list, then sheets_read_range for the values.';
+const FORM_READ_HINT =
+  'A Google Form has no text to inline. Use forms_get for its questions and forms_responses_list for its answers.';
 
 // Accepted alongside the full application/vnd.google-apps.* ids so the obvious
 // short spelling ("document") works; the enum advertises both.
@@ -279,10 +284,29 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
         };
 
         if (mimeType && GOOGLE_WORKSPACE_TYPES.has(mimeType)) {
-          const exported = await drive.files.export({
-            fileId,
-            mimeType: 'text/plain',
-          });
+          let exported;
+          try {
+            exported = await drive.files.export({
+              fileId,
+              mimeType: 'text/plain',
+            });
+          } catch (error: any) {
+            if (mimeType !== 'application/vnd.google-apps.spreadsheet') throw error;
+            const status = error?.code ?? error?.response?.status;
+            if (status !== 400 && status !== 403) throw error;
+            return {
+              content: [{
+                type: 'text' as const,
+                text: JSON.stringify({
+                  id: fileId, name, mimeType, error: 'unsupported_type',
+                  message: `"${name}" is a Google Sheet, which has no plain-text export.`,
+                  hint: SHEET_READ_HINT,
+                  retriable: false, account: account as string, webViewLink,
+                }, null, 2),
+              }],
+              isError: true as const,
+            };
+          }
           return respond(String(exported.data));
         }
 
@@ -366,7 +390,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
               mimeType,
               error: 'binary',
               message: `"${name}" is ${mimeType}, which has no text to inline.`,
-              hint: BINARY_READ_HINT,
+              hint: mimeType === 'application/vnd.google-apps.form' ? FORM_READ_HINT : BINARY_READ_HINT,
               retriable: false,
               account: account as string,
               webViewLink,
@@ -507,7 +531,7 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         filename: z.string().optional().describe('Name as it appears in Drive. Optional with localPath (defaults to the file\'s own name); required with contentBase64.'),
-        contentBase64: z.string().optional().describe(`Base64-encoded file content. Exactly one of contentBase64${localFiles ? ' or localPath' : ''} is required. Decoded size is capped at ${MAX_UPLOAD_BASE64_BYTES / (1024 * 1024)} MB.`),
+        contentBase64: z.string().optional().describe(`Base64-encoded file content. contentBase64${localFiles ? ', localPath or localDir' : ''} is how the file is passed: exactly one is required. Decoded size is capped at ${MAX_UPLOAD_BASE64_BYTES / (1024 * 1024)} MB; over the HTTP transport the request body limit (4 MB by default, about 3 MB of file once base64-encoded) applies first.`),
         ...(localFiles
           ? {
               localPath: z.string().min(1).optional().describe('Path of the SOURCE file to upload, on the machine running the server (this is not savePath): confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it. Exactly one of contentBase64, localPath or localDir is required.'),

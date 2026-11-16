@@ -341,6 +341,29 @@ export async function readAttachments(
   return out;
 }
 
+// An attachment is held in memory as base64 and again as bytes; a bound on
+// both size and parallel downloads keeps a burst of calls from exhausting it.
+const MAX_ATTACHMENT_DOWNLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_PARALLEL_ATTACHMENT_DOWNLOADS = 2;
+let activeDownloads = 0;
+const downloadWaiters: Array<() => void> = [];
+
+async function acquireDownloadSlot(): Promise<() => void> {
+  if (activeDownloads >= MAX_PARALLEL_ATTACHMENT_DOWNLOADS) {
+    await new Promise<void>((resolve) => downloadWaiters.push(resolve));
+  } else {
+    activeDownloads++;
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const next = downloadWaiters.shift();
+    if (next) next();
+    else activeDownloads--;
+  };
+}
+
 /** Tagged compose-time failure mapped to an isError envelope; `category`
  * defaults to validation_error (reply auto-fill raises not_found instead). */
 class GmailComposeError extends Error {
@@ -361,7 +384,16 @@ function composeErrorResult(error: unknown, account: Account) {
   return {
     content: [{
       type: 'text' as const,
-      text: JSON.stringify({ error: category, slug, message: (error as Error).message, retriable: false, account }),
+      text: JSON.stringify({
+        error: category,
+        slug,
+        message: (error as Error).message,
+        hint: category === 'not_found'
+          ? 'Nothing was sent or created. Check the message id with gmail_search or gmail_read and call again.'
+          : 'Nothing was sent or created. Correct the argument the message names and call again.',
+        retriable: false,
+        account,
+      }),
     }],
     isError: true,
   };
@@ -896,16 +928,38 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
         const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
 
-        const res = await gmail.users.messages.attachments.get({
-          userId: 'me',
-          messageId,
-          id: attachmentId,
-        });
+        const release = await acquireDownloadSlot();
+        let buffer: Buffer;
+        try {
+          const res = await gmail.users.messages.attachments.get({
+            userId: 'me',
+            messageId,
+            id: attachmentId,
+          });
 
-        const data = res.data.data;
-        if (!data) throw new Error('No attachment data returned');
+          const data = res.data.data;
+          if (!data) throw new Error('No attachment data returned');
 
-        const buffer = Buffer.from(data, 'base64url');
+          const decodedBytes = Math.floor((data.length * 3) / 4);
+          if (decodedBytes > MAX_ATTACHMENT_DOWNLOAD_BYTES) {
+            return {
+              content: [{
+                type: 'text' as const,
+                text: JSON.stringify({
+                  error: 'too_large',
+                  message: `The attachment is about ${decodedBytes} bytes, over the ${MAX_ATTACHMENT_DOWNLOAD_BYTES}-byte limit for a download.`,
+                  hint: 'Open the message in Gmail and save the file from there.',
+                  retriable: false,
+                  account,
+                }, null, 2),
+              }],
+              isError: true as const,
+            };
+          }
+          buffer = Buffer.from(data, 'base64url');
+        } finally {
+          release();
+        }
         const name = filename?.trim() || (await attachmentNameOf(gmail, messageId, attachmentId)) || `attachment-${attachmentId.slice(0, 8)}`;
         const fullPath = await prepareLocalDest(savePath, name);
         try {

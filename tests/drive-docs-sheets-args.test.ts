@@ -84,9 +84,16 @@ describe('drive_upload contentBase64', () => {
     expect(upload).toBeDefined();
   });
 
-  it('rejects content over the 10MB decoded cap, before any request', async () => {
+  it('accepts inline content between the old 10MB cap and the 25MB cap', async () => {
+    const h = toolHarness({ respond: () => ({ id: 'F9', name: 'big.bin', mimeType: 'application/octet-stream', webViewLink: 'https://x' }) });
+    const big = Buffer.alloc(12 * 1024 * 1024, 'a').toString('base64');
+    const res = await h.call('drive_upload', { account: 'test', filename: 'big.bin', contentBase64: big });
+    expect(res.isError).toBeFalsy();
+  });
+
+  it('rejects content over the 25MB decoded cap, before any request', async () => {
     const h = toolHarness();
-    const big = Buffer.alloc(10 * 1024 * 1024 + 1, 'a').toString('base64');
+    const big = Buffer.alloc(25 * 1024 * 1024 + 1, 'a').toString('base64');
     const res = await h.call('drive_upload', { account: 'test', filename: 'big.bin', contentBase64: big });
     const env = parse(res);
     expect(res.isError).toBe(true);
@@ -281,7 +288,7 @@ describe('sheets_copy_sheet_to', () => {
 describe('drive_upload contentBase64 length validation', () => {
   it('rejects contentBase64 whose string length exceeds the encoding overhead cap, before decoding', async () => {
     const h = toolHarness();
-    const MAX_UPLOAD_BASE64_BYTES = 10 * 1024 * 1024;
+    const MAX_UPLOAD_BASE64_BYTES = 25 * 1024 * 1024;
     const maxB64Length = Math.ceil(MAX_UPLOAD_BASE64_BYTES / 3) * 4 + 4;
     const oversized = 'a'.repeat(maxB64Length + 1);
     const res = await h.call('drive_upload', { account: 'test', filename: 'big.bin', contentBase64: oversized });

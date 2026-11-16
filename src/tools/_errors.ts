@@ -360,6 +360,15 @@ export function mapGoogleError(
       account,
     };
   }
+  if (status === 400 && /invalid attachment token/i.test(message)) {
+    return {
+      error: 'bad_request',
+      message,
+      hint: 'Gmail attachment ids are not stable: they change each time the message is read. Call gmail_read on the message again to get a fresh attachmentId, then retry with that one.',
+      retriable: false,
+      account,
+    };
+  }
   if (status === 404) {
     return {
       error: 'not_found',
