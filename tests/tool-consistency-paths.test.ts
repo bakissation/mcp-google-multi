@@ -129,6 +129,16 @@ describe('silent path aliases', () => {
     expect(normalizeCallArguments(upload, { directory: 'photos' }, 'drive_upload').args).toEqual({ localDir: 'photos' });
   });
 
+  it('does not map file anywhere, nor path on drive_update (a rename must not become a content swap)', () => {
+    const update: ArgShape = new Map([['account', 'other'], ['fileId', 'other'], ['localPath', 'other']] as const);
+    const a = { fileId: 'f', path: 'report.pdf' };
+    expect(normalizeCallArguments(update, a, 'drive_update').args).toBe(a);
+    const b = { fileId: 'f', file: 'report.pdf' };
+    expect(normalizeCallArguments(update, b, 'drive_update').args).toBe(b);
+    expect(normalizeCallArguments(upload, { file: 'a.txt' }, 'drive_upload').renamed).toEqual([]);
+    expect(normalizeCallArguments(update, { fileId: 'f', filePath: 'a.txt' }, 'drive_update').args).toEqual({ fileId: 'f', localPath: 'a.txt' });
+  });
+
   it('never overrides a declared key that is already present', () => {
     const input = { fileId: 'f', savePath: 'real', path: 'other' };
     const { args, renamed } = normalizeCallArguments(download, input, 'drive_download');

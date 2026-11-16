@@ -54,6 +54,20 @@ describe('drive_read: Sheets and Forms', () => {
     expect(out.hint).toContain('sheets_read_range');
   });
 
+  it('a 403 rate limit on a Sheet export is not reported as an unsupported type', async () => {
+    const h = toolHarness({
+      respond: (req: GoogleRequest) => {
+        if (req.url.includes('/export')) {
+          throw Object.assign(new Error('Rate Limit Exceeded'), { code: 403, errors: [{ reason: 'rateLimitExceeded' }] });
+        }
+        return { id: 's1', name: 'Budget', mimeType: 'application/vnd.google-apps.spreadsheet', webViewLink: 'https://x.example/s1' };
+      },
+    });
+    const res = await h.call('drive_read', { account: 'test', fileId: 's1' });
+    expect(res.isError).toBe(true);
+    expect(parseResult(res).error).not.toBe('unsupported_type');
+  });
+
   it('a Form points to forms_get instead of the download tools', async () => {
     const h = toolHarness({
       respond: () => ({ id: 'f1', name: 'Survey', mimeType: 'application/vnd.google-apps.form', webViewLink: 'https://x.example/f1' }),

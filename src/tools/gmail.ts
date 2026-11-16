@@ -348,9 +348,21 @@ const MAX_PARALLEL_ATTACHMENT_DOWNLOADS = 2;
 let activeDownloads = 0;
 const downloadWaiters: Array<() => void> = [];
 
+const DOWNLOAD_SLOT_WAIT_MS = 30_000;
+const ATTACHMENT_FETCH_TIMEOUT_MS = 120_000;
+
 async function acquireDownloadSlot(): Promise<() => void> {
   if (activeDownloads >= MAX_PARALLEL_ATTACHMENT_DOWNLOADS) {
-    await new Promise<void>((resolve) => downloadWaiters.push(resolve));
+    // A bounded wait: without it, two stuck downloads would block every later one forever.
+    await new Promise<void>((resolve, reject) => {
+      const waiter = (): void => { clearTimeout(timer); resolve(); };
+      const timer = setTimeout(() => {
+        const i = downloadWaiters.indexOf(waiter);
+        if (i >= 0) downloadWaiters.splice(i, 1);
+        reject(new Error('Too many attachment downloads are in progress. Retry in a moment.'));
+      }, DOWNLOAD_SLOT_WAIT_MS);
+      downloadWaiters.push(waiter);
+    });
   } else {
     activeDownloads++;
   }
@@ -935,7 +947,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
             userId: 'me',
             messageId,
             id: attachmentId,
-          });
+          }, { timeout: ATTACHMENT_FETCH_TIMEOUT_MS });
 
           const data = res.data.data;
           if (!data) throw new Error('No attachment data returned');

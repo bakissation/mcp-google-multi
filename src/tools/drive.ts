@@ -321,6 +321,10 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
             if (mimeType !== 'application/vnd.google-apps.spreadsheet') throw error;
             const status = error?.code ?? error?.response?.status;
             if (status !== 400 && status !== 403) throw error;
+            // A 403 is only "no text export" when Drive says so; rate limits and
+            // permission errors keep their own, retriable envelope.
+            const reason = String(error?.errors?.[0]?.reason ?? error?.response?.data?.error?.errors?.[0]?.reason ?? '');
+            if (status === 403 && /rate|quota|permission|insufficient|scope|notconfigured|forbidden/i.test(reason)) throw error;
             return {
               content: [{
                 type: 'text' as const,

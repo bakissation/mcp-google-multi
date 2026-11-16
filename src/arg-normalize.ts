@@ -59,10 +59,18 @@ const PATH_ALIASES: Record<string, Record<string, string[]>> = {
     (acc, k) => ({ ...acc, [k]: ['drive_download', 'drive_export', 'gmail_download_attachment'] }),
     {} as Record<string, string[]>,
   ),
-  localPath: ['path', 'filepath', 'file', 'localfile', 'sourcepath'].reduce(
-    (acc, k) => ({ ...acc, [k]: ['drive_upload', 'drive_update'] }),
-    {} as Record<string, string[]>,
-  ),
+  // No `file` anywhere, and no `path` on drive_update: on an update those read
+  // as a rename or a target, and rewriting them would replace file content.
+  localPath: {
+    ...['path', 'filepath', 'localfile', 'sourcepath'].reduce(
+      (acc, k) => ({ ...acc, [k]: ['drive_upload'] }),
+      {} as Record<string, string[]>,
+    ),
+    ...['filepath', 'localfile', 'sourcepath'].reduce(
+      (acc, k) => ({ ...acc, [k]: ['drive_upload', 'drive_update'] }),
+      {} as Record<string, string[]>,
+    ),
+  },
   localDir: ['directory', 'dir', 'sourcedir', 'localdirectory'].reduce(
     (acc, k) => ({ ...acc, [k]: ['drive_upload'] }),
     {} as Record<string, string[]>,
