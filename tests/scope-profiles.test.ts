@@ -23,8 +23,8 @@ afterEach(() => {
 });
 
 describe('bundle catalog', () => {
-  it('carries the 19 v5 bundles plus the analytics pair plus directory plus admin and admin_readonly, each with description and risk', () => {
-    expect(Object.keys(BUNDLE_CATALOG)).toHaveLength(24);
+  it('carries the 19 v5 bundles plus the analytics pair plus directory plus classroom_readonly plus admin and admin_readonly, each with description and risk', () => {
+    expect(Object.keys(BUNDLE_CATALOG)).toHaveLength(25);
     expect(BUNDLE_CATALOG.admin.scopes).toEqual(ADMIN_SCOPES);
     expect(BUNDLE_CATALOG.admin.workspaceOnly).toBe(true);
     for (const [name, entry] of Object.entries(BUNDLE_CATALOG)) {
@@ -35,7 +35,7 @@ describe('bundle catalog', () => {
   });
 
   it('derived OPTIONAL_SCOPE_BUNDLES keeps the v5 shape without admin', () => {
-    expect(Object.keys(OPTIONAL_SCOPE_BUNDLES)).toHaveLength(22);
+    expect(Object.keys(OPTIONAL_SCOPE_BUNDLES)).toHaveLength(23);
     expect(OPTIONAL_SCOPE_BUNDLES.admin).toBeUndefined();
     expect(OPTIONAL_SCOPE_BUNDLES.gmail_settings_sharing).toEqual([
       'https://www.googleapis.com/auth/gmail.settings.sharing',

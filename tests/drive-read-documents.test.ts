@@ -83,7 +83,9 @@ describe('drive_read: Word', () => {
     expect(res.isError).toBe(true);
     expect(out.error).toBe('binary');
     expect(out.message).toContain('no document body');
-    expect(out.hint).toContain('drive_download');
+    // The harness is a non-owner context: no host-file tools, so no dead-end tool name.
+    expect(out.hint).toContain('webViewLink');
+    expect(out.hint).not.toContain('drive_download');
   });
 
   it('bytes that are not a zip are a binary error, not a crash', async () => {
@@ -167,7 +169,9 @@ describe('drive_read: PDF', () => {
     expect(res.isError).toBe(true);
     expect(out.error).toBe('binary');
     expect(out.message).toContain('scanned PDF');
-    expect(out.hint).toContain('drive_download');
+    // The harness is a non-owner context: no host-file tools, so no dead-end tool name.
+    expect(out.hint).toContain('webViewLink');
+    expect(out.hint).not.toContain('drive_download');
   });
 
   it('bytes that are not a PDF are a binary error, not a crash', async () => {

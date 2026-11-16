@@ -11,6 +11,11 @@ process.env.GOOGLE_ACCOUNTS ??= 'example:user@example.com';
 process.env.GOOGLE_CLIENT_ID ??= 'skillgen';
 process.env.GOOGLE_CLIENT_SECRET ??= 'skillgen';
 
+// Tool descriptions embed the resolved local-files root. Pin it so the
+// generated tables are identical on every machine and under the test setup.
+const priorLocalRoot = process.env.GOOGLE_LOCAL_FILES_DIR;
+process.env.GOOGLE_LOCAL_FILES_DIR = '/path/to/local-files';
+
 const { z } = await import('zod');
 const { ToolRegistry } = await import('../src/registry.js');
 const { SERVICES } = await import('../src/services.js');
@@ -53,6 +58,9 @@ for (const gen of GENERATED_SERVICES) gen.register(withMeta);
 registerDiscoverTools(withMeta, FULL_POLICY);
 registerEscapeTools(withMeta, FULL_POLICY);
 registerAccountTools(withMeta);
+
+if (priorLocalRoot === undefined) delete process.env.GOOGLE_LOCAL_FILES_DIR;
+else process.env.GOOGLE_LOCAL_FILES_DIR = priorLocalRoot;
 
 export function allToolNames(): string[] {
   return withMeta.tools.map((t) => t.name);
