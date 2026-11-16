@@ -21,6 +21,20 @@ describe('private-range detection', () => {
       expect(isBlockedIPv4(ip)).toBe(true);
     }
   });
+  it('blocks the reserved documentation, benchmarking and protocol-assignment IPv4 ranges', () => {
+    for (const ip of ['192.0.0.1', '192.0.2.10', '198.18.0.1', '198.19.255.255', '198.51.100.7', '203.0.113.9']) {
+      expect(isBlockedIPv4(ip), ip).toBe(true);
+    }
+    for (const ip of ['192.0.1.1', '198.17.0.1', '198.20.0.1', '198.51.101.1', '203.0.112.1', '203.0.114.1']) {
+      expect(isBlockedIPv4(ip), ip).toBe(false);
+    }
+  });
+  it('blocks Teredo, documentation, discard-only, local-use NAT64 and site-local IPv6', () => {
+    for (const ip of ['2001:0:4136:e378:8000:63bf:3fff:fdd2', '2001:db8::1', '100::1', '64:ff9b:1::1', 'fec0::1']) {
+      expect(isBlockedIPv6(ip), ip).toBe(true);
+    }
+    expect(isBlockedIPv6('2001:1::1')).toBe(false);
+  });
   it('allows public IPv4', () => {
     for (const ip of ['8.8.8.8', '1.1.1.1', '93.184.216.34', '172.15.0.1', '172.32.0.1']) {
       expect(isBlockedIPv4(ip)).toBe(false);

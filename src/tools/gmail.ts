@@ -7,7 +7,7 @@ import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
 import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
-import { hostFilesRefused, prepareLocalDest, cleanupPartialWrite, assertLocalPathAllowed, localFileErrorResult, LocalFileError } from './_local-files.js';
+import { localRootNote, hostFilesRefused, prepareLocalDest, cleanupPartialWrite, assertLocalPathAllowed, localFileErrorResult, LocalFileError } from './_local-files.js';
 import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import addressparser from 'nodemailer/lib/addressparser/index.js';
 import { lookup as lookupMime } from 'mime-types';
@@ -282,7 +282,7 @@ const estimateEncoded = (rawBytes: number) => Math.ceil((rawBytes * 4) / 3);
 const attachmentSchema = z
   .array(
     z.object({
-      path: z.string().describe('Path to the file to attach, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi); a relative path resolves inside it, an absolute path must already be inside it.'),
+      path: z.string().describe('Path to the file to attach, on the machine running the server: confined to ' + localRootNote() + '; a relative path resolves inside it, an absolute path must already be inside it.'),
       filename: z.string().optional().describe('MIME filename; defaults to the path basename'),
       contentType: z.string().optional().describe('MIME type; defaults to a lookup on the filename'),
     }),
@@ -341,6 +341,41 @@ export async function readAttachments(
   return out;
 }
 
+// An attachment is held in memory as base64 and again as bytes; a bound on
+// both size and parallel downloads keeps a burst of calls from exhausting it.
+const MAX_ATTACHMENT_DOWNLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_PARALLEL_ATTACHMENT_DOWNLOADS = 2;
+let activeDownloads = 0;
+const downloadWaiters: Array<() => void> = [];
+
+const DOWNLOAD_SLOT_WAIT_MS = 30_000;
+const ATTACHMENT_FETCH_TIMEOUT_MS = 120_000;
+
+async function acquireDownloadSlot(): Promise<() => void> {
+  if (activeDownloads >= MAX_PARALLEL_ATTACHMENT_DOWNLOADS) {
+    // A bounded wait: without it, two stuck downloads would block every later one forever.
+    await new Promise<void>((resolve, reject) => {
+      const waiter = (): void => { clearTimeout(timer); resolve(); };
+      const timer = setTimeout(() => {
+        const i = downloadWaiters.indexOf(waiter);
+        if (i >= 0) downloadWaiters.splice(i, 1);
+        reject(new Error('Too many attachment downloads are in progress. Retry in a moment.'));
+      }, DOWNLOAD_SLOT_WAIT_MS);
+      downloadWaiters.push(waiter);
+    });
+  } else {
+    activeDownloads++;
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const next = downloadWaiters.shift();
+    if (next) next();
+    else activeDownloads--;
+  };
+}
+
 /** Tagged compose-time failure mapped to an isError envelope; `category`
  * defaults to validation_error (reply auto-fill raises not_found instead). */
 class GmailComposeError extends Error {
@@ -361,7 +396,16 @@ function composeErrorResult(error: unknown, account: Account) {
   return {
     content: [{
       type: 'text' as const,
-      text: JSON.stringify({ error: category, slug, message: (error as Error).message, retriable: false, account }),
+      text: JSON.stringify({
+        error: category,
+        slug,
+        message: (error as Error).message,
+        hint: category === 'not_found'
+          ? 'Nothing was sent or created. Check the message id with gmail_search or gmail_read and call again.'
+          : 'Nothing was sent or created. Correct the argument the message names and call again.',
+        retriable: false,
+        account,
+      }),
     }],
     isError: true,
   };
@@ -888,7 +932,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
         messageId: z.string().min(1).describe('The Gmail message ID'),
         attachmentId: z.string().min(1).describe('The attachment ID from gmail_read response'),
         filename: z.string().optional().describe('Filename to save as (e.g. report.xlsx). Optional: defaults to the attachment\'s own name from the message.'),
-        savePath: z.string().min(1).describe('Destination folder to save into, on the machine running the server: confined to GOOGLE_LOCAL_FILES_DIR (default <home>/Downloads/mcp-google-multi), created if missing; a relative path resolves inside it, an absolute path must already be inside it. The file name comes from `filename`.'),
+        savePath: z.string().min(1).optional().describe('Where to save, on the machine running the server: a folder (created if missing) or a full file path. Confined to ' + localRootNote() + '; a relative path resolves inside it, an absolute path must already be inside it. Optional: omitted, the file goes straight into that root. The file name comes from `filename` or, for a file path, from its last segment.'),
       },
     },
     async ({ account, messageId, attachmentId, filename, savePath }) => {
@@ -896,18 +940,40 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
         const auth = await getClientFn(account as Account);
         const gmail = gmailClient({ version: 'v1', auth });
 
-        const res = await gmail.users.messages.attachments.get({
-          userId: 'me',
-          messageId,
-          id: attachmentId,
-        });
+        const release = await acquireDownloadSlot();
+        let buffer: Buffer;
+        try {
+          const res = await gmail.users.messages.attachments.get({
+            userId: 'me',
+            messageId,
+            id: attachmentId,
+          }, { timeout: ATTACHMENT_FETCH_TIMEOUT_MS });
 
-        const data = res.data.data;
-        if (!data) throw new Error('No attachment data returned');
+          const data = res.data.data;
+          if (!data) throw new Error('No attachment data returned');
 
-        const buffer = Buffer.from(data, 'base64url');
+          const decodedBytes = Math.floor((data.length * 3) / 4);
+          if (decodedBytes > MAX_ATTACHMENT_DOWNLOAD_BYTES) {
+            return {
+              content: [{
+                type: 'text' as const,
+                text: JSON.stringify({
+                  error: 'too_large',
+                  message: `The attachment is about ${decodedBytes} bytes, over the ${MAX_ATTACHMENT_DOWNLOAD_BYTES}-byte limit for a download.`,
+                  hint: 'Open the message in Gmail and save the file from there.',
+                  retriable: false,
+                  account,
+                }, null, 2),
+              }],
+              isError: true as const,
+            };
+          }
+          buffer = Buffer.from(data, 'base64url');
+        } finally {
+          release();
+        }
         const name = filename?.trim() || (await attachmentNameOf(gmail, messageId, attachmentId)) || `attachment-${attachmentId.slice(0, 8)}`;
-        const fullPath = await prepareLocalDest(savePath, name);
+        const fullPath = await prepareLocalDest(savePath, name, { nameGiven: !!filename?.trim() });
         try {
           // wx: never silently clobber; prepareLocalDest already checked
           // existence, this is the belt-and-suspenders race guard.

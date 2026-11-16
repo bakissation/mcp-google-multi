@@ -35,6 +35,7 @@
     "./hint-provider": "./dist/hint-provider.js",
     "./http-confirm": "./dist/http-confirm.js",
     "./scope-observability": "./dist/scope-observability.js",
+    "./ssrf-guard": "./dist/ssrf-guard.js",
     "./package.json": "./package.json"
   },
   "files": [

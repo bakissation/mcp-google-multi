@@ -10,6 +10,8 @@ import {
   hostAllowed,
   jsonRpcMethod,
   logSafe,
+  DEFAULT_MAX_BODY_BYTES,
+  MAX_BODY_BYTES_CEILING,
   type Authenticator,
   type HttpHostOptions,
 } from '../src/http-transport.js';
@@ -177,6 +179,37 @@ describe('HttpTransportHost (stateless dispatch)', () => {
     expect(ok.status).toBe(200);
   });
 
+  it('the default body limit fits a 25 MB file sent inline as base64', async () => {
+    const base64Bytes = Math.ceil((25 * 1024 * 1024 * 4) / 3);
+    expect(DEFAULT_MAX_BODY_BYTES).toBeGreaterThan(base64Bytes + 64 * 1024);
+    const port = await startHost();
+    const big = await request(port, 'POST', '/mcp', {
+      headers: { accept: MCP_ACCEPT },
+      raw: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { pad: 'x'.repeat(base64Bytes) } }),
+    });
+    expect(big.status).not.toBe(413);
+  });
+
+  it('a 413 names the limit', async () => {
+    const port = await startHost(undefined, { maxBodyBytes: 200 });
+    const over = await request(port, 'POST', '/mcp', { headers: { accept: MCP_ACCEPT }, raw: JSON.stringify({ pad: 'x'.repeat(400) }) });
+    expect(over.status).toBe(413);
+    expect(JSON.parse(over.text).message).toContain('200 bytes');
+  });
+
+  it('a configured limit above the hard ceiling is clamped to it', async () => {
+    const port = await startHost(undefined, { maxBodyBytes: MAX_BODY_BYTES_CEILING * 8 });
+    const status = await new Promise<number>((resolve) => {
+      const req = http.request(
+        { hostname: '127.0.0.1', port, method: 'POST', path: '/mcp', headers: { host: '127.0.0.1', accept: MCP_ACCEPT, 'content-type': 'application/json', 'content-length': String(MAX_BODY_BYTES_CEILING + 1) } },
+        (res) => resolve(res.statusCode ?? 0),
+      );
+      req.on('error', () => resolve(0));
+      req.flushHeaders();
+    });
+    expect(status).toBe(413);
+  });
+
   it('cuts a chunked body without a length once it passes the cap and keeps serving', async () => {
     const port = await startHost(undefined, { maxBodyBytes: 200 });
     const outcome = await new Promise<string>((resolve) => {
@@ -198,7 +231,7 @@ describe('HttpTransportHost (stateless dispatch)', () => {
     const port = await startHost();
     const over = await request(port, 'POST', '/mcp', {
       headers: { accept: MCP_ACCEPT },
-      raw: JSON.stringify({ pad: 'x'.repeat(4_000_100) }),
+      raw: JSON.stringify({ pad: 'x'.repeat(DEFAULT_MAX_BODY_BYTES + 100) }),
     });
     expect(over.status).toBe(413);
   });

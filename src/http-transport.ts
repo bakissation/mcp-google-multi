@@ -64,8 +64,16 @@ export interface HttpHostOptions {
   /** Extra routes keyed by exact pathname (AS endpoints mount here). */
   routes?: Record<string, RouteHandler>;
   log?: (line: string) => void;
-  /** Max /mcp JSON body bytes (DoS guard). */
+  /** Max /mcp JSON body bytes (DoS guard). Default 36 MiB, clamped to 128 MiB. */
   maxBodyBytes?: number;
+  /** How long a client may take to send the request headers (default 15000 ms). */
+  headersTimeoutMs?: number;
+  /** How long a client may take to send a whole request (default 30000 ms).
+   * 0 disables the limit. */
+  requestTimeoutMs?: number;
+  /** Per-path override of requestTimeoutMs, keyed by exact pathname (0 = no
+   * limit). For a mounted route that legitimately receives a long body. */
+  routeRequestTimeoutMs?: Record<string, number>;
   /** Deadline for a single /mcp dispatch; a hung handler past this releases the
    * shared lock instead of wedging the transport (default 120s). */
   dispatchTimeoutMs?: number;
@@ -131,7 +139,13 @@ const DISPATCH_TIMEOUT_DEFAULT = 120_000;
 // Without a cap, one body multiplies per-call work by however many
 // JSON-RPC frames the SDK's synchronous batch screening finds in it.
 const MAX_BATCH_FRAMES = 16;
-const DEFAULT_MAX_BODY_BYTES = 4_000_000;
+// Sized for the 25 MB inline upload cap: 25 MiB of file is about 33.3 MiB once
+// base64-encoded, plus the JSON-RPC envelope.
+export const DEFAULT_MAX_BODY_BYTES = 36 * 1024 * 1024;
+/** A configured body limit is clamped here, so no setting can turn the cap off. */
+export const MAX_BODY_BYTES_CEILING = 128 * 1024 * 1024;
+const DEFAULT_HEADERS_TIMEOUT_MS = 15_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
 // A refusal's body reaches the wire verbatim, so it's validated: no new slug
 // literal enters core, and an overlong message can't leak an operator path/env var.
@@ -287,6 +301,7 @@ export class HttpTransportHost {
 
   async start(): Promise<void> {
     const { config } = this.opts;
+    const perRoute = Object.keys(this.opts.routeRequestTimeoutMs ?? {}).length > 0;
     const server = createServer((req, res) => {
       const socket = req.socket;
       // Once closing, a request arriving now is never handled (RFC 9112 §9.6)
@@ -312,6 +327,7 @@ export class HttpTransportHost {
       };
       res.once('finish', settle);
       res.once('close', settle);
+      if (perRoute) this.armRequestTimeout(req, res);
       // Never rejects (close() waits on it); the thrown message can name
       // server paths, so it goes only to the host's log.
       const done = this.handle(req, res)
@@ -339,8 +355,11 @@ export class HttpTransportHost {
       });
     });
     // Slow-loris mitigation behind the tunnel.
-    server.headersTimeout = 15_000;
-    server.requestTimeout = 30_000;
+    const requestMs = this.opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    const headersMs = this.opts.headersTimeoutMs ?? DEFAULT_HEADERS_TIMEOUT_MS;
+    server.headersTimeout = requestMs > 0 ? Math.min(headersMs, requestMs) : headersMs;
+    // Node's own limit is server-wide, so per-path overrides take it over.
+    server.requestTimeout = perRoute ? 0 : requestMs;
     this.httpServer = server;
     await new Promise<void>((resolve, reject) => {
       const onErr = (e: Error) => reject(e);
@@ -573,13 +592,13 @@ export class HttpTransportHost {
     // A declared length over the cap is refused before a single byte is read;
     // chunked bodies without a length are still bounded while streaming.
     const declared = Number(req.headers['content-length']);
-    if (Number.isFinite(declared) && declared > (this.opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES)) {
+    if (Number.isFinite(declared) && declared > this.bodyCap()) {
       this.log('413 payload_too_large path=/mcp');
       // Answer first and let the client read it: destroying the socket with
       // the body unread would reset the client before it can see the 413.
       lingerAfterRefusal(req.socket);
       res.setHeader('Connection', 'close');
-      this.fail(res, 413, 'payload_too_large', 'request body too large');
+      this.fail(res, 413, 'payload_too_large', this.tooLargeMessage());
       return;
     }
 
@@ -697,7 +716,7 @@ export class HttpTransportHost {
         const handler = createMcpHandler(() => server, {
           legacy: 'reject',
           responseMode: 'json',
-          maxRequestBodySize: this.opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES,
+          maxRequestBodySize: this.bodyCap(),
           onerror: (e: Error) => this.log(`modern_handler_error ${logSafe(e.message, 200)}`),
         });
         return { handle: toNodeHandler(handler), close: () => Promise.resolve(handler.close()).then(() => undefined) };
@@ -768,8 +787,19 @@ export class HttpTransportHost {
     );
   }
 
+  private bodyCap(): number {
+    const v = this.opts.maxBodyBytes;
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.min(Math.floor(v), MAX_BODY_BYTES_CEILING) : DEFAULT_MAX_BODY_BYTES;
+  }
+
+  private tooLargeMessage(): string {
+    const cap = this.bodyCap();
+    const limit = cap >= 1024 * 1024 ? `${Math.round((cap / (1024 * 1024)) * 10) / 10} MB` : `${cap} bytes`;
+    return `The request body is larger than this server's limit of ${limit}. A file sent inline as base64 is about a third bigger than the file itself.`;
+  }
+
   private readJson(req: IncomingMessage): Promise<unknown> {
-    const max = this.opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+    const max = this.bodyCap();
     return new Promise((resolve, reject) => {
       // A client that left while the request was authenticated or resolved has
       // already destroyed it, and no 'end' or 'error' would ever follow.
@@ -779,7 +809,7 @@ export class HttpTransportHost {
       req.on('data', (c: Buffer) => {
         size += c.length;
         if (size > max) {
-          reject(new Error('request body too large'));
+          reject(new Error(this.tooLargeMessage()));
           req.destroy();
           return;
         }
@@ -796,6 +826,22 @@ export class HttpTransportHost {
       });
       req.on('error', reject);
     });
+  }
+
+  private armRequestTimeout(req: IncomingMessage, res: ServerResponse): void {
+    const path = pathOf(req);
+    const own = this.opts.routeRequestTimeoutMs?.[path];
+    const ms = own ?? this.opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    if (!(ms > 0)) return;
+    const timer = setTimeout(() => {
+      if (req.complete) return;
+      this.fail(res, 408, 'request_timeout', 'The request took too long to arrive.');
+      req.destroy();
+    }, ms);
+    timer.unref();
+    const clear = () => clearTimeout(timer);
+    req.once('end', clear);
+    res.once('close', clear);
   }
 
   private fail(res: ServerResponse, status: number, error: string, message: string): void {

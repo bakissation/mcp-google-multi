@@ -34,6 +34,11 @@ export function isBlockedIPv4(ip: string): boolean {
   if (a === 172 && b >= 16 && b <= 31) return true; // 172.16/12 private
   if (a === 192 && b === 168) return true; // 192.168/16 private
   if (a === 100 && b >= 64 && b <= 127) return true; // 100.64/10 CGNAT
+  const [, , c] = parts;
+  if (a === 192 && b === 0 && (c === 0 || c === 2)) return true; // 192.0.0/24 protocol assignments, 192.0.2/24 TEST-NET-1
+  if (a === 198 && (b === 18 || b === 19)) return true; // 198.18/15 benchmarking
+  if (a === 198 && b === 51 && c === 100) return true; // 198.51.100/24 TEST-NET-2
+  if (a === 203 && b === 0 && c === 113) return true; // 203.0.113/24 TEST-NET-3
   if (a >= 224) return true; // 224/4 multicast + 240/4 reserved
   return false;
 }
@@ -45,7 +50,12 @@ V6_BLOCKED.addSubnet('::', 96, 'ipv6'); // ::/96 = ::1, ::, and v4-compatible
 V6_BLOCKED.addSubnet('::ffff:0:0', 96, 'ipv6'); // v4-mapped
 V6_BLOCKED.addSubnet('64:ff9b::', 96, 'ipv6'); // NAT64
 V6_BLOCKED.addSubnet('2002::', 16, 'ipv6'); // 6to4
+V6_BLOCKED.addSubnet('64:ff9b:1::', 48, 'ipv6'); // local-use NAT64
+V6_BLOCKED.addSubnet('100::', 64, 'ipv6'); // discard-only
+V6_BLOCKED.addSubnet('2001::', 32, 'ipv6'); // Teredo
+V6_BLOCKED.addSubnet('2001:db8::', 32, 'ipv6'); // documentation
 V6_BLOCKED.addSubnet('fc00::', 7, 'ipv6'); // unique-local
+V6_BLOCKED.addSubnet('fec0::', 10, 'ipv6'); // deprecated site-local
 V6_BLOCKED.addSubnet('fe80::', 10, 'ipv6'); // link-local
 V6_BLOCKED.addSubnet('ff00::', 8, 'ipv6'); // multicast
 

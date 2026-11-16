@@ -56,7 +56,13 @@ const bundleGate = (name: string) => ({
 });
 export const GENERATED_GATES: Record<string, { enabled: (set?: AccountSet) => boolean; hint: string }> = {
   appsmarket: bundleGate('appsmarket'),
-  classroom: bundleGate('classroom'),
+  classroom: {
+    enabled: (set?: AccountSet) => {
+      const b = new Set(getOptionalBundles(set));
+      return b.has('classroom') || b.has('classroom_readonly');
+    },
+    hint: `add "classroom" (or "classroom_readonly" to read only) to an account's scope profile (or legacy GOOGLE_OPTIONAL_SCOPES)`,
+  },
   cloudidentity: bundleGate('cloudidentity'),
   cloudsearch: bundleGate('cloudsearch'),
   driveactivity: bundleGate('driveactivity'),

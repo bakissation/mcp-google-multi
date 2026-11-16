@@ -65,6 +65,14 @@ describe('package exports map', () => {
     expect(typeof scopes.classifyMethodScopes).toBe('function');
   });
 
+  it('./ssrf-guard is declared: a host that fetches user-supplied URLs can reuse the same checks', async () => {
+    expect(pkg.exports['./ssrf-guard']).toBe('./dist/ssrf-guard.js');
+    const guard = await import('../src/ssrf-guard.js');
+    expect(typeof guard.assertPublicHttpsUrl).toBe('function');
+    expect(typeof guard.isBlockedIp).toBe('function');
+    expect(typeof guard.SsrfBlockedError).toBe('function');
+  });
+
   // The map points at dist, so only the built package proves a subpath
   // resolves for a consumer. Every build-then-test job in CI exercises this;
   // a local run without a build skips it.
