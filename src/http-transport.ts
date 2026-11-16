@@ -66,6 +66,14 @@ export interface HttpHostOptions {
   log?: (line: string) => void;
   /** Max /mcp JSON body bytes (DoS guard). */
   maxBodyBytes?: number;
+  /** How long a client may take to send the request headers (default 15000 ms). */
+  headersTimeoutMs?: number;
+  /** How long a client may take to send a whole request (default 30000 ms).
+   * 0 disables the limit. */
+  requestTimeoutMs?: number;
+  /** Per-path override of requestTimeoutMs, keyed by exact pathname (0 = no
+   * limit). For a mounted route that legitimately receives a long body. */
+  routeRequestTimeoutMs?: Record<string, number>;
   /** Deadline for a single /mcp dispatch; a hung handler past this releases the
    * shared lock instead of wedging the transport (default 120s). */
   dispatchTimeoutMs?: number;
@@ -132,6 +140,8 @@ const DISPATCH_TIMEOUT_DEFAULT = 120_000;
 // JSON-RPC frames the SDK's synchronous batch screening finds in it.
 const MAX_BATCH_FRAMES = 16;
 const DEFAULT_MAX_BODY_BYTES = 4_000_000;
+const DEFAULT_HEADERS_TIMEOUT_MS = 15_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
 // A refusal's body reaches the wire verbatim, so it's validated: no new slug
 // literal enters core, and an overlong message can't leak an operator path/env var.
@@ -287,6 +297,7 @@ export class HttpTransportHost {
 
   async start(): Promise<void> {
     const { config } = this.opts;
+    const perRoute = Object.keys(this.opts.routeRequestTimeoutMs ?? {}).length > 0;
     const server = createServer((req, res) => {
       const socket = req.socket;
       // Once closing, a request arriving now is never handled (RFC 9112 §9.6)
@@ -312,6 +323,7 @@ export class HttpTransportHost {
       };
       res.once('finish', settle);
       res.once('close', settle);
+      if (perRoute) this.armRequestTimeout(req, res);
       // Never rejects (close() waits on it); the thrown message can name
       // server paths, so it goes only to the host's log.
       const done = this.handle(req, res)
@@ -339,8 +351,11 @@ export class HttpTransportHost {
       });
     });
     // Slow-loris mitigation behind the tunnel.
-    server.headersTimeout = 15_000;
-    server.requestTimeout = 30_000;
+    const requestMs = this.opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    const headersMs = this.opts.headersTimeoutMs ?? DEFAULT_HEADERS_TIMEOUT_MS;
+    server.headersTimeout = requestMs > 0 ? Math.min(headersMs, requestMs) : headersMs;
+    // Node's own limit is server-wide, so per-path overrides take it over.
+    server.requestTimeout = perRoute ? 0 : requestMs;
     this.httpServer = server;
     await new Promise<void>((resolve, reject) => {
       const onErr = (e: Error) => reject(e);
@@ -796,6 +811,22 @@ export class HttpTransportHost {
       });
       req.on('error', reject);
     });
+  }
+
+  private armRequestTimeout(req: IncomingMessage, res: ServerResponse): void {
+    const path = pathOf(req);
+    const own = this.opts.routeRequestTimeoutMs?.[path];
+    const ms = own ?? this.opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    if (!(ms > 0)) return;
+    const timer = setTimeout(() => {
+      if (req.complete) return;
+      this.fail(res, 408, 'request_timeout', 'The request took too long to arrive.');
+      req.destroy();
+    }, ms);
+    timer.unref();
+    const clear = () => clearTimeout(timer);
+    req.once('end', clear);
+    res.once('close', clear);
   }
 
   private fail(res: ServerResponse, status: number, error: string, message: string): void {
