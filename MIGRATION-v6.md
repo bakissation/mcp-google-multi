@@ -334,7 +334,7 @@ declared explicitly (`mcp-google-multi/identity`, `/compose`, `/registry`,
 `/client`, `/config-file`, `/fs-atomic`, `/master-key`, `/mcp-token`,
 `/boot-gates`, `/tenant-purge`, `/doctor`, `/write-control`,
 `/scope-catalog`, `/auth`, `/usage-metrics`, `/metrics-tap`,
-`/hint-provider`, `/http-confirm`, `/scope-observability`). Any OTHER deep import into `dist/` (previously
+`/hint-provider`, `/http-confirm`, `/scope-observability`, `/ssrf-guard`). Any OTHER deep import into `dist/` (previously
 unrestricted, e.g. `mcp-google-multi/dist/trim.js`) now fails with
 `ERR_PACKAGE_PATH_NOT_EXPORTED`. The CLI (`npx mcp-google-multi ...`) and the
 MCP server entry are unaffected. If you relied on an undeclared deep import,
@@ -359,6 +359,15 @@ that identity) together with `ConfirmTokens`, `confirmTokenEnabled` and the
 `accountScopeSets` (granted and profile scope sets for one account, with
 `ScopeSetDeps` to read them from a custom token store), `summarizeToolScopes`,
 `classifyMethodScopes` and the other scope classification helpers.
+
+`/ssrf-guard` is a declared entry for a host that fetches a URL on a caller's
+behalf: `assertPublicHttpsUrl` (https only, every resolved address must be
+public; `resolveAll` lets a host supply its own resolver), `isBlockedIp` and
+the `SsrfBlockedError` class. It now also refuses the reserved documentation,
+benchmarking, Teredo, discard-only and site-local ranges. `HttpHostOptions`
+gains `headersTimeoutMs`, `requestTimeoutMs` (0 disables) and
+`routeRequestTimeoutMs`, a per-pathname override of the request timeout for a
+mounted route that receives a long body; the defaults stay 15 s and 30 s.
 
 `/hint-provider` is a new declared entry: a host serving more than one
 identity over one process (a single owner never needs this) can install one

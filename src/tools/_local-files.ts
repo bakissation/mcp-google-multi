@@ -252,16 +252,46 @@ export function localFilesDisabledByEnv(env: NodeJS.ProcessEnv = process.env): b
   return true;
 }
 
+/** A path whose last segment has a file extension and is not an existing
+ * folder: the caller meant a file, not a destination folder. */
+function looksLikeFilePath(p: string): boolean {
+  const leaf = path.basename(p);
+  if (!/^.+\.[A-Za-z0-9]{1,8}$/.test(leaf)) return false;
+  const absolute = path.isAbsolute(p) ? p : path.join(localFilesRoot(), p);
+  try {
+    return !fs.statSync(absolute).isDirectory();
+  } catch {
+    return true;
+  }
+}
+
+/** The allowed root as the server resolved it, for tool descriptions: the
+ * caller sees the real folder up front instead of learning it from a refusal. */
+export function localRootNote(): string {
+  return `${localFilesRoot()} (GOOGLE_LOCAL_FILES_DIR)`;
+}
+
 /** Resolve and validate a download/export destination directory, then
  * create it if missing. Refuses to overwrite an existing file: downloads
  * are attacker-influenced content (a shared Drive file, an inbound
  * attachment), so clobbering whatever is already at that path silently is
  * never the right default. */
-export async function prepareLocalDest(savePath: string, filename: string): Promise<string> {
-  const name = sanitizedName(filename);
-  // Agents routinely repeat the leaf in both savePath and filename; a blind
-  // join would bury the download in a directory named like the file itself.
-  const dir = path.basename(savePath) === name ? path.dirname(savePath) : savePath;
+export async function prepareLocalDest(
+  savePath: string | undefined,
+  filename: string,
+  opts: { nameGiven?: boolean } = {},
+): Promise<string> {
+  let name = sanitizedName(filename);
+  let dir = savePath ?? localFilesRoot();
+  if (savePath !== undefined && opts.nameGiven === false && looksLikeFilePath(savePath)) {
+    // The caller passed a file path and no separate name: the leaf is the name.
+    name = sanitizedName(savePath);
+    dir = path.dirname(savePath);
+  } else if (path.basename(dir) === name) {
+    // Agents routinely repeat the leaf in both savePath and filename; a blind
+    // join would bury the download in a directory named like the file itself.
+    dir = path.dirname(dir);
+  }
   // Write through the SAME resolved real path that was just checked, not
   // the caller-supplied one: re-deriving the destination from `dir` again
   // here would let a symlink swapped in between the check and this mkdir

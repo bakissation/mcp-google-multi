@@ -25,6 +25,9 @@ export interface ExecuteDeps {
   getClientFn?: typeof getClient;
   /** Token + profile view behind a 403 scope hint; absent = the single owner. */
   scopeDeps?: ScopeSetDeps;
+  /** Whether a curated tool is registered on this server; lets a hint name
+   * only tools the caller actually has. Absent = assume the file tools exist. */
+  hasTool?: (name: string) => boolean;
 }
 
 export interface ExecuteArgs {
@@ -69,7 +72,9 @@ export async function executeApiMethod(method: ApiMethodRef, args: ExecuteArgs, 
       {
         error: 'binary_unsupported',
         message: 'Binary media download (alt=media) returns no usable JSON through this tool.',
-        hint: 'Use drive_download / drive_export for file content.',
+        hint: deps.hasTool && !deps.hasTool('drive_download')
+          ? 'This tool cannot return file bytes. Use drive_read for text content, or open the file\'s webViewLink.'
+          : 'Use drive_download / drive_export for file content.',
         retriable: false,
         account: args.account,
       },
@@ -84,7 +89,9 @@ export async function executeApiMethod(method: ApiMethodRef, args: ExecuteArgs, 
       {
         error: 'binary_unsupported',
         message: 'drive.files.export returns binary content, not JSON, through this tool.',
-        hint: 'Use drive_export to export a Google Workspace file to disk.',
+        hint: deps.hasTool && !deps.hasTool('drive_export')
+          ? 'This tool cannot return exported bytes. Use drive_read for the text of a Google Workspace file, or open its webViewLink.'
+          : 'Use drive_export to export a Google Workspace file to disk.',
         retriable: false,
         account: args.account,
       },

@@ -165,6 +165,12 @@ function netCodeOf(error: any): string | undefined {
   return undefined;
 }
 
+/** True for a transient connect/DNS/timeout failure (never ENOTFOUND). */
+export function isRetriableNetworkError(error: any): boolean {
+  const code = netCodeOf(error);
+  return code !== undefined && RETRIABLE_NET_CODES.has(code);
+}
+
 /** Console deep-link to enable one API (noob-proofing hint). */
 function apiEnableLink(api: string): string {
   return `https://console.cloud.google.com/apis/library/${api}.googleapis.com`;
@@ -356,6 +362,15 @@ export function mapGoogleError(
       error: 'invalid_scope',
       message,
       hint: rendered?.hint ?? 'One of the requested OAuth scopes is malformed or unavailable to this client. Run `config check` to review the account scope profile, fix it, then re-auth.',
+      retriable: false,
+      account,
+    };
+  }
+  if (status === 400 && /invalid attachment token/i.test(message)) {
+    return {
+      error: 'bad_request',
+      message,
+      hint: 'Gmail attachment ids are not stable: they change each time the message is read. Call gmail_read on the message again to get a fresh attachmentId, then retry with that one.',
       retriable: false,
       account,
     };

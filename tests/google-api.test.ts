@@ -882,7 +882,7 @@ describe('google_api_call write-control name resolution', () => {
     // right) together; a generated tool's baked cud (CUD_OVERRIDES-
     // corrected at gen time) is the real one google_api_call must match.
     const ALL_BUNDLES = [
-      'slides', 'forms', 'chat', 'analytics', 'analytics_write', 'classroom', 'cloudidentity',
+      'slides', 'forms', 'chat', 'analytics', 'analytics_write', 'classroom', 'classroom_readonly', 'cloudidentity',
       'cloudsearch', 'vault', 'keep', 'driveactivity', 'drivelabels', 'script', 'postmaster',
       'groupssettings', 'groupsmigration', 'licensing', 'reseller', 'appsmarket',
     ];

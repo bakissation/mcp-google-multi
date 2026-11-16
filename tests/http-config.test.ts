@@ -181,3 +181,19 @@ describe('resolveHttpConfig', () => {
     }
   });
 });
+
+describe('MCP_HTTP_MAX_BODY_MB', () => {
+  it('is unset by default so the transport default applies', () => {
+    expect(resolveHttpConfig({ MCP_TRANSPORT: 'http' }).maxBodyBytes).toBeUndefined();
+  });
+
+  it('converts megabytes to bytes', () => {
+    expect(resolveHttpConfig({ MCP_TRANSPORT: 'http', MCP_HTTP_MAX_BODY_MB: '64' }).maxBodyBytes).toBe(64 * 1024 * 1024);
+  });
+
+  it('refuses a value that is not 1 to 128', () => {
+    for (const bad of ['0', '129', '-1', '1.5', 'lots']) {
+      expect(() => resolveHttpConfig({ MCP_TRANSPORT: 'http', MCP_HTTP_MAX_BODY_MB: bad }), bad).toThrow(HttpConfigError);
+    }
+  });
+});

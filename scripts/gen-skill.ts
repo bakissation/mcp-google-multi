@@ -11,7 +11,14 @@ process.env.GOOGLE_ACCOUNTS ??= 'example:user@example.com';
 process.env.GOOGLE_CLIENT_ID ??= 'skillgen';
 process.env.GOOGLE_CLIENT_SECRET ??= 'skillgen';
 
+// Tool descriptions embed the resolved local-files root. Pin it so the
+// generated tables are identical on every machine and under the test setup.
+const LOCAL_ROOT_PLACEHOLDER = '/path/to/local-files';
+const priorLocalRoot = process.env.GOOGLE_LOCAL_FILES_DIR;
+process.env.GOOGLE_LOCAL_FILES_DIR = LOCAL_ROOT_PLACEHOLDER;
+
 const { z } = await import('zod');
+const { localFilesRoot } = await import('../src/tools/_local-files.js');
 const { ToolRegistry } = await import('../src/registry.js');
 const { SERVICES } = await import('../src/services.js');
 const { GENERATED_SERVICES } = await import('../src/tools/generated/index.js');
@@ -54,6 +61,19 @@ registerDiscoverTools(withMeta, FULL_POLICY);
 registerEscapeTools(withMeta, FULL_POLICY);
 registerAccountTools(withMeta);
 
+// path.resolve turns the placeholder into a drive-qualified, backslash path on
+// Windows, so the descriptions carry the resolved form; map it back.
+const pinnedResolvedRoot = localFilesRoot();
+
+if (priorLocalRoot === undefined) delete process.env.GOOGLE_LOCAL_FILES_DIR;
+else process.env.GOOGLE_LOCAL_FILES_DIR = priorLocalRoot;
+
+/** Replace the resolved form of the pinned local-files root with the portable
+ * placeholder, so generated text does not depend on the platform's path rules. */
+export function portableRoot(text: string, resolvedRoot: string = pinnedResolvedRoot): string {
+  return text.split(resolvedRoot).join(LOCAL_ROOT_PLACEHOLDER);
+}
+
 export function allToolNames(): string[] {
   return withMeta.tools.map((t) => t.name);
 }
@@ -89,7 +109,7 @@ function argTable(tool: ToolEntry): string[] {
     const prop = props[name];
     const type = jsonTypeOf(prop);
     const req = required.has(name) ? 'required' : 'optional';
-    const desc = String(prop?.description ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+    const desc = portableRoot(String(prop?.description ?? '')).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
     lines.push(`| \`${name}\` | ${type} | ${req} | ${desc} |`);
   }
   lines.push('');
@@ -127,7 +147,7 @@ function renderService(service: string): string {
   );
 
   for (const tool of curated) {
-    lines.push(`## \`${tool.name}\``, '', `Class: ${tool.cud}`, '', tool.description.split('\n')[0], '', ...argTable(tool));
+    lines.push(`## \`${tool.name}\``, '', `Class: ${tool.cud}`, '', portableRoot(tool.description.split('\n')[0]), '', ...argTable(tool));
   }
 
   return lines.join('\n');
