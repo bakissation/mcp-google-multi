@@ -55,6 +55,30 @@ New to all this? It's written for someone who just installed Claude Code and has
 
 **Go deeper:** [Configuration reference](./docs/configuration.md) · [What's covered](./COVERAGE.md) · [Features tour](./docs/features.md) · [Remote / HTTP setup](./docs/http-setup.md) · [Secrets in a vault](./docs/secrets.md) · [Local usage metrics](./docs/usage-metrics.md) · [Migrating to v6](./MIGRATION-v6.md) · [Security policy](./SECURITY.md) · [Roadmap](https://github.com/bakissation/mcp-google-multi/milestones)
 
+## Which one to use: this server or Google's hosted Workspace MCP servers
+
+Google now runs its own remote MCP servers for Workspace. This is how they compare, from Google's pages as read on 17 November 2026. Their status can change, so check the sources before you decide.
+
+| | Google's hosted servers | mcp-google-multi |
+|---|---|---|
+| Where it runs | Google's endpoints, one per product (`gmailmcp`, `drivemcp`, `docsmcp`, `sheetsmcp`, `slidesmcp`, `calendarmcp`, `chatmcp`, People, Classroom, and a `search_corpus` search server) | Your machine over stdio, or your own host over HTTP |
+| Status | Developer Preview, and you need membership in the Google Workspace Developer Preview Program. No GA date is stated | Released and versioned, MIT licensed |
+| Setup | Enable the MCP services in a Google Cloud project, make a Web application OAuth client with "Use this client for an AI-powered agent" ticked, add test users if the consent screen is External | Your own OAuth client, an interactive setup wizard and a `doctor` check |
+| Scopes | Narrow, for example `gmail.readonly` and `gmail.compose` for Gmail, `drive.file` and `drive.readonly` for Drive | Per-account scope profiles, from read-only up to the full set you grant |
+| Coverage | Gmail, Drive, Docs, Sheets, Slides, Calendar, Chat, People, Classroom | 944 tools across 29 services, plus an escape hatch for any REST method ([COVERAGE.md](./COVERAGE.md)) |
+| Accounts | User-delegated OAuth, or service accounts with domain-wide delegation | Several Google accounts at once, by alias |
+| Writes | Sensitive actions through domain-wide delegation get confirmation prompts | Denied by default, with write profiles, an outbound recipient allowlist and local file confinement |
+| Limits and pricing | Not stated on the pages read | No metering or telemetry. Google's own API quotas apply to your client |
+| Admin view | Developer access is managed in the Admin console under Security > API Controls | You run it, so you own the credentials and the logs |
+
+**Pick Google's servers** when you want a first-party, no-install connector for Gmail, Drive, Calendar, Docs, Sheets or Slides, you are comfortable with a preview product, and the narrower scopes suit the job. They are also the natural choice when your organisation wants Google to host the connection.
+
+**Pick this server** when you need more than those products (Tasks, Forms, Meet, Analytics, Search Console, Admin and the rest), more than one account in one session, local files and attachments, a stricter write policy, or something that is not in preview.
+
+Nothing stops you running both: they are separate MCP servers.
+
+Sources: [Configure the Google Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers), [Universal Search MCP server](https://developers.google.com/workspace/guides/universal-search-mcp), [Workspace Updates, 1 May 2026](https://workspaceupdates.googleblog.com/2026/05/agent-tools-and-security-updates-for-workspace-developers.html).
+
 ## Agent skill
 
 The repo and the npm package both ship an [Agent Skill](https://code.claude.com/docs/en/skills) at `skills/google-workspace/`: a hand-written `SKILL.md` covering account selection, the discover step, incremental Gmail sweeps, keeping results small, write profiles, and the escape hatch, plus a `reference/` folder with a generated argument table per service. Loading it gets an agent calling this server's tools correctly without guessing argument names.
