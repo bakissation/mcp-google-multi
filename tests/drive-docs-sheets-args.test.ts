@@ -334,3 +334,28 @@ describe('parseA1Range with sheet title containing exclamation mark', () => {
   });
 });
 
+
+describe('drive_copy convertTo and ocrLanguage', () => {
+  const copyReq = (h: ReturnType<typeof toolHarness>) => h.requests().find((r) => /\/drive\/v3\/files\/SRC\/copy/.test(r.url));
+
+  it('converts the copy to the target Google type and passes the OCR language', async () => {
+    const h = toolHarness({ respond: () => ({ id: 'C1', name: 'scan', mimeType: 'application/vnd.google-apps.document' }) });
+    const res = await h.call('drive_copy', { account: 'test', fileId: 'SRC', convertTo: 'document', ocrLanguage: 'fr' });
+    expect(res.isError).toBeFalsy();
+    expect(parse(res).mimeType).toBe('application/vnd.google-apps.document');
+    const req = copyReq(h);
+    expect((req?.data as { mimeType?: string })?.mimeType).toBe('application/vnd.google-apps.document');
+    expect((req?.params as Record<string, unknown>)?.ocrLanguage).toBe('fr');
+  });
+
+  it('accepts a full google-apps mime id and ignores ocrLanguage without convertTo', async () => {
+    const h = toolHarness({ respond: () => ({ id: 'C1' }) });
+    await h.call('drive_copy', { account: 'test', fileId: 'SRC', convertTo: 'application/vnd.google-apps.spreadsheet' });
+    expect((copyReq(h)?.data as { mimeType?: string })?.mimeType).toBe('application/vnd.google-apps.spreadsheet');
+    const plain = toolHarness({ respond: () => ({ id: 'C2' }) });
+    await plain.call('drive_copy', { account: 'test', fileId: 'SRC', ocrLanguage: 'en' });
+    const req = copyReq(plain);
+    expect(req?.data as object).not.toHaveProperty('mimeType');
+    expect(req?.params as object).not.toHaveProperty('ocrLanguage');
+  });
+});

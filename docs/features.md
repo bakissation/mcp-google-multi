@@ -73,6 +73,8 @@ Every tool that touches the machine's disk (Gmail attachments, Drive `localPath`
 
 `drive_upload` also takes `localDir` to upload a whole local folder in one call: the folder becomes a new Drive folder (named by `filename`, else its own name) under `parentFolderId`, its subfolders are recreated, and files go up three at a time. Hidden entries and symlinks are skipped and listed, a folder over 200 files is refused before anything is created, and one failing file is reported in `results` without stopping the rest (the call errors only when every file failed). Each file is checked against the same root policy as `localPath`.
 
+`drive_copy` takes `convertTo` to turn a file already in Drive into a native Google Doc, Sheet, Slides or Drawing in one call, working from the file id. An image or PDF converted to a Document is read with Drive's OCR, and `ocrLanguage` hints the language. The source must be an importable format, and Drive's own conversion limits apply.
+
 
 ### Markdown email (send)
 
