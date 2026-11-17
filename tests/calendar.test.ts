@@ -267,3 +267,101 @@ describe('calendar_create_event start/end shapes', () => {
     }
   });
 });
+
+describe('calendar recurrence on create/update', () => {
+  const body = (h: ReturnType<typeof toolHarness>, verb: string) =>
+    (h.requests().find((r) => (r.method ?? 'GET').toUpperCase() === verb) as GoogleRequest | undefined)?.data as
+      { recurrence?: unknown; start?: unknown } | undefined;
+
+  it('create sends the rules and keeps commas inside an RRULE', async () => {
+    const h = toolHarness({ respond: (req) => req.data ?? {} });
+    const res = await h.call('calendar_create_event', {
+      account: 'test', summary: 'Coffee Test',
+      start: '2026-11-15T09:00:00', end: '2026-11-15T10:30:00',
+      startTimeZone: 'America/Chicago', endTimeZone: 'America/Chicago',
+      recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=SA,SU'],
+    });
+    expect(res.isError).toBeFalsy();
+    expect(body(h, 'POST')).toMatchObject({
+      recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=SA,SU'],
+      start: { dateTime: '2026-11-15T09:00:00', timeZone: 'America/Chicago' },
+    });
+    expect(parseResult(res).recurrence).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=SA,SU']);
+  });
+
+  it('create accepts the rules as a JSON string or one line per rule', async () => {
+    for (const recurrence of [
+      '["RRULE:FREQ=WEEKLY;BYDAY=SA,SU"]',
+      'RRULE:FREQ=WEEKLY;BYDAY=SA,SU\nEXDATE;TZID=America/Chicago:20261121T090000',
+    ]) {
+      const h = toolHarness({ respond: (req) => req.data ?? {} });
+      const res = await h.call('calendar_create_event', {
+        account: 'test', summary: 'x', start: '2026-11-15T09:00:00', end: '2026-11-15T10:30:00',
+        startTimeZone: 'America/Chicago', endTimeZone: 'America/Chicago', recurrence,
+      });
+      expect(res.isError, recurrence).toBeFalsy();
+      const sent = body(h, 'POST')?.recurrence as string[];
+      expect(sent[0]).toBe('RRULE:FREQ=WEEKLY;BYDAY=SA,SU');
+    }
+  });
+
+  it('create allows an all-day series with no zone', async () => {
+    const h = toolHarness({ respond: (req) => req.data ?? {} });
+    const res = await h.call('calendar_create_event', {
+      account: 'test', summary: 'Bins out', start: '2026-11-16', end: '2026-11-17', allDay: true,
+      recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO'],
+    });
+    expect(res.isError).toBeFalsy();
+    expect(body(h, 'POST')).toMatchObject({ recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO'], start: { date: '2026-11-16' } });
+  });
+
+  it('create refuses bad rules and an offset-only timed series, sending nothing', async () => {
+    const timed = { start: '2026-11-15T09:00:00', end: '2026-11-15T10:30:00', startTimeZone: 'America/Chicago', endTimeZone: 'America/Chicago' };
+    for (const args of [
+      { ...timed, recurrence: ['FREQ=WEEKLY;BYDAY=SA,SU'] },
+      { ...timed, recurrence: ['DTSTART:20261115T150000Z', 'RRULE:FREQ=DAILY'] },
+      { ...timed, recurrence: ['EXDATE:20261121T150000Z'] },
+      { ...timed, recurrence: [] },
+      { start: '2026-11-15T09:00:00-06:00', end: '2026-11-15T10:30:00-06:00', recurrence: ['RRULE:FREQ=DAILY'] },
+    ]) {
+      const h = toolHarness({ respond: () => ({}) });
+      const res = await h.call('calendar_create_event', { account: 'test', summary: 'x', ...args });
+      expect(res.isError, JSON.stringify(args)).toBe(true);
+      expect(parseResult(res).error).toBe('invalid_params');
+      expect(h.request).not.toHaveBeenCalled();
+    }
+  });
+
+  it('update replaces the rules on a series, e.g. to end it', async () => {
+    const current = { id: 's1', recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=SA,SU'],
+      start: { dateTime: '2026-11-15T09:00:00-06:00', timeZone: 'America/Chicago' },
+      end: { dateTime: '2026-11-15T10:30:00-06:00', timeZone: 'America/Chicago' } };
+    const h = toolHarness({ respond: (req) => ((req.method ?? 'GET').toUpperCase() === 'GET' ? current : { ...current, ...(req.data as object) }) });
+    const res = await h.call('calendar_update_event', {
+      account: 'test', eventId: 's1', recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=SA,SU;UNTIL=20261231T235959Z'],
+    });
+    expect(res.isError).toBeFalsy();
+    expect(body(h, 'PATCH')).toEqual({ recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=SA,SU;UNTIL=20261231T235959Z'] });
+  });
+
+  it('update refuses recurrence on a single occurrence, without patching', async () => {
+    const h = toolHarness({ respond: () => ({ id: 's1_20261121T150000Z', recurringEventId: 's1',
+      start: { dateTime: '2026-11-21T09:00:00-06:00', timeZone: 'America/Chicago' },
+      end: { dateTime: '2026-11-21T10:30:00-06:00', timeZone: 'America/Chicago' } }) });
+    const res = await h.call('calendar_update_event', {
+      account: 'test', eventId: 's1_20261121T150000Z', recurrence: ['RRULE:FREQ=DAILY'],
+    });
+    expect(res.isError).toBe(true);
+    expect(parseResult(res).message).toContain('s1');
+    expect(h.requests().some((r) => (r.method ?? 'GET').toUpperCase() === 'PATCH')).toBe(false);
+  });
+
+  it('update turning an offset-only event into a series needs a zone', async () => {
+    const h = toolHarness({ respond: () => ({ id: 'e1',
+      start: { dateTime: '2026-11-15T09:00:00-06:00' }, end: { dateTime: '2026-11-15T10:30:00-06:00' } }) });
+    const res = await h.call('calendar_update_event', { account: 'test', eventId: 'e1', recurrence: ['RRULE:FREQ=DAILY'] });
+    expect(res.isError).toBe(true);
+    expect(parseResult(res).message).toContain('startTimeZone');
+    expect(h.requests().some((r) => (r.method ?? 'GET').toUpperCase() === 'PATCH')).toBe(false);
+  });
+});
