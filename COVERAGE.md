@@ -715,7 +715,7 @@ Optional scope bundles: `analytics`, `analytics_write`, `appsmarket`, `chat`, `c
 | `drive_comment_get` | curated | read | Get a single comment by ID |
 | `drive_comment_list` | curated | read | List comments on a Drive file with pagination |
 | `drive_comment_update` | curated | update | Edit the content of an existing comment (PATCH semantics) |
-| `drive_copy` | curated | create | Duplicate a file in Google Drive (does not work on folders) |
+| `drive_copy` | curated | create | Duplicate a file in Google Drive (does not work on folders). Pass `convertTo` to make the copy a native Google Doc/Sheet |
 | `drive_create_folder` | curated | create | Create a new folder in Google Drive |
 | `drive_delete` | curated | delete | Permanently delete a file or folder from Google Drive. Irreversible. Use drive_trash for recoverable deletion. |
 | `drive_download` | curated | read | Download a binary file from Drive to local disk. For Google Workspace formats (Docs, Sheets, Slides), use drive_export i |
