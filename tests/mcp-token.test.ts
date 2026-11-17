@@ -377,6 +377,10 @@ describe('RefreshStore generations', () => {
     expect(onDisk(file, KEY).families[fidOf(t).toString('base64url')]).toMatchObject({ gen: 0 });
   });
 
+  // Each rotation is a locked, fsynced, renamed write of the encrypted store, so
+  // fifty of them are bound by the disk, not the CPU: 0.6 to 0.9 s on the Windows
+  // runner, but one run saw a stall past the 5 s default. Real time is spent
+  // on durability here, so the test is given room instead of weakening the write.
   it('fifty rotations leave one family record and no rotated-away tokens', () => {
     const { s, file } = storeAt();
     const t = chain(s, s.issue(1000, 'owner'), 1);
@@ -387,7 +391,7 @@ describe('RefreshStore generations', () => {
     expect(d.active).toEqual({});
     expect(d.spent).toEqual({});
     expect(Math.abs(readFileSync(file, 'utf-8').length - afterOne)).toBeLessThanOrEqual(4);
-  });
+  }, 30_000);
 
   it('any rotated-away generation revokes the family, not just the previous one', () => {
     let { s, file } = storeAt();

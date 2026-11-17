@@ -1115,8 +1115,13 @@ describe('refresh lifetimes on AuthServerConfig', () => {
   beforeEach(() => {
     off = 0;
   });
-  const startWith = (configOver: Record<string, unknown>, depOverrides: Partial<AuthServerDeps> = {}) =>
-    start({ now: () => Date.now() + off, ...depOverrides }, BASE, configOver);
+  // The clock is read once: Date.now() + off would add the real time the test
+  // takes to run (a stalled runner is enough) to every refresh, and a lifetime
+  // of 120 s checked at 119 s leaves only one second of slack.
+  const startWith = (configOver: Record<string, unknown>, depOverrides: Partial<AuthServerDeps> = {}) => {
+    const base = Date.now();
+    return start({ now: () => base + off, ...depOverrides }, BASE, configOver);
+  };
   async function signIn(port: number): Promise<string> {
     const authz = await req(port, 'GET', `/authorize?${authorizeQuery()}`);
     const cb = await req(port, 'GET', `/callback?code=owner-code&state=${encodeURIComponent(stateFrom(authz.headers.location as string))}`);
