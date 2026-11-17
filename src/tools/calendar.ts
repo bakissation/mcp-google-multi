@@ -158,14 +158,19 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
           .describe('IANA zone the event starts in, e.g. "America/Cayman"; start may then omit its offset (wall-clock time in that zone). Timed events only'),
         endTimeZone: z.string().optional()
           .describe('IANA zone the event ends in; may differ from startTimeZone (e.g. a flight). Timed events only'),
+        recurrence: recurrenceArg.optional().describe(RECURRENCE_DESCRIPTION),
       },
     },
     async ({ account, summary, start, end, description, location, attendees, calendarId, allDay,
-      startTimeZone, endTimeZone }) => {
+      startTimeZone, endTimeZone, recurrence }) => {
       const startTime = eventTime('start', start, startTimeZone, !!allDay);
       if ('error' in startTime) return invalidParams(account as Account, startTime.error, EVENT_TIME_HINT);
       const endTime = eventTime('end', end, endTimeZone, !!allDay);
       if ('error' in endTime) return invalidParams(account as Account, endTime.error, EVENT_TIME_HINT);
+      if (recurrence !== undefined) {
+        const bad = recurrenceError(recurrence, startTime.value, endTime.value);
+        if (bad) return invalidParams(account as Account, bad, RECURRENCE_HINT);
+      }
       try {
         if (attendees) {
           const outbound = checkOutbound('calendar attendee', attendees.split(','), String(account));
@@ -181,6 +186,7 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
         if (attendees) {
           event.attendees = attendees.split(',').map((e: string) => ({ email: e.trim() }));
         }
+        if (recurrence !== undefined) event.recurrence = recurrence;
 
         const res = await cal.events.insert({
           calendarId: calendarId ?? 'primary',
@@ -219,10 +225,13 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
           .describe('Comma-separated email addresses (replaces existing attendees)'),
         calendarId: z.string().default('primary').optional()
           .describe('Calendar ID (default: primary)'),
+        recurrence: recurrenceArg.optional().describe(
+          `${RECURRENCE_DESCRIPTION}. Replaces the series' whole rule set; to end a series, send its RRULE with UNTIL or COUNT. Pass the series ID (an occurrence's recurringEventId), not an occurrence ID`,
+        ),
       },
     },
     async ({ account, eventId, summary, start, end, startTimeZone, endTimeZone, description, location, attendees,
-      calendarId }) => {
+      calendarId, recurrence }) => {
       try {
         if (attendees) {
           const outbound = checkOutbound('calendar attendee', attendees.split(','), String(account));
@@ -242,6 +251,21 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
         if ('error' in startPatch) return invalidParams(account as Account, startPatch.error, EVENT_TIME_HINT);
         const endPatch = patchEventTime('end', end, endTimeZone, current.data.end);
         if ('error' in endPatch) return invalidParams(account as Account, endPatch.error, EVENT_TIME_HINT);
+        if (recurrence !== undefined) {
+          if (current.data.recurringEventId) {
+            return invalidParams(
+              account as Account,
+              `Event ${eventId} is one occurrence of the series ${current.data.recurringEventId}; recurrence can only be set on the series.`,
+              RECURRENCE_HINT,
+            );
+          }
+          const bad = recurrenceError(
+            recurrence,
+            startPatch.value ?? current.data.start ?? undefined,
+            endPatch.value ?? current.data.end ?? undefined,
+          );
+          if (bad) return invalidParams(account as Account, bad, RECURRENCE_HINT);
+        }
 
         const patch: any = {};
         if (summary !== undefined) patch.summary = summary;
@@ -252,6 +276,7 @@ export function registerCalendarTools(server: ToolRegistry, deps: CuratedToolDep
         if (attendees !== undefined) {
           patch.attendees = attendees.split(',').map((e: string) => ({ email: e.trim() }));
         }
+        if (recurrence !== undefined) patch.recurrence = recurrence;
 
         const res = await cal.events.patch({
           calendarId: calendarId ?? 'primary',
@@ -823,6 +848,55 @@ export const EVENT_TIME_HINT =
   'startTimeZone/endTimeZone ("2026-11-18T08:30:00" + "America/Cayman"). All-day events: a date ' +
   '("2026-11-18") and no time zone. Zones are IANA names.';
 
+const RECURRENCE_LINE_RE = /^(RRULE|EXRULE|RDATE|EXDATE)[:;]\S/i;
+
+export const RECURRENCE_DESCRIPTION =
+  'Makes the event repeat: RFC 5545 lines such as ["RRULE:FREQ=WEEKLY;BYDAY=SA,SU"], plus optional ' +
+  'EXDATE/RDATE lines. No DTSTART: the series starts at start. A timed recurring event needs ' +
+  'startTimeZone and endTimeZone, the zone the occurrences repeat in';
+
+export const RECURRENCE_HINT =
+  'recurrence is a list of RFC 5545 lines, e.g. ["RRULE:FREQ=WEEKLY;BYDAY=SA,SU"] or ' +
+  '["RRULE:FREQ=DAILY;COUNT=5", "EXDATE;TZID=America/Chicago:20261120T090000"]. A timed series needs ' +
+  'startTimeZone and endTimeZone (IANA names) so occurrences keep their wall-clock time across DST.';
+
+/** A JSON array, or one line per rule. Not comma-split: RRULE values contain commas (BYDAY=SA,SU). */
+export const recurrenceArg = z.preprocess((val) => {
+  if (typeof val !== 'string') return val;
+  const t = val.trim();
+  if (t.startsWith('[')) {
+    try { return JSON.parse(t); } catch { return val; }
+  }
+  return t.split(/\r?\n/).map((s) => s.trim()).filter((s) => s.length > 0);
+}, z.array(z.string()));
+
+/** Google expands a timed series in the zone on start/end and refuses one without it
+ * ("Missing time zone definition for start time"). Catch that, and malformed lines, locally. */
+export function recurrenceError(
+  recurrence: string[],
+  start: EventTime | { date?: string | null; dateTime?: string | null; timeZone?: string | null } | undefined,
+  end: EventTime | { date?: string | null; dateTime?: string | null; timeZone?: string | null } | undefined,
+): string | null {
+  if (recurrence.length === 0) return 'recurrence is empty; give at least one RRULE or RDATE line.';
+  for (const line of recurrence) {
+    if (/^DTSTART/i.test(line.trim())) {
+      return 'recurrence must not contain DTSTART; the series starts at the event\'s start.';
+    }
+    if (!RECURRENCE_LINE_RE.test(line.trim())) {
+      return `recurrence line "${line}" is not an RRULE, EXRULE, RDATE or EXDATE line.`;
+    }
+  }
+  if (!recurrence.some((l) => /^(RRULE|RDATE)/i.test(l.trim()))) {
+    return 'recurrence has no RRULE or RDATE line, so the event would not repeat.';
+  }
+  for (const [field, t] of [['start', start], ['end', end]] as const) {
+    if (t && 'dateTime' in t && t.dateTime && !t.timeZone) {
+      return `A recurring timed event needs ${field}TimeZone; ${field} has only a UTC offset, which cannot follow DST.`;
+    }
+  }
+  return null;
+}
+
 /** IANA name check via Intl (accepts canonical names and aliases like America/Cayman). */
 export function timeZoneError(field: string, timeZone: string): string | null {
   try {
@@ -962,6 +1036,7 @@ export function formatEvent(event: any, opts: { full?: boolean } = {}) {
       email: a.email,
       responseStatus: a.responseStatus,
     })),
+    recurrence: event.recurrence ?? undefined,
     recurringEventId: event.recurringEventId,
     hangoutLink: event.hangoutLink,
     created: full ? event.created : undefined,

@@ -157,19 +157,30 @@ function getOwnAddresses(gmail: any, account: string, primaryEmail: string): Pro
   return cached;
 }
 
-/** The attachment's own file name, found by walking the message parts for the
- * part carrying `attachmentId`. Undefined when the lookup fails or no part
+/** The attachment's own file name. Gmail hands out a new attachmentId on each
+ * read of the same message, so an id from an earlier gmail_read often differs
+ * from what the message lists now while Gmail still serves the bytes. Match by
+ * id first, then take the only named attachment, then the only one whose size
+ * equals the downloaded byte count. Undefined when the lookup fails or nothing
  * matches (the caller then falls back to a generated name). */
-export async function attachmentNameOf(gmail: any, messageId: string, attachmentId: string): Promise<string | undefined> {
+export async function attachmentNameOf(gmail: any, messageId: string, attachmentId: string, byteLength?: number): Promise<string | undefined> {
   try {
     const msg = await gmail.users.messages.get({ userId: 'me', id: messageId, format: 'full' });
+    const named: { id: string; name: string; size?: number }[] = [];
     const stack: any[] = msg.data.payload ? [msg.data.payload] : [];
     while (stack.length > 0) {
       const part = stack.pop();
-      if (part?.body?.attachmentId === attachmentId && typeof part.filename === 'string' && part.filename !== '') {
-        return part.filename;
+      if (part?.body?.attachmentId && typeof part.filename === 'string' && part.filename !== '') {
+        named.push({ id: part.body.attachmentId, name: part.filename, size: typeof part.body.size === 'number' ? part.body.size : undefined });
       }
       if (Array.isArray(part?.parts)) stack.push(...part.parts);
+    }
+    const exact = named.find((n) => n.id === attachmentId);
+    if (exact) return exact.name;
+    if (named.length === 1) return named[0].name;
+    if (byteLength !== undefined) {
+      const same = named.filter((n) => n.size === byteLength);
+      if (same.length === 1) return same[0].name;
     }
   } catch {
     // Name lookup is best effort; the download itself must not fail over it.
@@ -972,7 +983,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
         } finally {
           release();
         }
-        const name = filename?.trim() || (await attachmentNameOf(gmail, messageId, attachmentId)) || `attachment-${attachmentId.slice(0, 8)}`;
+        const name = filename?.trim() || (await attachmentNameOf(gmail, messageId, attachmentId, buffer.length)) || `attachment-${attachmentId.slice(0, 8)}`;
         const fullPath = await prepareLocalDest(savePath, name, { nameGiven: !!filename?.trim() });
         try {
           // wx: never silently clobber; prepareLocalDest already checked

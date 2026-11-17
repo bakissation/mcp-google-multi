@@ -98,6 +98,45 @@ describe('host-file tools: optional filename and actionable refusals', () => {
     expect(fs.readFileSync(path.join(root, 'in', 'invoice.pdf'), 'utf8')).toBe('pdf-bytes');
   });
 
+  it('gmail_download_attachment names the file from a message whose attachment ids rotated since the read', async () => {
+    const root = dir('mcp-gm-flow-');
+    process.env.GOOGLE_LOCAL_FILES_DIR = root;
+    const body = Buffer.from('twelve-bytes');
+    const h = ownerHarness((req) => {
+      if (req.url.includes('/attachments/')) return { data: body.toString('base64url'), size: body.length };
+      return {
+        id: 'M1',
+        payload: { parts: [
+          { filename: 'a.txt', body: { attachmentId: 'NOW-A', size: 5 } },
+          { filename: 'b.txt', body: { attachmentId: 'NOW-B', size: body.length } },
+        ] },
+      };
+    });
+    const res = await h.handlers.gmail_download_attachment({ account: 'test', messageId: 'M1', attachmentId: 'OLD-ID', savePath: 'in' });
+    expect(res.isError).toBeFalsy();
+    expect(fs.readFileSync(path.join(root, 'in', 'b.txt'), 'utf8')).toBe('twelve-bytes');
+  });
+
+  it('gmail_download_attachment takes the only attachment when the id is stale, and falls back when sizes tie', async () => {
+    const root = dir('mcp-gm-flow-');
+    process.env.GOOGLE_LOCAL_FILES_DIR = root;
+    const one = ownerHarness((req) => {
+      if (req.url.includes('/attachments/')) return { data: Buffer.from('xx').toString('base64url') };
+      return { id: 'M1', payload: { parts: [{ filename: 'only.pdf', body: { attachmentId: 'NOW' } }] } };
+    });
+    await one.handlers.gmail_download_attachment({ account: 'test', messageId: 'M1', attachmentId: 'STALEIDX', savePath: 'one' });
+    expect(fs.existsSync(path.join(root, 'one', 'only.pdf'))).toBe(true);
+    const tie = ownerHarness((req) => {
+      if (req.url.includes('/attachments/')) return { data: Buffer.from('xx').toString('base64url') };
+      return { id: 'M1', payload: { parts: [
+        { filename: 'p.txt', body: { attachmentId: 'N1', size: 2 } },
+        { filename: 'q.txt', body: { attachmentId: 'N2', size: 2 } },
+      ] } };
+    });
+    await tie.handlers.gmail_download_attachment({ account: 'test', messageId: 'M1', attachmentId: 'STALEIDX', savePath: 'tie' });
+    expect(fs.existsSync(path.join(root, 'tie', 'attachment-STALEIDX'))).toBe(true);
+  });
+
   it('gmail_download_attachment falls back to a generated name when the lookup finds nothing', async () => {
     const root = dir('mcp-gm-flow-');
     process.env.GOOGLE_LOCAL_FILES_DIR = root;

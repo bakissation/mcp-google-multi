@@ -104,7 +104,7 @@ Edit the content of an existing comment (PATCH semantics)
 
 Class: create
 
-Duplicate a file in Google Drive (does not work on folders)
+Duplicate a file in Google Drive (does not work on folders). Pass `convertTo` to make the copy a native Google Doc/Sheet/Slides/Drawing instead of a byte copy, so a Word, Excel, PowerPoint, CSV, text, HTML, Markdown, PDF or image file already in Drive becomes editable; an image or PDF converted to a Doc is run through OCR (`ocrLanguage` hints the language). Works on a file id, no download or upload.
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
@@ -112,6 +112,8 @@ Duplicate a file in Google Drive (does not work on folders)
 | `fileId` | string | required | Google Drive file ID to copy |
 | `newName` | string | optional | Name for the copy (default: "Copy of <original>") |
 | `parentFolderId` | string | optional | Where to put the copy, not parentId. Default: same folder |
+| `convertTo` | enum | optional | Convert the copy into this native Google Workspace type: "document" \| "spreadsheet" \| "presentation" \| "drawing" (full application/vnd.google-apps.* ids also accepted). The source must be an importable format, not already a Google file. Omit for a plain copy. |
+| `ocrLanguage` | string | optional | Language hint for OCR when an image or PDF is converted to a Document, as a language code such as "en", "fr" or "ar". Only used with convertTo. |
 
 ## `drive_create_folder`
 
