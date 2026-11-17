@@ -53,6 +53,7 @@ Create a Google Calendar event
 | `allDay` | boolean | optional | If true, start/end are dates (YYYY-MM-DD) not datetimes |
 | `startTimeZone` | string | optional | IANA zone the event starts in, e.g. "America/Cayman"; start may then omit its offset (wall-clock time in that zone). Timed events only |
 | `endTimeZone` | string | optional | IANA zone the event ends in; may differ from startTimeZone (e.g. a flight). Timed events only |
+| `recurrence` | array | optional | Makes the event repeat: RFC 5545 lines such as ["RRULE:FREQ=WEEKLY;BYDAY=SA,SU"], plus optional EXDATE/RDATE lines. No DTSTART: the series starts at start. A timed recurring event needs startTimeZone and endTimeZone, the zone the occurrences repeat in |
 
 ## `calendar_delete_event`
 
@@ -225,6 +226,7 @@ Update a Google Calendar event
 | `location` | string | optional | New event location |
 | `attendees` | string | optional | Comma-separated email addresses (replaces existing attendees) |
 | `calendarId` | string | optional | Calendar ID (default: primary) |
+| `recurrence` | array | optional | Makes the event repeat: RFC 5545 lines such as ["RRULE:FREQ=WEEKLY;BYDAY=SA,SU"], plus optional EXDATE/RDATE lines. No DTSTART: the series starts at start. A timed recurring event needs startTimeZone and endTimeZone, the zone the occurrences repeat in. Replaces the series' whole rule set; to end a series, send its RRULE with UNTIL or COUNT. Pass the series ID (an occurrence's recurringEventId), not an occurrence ID |
 
 ## `calendar_update_subscription`
 

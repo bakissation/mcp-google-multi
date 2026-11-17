@@ -975,15 +975,17 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
   server.registerTool(
     'drive_copy',
     {
-      description: 'Duplicate a file in Google Drive (does not work on folders)',
+      description: 'Duplicate a file in Google Drive (does not work on folders). Pass `convertTo` to make the copy a native Google Doc/Sheet/Slides/Drawing instead of a byte copy, so a Word, Excel, PowerPoint, CSV, text, HTML, Markdown, PDF or image file already in Drive becomes editable; an image or PDF converted to a Doc is run through OCR (`ocrLanguage` hints the language). Works on a file id, no download or upload.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         fileId: z.string().min(1).describe('Google Drive file ID to copy'),
         newName: z.string().optional().describe('Name for the copy (default: "Copy of <original>")'),
         parentFolderId: z.string().optional().describe('Where to put the copy, not parentId. Default: same folder'),
+        convertTo: z.enum(CONVERT_TO_VALUES).optional().describe('Convert the copy into this native Google Workspace type: "document" | "spreadsheet" | "presentation" | "drawing" (full application/vnd.google-apps.* ids also accepted). The source must be an importable format, not already a Google file. Omit for a plain copy.'),
+        ocrLanguage: z.string().min(2).max(35).optional().describe('Language hint for OCR when an image or PDF is converted to a Document, as a language code such as "en", "fr" or "ar". Only used with convertTo.'),
       },
     },
-    async ({ account, fileId, newName, parentFolderId }) => {
+    async ({ account, fileId, newName, parentFolderId, convertTo, ocrLanguage }) => {
       try {
         const auth = await getClientFn(account as Account);
         const drive = driveClient({ version: 'v3', auth });
@@ -992,8 +994,10 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
           requestBody: {
             name: newName,
             parents: parentFolderId ? [parentFolderId] : undefined,
+            ...(convertTo ? { mimeType: resolveConvertTarget(convertTo) } : {}),
           },
-          fields: 'id,name,webViewLink',
+          ...(convertTo && ocrLanguage ? { ocrLanguage } : {}),
+          fields: convertTo ? 'id,name,mimeType,webViewLink' : 'id,name,webViewLink',
           supportsAllDrives: true,
         });
         return {
