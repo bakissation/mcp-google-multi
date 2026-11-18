@@ -27,7 +27,7 @@ const APIS: Api[] = [
   { id: 'drivelabels', version: 'v2' },
   { id: 'forms', version: 'v1' },
   { id: 'gmail', version: 'v1' },
-  { id: 'gmailpostmastertools', version: 'v1' },
+  { id: 'gmailpostmastertools', version: 'v2' },
   { id: 'groupsmigration', version: 'v1' },
   { id: 'groupssettings', version: 'v1' },
   { id: 'keep', version: 'v1' },

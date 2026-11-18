@@ -7,6 +7,8 @@ import { accountField, registerGeneratedTool, type ExecuteDeps } from './_shared
 export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps: ExecuteDeps = {}): void {
   // Interned method scope sets (shared across tools; see scope-observability).
   const S_cloudidentity_v1: readonly (readonly string[])[] = [
+    ["https://www.googleapis.com/auth/cloud-identity.allowlisteddomains"],
+    ["https://www.googleapis.com/auth/cloud-identity.allowlisteddomains","https://www.googleapis.com/auth/cloud-identity.allowlisteddomains.readonly"],
     ["https://www.googleapis.com/auth/cloud-identity.devices"],
     ["https://www.googleapis.com/auth/cloud-identity.devices","https://www.googleapis.com/auth/cloud-identity.devices.readonly"],
     ["https://www.googleapis.com/auth/cloud-identity.devices.lookup"],
@@ -17,6 +19,62 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     ["https://www.googleapis.com/auth/cloud-identity.policies"],
     ["https://www.googleapis.com/auth/cloud-identity.policies","https://www.googleapis.com/auth/cloud-identity.policies.readonly"],
   ];
+  registerGeneratedTool(registry, {
+    name: "cloudidentity_allowlisted_domains_create",
+    cud: "create",
+    description: "Adds a domain to the allowlist.",
+    method: { id: "cloudidentity.allowlistedDomains.create", httpMethod: "POST", path: "v1/allowlistedDomains", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[0] },
+    params: [{"field":"fields","api":"fields","location":"query"}],
+    hasBody: true,
+    bodyParams: [{"field":"domain","api":"domain"},{"field":"name","api":"name"}],
+    shape: {
+      account: accountField(() => registry.accountAliases()),
+      domain: z.string().describe("Required. Immutable. Name of the domain that is in the allowlist. e.g. \"google.com\"").optional(),
+      name: z.string().describe("Output only. Identifier. Resource name of the domain in the allowlist e.g. \"allowlistedDomains/0184mhaj1smlusv\"").optional(),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  }, deps);
+  registerGeneratedTool(registry, {
+    name: "cloudidentity_allowlisted_domains_delete",
+    cud: "delete",
+    description: "Removes a domain from the allowlist.",
+    method: { id: "cloudidentity.allowlistedDomains.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
+    params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
+    hasBody: false,
+    shape: {
+      account: accountField(() => registry.accountAliases()),
+      name: z.string().min(1).describe("Required. Specifies the [resource name](https://google.aip.dev/122) of the domain to delete."),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  }, deps);
+  registerGeneratedTool(registry, {
+    name: "cloudidentity_allowlisted_domains_get",
+    cud: "read",
+    description: "Retrieves a specific domain from the allowlist.",
+    method: { id: "cloudidentity.allowlistedDomains.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[1] },
+    params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
+    hasBody: false,
+    shape: {
+      account: accountField(() => registry.accountAliases()),
+      name: z.string().min(1).describe("Required. Specifies the [resource name](https://google.aip.dev/122) of the domain to retrieve."),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  }, deps);
+  registerGeneratedTool(registry, {
+    name: "cloudidentity_allowlisted_domains_list",
+    cud: "read",
+    description: "Lists the domains in the allowlist.",
+    method: { id: "cloudidentity.allowlistedDomains.list", httpMethod: "GET", path: "v1/allowlistedDomains", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[1] },
+    params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
+    hasBody: false,
+    shape: {
+      account: accountField(() => registry.accountAliases()),
+      filter: z.string().describe("Optional. Provides an optional filter for list results. Currently, only exact matches on the domain are supported, such as \"domain = 'google.com'\", with no composite conditions.").optional(),
+      pageSize: z.number().describe("Optional. Specifies the requested page size. If unspecified, the service returns at most 5000 domains. The maximum value is 5000; values above 5000 coerce to 5000. The limits can change over time.").optional(),
+      pageToken: z.string().describe("Optional. Identifies a token from a previous page of results, if any.").optional(),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  }, deps);
   registerGeneratedTool(registry, {
     name: "cloudidentity_customers_userinvitations_cancel",
     cud: "delete",
@@ -92,7 +150,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_cancel_wipe",
     cud: "update",
     description: "Cancels an unfinished device wipe. This operation can be used to cancel device wipe in the gap between the wipe operation returning success and the device being",
-    method: { id: "cloudidentity.devices.cancelWipe", httpMethod: "POST", path: "v1/{+name}:cancelWipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
+    method: { id: "cloudidentity.devices.cancelWipe", httpMethod: "POST", path: "v1/{+name}:cancelWipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"}],
@@ -107,7 +165,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_create",
     cud: "create",
     description: "Creates a device. Only company-owned device may be created. **Note**: This method is available only to customers who have one of the following SKUs: Enterprise",
-    method: { id: "cloudidentity.devices.create", httpMethod: "POST", path: "v1/devices", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[0] },
+    method: { id: "cloudidentity.devices.create", httpMethod: "POST", path: "v1/devices", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[2] },
     params: [{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -121,7 +179,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_delete",
     cud: "delete",
     description: "Deletes the specified device.",
-    method: { id: "cloudidentity.devices.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
+    method: { id: "cloudidentity.devices.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -135,7 +193,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_device_users_approve",
     cud: "update",
     description: "Approves device to access user data.",
-    method: { id: "cloudidentity.devices.deviceUsers.approve", httpMethod: "POST", path: "v1/{+name}:approve", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
+    method: { id: "cloudidentity.devices.deviceUsers.approve", httpMethod: "POST", path: "v1/{+name}:approve", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"}],
@@ -150,7 +208,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_device_users_block",
     cud: "create",
     description: "Blocks device from accessing user data",
-    method: { id: "cloudidentity.devices.deviceUsers.block", httpMethod: "POST", path: "v1/{+name}:block", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
+    method: { id: "cloudidentity.devices.deviceUsers.block", httpMethod: "POST", path: "v1/{+name}:block", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"}],
@@ -165,7 +223,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_device_users_cancel_wipe",
     cud: "update",
     description: "Cancels an unfinished user account wipe. This operation can be used to cancel device wipe in the gap between the wipe operation returning success and the device",
-    method: { id: "cloudidentity.devices.deviceUsers.cancelWipe", httpMethod: "POST", path: "v1/{+name}:cancelWipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
+    method: { id: "cloudidentity.devices.deviceUsers.cancelWipe", httpMethod: "POST", path: "v1/{+name}:cancelWipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"}],
@@ -180,7 +238,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_device_users_client_states_get",
     cud: "read",
     description: "Gets the client state for the device user",
-    method: { id: "cloudidentity.devices.deviceUsers.clientStates.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[1] },
+    method: { id: "cloudidentity.devices.deviceUsers.clientStates.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[3] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -194,7 +252,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_device_users_client_states_list",
     cud: "read",
     description: "Lists the client states for the given search query.",
-    method: { id: "cloudidentity.devices.deviceUsers.clientStates.list", httpMethod: "GET", path: "v1/{+parent}/clientStates", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[1] },
+    method: { id: "cloudidentity.devices.deviceUsers.clientStates.list", httpMethod: "GET", path: "v1/{+parent}/clientStates", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[3] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"filter","api":"filter","location":"query"},{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -211,7 +269,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_device_users_client_states_patch",
     cud: "update",
     description: "Updates the client state for the device user **Note**: This method is available only to customers who have one of the following SKUs: Enterprise Standard, Enter",
-    method: { id: "cloudidentity.devices.deviceUsers.clientStates.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
+    method: { id: "cloudidentity.devices.deviceUsers.clientStates.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -227,7 +285,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_device_users_delete",
     cud: "delete",
     description: "Deletes the specified DeviceUser. This also revokes the user's access to device data.",
-    method: { id: "cloudidentity.devices.deviceUsers.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
+    method: { id: "cloudidentity.devices.deviceUsers.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -241,7 +299,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_device_users_get",
     cud: "read",
     description: "Retrieves the specified DeviceUser",
-    method: { id: "cloudidentity.devices.deviceUsers.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[1] },
+    method: { id: "cloudidentity.devices.deviceUsers.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[3] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -255,7 +313,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_device_users_list",
     cud: "read",
     description: "Lists/Searches DeviceUsers.",
-    method: { id: "cloudidentity.devices.deviceUsers.list", httpMethod: "GET", path: "v1/{+parent}/deviceUsers", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[1] },
+    method: { id: "cloudidentity.devices.deviceUsers.list", httpMethod: "GET", path: "v1/{+parent}/deviceUsers", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[3] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"filter","api":"filter","location":"query"},{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -273,7 +331,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_device_users_lookup",
     cud: "read",
     description: "Looks up resource names of the DeviceUsers associated with the caller's credentials, as well as the properties provided in the request. This method must be call",
-    method: { id: "cloudidentity.devices.deviceUsers.lookup", httpMethod: "GET", path: "v1/{+parent}:lookup", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[2] },
+    method: { id: "cloudidentity.devices.deviceUsers.lookup", httpMethod: "GET", path: "v1/{+parent}:lookup", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[4] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"androidId","api":"androidId","location":"query"},{"field":"iosDeviceId","api":"iosDeviceId","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"partner","api":"partner","location":"query"},{"field":"rawResourceId","api":"rawResourceId","location":"query"},{"field":"userId","api":"userId","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -293,7 +351,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_device_users_wipe",
     cud: "delete",
     description: "Wipes the user's account on a device. Other data on the device that is not associated with the user's work account is not affected. For example, if a Gmail app",
-    method: { id: "cloudidentity.devices.deviceUsers.wipe", httpMethod: "POST", path: "v1/{+name}:wipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
+    method: { id: "cloudidentity.devices.deviceUsers.wipe", httpMethod: "POST", path: "v1/{+name}:wipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"}],
@@ -308,7 +366,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_get",
     cud: "read",
     description: "Retrieves the specified device.",
-    method: { id: "cloudidentity.devices.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[1] },
+    method: { id: "cloudidentity.devices.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[3] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"customer","api":"customer","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -322,7 +380,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_list",
     cud: "read",
     description: "Lists/Searches devices.",
-    method: { id: "cloudidentity.devices.list", httpMethod: "GET", path: "v1/devices", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[1] },
+    method: { id: "cloudidentity.devices.list", httpMethod: "GET", path: "v1/devices", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[3] },
     params: [{"field":"customer","api":"customer","location":"query"},{"field":"filter","api":"filter","location":"query"},{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -340,7 +398,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_devices_wipe",
     cud: "delete",
     description: "Wipes all data on the specified device.",
-    method: { id: "cloudidentity.devices.wipe", httpMethod: "POST", path: "v1/{+name}:wipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[0] },
+    method: { id: "cloudidentity.devices.wipe", httpMethod: "POST", path: "v1/{+name}:wipe", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     bodyParams: [{"field":"customer","api":"customer"},{"field":"removeResetLock","api":"removeResetLock"}],
@@ -356,13 +414,13 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_create",
     cud: "create",
     description: "Creates a Group.",
-    method: { id: "cloudidentity.groups.create", httpMethod: "POST", path: "v1/groups", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[3] },
+    method: { id: "cloudidentity.groups.create", httpMethod: "POST", path: "v1/groups", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[5] },
     params: [{"field":"initialGroupConfig","api":"initialGroupConfig","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
       account: accountField(() => registry.accountAliases()),
       initialGroupConfig: z.enum(["INITIAL_GROUP_CONFIG_UNSPECIFIED","WITH_INITIAL_OWNER","EMPTY"]).describe("Optional. The initial configuration option for the `Group`.").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Group JSON request body. Top-level fields: additionalGroupKeys, createTime, description, displayName, dynamicGroupMetadata, groupKey, labels, name, parent, updateTime."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("Group JSON request body. Top-level fields: additionalGroupKeys, createTime, description, displayName, dynamicGroupMetadata, externalIds, groupKey, labels, name, parent, updateTime."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -370,7 +428,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_delete",
     cud: "delete",
     description: "Deletes a `Group`.",
-    method: { id: "cloudidentity.groups.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[3] },
+    method: { id: "cloudidentity.groups.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -383,7 +441,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_get",
     cud: "read",
     description: "Retrieves a `Group`.",
-    method: { id: "cloudidentity.groups.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -396,7 +454,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_get_security_settings",
     cud: "read",
     description: "Get Security Settings",
-    method: { id: "cloudidentity.groups.getSecuritySettings", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.getSecuritySettings", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"readMask","api":"readMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -410,7 +468,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_list",
     cud: "read",
     description: "Lists the `Group` resources under a customer or namespace.",
-    method: { id: "cloudidentity.groups.list", httpMethod: "GET", path: "v1/groups", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.list", httpMethod: "GET", path: "v1/groups", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"parent","api":"parent","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -426,7 +484,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_lookup",
     cud: "read",
     description: "Looks up the [resource name](https://cloud.google.com/apis/design/resource_names) of a `Group` by its `EntityKey`.",
-    method: { id: "cloudidentity.groups.lookup", httpMethod: "GET", path: "v1/groups:lookup", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.lookup", httpMethod: "GET", path: "v1/groups:lookup", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"groupKey.id","api":"groupKey.id","location":"query"},{"field":"groupKey.namespace","api":"groupKey.namespace","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -440,7 +498,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_memberships_check_transitive_membership",
     cud: "read",
     description: "Check a potential member for membership in a group. **Note:** This feature is only available to Google Workspace Enterprise Standard, Enterprise Plus, and Enter",
-    method: { id: "cloudidentity.groups.memberships.checkTransitiveMembership", httpMethod: "GET", path: "v1/{+parent}/memberships:checkTransitiveMembership", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.memberships.checkTransitiveMembership", httpMethod: "GET", path: "v1/{+parent}/memberships:checkTransitiveMembership", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"query","api":"query","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -454,7 +512,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_memberships_create",
     cud: "create",
     description: "Creates a `Membership`.",
-    method: { id: "cloudidentity.groups.memberships.create", httpMethod: "POST", path: "v1/{+parent}/memberships", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[3] },
+    method: { id: "cloudidentity.groups.memberships.create", httpMethod: "POST", path: "v1/{+parent}/memberships", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[5] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -468,7 +526,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_memberships_delete",
     cud: "delete",
     description: "Deletes a `Membership`.",
-    method: { id: "cloudidentity.groups.memberships.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[3] },
+    method: { id: "cloudidentity.groups.memberships.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -481,7 +539,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_memberships_get",
     cud: "read",
     description: "Retrieves a `Membership`.",
-    method: { id: "cloudidentity.groups.memberships.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.memberships.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -494,7 +552,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_memberships_get_membership_graph",
     cud: "read",
     description: "Get a membership graph of just a member or both a member and a group. **Note:** This feature is only available to Google Workspace Enterprise Standard, Enterpri",
-    method: { id: "cloudidentity.groups.memberships.getMembershipGraph", httpMethod: "GET", path: "v1/{+parent}/memberships:getMembershipGraph", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.memberships.getMembershipGraph", httpMethod: "GET", path: "v1/{+parent}/memberships:getMembershipGraph", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"query","api":"query","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -508,7 +566,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_memberships_list",
     cud: "read",
     description: "Lists the `Membership`s within a `Group`.",
-    method: { id: "cloudidentity.groups.memberships.list", httpMethod: "GET", path: "v1/{+parent}/memberships", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.memberships.list", httpMethod: "GET", path: "v1/{+parent}/memberships", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -524,7 +582,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_memberships_lookup",
     cud: "read",
     description: "Looks up the [resource name](https://cloud.google.com/apis/design/resource_names) of a `Membership` by its `EntityKey`.",
-    method: { id: "cloudidentity.groups.memberships.lookup", httpMethod: "GET", path: "v1/{+parent}/memberships:lookup", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.memberships.lookup", httpMethod: "GET", path: "v1/{+parent}/memberships:lookup", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"memberKey.id","api":"memberKey.id","location":"query"},{"field":"memberKey.namespace","api":"memberKey.namespace","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -539,7 +597,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_memberships_modify_membership_roles",
     cud: "update",
     description: "Modifies the `MembershipRole`s of a `Membership`.",
-    method: { id: "cloudidentity.groups.memberships.modifyMembershipRoles", httpMethod: "POST", path: "v1/{+name}:modifyMembershipRoles", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[3] },
+    method: { id: "cloudidentity.groups.memberships.modifyMembershipRoles", httpMethod: "POST", path: "v1/{+name}:modifyMembershipRoles", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -553,7 +611,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_memberships_search_direct_groups",
     cud: "read",
     description: "Searches direct groups of a member. Groups for which the actor does not have the permission to view memberships are silently filtered out.",
-    method: { id: "cloudidentity.groups.memberships.searchDirectGroups", httpMethod: "GET", path: "v1/{+parent}/memberships:searchDirectGroups", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.memberships.searchDirectGroups", httpMethod: "GET", path: "v1/{+parent}/memberships:searchDirectGroups", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"orderBy","api":"orderBy","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"query","api":"query","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -570,7 +628,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_memberships_search_transitive_groups",
     cud: "read",
     description: "Search transitive groups of a member. **Note:** This feature is only available to Google Workspace Enterprise Standard, Enterprise Plus, and Enterprise for Educ",
-    method: { id: "cloudidentity.groups.memberships.searchTransitiveGroups", httpMethod: "GET", path: "v1/{+parent}/memberships:searchTransitiveGroups", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.memberships.searchTransitiveGroups", httpMethod: "GET", path: "v1/{+parent}/memberships:searchTransitiveGroups", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"query","api":"query","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -586,7 +644,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_memberships_search_transitive_memberships",
     cud: "read",
     description: "Search transitive memberships of a group. **Note:** This feature is only available to Google Workspace Enterprise Standard, Enterprise Plus, and Enterprise for",
-    method: { id: "cloudidentity.groups.memberships.searchTransitiveMemberships", httpMethod: "GET", path: "v1/{+parent}/memberships:searchTransitiveMemberships", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.memberships.searchTransitiveMemberships", httpMethod: "GET", path: "v1/{+parent}/memberships:searchTransitiveMemberships", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -601,14 +659,14 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_patch",
     cud: "update",
     description: "Updates a `Group`.",
-    method: { id: "cloudidentity.groups.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[3] },
+    method: { id: "cloudidentity.groups.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
       account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Output only. The [resource name](https://cloud.google.com/apis/design/resource_names) of the `Group`. Shall be of the form `groups/{group}`."),
       updateMask: z.string().describe("Required. The names of fields to update. May only contain the following field names: `display_name`, `description`, `labels`.").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Group JSON request body. Top-level fields: additionalGroupKeys, createTime, description, displayName, dynamicGroupMetadata, groupKey, labels, name, parent, updateTime."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("Group JSON request body. Top-level fields: additionalGroupKeys, createTime, description, displayName, dynamicGroupMetadata, externalIds, groupKey, labels, name, parent, updateTime."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -616,14 +674,14 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_search",
     cud: "read",
     description: "Searches for `Group` resources matching a specified query.",
-    method: { id: "cloudidentity.groups.search", httpMethod: "GET", path: "v1/groups:search", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[4] },
+    method: { id: "cloudidentity.groups.search", httpMethod: "GET", path: "v1/groups:search", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[6] },
     params: [{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"query","api":"query","location":"query"},{"field":"view","api":"view","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
       account: accountField(() => registry.accountAliases()),
       pageSize: z.number().describe("The maximum number of results to return. Note that the number of results returned may be less than this value even if there are more available results. To fetch all results, clients must continue call").optional(),
       pageToken: z.string().describe("The `next_page_token` value returned from a previous search request, if any.").optional(),
-      query: z.string().describe("Required. The search query. * Must be specified in [Common Expression Language](https://opensource.google/projects/cel). * Must contain equality operators on the parent, e.g. `parent == 'customers/{cu").optional(),
+      query: z.string().describe("Required. The search query. * Must be specified in [Common Expression Language](https://opensource.google/projects/cel). See [CEL Introduction](https://github.com/google/cel-spec/blob/master/doc/intro").optional(),
       view: z.enum(["VIEW_UNSPECIFIED","BASIC","FULL"]).describe("The level of detail to be returned. If unspecified, defaults to `View.BASIC`.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
@@ -632,7 +690,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_groups_update_security_settings",
     cud: "update",
     description: "Update Security Settings",
-    method: { id: "cloudidentity.groups.updateSecuritySettings", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[3] },
+    method: { id: "cloudidentity.groups.updateSecuritySettings", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -647,7 +705,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_oidc_sso_profiles_create",
     cud: "create",
     description: "Creates an InboundOidcSsoProfile for a customer. When the target customer has enabled [Multi-party approval for sensitive actions](https://support.google.com/a/",
-    method: { id: "cloudidentity.inboundOidcSsoProfiles.create", httpMethod: "POST", path: "v1/inboundOidcSsoProfiles", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[5] },
+    method: { id: "cloudidentity.inboundOidcSsoProfiles.create", httpMethod: "POST", path: "v1/inboundOidcSsoProfiles", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[7] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -660,7 +718,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_oidc_sso_profiles_delete",
     cud: "delete",
     description: "Deletes an InboundOidcSsoProfile.",
-    method: { id: "cloudidentity.inboundOidcSsoProfiles.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
+    method: { id: "cloudidentity.inboundOidcSsoProfiles.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[7] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -673,7 +731,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_oidc_sso_profiles_get",
     cud: "read",
     description: "Gets an InboundOidcSsoProfile.",
-    method: { id: "cloudidentity.inboundOidcSsoProfiles.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[6] },
+    method: { id: "cloudidentity.inboundOidcSsoProfiles.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[8] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -686,7 +744,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_oidc_sso_profiles_list",
     cud: "read",
     description: "Lists InboundOidcSsoProfile objects for a Google enterprise customer.",
-    method: { id: "cloudidentity.inboundOidcSsoProfiles.list", httpMethod: "GET", path: "v1/inboundOidcSsoProfiles", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[6] },
+    method: { id: "cloudidentity.inboundOidcSsoProfiles.list", httpMethod: "GET", path: "v1/inboundOidcSsoProfiles", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[8] },
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -701,7 +759,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_oidc_sso_profiles_patch",
     cud: "update",
     description: "Updates an InboundOidcSsoProfile. When the target customer has enabled [Multi-party approval for sensitive actions](https://support.google.com/a/answer/13790448",
-    method: { id: "cloudidentity.inboundOidcSsoProfiles.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
+    method: { id: "cloudidentity.inboundOidcSsoProfiles.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[7] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -716,7 +774,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_saml_sso_profiles_create",
     cud: "create",
     description: "Creates an InboundSamlSsoProfile for a customer. When the target customer has enabled [Multi-party approval for sensitive actions](https://support.google.com/a/",
-    method: { id: "cloudidentity.inboundSamlSsoProfiles.create", httpMethod: "POST", path: "v1/inboundSamlSsoProfiles", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[5] },
+    method: { id: "cloudidentity.inboundSamlSsoProfiles.create", httpMethod: "POST", path: "v1/inboundSamlSsoProfiles", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[7] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -729,7 +787,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_saml_sso_profiles_delete",
     cud: "delete",
     description: "Deletes an InboundSamlSsoProfile.",
-    method: { id: "cloudidentity.inboundSamlSsoProfiles.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
+    method: { id: "cloudidentity.inboundSamlSsoProfiles.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[7] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -742,7 +800,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_saml_sso_profiles_get",
     cud: "read",
     description: "Gets an InboundSamlSsoProfile.",
-    method: { id: "cloudidentity.inboundSamlSsoProfiles.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[6] },
+    method: { id: "cloudidentity.inboundSamlSsoProfiles.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[8] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -755,7 +813,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_saml_sso_profiles_idp_credentials_add",
     cud: "create",
     description: "Adds an IdpCredential. Up to 2 credentials are allowed. When the target customer has enabled [Multi-party approval for sensitive actions](https://support.google",
-    method: { id: "cloudidentity.inboundSamlSsoProfiles.idpCredentials.add", httpMethod: "POST", path: "v1/{+parent}/idpCredentials:add", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[5] },
+    method: { id: "cloudidentity.inboundSamlSsoProfiles.idpCredentials.add", httpMethod: "POST", path: "v1/{+parent}/idpCredentials:add", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[7] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     bodyParams: [{"field":"pemData","api":"pemData"}],
@@ -770,7 +828,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_saml_sso_profiles_idp_credentials_delete",
     cud: "delete",
     description: "Deletes an IdpCredential.",
-    method: { id: "cloudidentity.inboundSamlSsoProfiles.idpCredentials.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
+    method: { id: "cloudidentity.inboundSamlSsoProfiles.idpCredentials.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[7] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -783,7 +841,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_saml_sso_profiles_idp_credentials_get",
     cud: "read",
     description: "Gets an IdpCredential.",
-    method: { id: "cloudidentity.inboundSamlSsoProfiles.idpCredentials.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[6] },
+    method: { id: "cloudidentity.inboundSamlSsoProfiles.idpCredentials.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[8] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -796,7 +854,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_saml_sso_profiles_idp_credentials_list",
     cud: "read",
     description: "Returns a list of IdpCredentials in an InboundSamlSsoProfile.",
-    method: { id: "cloudidentity.inboundSamlSsoProfiles.idpCredentials.list", httpMethod: "GET", path: "v1/{+parent}/idpCredentials", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[6] },
+    method: { id: "cloudidentity.inboundSamlSsoProfiles.idpCredentials.list", httpMethod: "GET", path: "v1/{+parent}/idpCredentials", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["parent"], scopes: S_cloudidentity_v1[8] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -811,7 +869,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_saml_sso_profiles_list",
     cud: "read",
     description: "Lists InboundSamlSsoProfiles for a customer.",
-    method: { id: "cloudidentity.inboundSamlSsoProfiles.list", httpMethod: "GET", path: "v1/inboundSamlSsoProfiles", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[6] },
+    method: { id: "cloudidentity.inboundSamlSsoProfiles.list", httpMethod: "GET", path: "v1/inboundSamlSsoProfiles", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[8] },
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -826,7 +884,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_saml_sso_profiles_patch",
     cud: "update",
     description: "Updates an InboundSamlSsoProfile. When the target customer has enabled [Multi-party approval for sensitive actions](https://support.google.com/a/answer/13790448",
-    method: { id: "cloudidentity.inboundSamlSsoProfiles.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
+    method: { id: "cloudidentity.inboundSamlSsoProfiles.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[7] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -841,7 +899,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_sso_assignments_create",
     cud: "create",
     description: "Creates an InboundSsoAssignment for users and devices in a `Customer` under a given `Group` or `OrgUnit`.",
-    method: { id: "cloudidentity.inboundSsoAssignments.create", httpMethod: "POST", path: "v1/inboundSsoAssignments", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[5] },
+    method: { id: "cloudidentity.inboundSsoAssignments.create", httpMethod: "POST", path: "v1/inboundSsoAssignments", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[7] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -854,7 +912,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_sso_assignments_delete",
     cud: "delete",
     description: "Deletes an InboundSsoAssignment. To disable SSO, Create (or Update) an assignment that has `sso_mode` == `SSO_OFF`.",
-    method: { id: "cloudidentity.inboundSsoAssignments.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
+    method: { id: "cloudidentity.inboundSsoAssignments.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[7] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -867,7 +925,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_sso_assignments_get",
     cud: "read",
     description: "Gets an InboundSsoAssignment.",
-    method: { id: "cloudidentity.inboundSsoAssignments.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[6] },
+    method: { id: "cloudidentity.inboundSsoAssignments.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[8] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -880,12 +938,12 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_sso_assignments_list",
     cud: "read",
     description: "Lists the InboundSsoAssignments for a `Customer`.",
-    method: { id: "cloudidentity.inboundSsoAssignments.list", httpMethod: "GET", path: "v1/inboundSsoAssignments", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[6] },
+    method: { id: "cloudidentity.inboundSsoAssignments.list", httpMethod: "GET", path: "v1/inboundSsoAssignments", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[8] },
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
       account: accountField(() => registry.accountAliases()),
-      filter: z.string().describe("A CEL expression to filter the results. The only supported filter is filtering by customer. For example: `customer==customers/C0123abc`. Omitting the filter or specifying a filter of `customer==custom").optional(),
+      filter: z.string().describe("A CEL expression to filter the results. The only supported filter is filtering by customer. For example: `customer==\"customers/C0123abc\"`. Omitting the filter or specifying a filter of `customer==\"cus").optional(),
       pageSize: z.number().describe("The maximum number of assignments to return. The service may return fewer than this value. If omitted (or defaulted to zero) the server will use a sensible default. This default may change over time. ").optional(),
       pageToken: z.string().describe("A page token, received from a previous `ListInboundSsoAssignments` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListInboundSsoAssignments` mus").optional(),
       fields: z.string().optional().describe('Response field mask.'),
@@ -895,7 +953,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_inbound_sso_assignments_patch",
     cud: "update",
     description: "Updates an InboundSsoAssignment. The body of this request is the `inbound_sso_assignment` field and the `update_mask` is relative to that. For example: a PATCH",
-    method: { id: "cloudidentity.inboundSsoAssignments.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[5] },
+    method: { id: "cloudidentity.inboundSsoAssignments.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[7] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -910,7 +968,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_policies_create",
     cud: "create",
     description: "Create a policy.",
-    method: { id: "cloudidentity.policies.create", httpMethod: "POST", path: "v1/policies", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[7] },
+    method: { id: "cloudidentity.policies.create", httpMethod: "POST", path: "v1/policies", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[9] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {
@@ -923,7 +981,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_policies_delete",
     cud: "delete",
     description: "Delete a policy.",
-    method: { id: "cloudidentity.policies.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[7] },
+    method: { id: "cloudidentity.policies.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[9] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -936,7 +994,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_policies_get",
     cud: "read",
     description: "Get a policy.",
-    method: { id: "cloudidentity.policies.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[8] },
+    method: { id: "cloudidentity.policies.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[10] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -949,7 +1007,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_policies_list",
     cud: "read",
     description: "List policies.",
-    method: { id: "cloudidentity.policies.list", httpMethod: "GET", path: "v1/policies", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[8] },
+    method: { id: "cloudidentity.policies.list", httpMethod: "GET", path: "v1/policies", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: [], scopes: S_cloudidentity_v1[10] },
     params: [{"field":"filter","api":"filter","location":"query"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
     shape: {
@@ -964,7 +1022,7 @@ export function registerCloudidentityGeneratedTools(registry: ToolRegistry, deps
     name: "cloudidentity_policies_patch",
     cud: "update",
     description: "Update a policy.",
-    method: { id: "cloudidentity.policies.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[7] },
+    method: { id: "cloudidentity.policies.patch", httpMethod: "PATCH", path: "v1/{+name}", baseUrl: "https://cloudidentity.googleapis.com/", requiredParams: ["name"], scopes: S_cloudidentity_v1[9] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
     shape: {

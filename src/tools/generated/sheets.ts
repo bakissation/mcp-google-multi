@@ -47,7 +47,7 @@ export function registerSheetsGeneratedTools(registry: ToolRegistry, deps: Execu
     shape: {
       account: accountField(() => registry.accountAliases()),
       spreadsheetId: z.string().min(1).describe("The spreadsheet to request."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("GetSpreadsheetByDataFilterRequest JSON request body. Top-level fields: dataFilters, excludeTablesInBandedRanges, includeGridData."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("GetSpreadsheetByDataFilterRequest JSON request body. Top-level fields: commentsViewMode, dataFilters, excludeTablesInBandedRanges, includeGridData."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);

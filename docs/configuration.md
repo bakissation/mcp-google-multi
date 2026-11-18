@@ -54,7 +54,7 @@ Each account can point at a named **scope profile** so consent is exactly what t
 | `keep` | low | Read and edit Keep notes (not for a personal or external-organisation account) |
 | `driveactivity` | low | Read the Drive activity feed |
 | `directory` | low | Search the Workspace domain directory with `contacts_search_directory` (Workspace accounts only) |
-| `postmaster` | low | Read Postmaster Tools deliverability data |
+| `postmaster` | medium | Read Postmaster Tools deliverability data, and register, verify and manage domains and their users |
 | `analytics` | low | Read Google Analytics (GA4): reports, realtime, account/property config |
 | `analytics_write` | medium | Edit GA4 configuration: properties, streams, key events, custom definitions (includes read) |
 | `forms` | medium | Build Forms and read responses |
