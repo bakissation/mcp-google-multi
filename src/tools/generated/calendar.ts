@@ -16,11 +16,11 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.calendars"],
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/calendar.calendars"],
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/calendar.calendars","https://www.googleapis.com/auth/calendar.calendars.readonly","https://www.googleapis.com/auth/calendar.readonly"],
-    ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.acls","https://www.googleapis.com/auth/calendar.acls.readonly","https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/calendar.calendarlist","https://www.googleapis.com/auth/calendar.calendarlist.readonly","https://www.googleapis.com/auth/calendar.events","https://www.googleapis.com/auth/calendar.events.freebusy","https://www.googleapis.com/auth/calendar.events.owned","https://www.googleapis.com/auth/calendar.events.owned.readonly","https://www.googleapis.com/auth/calendar.events.public.readonly","https://www.googleapis.com/auth/calendar.events.readonly","https://www.googleapis.com/auth/calendar.readonly","https://www.googleapis.com/auth/calendar.settings.readonly"],
+    ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.acls","https://www.googleapis.com/auth/calendar.acls.readonly","https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/calendar.calendarlist","https://www.googleapis.com/auth/calendar.calendarlist.readonly","https://www.googleapis.com/auth/calendar.events","https://www.googleapis.com/auth/calendar.events.freebusy","https://www.googleapis.com/auth/calendar.events.owned","https://www.googleapis.com/auth/calendar.events.owned.readonly","https://www.googleapis.com/auth/calendar.events.public.readonly","https://www.googleapis.com/auth/calendar.events.readonly","https://www.googleapis.com/auth/calendar.readonly","https://www.googleapis.com/auth/calendar.settings","https://www.googleapis.com/auth/calendar.settings.readonly"],
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/calendar.calendarlist","https://www.googleapis.com/auth/calendar.calendarlist.readonly","https://www.googleapis.com/auth/calendar.events.freebusy","https://www.googleapis.com/auth/calendar.events.owned","https://www.googleapis.com/auth/calendar.events.owned.readonly","https://www.googleapis.com/auth/calendar.events.public.readonly","https://www.googleapis.com/auth/calendar.readonly"],
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/calendar.events","https://www.googleapis.com/auth/calendar.events.owned"],
     ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.app.created","https://www.googleapis.com/auth/calendar.events","https://www.googleapis.com/auth/calendar.events.freebusy","https://www.googleapis.com/auth/calendar.events.owned","https://www.googleapis.com/auth/calendar.events.owned.readonly","https://www.googleapis.com/auth/calendar.events.public.readonly","https://www.googleapis.com/auth/calendar.events.readonly","https://www.googleapis.com/auth/calendar.readonly"],
-    ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.readonly","https://www.googleapis.com/auth/calendar.settings.readonly"],
+    ["https://www.googleapis.com/auth/calendar","https://www.googleapis.com/auth/calendar.readonly","https://www.googleapis.com/auth/calendar.settings","https://www.googleapis.com/auth/calendar.settings.readonly"],
   ];
   registerGeneratedTool(registry, {
     name: "calendar_acl_delete",
@@ -229,7 +229,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     shape: {
       account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Calendar JSON request body. Top-level fields: autoAcceptInvitations, conferenceProperties, dataOwner, description, etag, id, kind, labelProperties, location, summary, timeZone."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("Calendar JSON request body. Top-level fields: autoAcceptInvitations, conferenceProperties, dataOwner, description, etag, id, kind, labelProperties, location, summary, timeZone, workingHours."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -258,7 +258,7 @@ export function registerCalendarGeneratedTools(registry: ToolRegistry, deps: Exe
     shape: {
       account: accountField(() => registry.accountAliases()),
       calendarId: z.string().min(1).describe("Calendar identifier. To retrieve calendar IDs call the calendarList.list method. If you want to access the primary calendar of the currently logged in user, use the \"primary\" keyword."),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("Calendar JSON request body. Top-level fields: autoAcceptInvitations, conferenceProperties, dataOwner, description, etag, id, kind, labelProperties, location, summary, timeZone."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("Calendar JSON request body. Top-level fields: autoAcceptInvitations, conferenceProperties, dataOwner, description, etag, id, kind, labelProperties, location, summary, timeZone, workingHours."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);

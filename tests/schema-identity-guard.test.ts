@@ -42,15 +42,7 @@ function fullRegistry(): ToolRegistry {
 
 // Google's OWN params that look identity-shaped (Discovery path/query sent verbatim, gated by the
 // account token's scopes), not an identity override; new entries must be tool.field exact and justified here.
-const GOOGLE_API_PARAM_EXCEPTIONS = new Set([
-  'workspaceevents_tasks_cancel.tenant',
-  'workspaceevents_tasks_get.tenant',
-  'workspaceevents_tasks_push_notification_configs_create.tenant',
-  'workspaceevents_tasks_push_notification_configs_delete.tenant',
-  'workspaceevents_tasks_push_notification_configs_get.tenant',
-  'workspaceevents_tasks_push_notification_configs_list.tenant',
-  'workspaceevents_tasks_subscribe.tenant',
-]);
+const GOOGLE_API_PARAM_EXCEPTIONS = new Set<string>([]);
 
 describe('static identity-field guard', () => {
   it('no registered tool declares an identity-shaped input field', () => {

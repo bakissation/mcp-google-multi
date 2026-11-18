@@ -11,19 +11,6 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry, de
     ["https://www.googleapis.com/auth/chat.app.all.memberships.readonly","https://www.googleapis.com/auth/chat.app.all.messages.readonly","https://www.googleapis.com/auth/chat.app.all.spaces.readonly","https://www.googleapis.com/auth/chat.app.all.users.readstate.readonly","https://www.googleapis.com/auth/chat.app.memberships","https://www.googleapis.com/auth/chat.app.memberships.readonly","https://www.googleapis.com/auth/chat.app.messages.readonly","https://www.googleapis.com/auth/chat.app.spaces","https://www.googleapis.com/auth/chat.app.spaces.readonly","https://www.googleapis.com/auth/chat.memberships","https://www.googleapis.com/auth/chat.memberships.readonly","https://www.googleapis.com/auth/chat.messages","https://www.googleapis.com/auth/chat.messages.reactions","https://www.googleapis.com/auth/chat.messages.reactions.readonly","https://www.googleapis.com/auth/chat.messages.readonly","https://www.googleapis.com/auth/chat.spaces","https://www.googleapis.com/auth/chat.spaces.readonly","https://www.googleapis.com/auth/chat.users.availability","https://www.googleapis.com/auth/chat.users.availability.readonly","https://www.googleapis.com/auth/chat.users.readstate","https://www.googleapis.com/auth/chat.users.readstate.readonly","https://www.googleapis.com/auth/drive","https://www.googleapis.com/auth/drive.file","https://www.googleapis.com/auth/drive.metadata","https://www.googleapis.com/auth/drive.metadata.readonly","https://www.googleapis.com/auth/drive.readonly","https://www.googleapis.com/auth/meetings.space.created","https://www.googleapis.com/auth/meetings.space.readonly"],
   ];
   registerGeneratedTool(registry, {
-    name: "workspaceevents_message_stream",
-    cud: "create",
-    description: "SendStreamingMessage is a streaming call that will return a stream of task update events until the Task is in an interrupted or terminal state.",
-    method: { id: "workspaceevents.message.stream", httpMethod: "POST", path: "v1/message:stream", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: [] },
-    params: [{"field":"fields","api":"fields","location":"query"}],
-    hasBody: true,
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("SendMessageRequest JSON request body. Top-level fields: configuration, message, metadata, tenant."),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
     name: "workspaceevents_operations_get",
     cud: "read",
     description: "Gets the latest state of a long-running operation. Clients can use this method to poll the operation result at intervals as recommended by the API service.",
@@ -121,110 +108,6 @@ export function registerWorkspaceeventsGeneratedTools(registry: ToolRegistry, de
     shape: {
       account: accountField(() => registry.accountAliases()),
       name: z.string().min(1).describe("Required. Resource name of the subscription. Format: `subscriptions/{subscription}`"),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
-    name: "workspaceevents_tasks_cancel",
-    cud: "delete",
-    description: "Cancel a task from the agent. If supported one should expect no more task updates for the task.",
-    method: { id: "workspaceevents.tasks.cancel", httpMethod: "POST", path: "v1/{+name}:cancel", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
-    params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: true,
-    bodyParams: [{"field":"tenant","api":"tenant"}],
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      name: z.string().min(1).describe("The resource name of the task to cancel. Format: tasks/{task_id}"),
-      tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
-    name: "workspaceevents_tasks_get",
-    cud: "read",
-    description: "Get the current state of a task from the agent.",
-    method: { id: "workspaceevents.tasks.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
-    params: [{"field":"name","api":"name","location":"path"},{"field":"historyLength","api":"historyLength","location":"query"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: false,
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      name: z.string().min(1).describe("Required. The resource name of the task. Format: tasks/{task_id}"),
-      historyLength: z.number().describe("The number of most recent messages from the task's history to retrieve.").optional(),
-      tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
-    name: "workspaceevents_tasks_push_notification_configs_create",
-    cud: "create",
-    description: "Set a push notification config for a task.",
-    method: { id: "workspaceevents.tasks.pushNotificationConfigs.create", httpMethod: "POST", path: "v1/{+parent}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["parent"] },
-    params: [{"field":"parent","api":"parent","location":"path"},{"field":"configId","api":"configId","location":"query"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: true,
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      parent: z.string().min(1).describe("Required. The parent task resource for this config. Format: tasks/{task_id}"),
-      configId: z.string().describe("Required. The ID for the new config.").optional(),
-      tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("TaskPushNotificationConfig JSON request body. Top-level fields: name, pushNotificationConfig."),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
-    name: "workspaceevents_tasks_push_notification_configs_delete",
-    cud: "delete",
-    description: "Delete a push notification config for a task.",
-    method: { id: "workspaceevents.tasks.pushNotificationConfigs.delete", httpMethod: "DELETE", path: "v1/{+name}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
-    params: [{"field":"name","api":"name","location":"path"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: false,
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      name: z.string().min(1).describe("The resource name of the config to delete. Format: tasks/{task_id}/pushNotificationConfigs/{config_id}"),
-      tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
-    name: "workspaceevents_tasks_push_notification_configs_get",
-    cud: "read",
-    description: "Get a push notification config for a task.",
-    method: { id: "workspaceevents.tasks.pushNotificationConfigs.get", httpMethod: "GET", path: "v1/{+name}", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
-    params: [{"field":"name","api":"name","location":"path"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: false,
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      name: z.string().min(1).describe("The resource name of the config to retrieve. Format: tasks/{task_id}/pushNotificationConfigs/{config_id}"),
-      tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
-    name: "workspaceevents_tasks_push_notification_configs_list",
-    cud: "read",
-    description: "Get a list of push notifications configured for a task.",
-    method: { id: "workspaceevents.tasks.pushNotificationConfigs.list", httpMethod: "GET", path: "v1/{+parent}/pushNotificationConfigs", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["parent"] },
-    params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: false,
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      parent: z.string().min(1).describe("The parent task resource. Format: tasks/{task_id}"),
-      pageSize: z.number().describe("For AIP-158 these fields are present. Usually not used/needed. The maximum number of configurations to return. If unspecified, all configs will be returned.").optional(),
-      pageToken: z.string().describe("A page token received from a previous ListTaskPushNotificationConfigRequest call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListTaskPushNotificat").optional(),
-      tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
-      fields: z.string().optional().describe('Response field mask.'),
-    },
-  }, deps);
-  registerGeneratedTool(registry, {
-    name: "workspaceevents_tasks_subscribe",
-    cud: "read",
-    description: "TaskSubscription is a streaming call that will return a stream of task update events. This attaches the stream to an existing in process task. If the task is co",
-    method: { id: "workspaceevents.tasks.subscribe", httpMethod: "GET", path: "v1/{+name}:subscribe", baseUrl: "https://workspaceevents.googleapis.com/", requiredParams: ["name"] },
-    params: [{"field":"name","api":"name","location":"path"},{"field":"tenant","api":"tenant","location":"query"},{"field":"fields","api":"fields","location":"query"}],
-    hasBody: false,
-    shape: {
-      account: accountField(() => registry.accountAliases()),
-      name: z.string().min(1).describe("The resource name of the task to subscribe to. Format: tasks/{task_id}"),
-      tenant: z.string().describe("Optional tenant, provided as a path parameter. Experimental, might still change for 1.0 release.").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);

@@ -89,7 +89,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry, deps: Ex
       itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which to create the attachment. This field is required, but is not marked as such while we are migrating from post_id."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. This authorization token is required for in-Classr").optional(),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, gradeSyncEnabled, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, +1 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -156,7 +156,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry, deps: Ex
       itemId: z.string().min(1).describe("Identifier of the post under which the attachment is attached."),
       postId: z.string().describe("Required. Identifier of the post under which the attachment is attached.").optional(),
       updateMask: z.string().describe("Required. Mask that identifies which fields on the attachment to update. The update fails if invalid fields are specified. If a field supports empty values, it can be cleared by specifying it in the u").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, gradeSyncEnabled, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, +1 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -280,7 +280,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry, deps: Ex
       itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which to create the attachment. This field is required, but is not marked as such while we are migrating from post_id."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. This authorization token is required for in-Classr").optional(),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, gradeSyncEnabled, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, +1 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -347,7 +347,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry, deps: Ex
       itemId: z.string().min(1).describe("Identifier of the post under which the attachment is attached."),
       postId: z.string().describe("Required. Identifier of the post under which the attachment is attached.").optional(),
       updateMask: z.string().describe("Required. Mask that identifies which fields on the attachment to update. The update fails if invalid fields are specified. If a field supports empty values, it can be cleared by specifying it in the u").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, gradeSyncEnabled, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, +1 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -365,6 +365,23 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry, deps: Ex
       itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which the attachment is attached. This field is required, but is not marked as such while we are migrating from post_id."),
       submissionId: z.string().min(1).describe("Required. Identifier of the student’s submission."),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  }, deps);
+  registerGeneratedTool(registry, {
+    name: "classroom_coursework_addon_submissions_list",
+    cud: "read",
+    description: "Returns a list of student submissions that the requester is permitted to view. This method returns the following error codes: * `PERMISSION_DENIED` for access e",
+    method: { id: "classroom.courses.courseWork.addOnAttachments.studentSubmissions.list", httpMethod: "GET", path: "v1/courses/{courseId}/courseWork/{itemId}/addOnAttachments/{attachmentId}/studentSubmissions", baseUrl: "https://classroom.googleapis.com/", requiredParams: ["courseId","itemId","attachmentId"], scopes: S_classroom_v1[6] },
+    params: [{"field":"attachmentId","api":"attachmentId","location":"path"},{"field":"courseId","api":"courseId","location":"path"},{"field":"itemId","api":"itemId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
+    hasBody: false,
+    shape: {
+      account: accountField(() => registry.accountAliases()),
+      attachmentId: z.string().min(1).describe("Required. Identifier of the add-on attachment."),
+      courseId: z.string().min(1).describe("Required. Identifier of the course."),
+      itemId: z.string().min(1).describe("Required. Identifier of the `CourseWork` under which the attachment is attached."),
+      pageSize: z.number().describe("Optional. Maximum number of submissions to return. Zero or unspecified indicates that the server may assign a maximum. The server may return fewer than the specified number of results.").optional(),
+      pageToken: z.string().describe("Optional. A page token, received from a previous `ListAddOnAttachmentStudentSubmissions` call. Provide this to retrieve the subsequent page. When paginating, all other parameters provided to `ListAddO").optional(),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -722,7 +739,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry, deps: Ex
       itemId: z.string().min(1).describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which to create the attachment. This field is required, but is not marked as such while we are migrating from post_id."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. This authorization token is required for in-Classr").optional(),
       postId: z.string().describe("Optional. Deprecated, use `item_id` instead.").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, gradeSyncEnabled, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, +1 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -789,7 +806,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry, deps: Ex
       itemId: z.string().min(1).describe("Identifier of the post under which the attachment is attached."),
       postId: z.string().describe("Required. Identifier of the post under which the attachment is attached.").optional(),
       updateMask: z.string().describe("Required. Mask that identifies which fields on the attachment to update. The update fails if invalid fields are specified. If a field supports empty values, it can be cleared by specifying it in the u").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, gradeSyncEnabled, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, +1 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -984,7 +1001,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry, deps: Ex
       postId: z.string().min(1).describe("Optional. Deprecated, use `item_id` instead."),
       addOnToken: z.string().describe("Optional. Token that authorizes the request. The token is passed as a query parameter when the user is redirected from Classroom to the add-on's URL. This authorization token is required for in-Classr").optional(),
       itemId: z.string().describe("Identifier of the `Announcement`, `CourseWork`, or `CourseWorkMaterial` under which to create the attachment. This field is required, but is not marked as such while we are migrating from post_id.").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, gradeSyncEnabled, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, +1 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -1051,7 +1068,7 @@ export function registerClassroomGeneratedTools(registry: ToolRegistry, deps: Ex
       postId: z.string().min(1).describe("Required. Identifier of the post under which the attachment is attached."),
       itemId: z.string().describe("Identifier of the post under which the attachment is attached.").optional(),
       updateMask: z.string().describe("Required. Mask that identifies which fields on the attachment to update. The update fails if invalid fields are specified. If a field supports empty values, it can be cleared by specifying it in the u").optional(),
-      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, title."),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("AddOnAttachment JSON request body. Top-level fields: copyHistory, courseId, dueDate, dueTime, gradeSyncEnabled, id, itemId, maxPoints, postId, studentViewUri, studentWorkReviewUri, teacherViewUri, +1 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
