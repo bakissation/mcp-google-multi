@@ -1468,19 +1468,10 @@ export function registerAdminGeneratedTools(registry: ToolRegistry, deps: Execut
     method: { id: "directory.roleAssignments.insert", httpMethod: "POST", path: "admin/directory/v1/customer/{customer}/roleassignments", baseUrl: "https://admin.googleapis.com/", requiredParams: ["customer"], scopes: S_admin_directory_v1[22] },
     params: [{"field":"customer","api":"customer","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
-    bodyParams: [{"field":"assignedTo","api":"assignedTo"},{"field":"assigneeType","api":"assigneeType"},{"field":"condition","api":"condition"},{"field":"etag","api":"etag"},{"field":"kind","api":"kind"},{"field":"orgUnitId","api":"orgUnitId"},{"field":"roleAssignmentId","api":"roleAssignmentId"},{"field":"roleId","api":"roleId"},{"field":"scopeType","api":"scopeType"}],
     shape: {
       account: accountField(() => registry.accountAliases()),
       customer: z.string().min(1).describe("Immutable ID of the Google Workspace account."),
-      assignedTo: z.string().describe("The unique ID of the entity this role is assigned to—either the `user_id` of a user, the `group_id` of a group, or the `uniqueId` of a service account as defined in [Identity and Access Management (IA").optional(),
-      assigneeType: z.enum(["user","group"]).describe("Output only. The type of the assignee (`USER` or `GROUP`).").optional(),
-      condition: z.string().describe("Optional. The condition associated with this role assignment. Note: Feature is available to Enterprise Standard, Enterprise Plus, Google Workspace for Education Plus and Cloud Identity Premium custome").optional(),
-      etag: z.string().describe("ETag of the resource.").optional(),
-      kind: z.string().describe("The type of the API resource. This is always `admin#directory#roleAssignment`.").optional(),
-      orgUnitId: z.string().describe("If the role is restricted to an organization unit, this contains the ID for the organization unit the exercise of this role is restricted to.").optional(),
-      roleAssignmentId: z.string().describe("ID of this roleAssignment.").optional(),
-      roleId: z.string().describe("The ID of the role that is assigned.").optional(),
-      scopeType: z.string().describe("The scope in which this role is assigned.").optional(),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("RoleAssignment JSON request body. Top-level fields: assignedTo, assigneeType, condition, etag, expirationDetails, kind, orgUnitId, roleAssignmentId, roleId, scopeType."),
       fields: z.string().optional().describe('Response field mask.'),
     },
   }, deps);
@@ -1793,7 +1784,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry, deps: Execut
   registerGeneratedTool(registry, {
     name: "admin_users_create_guest",
     cud: "create",
-    description: "Create a guest user with access to a [subset of Workspace capabilities](https://support.google.com/a/answer/16558545). This feature is currently in Open Beta.",
+    description: "Create a guest user with access to a [subset of Workspace capabilities](https://support.google.com/a/answer/16558545).",
     method: { id: "directory.users.createGuest", httpMethod: "POST", path: "admin/directory/v1/users:createGuest", baseUrl: "https://admin.googleapis.com/", requiredParams: [], scopes: S_admin_directory_v1[27] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
@@ -1827,7 +1818,7 @@ export function registerAdminGeneratedTools(registry: ToolRegistry, deps: Execut
     hasBody: true,
     shape: {
       account: accountField(() => registry.accountAliases()),
-      resolveConflictAccount: coerceBoolean.describe("Optional. If set to `true`, the option selected for [handling unmanaged user accounts](https://support.google.com/a/answer/11112794) will apply. Default: `false`").optional(),
+      resolveConflictAccount: coerceBoolean.describe("Optional. Applies the option selected for [Find and add unmanaged users](https://knowledge.workspace.google.com/admin/users/find-and-add-unmanaged-users) to resolve conflicting accounts when set to `t").optional(),
       body: coerceJson(z.record(z.string(), z.unknown())).describe("User JSON request body. Top-level fields: addresses, agreedToTerms, aliases, archivalTime, archived, changePasswordAtNextLogin, creationTime, customSchemas, customerId, deletionTime, emails, etag, +38 more."),
       fields: z.string().optional().describe('Response field mask.'),
     },

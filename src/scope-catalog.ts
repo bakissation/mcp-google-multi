@@ -168,9 +168,13 @@ export const BUNDLE_CATALOG: Record<string, BundleCatalogEntry> = {
     risk: 'medium',
   },
   postmaster: {
-    scopes: ['https://www.googleapis.com/auth/postmaster.readonly'],
-    description: 'Read Gmail Postmaster Tools deliverability data.',
-    risk: 'low',
+    scopes: [
+      'https://www.googleapis.com/auth/postmaster.traffic.readonly',
+      'https://www.googleapis.com/auth/postmaster.domain',
+      'https://www.googleapis.com/auth/postmaster.user',
+    ],
+    description: 'Read Gmail Postmaster Tools deliverability data, and register, verify and manage domains and their users.',
+    risk: 'medium',
   },
   analytics: {
     scopes: ['https://www.googleapis.com/auth/analytics.readonly'],

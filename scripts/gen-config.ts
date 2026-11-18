@@ -25,7 +25,7 @@ export const GEN_APIS: GenApi[] = [
   { file: 'drivelabels.v2.json', service: 'drivelabels' },
   { file: 'forms.v1.json', service: 'forms' },
   { file: 'gmail.v1.json', service: 'gmail' },
-  { file: 'gmailpostmastertools.v1.json', service: 'postmaster' },
+  { file: 'gmailpostmastertools.v2.json', service: 'postmaster' },
   { file: 'groupsmigration.v1.json', service: 'groupsmigration' },
   { file: 'groupssettings.v1.json', service: 'groupssettings' },
   { file: 'keep.v1.json', service: 'keep' },
@@ -376,6 +376,10 @@ export const CUD_OVERRIDES: Record<string, Cud> = {
   // POST only because of the body; this tests and reports without changing
   // state. `run` isn't a blanket read verb; script.scripts.run executes code.
   'searchconsole.urlTestingTools.mobileFriendlyTest.run': 'read',
+  // Query-only POST (metrics read with a request body); the verb list does not know it.
+  'gmailpostmastertools.domainStats.batchQuery': 'read',
+  // Re-checks the DNS record and flips the domain's verification state.
+  'gmailpostmastertools.domains.verify': 'update',
 };
 
 // Replacement tool names for methodIds whose derived name exceeds the 64-char
@@ -390,6 +394,7 @@ export const NAME_OVERRIDES: Record<string, string> = {
   'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.list': 'analytics_data_streams_measurement_protocol_secrets_list',
   'analyticsadmin.properties.dataStreams.measurementProtocolSecrets.patch': 'analytics_data_streams_measurement_protocol_secrets_patch',
   'classroom.courses.courseWork.addOnAttachments.studentSubmissions.get': 'classroom_coursework_addon_submissions_get',
+  'classroom.courses.courseWork.addOnAttachments.studentSubmissions.list': 'classroom_coursework_addon_submissions_list',
   'classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch': 'classroom_coursework_addon_submissions_patch',
   'classroom.courses.courseWork.studentSubmissions.modifyAttachments': 'classroom_coursework_submissions_modify_attachments',
   'classroom.courses.courseWorkMaterials.addOnAttachments.create': 'classroom_coursework_materials_addons_create',
