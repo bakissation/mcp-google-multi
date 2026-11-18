@@ -31,7 +31,7 @@ export const SUPPORTED_APIS: Record<string, { id: string; version: string }> = {
   groupsmigration: { id: 'groupsmigration', version: 'v1' },
   keep: { id: 'keep', version: 'v1' },
   licensing: { id: 'licensing', version: 'v1' },
-  postmaster: { id: 'gmailpostmastertools', version: 'v1' },
+  postmaster: { id: 'gmailpostmastertools', version: 'v2' },
   reseller: { id: 'reseller', version: 'v1' },
   script: { id: 'script', version: 'v1' },
   vault: { id: 'vault', version: 'v1' },

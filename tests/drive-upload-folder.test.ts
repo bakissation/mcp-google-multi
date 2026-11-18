@@ -45,6 +45,19 @@ function ownerHarness(opts: { failName?: string } = {}) {
   return { handlers, schemas, request, created };
 }
 
+/** Makes every readdir of a folder named `big` answer with `n` plain files. */
+function fakeBigFolder(n: number) {
+  const real = fs.promises.readdir.bind(fs.promises) as (...a: unknown[]) => Promise<unknown>;
+  const entries = Array.from({ length: n }, (_, i) => ({
+    name: `f${i}.txt`,
+    isSymbolicLink: () => false,
+    isDirectory: () => false,
+    isFile: () => true,
+  }));
+  return vi.spyOn(fs.promises, 'readdir').mockImplementation(((dir: unknown, ...rest: unknown[]) =>
+    path.basename(String(dir)) === 'big' ? Promise.resolve(entries) : real(dir, ...rest)) as never);
+}
+
 describe('drive_upload localDir', () => {
   const dirs: string[] = [];
   const priorRoot = process.env.GOOGLE_LOCAL_FILES_DIR;
@@ -133,14 +146,21 @@ describe('drive_upload localDir', () => {
   });
 
   it('refuses a folder over the file cap before creating anything in Drive', async () => {
-    const tree: Record<string, string> = {};
-    for (let i = 0; i < 201; i++) tree[`big/f${i}.txt`] = 'x';
-    root(tree);
-    const h = ownerHarness();
-    const res = await h.handlers.drive_upload({ account: 'test', localDir: 'big' });
-    expect(res.isError).toBe(true);
-    expect(parse(res).error).toBe('invalid_params');
-    expect(h.request).not.toHaveBeenCalled();
+    // The cap check reads directory entries only, so the 201 entries are faked
+    // instead of written: creating 201 real files cost 31 s on the Windows
+    // runner, inside the test body.
+    root({ 'big/.keep': '' });
+    const readdir = fakeBigFolder(201);
+    try {
+      const h = ownerHarness();
+      const res = await h.handlers.drive_upload({ account: 'test', localDir: 'big' });
+      expect(readdir).toHaveBeenCalled();
+      expect(res.isError).toBe(true);
+      expect(parse(res).error).toBe('invalid_params');
+      expect(h.request).not.toHaveBeenCalled();
+    } finally {
+      readdir.mockRestore();
+    }
   });
 
   it('refuses a path outside the local-files root, a plain file, and a missing folder', async () => {
@@ -194,6 +214,19 @@ describe('planLocalFolder', () => {
       expect(plan?.files).toEqual(['b/c/d.txt', 'z.txt']);
     } finally {
       fs.rmSync(r, { recursive: true, force: true });
+    }
+  });
+
+  it('holds exactly 200 files and refuses the 201st (the per-call cap)', async () => {
+    for (const [n, ok] of [[200, true], [201, false]] as const) {
+      const readdir = fakeBigFolder(n);
+      try {
+        const plan = await planLocalFolder(path.join(TMP, 'big'));
+        expect(plan === null).toBe(!ok);
+        if (plan) expect(plan.files).toHaveLength(200);
+      } finally {
+        readdir.mockRestore();
+      }
     }
   });
 });

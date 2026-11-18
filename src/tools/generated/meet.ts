@@ -15,7 +15,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry, deps: Execute
   registerGeneratedTool(registry, {
     name: "meet_conference_records_participants_get",
     cud: "read",
-    description: "Gets a participant by participant ID.",
+    description: "Gets a participant by participant ID. For more information, see [Work with participants](https://developers.google.com/workspace/meet/api/guides/participants).",
     method: { id: "meet.conferenceRecords.participants.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
@@ -44,7 +44,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry, deps: Execute
   registerGeneratedTool(registry, {
     name: "meet_conference_records_participants_participant_sessions_get",
     cud: "read",
-    description: "Gets a participant session by participant session ID.",
+    description: "Gets a participant session by participant session ID. For more information, see [Work with participants](https://developers.google.com/workspace/meet/api/guides",
     method: { id: "meet.conferenceRecords.participants.participantSessions.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
@@ -73,7 +73,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry, deps: Execute
   registerGeneratedTool(registry, {
     name: "meet_conference_records_recordings_get",
     cud: "read",
-    description: "Gets a recording by recording ID.",
+    description: "Gets a recording by recording ID. For more information, see [Work with artifacts](https://developers.google.com/workspace/meet/api/guides/artifacts).",
     method: { id: "meet.conferenceRecords.recordings.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
@@ -86,7 +86,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry, deps: Execute
   registerGeneratedTool(registry, {
     name: "meet_conference_records_smart_notes_get",
     cud: "read",
-    description: "Gets smart notes by smart note ID.",
+    description: "Gets smart notes by smart note ID. For more information, see [Work with artifacts](https://developers.google.com/workspace/meet/api/guides/artifacts).",
     method: { id: "meet.conferenceRecords.smartNotes.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
@@ -99,7 +99,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry, deps: Execute
   registerGeneratedTool(registry, {
     name: "meet_conference_records_smart_notes_list",
     cud: "read",
-    description: "Lists the set of smart notes from the conference record. By default, ordered by start time and in ascending order.",
+    description: "Lists the set of smart notes from the conference record. By default, ordered by start time and in ascending order. For more information, see [Work with artifact",
     method: { id: "meet.conferenceRecords.smartNotes.list", httpMethod: "GET", path: "v2/{+parent}/smartNotes", baseUrl: "https://meet.googleapis.com/", requiredParams: ["parent"], scopes: S_meet_v2[0] },
     params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
@@ -114,7 +114,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry, deps: Execute
   registerGeneratedTool(registry, {
     name: "meet_conference_records_transcripts_entries_get",
     cud: "read",
-    description: "Gets a `TranscriptEntry` resource by entry ID. Note: The transcript entries returned by the Google Meet API might not match the transcription found in the Googl",
+    description: "Gets a `TranscriptEntry` resource by entry ID. For more information, see [Work with artifacts](https://developers.google.com/workspace/meet/api/guides/artifacts",
     method: { id: "meet.conferenceRecords.transcripts.entries.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
@@ -127,7 +127,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry, deps: Execute
   registerGeneratedTool(registry, {
     name: "meet_conference_records_transcripts_get",
     cud: "read",
-    description: "Gets a transcript by transcript ID.",
+    description: "Gets a transcript by transcript ID. For more information, see [Work with artifacts](https://developers.google.com/workspace/meet/api/guides/artifacts).",
     method: { id: "meet.conferenceRecords.transcripts.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
@@ -140,7 +140,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry, deps: Execute
   registerGeneratedTool(registry, {
     name: "meet_spaces_create",
     cud: "create",
-    description: "Creates a space.",
+    description: "Creates a space. For more information, see [Manage meeting spaces](https://developers.google.com/workspace/meet/api/guides/manage-meeting-spaces).",
     method: { id: "meet.spaces.create", httpMethod: "POST", path: "v2/spaces", baseUrl: "https://meet.googleapis.com/", requiredParams: [], scopes: S_meet_v2[1] },
     params: [{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
@@ -153,7 +153,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry, deps: Execute
   registerGeneratedTool(registry, {
     name: "meet_spaces_end_active_conference",
     cud: "delete",
-    description: "Ends an active conference (if there's one). For an example, see [End active conference](https://developers.google.com/workspace/meet/api/guides/meeting-spaces#e",
+    description: "Ends an active conference (if there's one). For more information, see [Manage meeting spaces](https://developers.google.com/workspace/meet/api/guides/manage-mee",
     method: { id: "meet.spaces.endActiveConference", httpMethod: "POST", path: "v2/{+name}:endActiveConference", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[1] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,
@@ -167,7 +167,7 @@ export function registerMeetGeneratedTools(registry: ToolRegistry, deps: Execute
   registerGeneratedTool(registry, {
     name: "meet_spaces_get",
     cud: "read",
-    description: "Gets details about a meeting space. For an example, see [Get a meeting space](https://developers.google.com/workspace/meet/api/guides/meeting-spaces#get-meeting",
+    description: "Gets details about a meeting space. For more information, see [Manage meeting spaces](https://developers.google.com/workspace/meet/api/guides/manage-meeting-spa",
     method: { id: "meet.spaces.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[2] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,
@@ -178,9 +178,99 @@ export function registerMeetGeneratedTools(registry: ToolRegistry, deps: Execute
     },
   }, deps);
   registerGeneratedTool(registry, {
+    name: "meet_spaces_members_batch_update",
+    cud: "update",
+    description: "Updates members of one space within a batch. For more information, see [Manage meeting space members](https://developers.google.com/workspace/meet/api/guides/me",
+    method: { id: "meet.spaces.members.batchUpdate", httpMethod: "POST", path: "v2/{+parent}/members:batchUpdate", baseUrl: "https://meet.googleapis.com/", requiredParams: ["parent"], scopes: S_meet_v2[1] },
+    params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
+    hasBody: true,
+    shape: {
+      account: accountField(() => registry.accountAliases()),
+      parent: z.string().min(1).describe("Required. The parent resource shared by all Members being updated. Format: spaces/{space}"),
+      body: coerceJson(z.record(z.string(), z.unknown())).describe("BatchUpdateMembersRequest JSON request body. Top-level fields: requests, updateMask."),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  }, deps);
+  registerGeneratedTool(registry, {
+    name: "meet_spaces_members_create",
+    cud: "create",
+    description: "Creates a member. For more information, see [Manage meeting space members](https://developers.google.com/workspace/meet/api/guides/meeting-space-members). This",
+    method: { id: "meet.spaces.members.create", httpMethod: "POST", path: "v2/{+parent}/members", baseUrl: "https://meet.googleapis.com/", requiredParams: ["parent"], scopes: S_meet_v2[1] },
+    params: [{"field":"parent","api":"parent","location":"path"},{"field":"fields","api":"fields","location":"query"}],
+    hasBody: true,
+    bodyParams: [{"field":"email","api":"email"},{"field":"name","api":"name"},{"field":"role","api":"role"}],
+    shape: {
+      account: accountField(() => registry.accountAliases()),
+      parent: z.string().min(1).describe("Required. Format: spaces/{space}"),
+      email: z.string().describe("Email for the member. This is required for creating the member.").optional(),
+      name: z.string().describe("Identifier. Resource name of the member. Format: `spaces/{space}/members/{member}`").optional(),
+      role: z.enum(["ROLE_UNSPECIFIED","COHOST"]).describe("The meeting role assigned to the member.").optional(),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  }, deps);
+  registerGeneratedTool(registry, {
+    name: "meet_spaces_members_delete",
+    cud: "delete",
+    description: "Deletes the member who was previously assigned roles in the space. For more information, see [Manage meeting space members](https://developers.google.com/worksp",
+    method: { id: "meet.spaces.members.delete", httpMethod: "DELETE", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[1] },
+    params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
+    hasBody: false,
+    shape: {
+      account: accountField(() => registry.accountAliases()),
+      name: z.string().min(1).describe("Required. Format: “spaces/{space}/members/{member}”"),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  }, deps);
+  registerGeneratedTool(registry, {
+    name: "meet_spaces_members_get",
+    cud: "read",
+    description: "Gets a member. For more information, see [Manage meeting space members](https://developers.google.com/workspace/meet/api/guides/meeting-space-members). This API",
+    method: { id: "meet.spaces.members.get", httpMethod: "GET", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[0] },
+    params: [{"field":"name","api":"name","location":"path"},{"field":"fields","api":"fields","location":"query"}],
+    hasBody: false,
+    shape: {
+      account: accountField(() => registry.accountAliases()),
+      name: z.string().min(1).describe("Required. Format: “spaces/{space}/members/{member}”"),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  }, deps);
+  registerGeneratedTool(registry, {
+    name: "meet_spaces_members_list",
+    cud: "read",
+    description: "Lists members. For more information, see [Manage meeting space members](https://developers.google.com/workspace/meet/api/guides/meeting-space-members). This API",
+    method: { id: "meet.spaces.members.list", httpMethod: "GET", path: "v2/{+parent}/members", baseUrl: "https://meet.googleapis.com/", requiredParams: ["parent"], scopes: S_meet_v2[0] },
+    params: [{"field":"parent","api":"parent","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
+    hasBody: false,
+    shape: {
+      account: accountField(() => registry.accountAliases()),
+      parent: z.string().min(1).describe("Required. Format: spaces/{space}"),
+      pageSize: z.number().describe("Optional. Maximum number of members to return. The service might return fewer than this value. If unspecified or set to 0, at most 250 members are returned. The maximum value is 500; values above 500 ").optional(),
+      pageToken: z.string().describe("Optional. Page token returned from previous List Call.").optional(),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  }, deps);
+  registerGeneratedTool(registry, {
+    name: "meet_spaces_members_patch",
+    cud: "update",
+    description: "Updates a member. For more information, see [Manage meeting space members](https://developers.google.com/workspace/meet/api/guides/meeting-space-members).",
+    method: { id: "meet.spaces.members.patch", httpMethod: "PATCH", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[1] },
+    params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
+    hasBody: true,
+    bodyParams: [{"field":"email","api":"email"},{"field":"name_","api":"name"},{"field":"role","api":"role"}],
+    shape: {
+      account: accountField(() => registry.accountAliases()),
+      name: z.string().min(1).describe("Identifier. Resource name of the member. Format: `spaces/{space}/members/{member}`"),
+      updateMask: z.string().describe("Optional. Field mask used to specify the fields to be updated in the member. If update_mask isn't provided(not set, set with empty paths, or only has \"\" as paths), it defaults to update all fields pro").optional(),
+      email: z.string().describe("Email for the member. This is required for creating the member.").optional(),
+      name_: z.string().describe("Identifier. Resource name of the member. Format: `spaces/{space}/members/{member}`").optional(),
+      role: z.enum(["ROLE_UNSPECIFIED","COHOST"]).describe("The meeting role assigned to the member.").optional(),
+      fields: z.string().optional().describe('Response field mask.'),
+    },
+  }, deps);
+  registerGeneratedTool(registry, {
     name: "meet_spaces_patch",
     cud: "update",
-    description: "Updates details about a meeting space. For an example, see [Update a meeting space](https://developers.google.com/workspace/meet/api/guides/meeting-spaces#updat",
+    description: "Updates details about a meeting space. For more information, see [Manage meeting spaces](https://developers.google.com/workspace/meet/api/guides/manage-meeting-",
     method: { id: "meet.spaces.patch", httpMethod: "PATCH", path: "v2/{+name}", baseUrl: "https://meet.googleapis.com/", requiredParams: ["name"], scopes: S_meet_v2[3] },
     params: [{"field":"name","api":"name","location":"path"},{"field":"updateMask","api":"updateMask","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: true,

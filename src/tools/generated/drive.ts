@@ -116,7 +116,7 @@ export function registerDriveGeneratedTools(registry: ToolRegistry, deps: Execut
   registerGeneratedTool(registry, {
     name: "drive_approvals_list",
     cud: "read",
-    description: "Lists the approvals on a file. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals).",
+    description: "Lists the approvals on a file. For more information, see [Manage approvals](https://developers.google.com/workspace/drive/api/guides/approvals). By default, thi",
     method: { id: "drive.approvals.list", httpMethod: "GET", path: "files/{fileId}/approvals", baseUrl: "https://www.googleapis.com/drive/v3/", requiredParams: ["fileId"], scopes: S_drive_v3[2] },
     params: [{"field":"fileId","api":"fileId","location":"path"},{"field":"pageSize","api":"pageSize","location":"query"},{"field":"pageToken","api":"pageToken","location":"query"},{"field":"fields","api":"fields","location":"query"}],
     hasBody: false,

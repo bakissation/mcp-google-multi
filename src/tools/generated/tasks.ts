@@ -21,7 +21,7 @@ export function registerTasksGeneratedTools(registry: ToolRegistry, deps: Execut
       account: accountField(() => registry.accountAliases()),
       tasklist: z.string().min(1).describe("Task list identifier."),
       etag: z.string().describe("ETag of the resource.").optional(),
-      id: z.string().describe("Task list identifier.").optional(),
+      id: z.string().describe("Task list identifier. In requests, the authenticated user's default task list can also be referred to as \"@default\".").optional(),
       kind: z.string().describe("Output only. Type of the resource. This is always \"tasks#taskList\".").optional(),
       selfLink: z.string().describe("Output only. URL pointing to this task list. Used to retrieve, update, or delete this task list.").optional(),
       title: z.string().describe("Title of the task list. Maximum length allowed: 1024 characters.").optional(),
