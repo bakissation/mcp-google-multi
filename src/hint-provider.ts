@@ -27,6 +27,7 @@ export type HintCase =
   | { kind: 'no_oauth_client' }
   | { kind: 'network_error'; code: string }
   | { kind: 'local_path'; code: string; path?: string }
+  | { kind: 'host_files'; tool: string; key: string }
   | { kind: 'internal'; account?: string }
   | { kind: 'untrusted_host' }
   | { kind: 'toolset_disabled'; api: string; service: string }
@@ -69,6 +70,7 @@ export const HINT_KINDS = [
   'no_oauth_client',
   'network_error',
   'local_path',
+  'host_files',
   'internal',
   'untrusted_host',
   'toolset_disabled',

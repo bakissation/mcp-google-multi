@@ -13,6 +13,7 @@ describe('HINT_KINDS', () => {
       'apis_disabled',
       'daily_quota',
       'dead_refresh_token',
+      'host_files',
       'internal',
       'invalid_scope',
       'legacy_plaintext_token',
