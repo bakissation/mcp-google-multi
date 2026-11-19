@@ -11,6 +11,7 @@ import { registerTasksTools } from './tools/tasks.js';
 import { registerMeetTools } from './tools/meet.js';
 import { registerSlidesTools } from './tools/slides.js';
 import { registerFormsTools } from './tools/forms.js';
+import { registerClassroomTools } from './tools/classroom.js';
 import { registerChatTools } from './tools/chat.js';
 import { registerAdminTools } from './tools/admin.js';
 import { registerAnalyticsTools } from './tools/analytics.js';
@@ -42,6 +43,7 @@ export const SERVICES: ServiceEntry[] = [
   { name: 'tasks', register: registerTasksTools },
   { name: 'meet', register: registerMeetTools },
   { name: 'slides', register: registerSlidesTools, enabled: (set) => new Set(getOptionalBundles(set)).has('slides') },
+  { name: 'classroom', register: registerClassroomTools, enabled: (set) => { const b = new Set(getOptionalBundles(set)); return b.has('classroom') || b.has('classroom_readonly'); } },
   { name: 'forms', register: registerFormsTools, enabled: (set) => new Set(getOptionalBundles(set)).has('forms') },
   { name: 'chat', register: registerChatTools, enabled: (set) => new Set(getOptionalBundles(set)).has('chat') },
   { name: 'analytics', register: registerAnalyticsTools, enabled: (set) => { const b = new Set(getOptionalBundles(set)); return b.has('analytics') || b.has('analytics_write'); } },

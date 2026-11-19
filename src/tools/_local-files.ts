@@ -6,6 +6,7 @@ import { configDir } from '../config-file.js';
 import { getTokenDir } from '../accounts.js';
 import { discoveryCacheDir } from '../discovery-client.js';
 import { getLoadedEnvFiles } from '../env-load.js';
+import { hostFilesHint } from '../arg-strict.js';
 
 /** Refusal for a host-file argument on a context that may not touch the
  * server's disk: the host belongs to its operator, not to every caller. */
@@ -16,7 +17,7 @@ export function hostFilesRefused(account: string | undefined, what: string) {
       text: stringifyEnvelope({
         error: 'forbidden',
         message: `${what}: this caller may not read files on the machine running the server.`,
-        hint: 'Put the file in Drive first and work from its Drive id.',
+        hint: hostFilesHint('', what),
         retriable: false,
         account,
       }),

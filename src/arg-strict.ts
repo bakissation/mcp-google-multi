@@ -3,6 +3,7 @@
 
 import { editDistance, SUGGEST_MAX_INPUT } from './scope-catalog.js';
 import { sliceClean } from './trim.js';
+import { hints } from './hint-provider.js';
 
 export type UnknownArgMode = 'reject' | 'warn' | 'off';
 
@@ -147,7 +148,11 @@ const COMMON_ALIASES: Record<string, string[]> = {
 
 const TOOL_ALIASES: Record<string, Record<string, string[]>> = {
   drive_list: { parent: ['folderId'], parentid: ['folderId'], folder: ['folderId'] },
-  drive_move: { parent: ['newParentFolderId'], parentid: ['newParentFolderId'], newparentid: ['newParentFolderId'], destination: ['newParentFolderId'], folderid: ['newParentFolderId'] },
+  drive_move: { parent: ['newParentFolderId'], parentid: ['newParentFolderId'], newparentid: ['newParentFolderId'], parentfolderid: ['newParentFolderId'], destination: ['newParentFolderId'], folderid: ['newParentFolderId'] },
+  drive_update: { name: ['newName'], title: ['newName'], filename: ['newName'], parent: ['newParentFolderId'], parentid: ['newParentFolderId'], newparentid: ['newParentFolderId'], parentfolderid: ['newParentFolderId'], destination: ['newParentFolderId'] },
+  drive_copy: { name: ['newName'], title: ['newName'], filename: ['newName'], parent: ['parentFolderId'], parentid: ['parentFolderId'], newparentid: ['parentFolderId'], newparentfolderid: ['parentFolderId'], destination: ['parentFolderId'], format: ['convertTo'] },
+  docs_create: { parent: ['parentFolderId'], parentid: ['parentFolderId'], folderid: ['parentFolderId'], folder: ['parentFolderId'] },
+  drive_create_shortcut: { name: ['shortcutName'], title: ['shortcutName'], target: ['targetId'], targetfileid: ['targetId'], fileid: ['targetId'], parent: ['parentFolderId'], parentid: ['parentFolderId'] },
   drive_upload: { name: ['filename'], title: ['filename'], format: ['convertTo'], parent: ['parentFolderId'] },
   drive_create_folder: { title: ['name'], parent: ['parentFolderId'] },
   drive_export: { format: ['mimeType'] },
@@ -220,6 +225,27 @@ export function screenArguments(tool: string, args: Record<string, unknown>, dec
   return out;
 }
 
+/** Argument names that point at a file on the machine running the server. A
+ * context that may not touch that disk does not declare them, so they arrive
+ * here as unknown; the useful answer is where the file should go instead. */
+const HOST_FILE_KEYS: ReadonlySet<string> = new Set([
+  'localpath',
+  'localdir',
+  'savepath',
+  'filepath',
+  'localfile',
+  'sourcepath',
+  'sourcedir',
+  'outputpath',
+]);
+
+const HOST_FILES_DEFAULT_HINT =
+  'This server cannot read or write files on the machine running it. Put the file in Drive first (drive_upload with contentBase64 for small files) and work from its Drive id.';
+
+export function hostFilesHint(tool: string, key: string): string {
+  return hints()?.render({ kind: 'host_files', tool, key })?.hint ?? HOST_FILES_DEFAULT_HINT;
+}
+
 export interface SiblingSpelling {
   key: string;
   tools: string[];
@@ -237,7 +263,10 @@ export function unknownArgEnvelope(
   const accepts = `This tool accepts: ${declared.join(', ')}.`;
   const suggested = unknown.flatMap((u) => u.suggestions);
   let hint: string;
-  if (suggested.length > 0) {
+  const hostFile = unknown.find((u) => HOST_FILE_KEYS.has(flatten(u.sent)) && !declared.includes(u.sent));
+  if (hostFile) {
+    hint = hostFilesHint(tool, hostFile.sent);
+  } else if (suggested.length > 0) {
     const did = unknown
       .filter((u) => u.suggestions.length > 0)
       .map((u) => u.suggestions.map((s) => `"${s}"`).join(' or '))

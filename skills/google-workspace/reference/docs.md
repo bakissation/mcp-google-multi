@@ -35,12 +35,13 @@ Generic documents.batchUpdate pass-through. Accepts the full Request union (40 t
 
 Class: create
 
-Create a new Google Docs document
+Create a new Google Docs document. Pass `parentFolderId` to create it inside a Drive folder instead of the My Drive root.
 
 | Argument | Type | Required | Description |
 |---|---|---|---|
 | `account` | string | optional | Google account alias |
 | `title` | string | required | Document title |
+| `parentFolderId` | string | optional | Drive folder ID to create the document in, not parentId. Defaults to My Drive root |
 
 ## `docs_create_footer`
 
