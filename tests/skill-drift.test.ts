@@ -94,8 +94,28 @@ describe('skill reference tables', () => {
   });
 });
 
+// Tools a hosted deployment adds on top of this package. The skill may name
+// them so an agent on a hosted server knows what to reach for; they are not
+// registered here, so they are listed explicitly and kept off the call-syntax
+// (argument) check.
+const HOSTED_ONLY_TOOLS = [
+  'file_transfer_create',
+  'file_transfer_list',
+  'file_transfer_revoke',
+  'gmail_attachment_to_drive',
+  'drive_attach_to_draft',
+  'drive_transfer_stream',
+  'drive_zip',
+  'drive_unzip',
+];
+
 describe('SKILL.md tool and argument names', () => {
-  const toolNames = new Set(allToolNames());
+  const toolNames = new Set([...allToolNames(), ...HOSTED_ONLY_TOOLS]);
+
+  it('the hosted-only list holds no tool this package registers (it would hide a rename)', () => {
+    const own = new Set(allToolNames());
+    expect(HOSTED_ONLY_TOOLS.filter((n) => own.has(n))).toEqual([]);
+  });
 
   it('names only tools and arguments the registry actually has', () => {
     const text = fs.readFileSync(skillMdPath, 'utf8');
