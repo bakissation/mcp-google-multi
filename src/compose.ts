@@ -49,7 +49,6 @@ export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Di
   // systemd, an isolated service user) cannot fail server startup over a
   // feature this run might never use. `config check` hits this same path.
   if (localFilesEnabled) logLocalFilesRootAtStartup();
-  const clientDeps: CuratedToolDeps = { getClientFn: ctx.getClient, localFiles: localFilesEnabled };
   const execDeps: ExecuteDeps = {
     getClientFn: ctx.getClient,
     scopeDeps: {
@@ -58,6 +57,7 @@ export function buildRegistry(server: McpServer, ctx: IdentityContext, mode?: Di
     },
     hasTool: (name) => registry.hasTool(name),
   };
+  const clientDeps: CuratedToolDeps = { getClientFn: ctx.getClient, localFiles: localFilesEnabled, scopeDeps: execDeps.scopeDeps, hasTool: execDeps.hasTool };
   const toolsets = getToolsets();
   if (toolsets !== 'all') {
     const known = new Set([...SERVICES.map((s) => s.name), ...GENERATED_SERVICES.map((s) => s.name)]);
