@@ -1061,6 +1061,46 @@ export function registerDriveTools(server: ToolRegistry, deps: CuratedToolDeps =
     },
   );
 
+  server.registerTool(
+    'drive_create_shortcut',
+    {
+      description:
+        'Create a Drive shortcut: a small link in one folder that points at a file or folder kept elsewhere, so the same item appears in two places without a copy or a move. Use it to file a document in a second folder; use drive_copy for an independent duplicate, drive_move to relocate.',
+      inputSchema: {
+        account: accountEnum.describe('Google account alias'),
+        targetId: z.string().min(1).describe('ID of the file or folder the shortcut points to'),
+        shortcutName: z.string().min(1).optional().describe("Name of the shortcut (default: the target's own name)"),
+        parentFolderId: z.string().min(1).optional().describe('Folder to put the shortcut in, not parentId. Defaults to My Drive root'),
+      },
+    },
+    async ({ account, targetId, shortcutName, parentFolderId }) => {
+      try {
+        const auth = await getClientFn(account as Account);
+        const drive = driveClient({ version: 'v3', auth });
+        let name = shortcutName;
+        if (!name) {
+          const target = await drive.files.get({ fileId: targetId, fields: 'name', supportsAllDrives: true });
+          name = target.data.name ?? undefined;
+        }
+        const res = await drive.files.create({
+          requestBody: {
+            name,
+            mimeType: 'application/vnd.google-apps.shortcut',
+            shortcutDetails: { targetId },
+            parents: parentFolderId ? [parentFolderId] : undefined,
+          },
+          fields: 'id,name,mimeType,shortcutDetails,webViewLink',
+          supportsAllDrives: true,
+        });
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(res.data, null, 2) }],
+        };
+      } catch (error: any) {
+        return handleDriveError(error, account as Account);
+      }
+    },
+  );
+
   // ─── Permissions / sharing ─────────────────────────────────────────────
 
   server.registerTool(

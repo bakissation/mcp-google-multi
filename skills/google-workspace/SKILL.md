@@ -133,6 +133,16 @@ service's reference table in `reference/` next to this file. When in doubt,
 discover the tool again and read its declared arguments rather than guessing
 from memory or from another service's convention.
 
+Spellings that differ between sibling tools and cost a call when guessed:
+
+- A new name is `newName` on `drive_update` and `drive_copy`, and `name` on
+  `drive_create_folder`. A new location is `newParentFolderId` on
+  `drive_update` and `drive_move`, and `parentFolderId` everywhere an item is
+  created or copied (`drive_upload`, `drive_create_folder`, `drive_copy`,
+  `docs_create`, `drive_create_shortcut`). Never `parentId`.
+- A rejected call names the declared spelling in its `hint` ("Did you mean ..."):
+  fix that one argument and repeat; nothing was sent to Google.
+
 Each `reference/<service>.md` file tables every **curated** tool for that
 service: its name, its read/create/update/delete class, a one-line summary,
 and every argument with its type, whether it's required, and its
@@ -178,3 +188,69 @@ pointer to `drive_download` / `drive_export`), and a response over about
 100k characters may be cut by the client, so narrow a large request. Prefer
 a named curated or generated tool when one exists: it is more token-lean
 and better typed than building the call by hand.
+
+## 8. Files: local server or hosted server
+
+Where the server runs decides how bytes reach Drive. Check once per session
+which of these tools `drive_discover` and `gmail_discover` list.
+
+**A server on the user's own machine** (stdio, the default install) may read
+and write files inside its local-files folder: `drive_upload` with
+`localPath` or `localDir`, `drive_download`, `drive_export` with `savePath`,
+and `gmail_download_attachment`. Paths are paths on that machine, confined to
+the folder named in the tool's description.
+
+**A hosted server** cannot touch any disk you can see, so none of those local
+path arguments exist and `drive_download` and `gmail_download_attachment` are
+absent. A call that sends `localPath` is rejected with a pointer to this
+section. Do not look for a way around it; pick the tool for the job:
+
+- A file already in Drive, or one that arrived as an email attachment: keep it
+  server side. `gmail_attachment_to_drive` saves a message attachment into a
+  Drive folder (take `messageId` and `attachmentId` from `gmail_read`).
+  `drive_copy` with `convertTo` (`document`, `spreadsheet`, `presentation` or
+  `drawing`) turns a Word, Excel, PowerPoint, CSV, text, HTML, Markdown, PDF
+  or image file already in Drive into a native, editable Google file with no
+  download or upload (`ocrLanguage` helps with scans). `drive_transfer` and
+  `drive_transfer_stream` move a file between two linked accounts.
+- A Google Doc, Sheet or Slides file that must leave as a PDF or Office file:
+  `drive_export` saves the export as a new Drive file instead of a local file;
+  `drive_attach_to_draft` mails it as a draft attachment.
+- A file that only exists on the person's computer, or that the person wants
+  on their computer: `file_transfer_create`. It returns a one-time link:
+  direction `upload` (into a Drive folder) or `download` (one Drive file).
+  Hand the `url` to the person to open in a browser, or, from a program that
+  can send web requests, use the `upload` or `download` block it returns. A
+  link works once and expires within minutes, so create it when the person is
+  ready and never log it. `file_transfer_list` and `file_transfer_revoke`
+  show and cancel open links. If it answers that file links are off for this
+  account, say so and stop; the operator turns them on.
+- Small content you already hold as text or base64: `drive_upload` with
+  `contentBase64` (or `docs_create` plus `docs_insert_text`) needs no link.
+- Folders and archives: `drive_zip` and `drive_unzip` work on Drive ids
+  where the operator enabled them; `drive_create_shortcut` shows one item in
+  a second folder without a copy or a move.
+
+Rules of thumb: prefer an id-to-id tool over anything that moves bytes through
+the conversation; never paste file contents into a tool call to get around a
+missing tool; if the tool you need is not listed, tell the user what is
+missing rather than approximating it with `google_api_call`.
+
+## 9. Google Classroom
+
+With the Classroom scope bundles granted, the curated Classroom tools cover
+the common teacher flow; the long tail (announcements, rosters, grading,
+topics) stays under the generated `classroom_*` tools.
+
+1. `classroom_list_courses` finds the `courseId` (active courses by default).
+2. Read with `classroom_list_materials`, `classroom_list_coursework` and
+   `classroom_list_submissions`. Drafts are hidden by default; pass `states`
+   `DRAFT` to see them.
+3. Create with `classroom_create_material` (resources, no grade) or
+   `classroom_create_coursework` (assignment or question, optional points and
+   due date). Both create a **DRAFT** unless `state` is `PUBLISHED`; a draft
+   is invisible to students. Attach Drive files by id with `driveFileIds`
+   (the file must already be in Drive; `shareMode` defaults to view only) and
+   web addresses with `links`.
+4. `classroom_publish` flips a draft to published, which notifies students.
+   Show the user what will be published and publish only on their go.

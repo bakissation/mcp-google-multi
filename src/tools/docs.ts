@@ -2,6 +2,7 @@ import type { ToolRegistry } from '../registry.js';
 import { z } from 'zod';
 import { coerceBoolean, coerceJson } from './_coerce.js';
 import { docs as docsClient } from '@googleapis/docs';
+import { drive as driveClient } from '@googleapis/drive';
 import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
@@ -181,15 +182,34 @@ export function registerDocsTools(server: ToolRegistry, deps: CuratedToolDeps = 
   server.registerTool(
     'docs_create',
     {
-      description: 'Create a new Google Docs document',
+      description: 'Create a new Google Docs document. Pass `parentFolderId` to create it inside a Drive folder instead of the My Drive root.',
       inputSchema: {
         account: accountEnum.describe('Google account alias'),
         title: z.string().describe('Document title'),
+        parentFolderId: z.string().min(1).optional().describe('Drive folder ID to create the document in, not parentId. Defaults to My Drive root'),
       },
     },
-    async ({ account, title }) => {
+    async ({ account, title, parentFolderId }) => {
       try {
         const auth = await getClientFn(account as Account);
+        if (parentFolderId) {
+          // The Docs API cannot place a new document in a folder; Drive creates
+          // the same native Document with its parent set in one call.
+          const drive = driveClient({ version: 'v3', auth });
+          const created = await drive.files.create({
+            requestBody: { name: title, mimeType: 'application/vnd.google-apps.document', parents: [parentFolderId] },
+            fields: 'id,name,webViewLink',
+            supportsAllDrives: true,
+          });
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify({
+              documentId: created.data.id,
+              title: created.data.name,
+              webViewLink: created.data.webViewLink,
+              parentFolderId,
+            }, null, 2) }],
+          };
+        }
         const docs = docsClient({ version: 'v1', auth });
         const res = await docs.documents.create({
           requestBody: { title },

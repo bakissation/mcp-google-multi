@@ -269,3 +269,27 @@ describe('unknownArgEnvelope', () => {
     expect(blob).not.toContain('1a2b3c');
   });
 });
+
+describe('file-handling argument aliases', () => {
+  const UPDATE = ['account', 'fileId', 'newName', 'newParentFolderId'];
+  const COPY = ['account', 'fileId', 'newName', 'parentFolderId', 'convertTo', 'ocrLanguage'];
+
+  it('points name at newName on drive_update and drive_copy', () => {
+    expect(screenArguments('drive_update', { account: 'w', fileId: 'f', name: 'N' }, UPDATE).unknown[0].suggestions).toEqual(['newName']);
+    expect(screenArguments('drive_copy', { account: 'w', fileId: 'f', name: 'N' }, COPY).unknown[0].suggestions).toEqual(['newName']);
+  });
+
+  it('points parent spellings at each tool\'s own parent key', () => {
+    expect(screenArguments('drive_update', { account: 'w', fileId: 'f', parentFolderId: 'P' }, UPDATE).unknown[0].suggestions).toContain('newParentFolderId');
+    expect(screenArguments('drive_move', { account: 'w', fileId: 'f', parentFolderId: 'P' }, DRIVE_MOVE).unknown[0].suggestions).toContain('newParentFolderId');
+    expect(screenArguments('drive_copy', { account: 'w', fileId: 'f', newParentId: 'P' }, COPY).unknown[0].suggestions).toContain('parentFolderId');
+  });
+
+  it('answers a host-file argument with where the file should go instead', () => {
+    const s = screenArguments('drive_upload', { account: 'w', localPath: '/tmp/a.pdf' }, ['account', 'filename', 'contentBase64']);
+    const env = unknownArgEnvelope('drive_upload', s.unknown, ['account', 'filename', 'contentBase64'], 'w');
+    expect(env.error).toBe('unknown_argument');
+    expect(env.hint).toContain('Put the file in Drive first');
+    expect(env.hint).not.toContain('Did you mean');
+  });
+});
