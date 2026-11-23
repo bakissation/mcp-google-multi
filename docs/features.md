@@ -101,8 +101,9 @@ Set `replyToMessageId` on `gmail_send` / `gmail_create_draft` and the server der
 - `subject` ← the source `Subject`, prefixed `Re: ` unless it already carries one (never double-prefixed).
 - `cc` ← only with `replyAll: true`: the source `To` + `Cc` minus your own addresses (primary + Gmail send-as aliases) minus the `to` recipient.
 - `In-Reply-To` / `References` threading headers.
+- the quoted original, appended under your `body` in both parts: the Gmail API adds none to a raw message, so without it the reply arrives bare. The HTML part wraps the source HTML (plain text when it has none) in Gmail's own `gmail_quote` block, which Gmail collapses as it does for a reply written in its UI; the plain part gets the `>`-prefixed text under an `On <date>, <sender> wrote:` line. Pass `quoteOriginal: false` for a bare reply. Inline images of the source (`cid:` references) are not carried over.
 
-Any value you pass explicitly wins over the derived one (`to`, `cc`, `subject` are optional when `replyToMessageId` is set). If the source can't be fetched: with a caller `to`, the send proceeds with threading degraded to the message id; without a `to`, the call fails `not_found` rather than sending to nobody. A failed send-as lookup degrades the own-address set to your primary and never blocks the send.
+Any value you pass explicitly wins over the derived one (`to`, `cc`, `subject` are optional when `replyToMessageId` is set). If the source can't be fetched: with a caller `to`, the send proceeds with threading degraded to the message id; without a `to`, the call fails `not_found` rather than sending to nobody. A failed send-as lookup degrades the own-address set to your primary and never blocks the send. The quote needs the source body, so the fetch is `format: full` (still one call); if that is refused, the reply falls back to the header-only fetch and goes out without the quote.
 
 
 ### Contact resolver

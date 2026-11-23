@@ -135,6 +135,56 @@ export function buildReplyHeaders(
   };
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// A quoted source goes inside a blockquote, so its document wrappers have to go; script and head never belong in a quote.
+function quotableHtml(html: string): string {
+  let out = html;
+  for (let previous = ''; previous !== out; ) {
+    previous = out;
+    out = out.replace(/<(script|head)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '');
+  }
+  return out.replace(/<!doctype[^>]*>/gi, '').replace(/<\/?(?:html|body|script|head)\b[^>]*>/gi, '');
+}
+
+export interface ReplyQuoteSource {
+  from: string;
+  date: string;
+  /** The source's text/plain body ('' when it has none). */
+  plain: string;
+  /** The source's text/html body ('' when it has none). */
+  html: string;
+}
+
+/** The quoted original a mail client appends to a reply: the Gmail API never adds it to a raw message.
+ * Returns undefined when the source has no text body at all. */
+export function buildReplyQuote(src: ReplyQuoteSource): { text: string; html: string } | undefined {
+  if (src.plain === '' && src.html === '') return undefined;
+  const who = src.from.trim() || 'the sender';
+  const attribution = src.date.trim() ? `On ${src.date.trim()}, ${who} wrote:` : `${who} wrote:`;
+
+  const plain = src.plain !== '' ? src.plain : htmlToMarkdown(src.html).text;
+  const quotedText = plain
+    .replace(/\r\n|\r/g, '\n')
+    .split('\n')
+    .map((line) => (line === '' ? '>' : `> ${line}`))
+    .join('\n');
+
+  const inner = src.html !== ''
+    ? quotableHtml(src.html)
+    : escapeHtml(src.plain).replace(/\r\n|\r|\n/g, '<br>\n');
+  // Gmail's own class names, so Gmail collapses the quote the way it does for a reply written in its UI.
+  const html =
+    '<br><div class="gmail_quote gmail_quote_container">' +
+    `<div dir="ltr" class="gmail_attr">${escapeHtml(attribution)}<br></div>` +
+    '<blockquote class="gmail_quote" style="margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">' +
+    `${inner}</blockquote></div>\n`;
+
+  return { text: `${attribution}\n${quotedText}\n`, html };
+}
+
 export interface ComposeAttachment {
   filename: string;
   content: Buffer;
