@@ -6,7 +6,7 @@ import { accountArgLive } from '../accounts.js';
 import type { Account } from '../accounts.js';
 import { getClient, type CuratedToolDeps } from '../client.js';
 import { handleGoogleApiError, invalidParams, mapGoogleError } from './_errors.js';
-import { buildReplyHeaders, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
+import { buildReplyHeaders, buildReplyQuote, composeRaw, renderMarkdown, htmlToMarkdown, HeaderInjectionError, type ComposeAttachment } from './gmail-mime.js';
 import { localRootNote, hostFilesRefused, prepareLocalDest, cleanupPartialWrite, assertLocalPathAllowed, localFileErrorResult, LocalFileError } from './_local-files.js';
 import { checkOutbound, outboundDeniedEnvelope, resolveOutboundAllowlist } from '../outbound-allowlist.js';
 import addressparser from 'nodemailer/lib/addressparser/index.js';
@@ -197,29 +197,41 @@ interface ReplyDerivation {
   to?: string;
   cc?: string;
   subject?: string;
+  /** The quoted original for both body parts; set only when asked for and the source has a text body. */
+  quote?: { text: string; html: string };
 }
 
+const REPLY_HEADERS = ['From', 'To', 'Cc', 'Subject', 'Date', 'Message-ID', 'References'];
+
 /** Fetch the reply source once and derive threading headers plus (auto-fill)
- * to/cc/subject. On any fetch failure, degrade to the API id for threading and
- * report sourceFound:false so the caller can decide. */
+ * to/cc/subject, and with `quote` the quoted original. On any fetch failure,
+ * degrade to the API id for threading and report sourceFound:false so the
+ * caller can decide. */
 export async function resolveReply(
   gmail: any,
   account: string,
   primaryEmail: string,
   replyToMessageId: string,
   replyAll: boolean,
+  quote = false,
 ): Promise<ReplyDerivation> {
   let headers: any[] | undefined;
   let threadId: string | undefined;
+  let payload: any;
+  const getMetadata = () => gmail.users.messages.get({
+    userId: 'me',
+    id: replyToMessageId,
+    format: 'metadata',
+    metadataHeaders: REPLY_HEADERS,
+  });
   try {
-    const meta = await gmail.users.messages.get({
-      userId: 'me',
-      id: replyToMessageId,
-      format: 'metadata',
-      metadataHeaders: ['From', 'To', 'Cc', 'Subject', 'Message-ID', 'References'],
-    });
-    headers = meta.data.payload?.headers;
-    threadId = meta.data.threadId ?? undefined;
+    // A token that cannot read bodies still gets a threaded, addressed reply without the quote.
+    const source = quote
+      ? await gmail.users.messages.get({ userId: 'me', id: replyToMessageId, format: 'full' }).catch(getMetadata)
+      : await getMetadata();
+    payload = source.data.payload;
+    headers = payload?.headers;
+    threadId = source.data.threadId ?? undefined;
   } catch {
     // Degrade to the API id rather than blocking the send.
     return { inReplyTo: replyToMessageId, references: replyToMessageId, sourceFound: false };
@@ -262,7 +274,20 @@ export async function resolveReply(
     to: derivedTo || undefined,
     cc: derivedCc,
     subject: deriveReplySubject(getHeader(headers, 'Subject')),
+    ...(quote ? { quote: replyQuoteOf(payload, headers) } : {}),
   };
+}
+
+function replyQuoteOf(payload: any, headers: any[] | undefined): { text: string; html: string } | undefined {
+  const plain: string[] = [];
+  const html: string[] = [];
+  collectTextParts(payload, plain, html, true);
+  return buildReplyQuote({
+    from: getHeader(headers, 'From'),
+    date: getHeader(headers, 'Date'),
+    plain: plain.join('\n\n'),
+    html: html.join('\n'),
+  });
 }
 
 // Gmail's after:/before: operators take epoch seconds; Date.parse accepts both
@@ -853,12 +878,14 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           .describe('Message ID to reply to. Sets In-Reply-To/References and, unless overridden, derives to/subject (and cc when replyAll) from the source, so you need not read it first.'),
         replyAll: coerceBoolean.optional()
           .describe('With replyToMessageId: include the source To+Cc (minus your own addresses) in cc. Default false (reply to sender only).'),
+        quoteOriginal: coerceBoolean.optional()
+          .describe('With replyToMessageId: append the source message as a quoted block under `body`, as a mail client does. Default true; pass false for a bare reply.'),
         replyToThreadId: z.string().optional()
           .describe('Thread ID to send the message in'),
         ...(localFiles ? { attachments: coerceJson(attachmentSchema) } : {}),
       },
     },
-    async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, replyToThreadId, attachments }) => {
+    async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, quoteOriginal, replyToThreadId, attachments }) => {
       if (!localFiles && (attachments as unknown[] | undefined)?.length) return hostFilesRefused(account, 'attachments');
       try {
         const auth = await getClientFn(account as Account);
@@ -869,7 +896,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           throw new GmailComposeError('E_HTMLBODY_REMOVED', 'htmlBody was removed in v6: author Markdown in `body`; for literal HTML pass `allowRawHtml: true`.');
         }
         const reply = replyToMessageId
-          ? await resolveReply(gmail, account as Account, config.email, replyToMessageId, replyAll === true)
+          ? await resolveReply(gmail, account as Account, config.email, replyToMessageId, replyAll === true, quoteOriginal !== false)
           : undefined;
         // Caller value > derived value. A missing source with no caller `to`
         // means we cannot address the reply: fail rather than silently drop it.
@@ -892,16 +919,17 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           account as Account,
         );
         if (outbound) return outbound;
-        const html = renderMarkdown(body, allowRawHtml === true);
+        const text = reply?.quote ? `${body}\n\n${reply.quote.text}` : body;
+        const html = renderMarkdown(body, allowRawHtml === true) + (reply?.quote?.html ?? '');
         const files = await readAttachments(
           attachments as Array<{ path: string; filename?: string; contentType?: string }> | undefined,
-          Buffer.byteLength(body ?? '') + Buffer.byteLength(html),
+          Buffer.byteLength(text ?? '') + Buffer.byteLength(html),
         );
         const encoded = await composeRaw({
           from: config.email,
           to: finalTo,
           subject: finalSubject,
-          text: body,
+          text,
           html,
           cc: finalCc,
           inReplyTo: reply?.inReplyTo,
@@ -1027,12 +1055,14 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           .describe('Message ID to reply to. Sets In-Reply-To/References and, unless overridden, derives to/subject (and cc when replyAll) from the source, so you need not read it first.'),
         replyAll: coerceBoolean.optional()
           .describe('With replyToMessageId: include the source To+Cc (minus your own addresses) in cc. Default false (reply to sender only).'),
+        quoteOriginal: coerceBoolean.optional()
+          .describe('With replyToMessageId: append the source message as a quoted block under `body`, as a mail client does. Default true; pass false for a bare reply.'),
         replyToThreadId: z.string().optional()
           .describe('Thread ID to associate the draft with'),
         ...(localFiles ? { attachments: coerceJson(attachmentSchema) } : {}),
       },
     },
-    async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, replyToThreadId, attachments }) => {
+    async ({ account, to, subject, body, htmlBody, allowRawHtml, cc, replyToMessageId, replyAll, quoteOriginal, replyToThreadId, attachments }) => {
       if (!localFiles && (attachments as unknown[] | undefined)?.length) return hostFilesRefused(account, 'attachments');
       try {
         const auth = await getClientFn(account as Account);
@@ -1043,7 +1073,7 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           throw new GmailComposeError('E_HTMLBODY_REMOVED', 'htmlBody was removed in v6: author Markdown in `body`; for literal HTML pass `allowRawHtml: true`.');
         }
         const reply = replyToMessageId
-          ? await resolveReply(gmail, account as Account, config.email, replyToMessageId, replyAll === true)
+          ? await resolveReply(gmail, account as Account, config.email, replyToMessageId, replyAll === true, quoteOriginal !== false)
           : undefined;
         if (reply && !reply.sourceFound && to === undefined) {
           throw new GmailComposeError('E_REPLY_SOURCE_NOT_FOUND', `reply source message ${replyToMessageId} not found; recipients could not be derived and no \`to\` was provided.`, 'not_found');
@@ -1064,16 +1094,17 @@ export function registerGmailTools(server: ToolRegistry, deps: CuratedToolDeps =
           account as Account,
         );
         if (outbound) return outbound;
-        const html = renderMarkdown(body, allowRawHtml === true);
+        const text = reply?.quote ? `${body}\n\n${reply.quote.text}` : body;
+        const html = renderMarkdown(body, allowRawHtml === true) + (reply?.quote?.html ?? '');
         const files = await readAttachments(
           attachments as Array<{ path: string; filename?: string; contentType?: string }> | undefined,
-          Buffer.byteLength(body ?? '') + Buffer.byteLength(html),
+          Buffer.byteLength(text ?? '') + Buffer.byteLength(html),
         );
         const encoded = await composeRaw({
           from: config.email,
           to: finalTo,
           subject: finalSubject,
-          text: body,
+          text,
           html,
           cc: finalCc,
           inReplyTo: reply?.inReplyTo,

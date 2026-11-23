@@ -135,6 +135,139 @@ export function buildReplyHeaders(
   };
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// A quoted source goes inside a blockquote, so its document wrappers have to go; script and head never belong in a quote.
+// This is an index scan rather than a regex replace: removing one tag can join its neighbours into a new one
+// (`<scr<script></script>ipt>`), so the scan repeats until nothing changes, and an opening that is never closed is
+// dropped with everything after it. Any `<` of those tags that is still left is escaped to text.
+const WRAPPER_TAGS = ['script', 'head', 'html', 'body'];
+
+/** ASCII-only lowercase: toLowerCase() can change the length of a string (e.g. U+0130), which would shift every index. */
+function asciiLower(s: string): string {
+  const out: string[] = [];
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    out.push(c >= 65 && c <= 90 ? String.fromCharCode(c + 32) : s[i]);
+  }
+  return out.join('');
+}
+
+function isNameChar(c: number): boolean {
+  return (c >= 97 && c <= 122) || (c >= 48 && c <= 57) || c === 95;
+}
+
+/** The wrapper tag whose `<` is at `lt` in the lowercased text, if any. */
+function wrapperTagAt(lower: string, lt: number): { name: string; closing: boolean; nameEnd: number } | undefined {
+  const closing = lower[lt + 1] === '/';
+  const start = lt + (closing ? 2 : 1);
+  for (const name of WRAPPER_TAGS) {
+    if (lower.startsWith(name, start) && !isNameChar(lower.charCodeAt(start + name.length))) {
+      return { name, closing, nameEnd: start + name.length };
+    }
+  }
+  return undefined;
+}
+
+function isSpace(c: number): boolean {
+  return c === 32 || (c >= 9 && c <= 13);
+}
+
+/** Index just past the `</name   >` that closes a block, or -1 when there is none. */
+function closeTagEnd(lower: string, name: string, from: number): number {
+  for (let at = lower.indexOf(`</${name}`, from); at !== -1; at = lower.indexOf(`</${name}`, at + 1)) {
+    let k = at + 2 + name.length;
+    while (k < lower.length && isSpace(lower.charCodeAt(k))) k++;
+    if (lower[k] === '>') return k + 1;
+  }
+  return -1;
+}
+
+function stripWrappersOnce(html: string): string {
+  const lower = asciiLower(html);
+  const parts: string[] = [];
+  let i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf('<', i);
+    if (lt === -1) {
+      parts.push(html.slice(i));
+      break;
+    }
+    parts.push(html.slice(i, lt));
+    const tagEnd = html.indexOf('>', lt);
+    if (lower.startsWith('<!doctype', lt)) {
+      if (tagEnd === -1) { parts.push('<'); i = lt + 1; } else i = tagEnd + 1;
+      continue;
+    }
+    const tag = wrapperTagAt(lower, lt);
+    if (tag === undefined) { parts.push('<'); i = lt + 1; continue; }
+    if (tag.name === 'html' || tag.name === 'body' || tag.closing) {
+      if (tagEnd === -1) { parts.push('<'); i = lt + 1; } else i = tagEnd + 1;
+      continue;
+    }
+    // An opening script or head: drop the whole block, or everything to the end when it never closes.
+    const end = tagEnd === -1 ? -1 : closeTagEnd(lower, tag.name, tagEnd + 1);
+    if (end === -1) break;
+    i = end;
+  }
+  return parts.join('');
+}
+
+function quotableHtml(html: string): string {
+  let out = html;
+  for (let previous = ''; previous !== out; ) {
+    previous = out;
+    out = stripWrappersOnce(out);
+  }
+  const lower = asciiLower(out);
+  const parts: string[] = [];
+  let i = 0;
+  for (let lt = out.indexOf('<'); lt !== -1; lt = out.indexOf('<', i)) {
+    parts.push(out.slice(i, lt), wrapperTagAt(lower, lt) === undefined ? '<' : '&lt;');
+    i = lt + 1;
+  }
+  parts.push(out.slice(i));
+  return parts.join('');
+}
+
+export interface ReplyQuoteSource {
+  from: string;
+  date: string;
+  /** The source's text/plain body ('' when it has none). */
+  plain: string;
+  /** The source's text/html body ('' when it has none). */
+  html: string;
+}
+
+/** The quoted original a mail client appends to a reply: the Gmail API never adds it to a raw message.
+ * Returns undefined when the source has no text body at all. */
+export function buildReplyQuote(src: ReplyQuoteSource): { text: string; html: string } | undefined {
+  if (src.plain === '' && src.html === '') return undefined;
+  const who = src.from.trim() || 'the sender';
+  const attribution = src.date.trim() ? `On ${src.date.trim()}, ${who} wrote:` : `${who} wrote:`;
+
+  const plain = src.plain !== '' ? src.plain : htmlToMarkdown(src.html).text;
+  const quotedText = plain
+    .replace(/\r\n|\r/g, '\n')
+    .split('\n')
+    .map((line) => (line === '' ? '>' : `> ${line}`))
+    .join('\n');
+
+  const inner = src.html !== ''
+    ? quotableHtml(src.html)
+    : escapeHtml(src.plain).replace(/\r\n|\r|\n/g, '<br>\n');
+  // Gmail's own class names, so Gmail collapses the quote the way it does for a reply written in its UI.
+  const html =
+    '<br><div class="gmail_quote gmail_quote_container">' +
+    `<div dir="ltr" class="gmail_attr">${escapeHtml(attribution)}<br></div>` +
+    '<blockquote class="gmail_quote" style="margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">' +
+    `${inner}</blockquote></div>\n`;
+
+  return { text: `${attribution}\n${quotedText}\n`, html };
+}
+
 export interface ComposeAttachment {
   filename: string;
   content: Buffer;

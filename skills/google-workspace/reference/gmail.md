@@ -45,6 +45,7 @@ Create a Gmail draft without sending
 | `cc` | string | optional | CC recipients, comma-separated. With replyToMessageId + replyAll, derived from the source minus your own addresses; a supplied value wins. |
 | `replyToMessageId` | string | optional | Message ID to reply to. Sets In-Reply-To/References and, unless overridden, derives to/subject (and cc when replyAll) from the source, so you need not read it first. |
 | `replyAll` | boolean | optional | With replyToMessageId: include the source To+Cc (minus your own addresses) in cc. Default false (reply to sender only). |
+| `quoteOriginal` | boolean | optional | With replyToMessageId: append the source message as a quoted block under `body`, as a mail client does. Default true; pass false for a bare reply. |
 | `replyToThreadId` | string | optional | Thread ID to associate the draft with |
 | `attachments` | array | optional | Files to attach (each { path, filename?, contentType? }); path must be absolute |
 
@@ -262,6 +263,7 @@ Send an email from a Gmail account
 | `cc` | string | optional | CC recipients, comma-separated. With replyToMessageId + replyAll, derived from the source minus your own addresses; a supplied value wins. |
 | `replyToMessageId` | string | optional | Message ID to reply to. Sets In-Reply-To/References and, unless overridden, derives to/subject (and cc when replyAll) from the source, so you need not read it first. |
 | `replyAll` | boolean | optional | With replyToMessageId: include the source To+Cc (minus your own addresses) in cc. Default false (reply to sender only). |
+| `quoteOriginal` | boolean | optional | With replyToMessageId: append the source message as a quoted block under `body`, as a mail client does. Default true; pass false for a bare reply. |
 | `replyToThreadId` | string | optional | Thread ID to send the message in |
 | `attachments` | array | optional | Files to attach (each { path, filename?, contentType? }); path must be absolute |
 
