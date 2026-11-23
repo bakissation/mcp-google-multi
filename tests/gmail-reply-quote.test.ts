@@ -62,6 +62,48 @@ describe('buildReplyQuote', () => {
     expect(q?.html).toContain('a@b.c wrote:');
   });
 
+  describe('script and head tags in an HTML source', () => {
+    const quote = (html: string): string => buildReplyQuote({ from: 'a@b.c', date: '', plain: '', html })?.html ?? '';
+    const inner = (html: string): string => {
+      const out = quote(html);
+      return out.slice(out.indexOf('padding-left:1ex">') + 'padding-left:1ex">'.length, out.indexOf('</blockquote>'));
+    };
+    const live = /<\/?(html|head|body|script)\b/i;
+
+    it('leaves no live script tag when removing one joins its neighbours into another', () => {
+      for (const html of [
+        '<scr<script></script>ipt>alert(1)</script>',
+        '<scr<script>x</script>ipt>alert(1)</scr<script>x</script>ipt>',
+        '<<script></script>script>alert(1)',
+        '<he<head></head>ad><title>t</title></head>',
+      ]) {
+        expect(inner(html)).not.toMatch(live);
+      }
+    });
+
+    it('escapes an unclosed script or head opening instead of passing it through', () => {
+      expect(inner('<p>a</p><script')).toBe('<p>a</p>&lt;script');
+      expect(inner('<p>a</p></script')).toBe('<p>a</p>&lt;/script');
+      expect(inner('x<head')).toBe('x&lt;head');
+    });
+
+    it('treats the tag names case-insensitively', () => {
+      expect(inner('<SCRIPT>x()</SCRIPT><p>ok</p><ScRiPt')).toBe('<p>ok</p>&lt;ScRiPt');
+      expect(inner('<HEAD><TITLE>t</TITLE></HEAD><BODY><p>ok</p></BODY>')).toBe('<p>ok</p>');
+    });
+
+    it('does not touch names that only start with a stripped one', () => {
+      expect(inner('<p>a</p><header>h</header><scripture>s</scripture><bodyguard>b</bodyguard>'))
+        .toBe('<p>a</p><header>h</header><scripture>s</scripture><bodyguard>b</bodyguard>');
+    });
+
+    it('keeps an ordinary HTML mail unchanged apart from its document wrappers', () => {
+      const body = '<div dir="ltr"><p>Hello <b>Bob</b>,</p><ul><li>one</li><li><a href="https://x.y/?a=1&amp;b=2">two</a></li></ul><table><tr><td>1 &lt; 2</td></tr></table><img src="cid:logo"><br>Alice</div>';
+      expect(inner(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>p{margin:0}</style></head><body>${body}</body></html>`)).toBe(body);
+      expect(inner(body)).toBe(body);
+    });
+  });
+
   it('escapes a plain-only source in the HTML part and the attribution', () => {
     const q = buildReplyQuote({ from: 'Eve <eve@x.y>', date: '', plain: '<b>not bold</b>\nnext', html: '' });
     expect(q?.html).toContain('&lt;b&gt;not bold&lt;/b&gt;<br>');

@@ -140,13 +140,18 @@ function escapeHtml(s: string): string {
 }
 
 // A quoted source goes inside a blockquote, so its document wrappers have to go; script and head never belong in a quote.
+// Each strip runs to a fixed point: removing one tag can join its neighbours into a new one (`<scr<script></script>ipt>`).
+// Whatever opening bracket of those tags is still left (an unclosed `<script`) is escaped to text, so none can reach the mail.
 function quotableHtml(html: string): string {
   let out = html;
   for (let previous = ''; previous !== out; ) {
     previous = out;
-    out = out.replace(/<(script|head)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '');
+    out = out
+      .replace(/<(script|head)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+      .replace(/<!doctype[^>]*>/gi, '')
+      .replace(/<\/?(?:html|body|script|head)\b[^>]*>/gi, '');
   }
-  return out.replace(/<!doctype[^>]*>/gi, '').replace(/<\/?(?:html|body|script|head)\b[^>]*>/gi, '');
+  return out.replace(/<(?=\/?(?:html|body|script|head)\b)/gi, '&lt;');
 }
 
 export interface ReplyQuoteSource {
