@@ -81,15 +81,29 @@ describe('buildReplyQuote', () => {
       }
     });
 
-    it('escapes an unclosed script or head opening instead of passing it through', () => {
-      expect(inner('<p>a</p><script')).toBe('<p>a</p>&lt;script');
+    it('drops a script or head block that never closes, with everything after it', () => {
+      expect(inner('<p>a</p><script>alert(1)<p>b</p>')).toBe('<p>a</p>');
+      expect(inner('<p>a</p><script')).toBe('<p>a</p>');
+      expect(inner('x<head><title>t</title><p>b</p>')).toBe('x');
+    });
+
+    it('escapes a stray closing script or head that has no end bracket', () => {
       expect(inner('<p>a</p></script')).toBe('<p>a</p>&lt;/script');
-      expect(inner('x<head')).toBe('x&lt;head');
+      expect(inner('x</HEAD')).toBe('x&lt;/HEAD');
+      expect(inner('<p>a</p><body')).toBe('<p>a</p>&lt;body');
+    });
+
+    it('removes stray closing tags and wrappers that carry attributes', () => {
+      expect(inner('</script><p>a</p></head><body class="x" onload="y()"><p>b</p></body></html>')).toBe('<p>a</p><p>b</p>');
     });
 
     it('treats the tag names case-insensitively', () => {
-      expect(inner('<SCRIPT>x()</SCRIPT><p>ok</p><ScRiPt')).toBe('<p>ok</p>&lt;ScRiPt');
+      expect(inner('<SCRIPT>x()</SCRIPT><p>ok</p><ScRiPt')).toBe('<p>ok</p>');
       expect(inner('<HEAD><TITLE>t</TITLE></HEAD><BODY><p>ok</p></BODY>')).toBe('<p>ok</p>');
+    });
+
+    it('keeps the block boundaries right when a character changes length in lower case', () => {
+      expect(inner('<p>\u0130\u0130\u0130</p><script>x()</script><p>ok</p>')).toBe('<p>\u0130\u0130\u0130</p><p>ok</p>');
     });
 
     it('does not touch names that only start with a stripped one', () => {
