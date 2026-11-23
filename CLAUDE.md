@@ -106,7 +106,7 @@ Reads are never gated. CUD is **deny-by-default**: `GOOGLE_PROFILE` (read-only /
 
 ## Email compose (gmail_send / gmail_create_draft)
 
-Both route through `composeRaw()` in `gmail-mime.ts` (nodemailer MailComposer): header/RFC-2047/address encoding and boundaries are the library's job. A pre-check rejects CR/LF in `from`/`to`/`cc`/`subject` (`E_HEADER_INJECTION`). `attachments` are read by THIS server into buffers (`disableFileAccess`/`disableUrlAccess` on MailComposer), absolute-path-only, basename-guarded, files inside the server's config/token dir refused, total capped at Gmail's ~25 MB message limit once encoded (`E_ATTACHMENT_TOO_LARGE`). Do NOT reintroduce hand-rolled header encoders (they were the injection surface).
+Both route through `composeRaw()` in `gmail-mime.ts` (nodemailer MailComposer): header/RFC-2047/address encoding and boundaries are the library's job. A reply (`replyToMessageId`) appends the quoted original to both parts via `buildReplyQuote()` unless `quoteOriginal: false`: the Gmail API never adds one to a raw message. A pre-check rejects CR/LF in `from`/`to`/`cc`/`subject` (`E_HEADER_INJECTION`). `attachments` are read by THIS server into buffers (`disableFileAccess`/`disableUrlAccess` on MailComposer), absolute-path-only, basename-guarded, files inside the server's config/token dir refused, total capped at Gmail's ~25 MB message limit once encoded (`E_ATTACHMENT_TOO_LARGE`). Do NOT reintroduce hand-rolled header encoders (they were the injection surface).
 
 ## Drive specifics
 
